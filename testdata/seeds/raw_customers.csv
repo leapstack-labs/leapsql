@@ -1,0 +1,6 @@
+id,email,name,created_at,is_active
+1,alice@example.com,Alice Smith,2024-01-01,true
+2,bob@example.com,Bob Johnson,2024-01-15,true
+3,carol@example.com,Carol Williams,2024-02-01,true
+4,david@example.com,David Brown,2024-02-15,false
+5,eve@example.com,Eve Davis,2024-03-01,true

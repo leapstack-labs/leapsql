@@ -1,0 +1,83 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  MODELS_DIR: testdata/models
+  SEEDS_DIR: testdata/seeds
+  STATE_FILE: .dbgo/state.db
+  DATABASE: ""
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build the dbgo CLI
+    cmds:
+      - go build -o dbgo ./cmd/dbgo
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test:verbose:
+    desc: Run all tests with verbose output
+    cmds:
+      - go test -v ./...
+
+  run:
+    desc: Run all models
+    deps: [build]
+    cmds:
+      - ./dbgo run -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}} {{if .DATABASE}}-database {{.DATABASE}}{{end}} -v
+
+  run:select:
+    desc: Run selected models (use MODEL=staging.stg_customers)
+    deps: [build]
+    cmds:
+      - ./dbgo run -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}} {{if .DATABASE}}-database {{.DATABASE}}{{end}} -select {{.MODEL}} -v
+    requires:
+      vars: [MODEL]
+
+  run:downstream:
+    desc: Run selected models with downstream (use MODEL=staging.stg_customers)
+    deps: [build]
+    cmds:
+      - ./dbgo run -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}} {{if .DATABASE}}-database {{.DATABASE}}{{end}} -select {{.MODEL}} -downstream -v
+    requires:
+      vars: [MODEL]
+
+  list:
+    desc: List all models and dependencies
+    deps: [build]
+    cmds:
+      - ./dbgo list -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}}
+
+  dag:
+    desc: Show dependency graph
+    deps: [build]
+    cmds:
+      - ./dbgo dag -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}}
+
+  seed:
+    desc: Load seed data
+    deps: [build]
+    cmds:
+      - ./dbgo seed -models {{.MODELS_DIR}} -seeds {{.SEEDS_DIR}} -state {{.STATE_FILE}} {{if .DATABASE}}-database {{.DATABASE}}{{end}}
+
+  version:
+    desc: Show version
+    deps: [build]
+    cmds:
+      - ./dbgo version
+
+  clean:
+    desc: Clean build artifacts and state
+    cmds:
+      - rm -f dbgo
+      - rm -rf .dbgo
