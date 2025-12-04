@@ -318,3 +318,157 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 		t.Errorf("expected 1 model (skipping hidden), got %d", len(models))
 	}
 }
+
+func TestParser_ParseContent_AutoDetectSources(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: simple FROM clause
+	content := `SELECT id, name FROM customers`
+	config, err := p.ParseContent("/models/simple.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	if len(config.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
+	}
+	if config.Sources[0] != "customers" {
+		t.Errorf("expected source 'customers', got %q", config.Sources[0])
+	}
+}
+
+func TestParser_ParseContent_AutoDetectQualifiedSources(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: qualified table names
+	content := `SELECT id, name FROM staging.stg_customers`
+	config, err := p.ParseContent("/models/qualified.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	if len(config.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
+	}
+	if config.Sources[0] != "staging.stg_customers" {
+		t.Errorf("expected source 'staging.stg_customers', got %q", config.Sources[0])
+	}
+}
+
+func TestParser_ParseContent_AutoDetectJoinSources(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: JOIN with multiple sources
+	content := `SELECT 
+		c.customer_id,
+		o.order_id
+	FROM staging.stg_customers c
+	LEFT JOIN staging.stg_orders o ON c.customer_id = o.customer_id`
+	config, err := p.ParseContent("/models/join.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	if len(config.Sources) != 2 {
+		t.Fatalf("expected 2 sources, got %d: %v", len(config.Sources), config.Sources)
+	}
+
+	// Check both sources are present (order may vary)
+	sourcesMap := make(map[string]bool)
+	for _, s := range config.Sources {
+		sourcesMap[s] = true
+	}
+	if !sourcesMap["staging.stg_customers"] {
+		t.Error("expected 'staging.stg_customers' in sources")
+	}
+	if !sourcesMap["staging.stg_orders"] {
+		t.Error("expected 'staging.stg_orders' in sources")
+	}
+}
+
+func TestParser_ParseContent_AutoDetectWithPragmas(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: SQL with pragmas - should still detect sources from SQL
+	content := `-- @config(materialized='table')
+-- @import(staging.stg_customers)
+-- Comment line
+SELECT 
+	customer_id,
+	customer_name
+FROM staging.stg_customers`
+
+	config, err := p.ParseContent("/models/with_pragmas.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	// Should have explicit import from pragma
+	if len(config.Imports) != 1 {
+		t.Errorf("expected 1 import, got %d", len(config.Imports))
+	}
+
+	// Should also have auto-detected source
+	if len(config.Sources) != 1 {
+		t.Fatalf("expected 1 auto-detected source, got %d: %v", len(config.Sources), config.Sources)
+	}
+	if config.Sources[0] != "staging.stg_customers" {
+		t.Errorf("expected source 'staging.stg_customers', got %q", config.Sources[0])
+	}
+}
+
+func TestParser_ParseContent_AutoDetectSubquery(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: subquery with inner table reference
+	content := `SELECT * FROM (
+		SELECT id, name FROM raw_customers
+	) subq`
+
+	config, err := p.ParseContent("/models/subquery.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	if len(config.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
+	}
+	if config.Sources[0] != "raw_customers" {
+		t.Errorf("expected source 'raw_customers', got %q", config.Sources[0])
+	}
+}
+
+func TestParser_ParseContent_AutoDetectCTE(t *testing.T) {
+	p := NewParser("/models")
+
+	// Test: CTE - should only include real table sources, not the CTE itself
+	content := `WITH customer_orders AS (
+		SELECT customer_id, COUNT(*) as order_count
+		FROM raw_orders
+		GROUP BY customer_id
+	)
+	SELECT c.*, co.order_count
+	FROM raw_customers c
+	JOIN customer_orders co ON c.id = co.customer_id`
+
+	config, err := p.ParseContent("/models/cte.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	// Should have 2 sources (raw_orders and raw_customers), not the CTE (customer_orders)
+	sourcesMap := make(map[string]bool)
+	for _, s := range config.Sources {
+		sourcesMap[s] = true
+	}
+
+	if !sourcesMap["raw_orders"] {
+		t.Errorf("expected 'raw_orders' in sources, got %v", config.Sources)
+	}
+	if !sourcesMap["raw_customers"] {
+		t.Errorf("expected 'raw_customers' in sources, got %v", config.Sources)
+	}
+	if sourcesMap["customer_orders"] {
+		t.Error("CTE 'customer_orders' should NOT be in sources")
+	}
+}

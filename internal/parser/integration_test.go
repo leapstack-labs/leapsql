@@ -46,12 +46,12 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 		t.Errorf("stg_customers materialized = %q, expected 'table'", m.Materialized)
 	}
 
-	// Check mart with dependencies
+	// Check mart with dependencies (now using auto-detected sources)
 	if m, ok := modelMap["marts.customer_summary"]; !ok {
 		t.Error("missing marts.customer_summary")
 	} else {
-		if len(m.Imports) != 2 {
-			t.Errorf("customer_summary imports = %d, expected 2", len(m.Imports))
+		if len(m.Sources) != 2 {
+			t.Errorf("customer_summary sources = %d, expected 2 (auto-detected from SQL)", len(m.Sources))
 		}
 	}
 
@@ -79,6 +79,7 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 }
 
 // TestIntegration_BuildDAG builds and validates the DAG from test dataset.
+// Uses auto-detected Sources instead of @import pragmas.
 func TestIntegration_BuildDAG(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
@@ -98,12 +99,25 @@ func TestIntegration_BuildDAG(t *testing.T) {
 		g.AddNode(m.Path, m)
 	}
 
-	// Add edges from imports
+	// Build a lookup to resolve table references to model paths
+	// Maps: "staging.stg_customers" → "staging.stg_customers"
+	// Also: "stg_customers" → "staging.stg_customers"
+	tableLookup := make(map[string]string)
 	for _, m := range models {
-		for _, imp := range m.Imports {
-			if _, exists := g.GetNode(imp); exists {
-				if err := g.AddEdge(imp, m.Path); err != nil {
-					t.Errorf("failed to add edge %s -> %s: %v", imp, m.Path, err)
+		tableLookup[m.Path] = m.Path
+		// Also add unqualified name
+		parts := splitModelPath(m.Path)
+		if len(parts) == 2 {
+			tableLookup[parts[1]] = m.Path
+		}
+	}
+
+	// Add edges from auto-detected Sources
+	for _, m := range models {
+		for _, src := range m.Sources {
+			if modelPath, ok := tableLookup[src]; ok {
+				if err := g.AddEdge(modelPath, m.Path); err != nil {
+					t.Errorf("failed to add edge %s -> %s: %v", modelPath, m.Path, err)
 				}
 			}
 		}
@@ -167,19 +181,33 @@ func TestIntegration_BuildDAG(t *testing.T) {
 		positions[node.ID] = i
 	}
 
+	// Verify using Sources (auto-detected)
 	for _, m := range models {
-		for _, dep := range m.Imports {
-			if pos, ok := positions[dep]; ok {
-				if pos >= positions[m.Path] {
-					t.Errorf("dependency %s (pos %d) should come before %s (pos %d)",
-						dep, pos, m.Path, positions[m.Path])
+		for _, src := range m.Sources {
+			if modelPath, ok := tableLookup[src]; ok {
+				if pos, exists := positions[modelPath]; exists {
+					if pos >= positions[m.Path] {
+						t.Errorf("dependency %s (pos %d) should come before %s (pos %d)",
+							modelPath, pos, m.Path, positions[m.Path])
+					}
 				}
 			}
 		}
 	}
 }
 
+// splitModelPath splits "schema.model" into ["schema", "model"]
+func splitModelPath(path string) []string {
+	for i := 0; i < len(path); i++ {
+		if path[i] == '.' {
+			return []string{path[:i], path[i+1:]}
+		}
+	}
+	return []string{path}
+}
+
 // TestIntegration_AffectedNodes tests change impact analysis.
+// Uses auto-detected Sources instead of @import pragmas.
 func TestIntegration_AffectedNodes(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
@@ -198,10 +226,22 @@ func TestIntegration_AffectedNodes(t *testing.T) {
 	for _, m := range models {
 		g.AddNode(m.Path, m)
 	}
+
+	// Build a lookup to resolve table references to model paths
+	tableLookup := make(map[string]string)
 	for _, m := range models {
-		for _, imp := range m.Imports {
-			if _, exists := g.GetNode(imp); exists {
-				g.AddEdge(imp, m.Path)
+		tableLookup[m.Path] = m.Path
+		parts := splitModelPath(m.Path)
+		if len(parts) == 2 {
+			tableLookup[parts[1]] = m.Path
+		}
+	}
+
+	// Add edges from auto-detected Sources
+	for _, m := range models {
+		for _, src := range m.Sources {
+			if modelPath, ok := tableLookup[src]; ok {
+				g.AddEdge(modelPath, m.Path)
 			}
 		}
 	}

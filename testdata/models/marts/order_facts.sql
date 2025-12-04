@@ -1,5 +1,4 @@
 -- @config(materialized='incremental', unique_key='order_id')
--- @import(staging.stg_orders, staging.stg_customers)
 -- Incremental order facts - only processes new orders
 
 SELECT 

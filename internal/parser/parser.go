@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/user/dbgo/pkg/lineage"
 )
 
 // ModelConfig holds configuration extracted from SQL model pragmas.
@@ -23,8 +25,11 @@ type ModelConfig struct {
 	Materialized string
 	// UniqueKey for incremental models
 	UniqueKey string
-	// Imports are the model dependencies (other models this one references)
+	// Imports are explicit model dependencies from @import pragmas (legacy)
 	Imports []string
+	// Sources are all table names referenced in the SQL (auto-detected via lineage parser)
+	// This includes both model references and external/raw tables
+	Sources []string
 	// SQL is the raw SQL content (excluding pragmas)
 	SQL string
 	// RawContent is the full file content including pragmas
@@ -147,7 +152,26 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 
 	config.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 
+	// Auto-detect table sources using the lineage parser
+	if config.SQL != "" {
+		sources, err := extractTableSources(config.SQL)
+		if err == nil {
+			config.Sources = sources
+		}
+		// If lineage extraction fails, we continue without sources
+		// The model may have syntax errors or use unsupported SQL features
+	}
+
 	return config, nil
+}
+
+// extractTableSources uses the lineage parser to extract all table names from SQL.
+func extractTableSources(sql string) ([]string, error) {
+	modelLineage, err := lineage.ExtractLineage(sql, nil)
+	if err != nil {
+		return nil, err
+	}
+	return modelLineage.Sources, nil
 }
 
 // parseConfig parses config pragma key-value pairs.

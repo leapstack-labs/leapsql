@@ -15,6 +15,7 @@ import (
 	"github.com/user/dbgo/internal/adapter"
 	"github.com/user/dbgo/internal/dag"
 	"github.com/user/dbgo/internal/parser"
+	"github.com/user/dbgo/internal/registry"
 	"github.com/user/dbgo/internal/state"
 )
 
@@ -26,6 +27,7 @@ type Engine struct {
 	seedsDir  string
 	graph     *dag.Graph
 	models    map[string]*parser.ModelConfig
+	registry  *registry.ModelRegistry
 }
 
 // Config holds engine configuration.
@@ -70,6 +72,7 @@ func New(cfg Config) (*Engine, error) {
 		seedsDir:  cfg.SeedsDir,
 		graph:     dag.NewGraph(),
 		models:    make(map[string]*parser.ModelConfig),
+		registry:  registry.NewModelRegistry(),
 	}, nil
 }
 
@@ -123,6 +126,7 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 }
 
 // Discover scans the models directory and builds the dependency graph.
+// It uses the registry to resolve auto-detected table sources to model dependencies.
 func (e *Engine) Discover() error {
 	scanner := parser.NewScanner(e.modelsDir)
 	models, err := scanner.ScanDir(e.modelsDir)
@@ -130,22 +134,44 @@ func (e *Engine) Discover() error {
 		return fmt.Errorf("failed to scan models: %w", err)
 	}
 
-	// Clear existing graph
+	// Clear existing state
 	e.graph = dag.NewGraph()
 	e.models = make(map[string]*parser.ModelConfig)
+	e.registry = registry.NewModelRegistry()
 
-	// Add all models as nodes
+	// Phase 1: Register all models in the registry
 	for _, m := range models {
-		e.graph.AddNode(m.Path, m)
+		e.registry.Register(m)
 		e.models[m.Path] = m
 	}
 
-	// Add dependency edges
+	// Phase 2: Add all models as nodes in the graph
 	for _, m := range models {
-		for _, imp := range m.Imports {
-			if _, exists := e.graph.GetNode(imp); exists {
-				if err := e.graph.AddEdge(imp, m.Path); err != nil {
-					return fmt.Errorf("failed to add dependency %s -> %s: %w", imp, m.Path, err)
+		e.graph.AddNode(m.Path, m)
+	}
+
+	// Phase 3: Resolve dependencies and add edges
+	for _, m := range models {
+		// Prefer auto-detected Sources over legacy @import Imports
+		var tableSources []string
+		if len(m.Sources) > 0 {
+			tableSources = m.Sources
+		} else {
+			tableSources = m.Imports
+		}
+
+		// Resolve table names to model dependencies
+		dependencies, _ := e.registry.ResolveDependencies(tableSources)
+
+		// Add edges for each dependency
+		for _, dep := range dependencies {
+			// Skip self-references
+			if dep == m.Path {
+				continue
+			}
+			if _, exists := e.graph.GetNode(dep); exists {
+				if err := e.graph.AddEdge(dep, m.Path); err != nil {
+					return fmt.Errorf("failed to add dependency %s -> %s: %w", dep, m.Path, err)
 				}
 			}
 		}

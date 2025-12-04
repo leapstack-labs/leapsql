@@ -1,5 +1,4 @@
 -- @config(materialized='view')
--- @import(marts.customer_summary, marts.product_summary)
 -- Executive dashboard summary combining customer and product metrics
 
 WITH customer_metrics AS (

@@ -1,5 +1,4 @@
 -- @config(materialized='table')
--- @import(staging.stg_customers, staging.stg_orders)
 -- Customer summary with order metrics
 
 SELECT 

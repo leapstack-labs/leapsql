@@ -205,12 +205,20 @@ func (e *lineageExtractor) expandStar(scope *Scope, tableName string, startIndex
 			Column: ref.Column,
 		}
 
-		// Record the source table
+		// Record the source table (avoiding CTE/derived names)
 		if entry, ok := scope.Lookup(ref.Table); ok {
-			if entry.SourceTable != "" {
-				e.sources[entry.SourceTable] = struct{}{}
-			} else {
-				e.sources[entry.Name] = struct{}{}
+			switch entry.Type {
+			case ScopeTable:
+				if entry.SourceTable != "" {
+					e.sources[entry.SourceTable] = struct{}{}
+				} else {
+					e.sources[entry.Name] = struct{}{}
+				}
+			case ScopeCTE, ScopeDerived:
+				// For CTEs and derived tables, use underlying sources
+				for _, underlying := range entry.UnderlyingSources {
+					e.sources[underlying] = struct{}{}
+				}
 			}
 		}
 
@@ -340,7 +348,28 @@ func (e *lineageExtractor) resolveColumnRef(scope *Scope, ref *ColumnRef) *Sourc
 	// Try to resolve through scope
 	resolved, ok := scope.ResolveColumnFull(ref)
 	if ok {
-		// Record the source table
+		// For CTEs and derived tables, record underlying sources instead of the CTE/derived name
+		if resolved.FromCTE || resolved.FromDerived {
+			// Lookup the entry to get underlying sources
+			if entry, entryOk := scope.Lookup(resolved.Table); entryOk {
+				for _, underlying := range entry.UnderlyingSources {
+					e.sources[underlying] = struct{}{}
+				}
+			}
+			// Return source with the underlying table if there's only one, otherwise use the alias
+			if entry, entryOk := scope.Lookup(resolved.Table); entryOk && len(entry.UnderlyingSources) == 1 {
+				return &SourceColumn{
+					Table:  entry.UnderlyingSources[0],
+					Column: resolved.Column,
+				}
+			}
+			return &SourceColumn{
+				Table:  resolved.Table, // Keep CTE/derived alias for column lineage tracing
+				Column: resolved.Column,
+			}
+		}
+
+		// Physical table - record the source table
 		if resolved.SourceTable != "" {
 			e.sources[resolved.SourceTable] = struct{}{}
 		} else {
@@ -353,8 +382,20 @@ func (e *lineageExtractor) resolveColumnRef(scope *Scope, ref *ColumnRef) *Sourc
 		}
 	}
 
-	// Fallback: use the reference as-is
+	// Fallback: use the reference as-is, but check if it's a CTE/derived first
 	if ref.Table != "" {
+		if entry, entryOk := scope.Lookup(ref.Table); entryOk {
+			if entry.Type == ScopeCTE || entry.Type == ScopeDerived {
+				// Don't add CTE/derived names to sources
+				for _, underlying := range entry.UnderlyingSources {
+					e.sources[underlying] = struct{}{}
+				}
+				return &SourceColumn{
+					Table:  ref.Table,
+					Column: ref.Column,
+				}
+			}
+		}
 		e.sources[ref.Table] = struct{}{}
 		return &SourceColumn{
 			Table:  ref.Table,
@@ -426,7 +467,8 @@ func (e *lineageExtractor) collectSources(scope *Scope) {
 				e.sources[entry.Name] = struct{}{}
 			}
 		case ScopeCTE, ScopeDerived:
-			// For CTEs and derived tables, use underlying sources
+			// For CTEs and derived tables, use ONLY underlying sources
+			// Do NOT add the CTE/derived name itself
 			for _, underlying := range entry.UnderlyingSources {
 				e.sources[underlying] = struct{}{}
 			}

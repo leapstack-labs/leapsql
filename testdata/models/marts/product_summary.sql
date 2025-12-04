@@ -1,5 +1,4 @@
 -- @config(materialized='table')
--- @import(staging.stg_orders, staging.stg_products)
 -- Product sales metrics
 
 SELECT 
