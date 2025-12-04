@@ -76,11 +76,25 @@ tasks:
     cmds:
       - ./dbgo version
 
+  docs:build:
+    desc: Generate static documentation site
+    deps: [build]
+    cmds:
+      - ./dbgo docs build -models {{.MODELS_DIR}} -output ./docs-site -project "DBGo Project"
+
+  docs:serve:
+    desc: Build and serve documentation locally
+    deps: [build]
+    cmds:
+      - ./dbgo docs serve -models {{.MODELS_DIR}} -port 8080 -project "DBGo Project"
+
   clean:
     desc: Clean build artifacts and state
     cmds:
       - rm -f dbgo
       - rm -rf .dbgo
+      - rm -rf .dbgo-docs
+      - rm -rf docs-site
 
   context:sqlglot:
     desc: Shallow clone sqlglot repository into context/
