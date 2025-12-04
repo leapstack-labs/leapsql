@@ -84,11 +84,18 @@ type ColumnLineageDoc struct {
 	Edges []ColumnLineageEdge `json:"edges"`
 }
 
+// SourceDoc represents an external data source (not a model).
+type SourceDoc struct {
+	Name         string   `json:"name"`
+	ReferencedBy []string `json:"referenced_by"` // models that use this source
+}
+
 // Catalog represents the full documentation catalog.
 type Catalog struct {
 	GeneratedAt   time.Time        `json:"generated_at"`
 	ProjectName   string           `json:"project_name"`
 	Models        []*ModelDoc      `json:"models"`
+	Sources       []SourceDoc      `json:"sources"`
 	Lineage       LineageDoc       `json:"lineage"`
 	ColumnLineage ColumnLineageDoc `json:"column_lineage"`
 }
@@ -132,6 +139,7 @@ func (g *Generator) GenerateCatalog() *Catalog {
 		GeneratedAt: time.Now().UTC(),
 		ProjectName: g.projectName,
 		Models:      make([]*ModelDoc, 0, len(g.models)),
+		Sources:     []SourceDoc{},
 	}
 
 	// Build model docs
@@ -178,8 +186,37 @@ func (g *Generator) GenerateCatalog() *Catalog {
 		}
 	}
 
-	// Build lineage graph
-	catalog.Lineage = g.buildLineage(modelDocs)
+	// Collect external sources (tables that aren't models)
+	sourceRefs := make(map[string][]string) // source name -> models that reference it
+	for _, doc := range modelDocs {
+		for _, src := range doc.Sources {
+			// Check if this source is NOT a model
+			if _, isModel := modelDocs[src]; !isModel {
+				// Also check by name (in case the source uses just the table name)
+				isModelByName := false
+				for _, m := range g.models {
+					if m.Name == src {
+						isModelByName = true
+						break
+					}
+				}
+				if !isModelByName {
+					sourceRefs[src] = append(sourceRefs[src], doc.Path)
+				}
+			}
+		}
+	}
+
+	// Build Sources list
+	for srcName, refs := range sourceRefs {
+		catalog.Sources = append(catalog.Sources, SourceDoc{
+			Name:         srcName,
+			ReferencedBy: refs,
+		})
+	}
+
+	// Build lineage graph (now includes sources)
+	catalog.Lineage = g.buildLineage(modelDocs, catalog.Sources)
 
 	// Build column lineage graph
 	catalog.ColumnLineage = g.buildColumnLineage(g.models, modelDocs)
@@ -187,10 +224,10 @@ func (g *Generator) GenerateCatalog() *Catalog {
 	return catalog
 }
 
-// buildLineage constructs the lineage graph from model docs.
-func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc) LineageDoc {
+// buildLineage constructs the lineage graph from model docs and sources.
+func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc, sources []SourceDoc) LineageDoc {
 	lineage := LineageDoc{
-		Nodes: make([]string, 0, len(modelDocs)),
+		Nodes: make([]string, 0, len(modelDocs)+len(sources)),
 		Edges: []LineageEdge{},
 	}
 
@@ -199,12 +236,27 @@ func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc) LineageDoc {
 		lineage.Nodes = append(lineage.Nodes, path)
 	}
 
-	// Add edges from dependencies
+	// Add all source nodes (prefixed with "source:" to distinguish)
+	for _, src := range sources {
+		lineage.Nodes = append(lineage.Nodes, "source:"+src.Name)
+	}
+
+	// Add edges from dependencies (model -> model)
 	for _, doc := range modelDocs {
 		for _, depPath := range doc.Dependencies {
 			lineage.Edges = append(lineage.Edges, LineageEdge{
 				Source: depPath,
 				Target: doc.Path,
+			})
+		}
+	}
+
+	// Add edges from sources to models (source -> model)
+	for _, src := range sources {
+		for _, modelPath := range src.ReferencedBy {
+			lineage.Edges = append(lineage.Edges, LineageEdge{
+				Source: "source:" + src.Name,
+				Target: modelPath,
 			})
 		}
 	}

@@ -4,6 +4,7 @@
 // Global state
 let CATALOG = null;
 let MODELS_BY_PATH = {};
+let SOURCES_BY_NAME = {};
 
 // Initialize the app
 async function init() {
@@ -15,10 +16,17 @@ async function init() {
     }
     CATALOG = await response.json();
     
-    // Build lookup map
+    // Build lookup map for models
     CATALOG.models.forEach(model => {
       MODELS_BY_PATH[model.path] = model;
     });
+    
+    // Build lookup map for sources
+    if (CATALOG.sources) {
+      CATALOG.sources.forEach(source => {
+        SOURCES_BY_NAME[source.name] = source;
+      });
+    }
     
     // Initial render
     router();
@@ -58,6 +66,9 @@ function router() {
       highlightCode();
       initColumnLineage(modelPath);
     }, 0);
+  } else if (hash.startsWith('/sources/')) {
+    const sourceName = decodeURIComponent(hash.slice(9));
+    app.innerHTML = renderLayout(renderSourcePage(sourceName));
   } else {
     app.innerHTML = renderLayout(renderNotFound());
   }
@@ -68,7 +79,7 @@ function router() {
 
 // Update active navigation link
 function updateActiveNav() {
-  document.querySelectorAll('.nav-link, .model-item').forEach(link => {
+  document.querySelectorAll('.nav-link, .model-item, .source-item').forEach(link => {
     const href = link.getAttribute('href');
     if (href === window.location.hash || (href === '#/' && !window.location.hash)) {
       link.classList.add('active');
@@ -92,8 +103,6 @@ function renderLayout(content) {
 
 // Sidebar
 function renderSidebar() {
-  const modelsByFolder = groupModelsByFolder(CATALOG.models);
-  
   return `
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -105,7 +114,7 @@ function renderSidebar() {
         <input 
           type="text" 
           class="search-input" 
-          placeholder="Search models..." 
+          placeholder="Search..." 
           onkeyup="handleSearch(this.value)"
         >
       </div>
@@ -123,10 +132,9 @@ function renderSidebar() {
         </div>
         
         <div class="nav-section" id="models-nav">
-          <div class="nav-section-title">Models</div>
-          <ul class="model-list" id="model-list">
-            ${renderModelList(modelsByFolder)}
-          </ul>
+          <div class="nav-group-list" id="nav-group-list">
+            ${renderNavGroups()}
+          </div>
         </div>
       </nav>
     </aside>
@@ -147,48 +155,132 @@ function groupModelsByFolder(models) {
   return groups;
 }
 
-// Render model list
-function renderModelList(modelsByFolder) {
+// Get collapsed state from localStorage
+function getCollapsedState() {
+  try {
+    const stored = localStorage.getItem('dbgo-nav-collapsed');
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+// Save collapsed state to localStorage
+function saveCollapsedState(state) {
+  try {
+    localStorage.setItem('dbgo-nav-collapsed', JSON.stringify(state));
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
+// Toggle group collapsed state
+function toggleGroup(groupId) {
+  const state = getCollapsedState();
+  state[groupId] = !state[groupId];
+  saveCollapsedState(state);
+  
+  // Re-render the nav groups
+  const navGroupList = document.getElementById('nav-group-list');
+  if (navGroupList) {
+    navGroupList.innerHTML = renderNavGroups();
+    updateActiveNav();
+  }
+}
+
+// Render navigation groups (Sources + Model folders)
+function renderNavGroups(searchQuery = '') {
+  const collapsedState = getCollapsedState();
   let html = '';
-  Object.entries(modelsByFolder).sort().forEach(([folder, models]) => {
-    html += `<li class="nav-section-title" style="padding: 0.5rem 1.5rem; margin-top: 0.5rem;">${folder}</li>`;
-    models.sort((a, b) => a.name.localeCompare(b.name)).forEach(model => {
-      html += `
-        <li>
-          <a href="#/models/${encodeURIComponent(model.path)}" class="model-item" data-model="${model.path}">
-            ${model.name}
-            <span class="model-badge ${model.materialized}">${model.materialized}</span>
-          </a>
-        </li>
-      `;
-    });
+  
+  // Filter models based on search
+  const filteredModels = searchQuery 
+    ? CATALOG.models.filter(m => 
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.description && m.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : CATALOG.models;
+  
+  // Filter sources based on search
+  const filteredSources = searchQuery && CATALOG.sources
+    ? CATALOG.sources.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : (CATALOG.sources || []);
+  
+  // Render Sources group first (if there are sources)
+  if (filteredSources.length > 0) {
+    const isCollapsed = collapsedState['sources'];
+    html += `
+      <div class="nav-group">
+        <div class="nav-group-header" onclick="toggleGroup('sources')">
+          <span class="nav-group-toggle">${isCollapsed ? '+' : '-'}</span>
+          <span class="nav-group-title">Sources</span>
+          <span class="nav-group-count">${filteredSources.length}</span>
+        </div>
+        ${!isCollapsed ? `
+          <div class="nav-group-items">
+            ${filteredSources
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(src => `
+                <a href="#/sources/${encodeURIComponent(src.name)}" class="source-item" data-source="${src.name}">
+                  ${src.name}
+                </a>
+              `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  // Group models by folder
+  const groups = groupModelsByFolder(filteredModels);
+  
+  // Render each model group
+  Object.keys(groups).sort().forEach(folder => {
+    const models = groups[folder];
+    const isCollapsed = collapsedState[folder];
+    
+    html += `
+      <div class="nav-group">
+        <div class="nav-group-header" onclick="toggleGroup('${folder}')">
+          <span class="nav-group-toggle">${isCollapsed ? '+' : '-'}</span>
+          <span class="nav-group-title">${folder}</span>
+          <span class="nav-group-count">${models.length}</span>
+        </div>
+        ${!isCollapsed ? `
+          <div class="nav-group-items">
+            ${models
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(model => `
+                <a href="#/models/${encodeURIComponent(model.path)}" class="model-item" data-model="${model.path}">
+                  ${model.name}
+                  <span class="model-badge ${model.materialized}">${model.materialized}</span>
+                </a>
+              `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
   });
+  
   return html;
 }
 
 // Search handler
 function handleSearch(query) {
-  const modelList = document.getElementById('model-list');
-  if (!modelList) return;
+  const navGroupList = document.getElementById('nav-group-list');
+  if (!navGroupList) return;
   
   const normalizedQuery = query.toLowerCase().trim();
+  navGroupList.innerHTML = renderNavGroups(normalizedQuery);
   
-  if (!normalizedQuery) {
-    // Reset to full list
-    const modelsByFolder = groupModelsByFolder(CATALOG.models);
-    modelList.innerHTML = renderModelList(modelsByFolder);
-    return;
+  // If searching, expand all groups to show results
+  if (normalizedQuery) {
+    saveCollapsedState({});
+    navGroupList.innerHTML = renderNavGroups(normalizedQuery);
   }
   
-  // Filter models
-  const filtered = CATALOG.models.filter(model => 
-    model.name.toLowerCase().includes(normalizedQuery) ||
-    model.path.toLowerCase().includes(normalizedQuery) ||
-    (model.description && model.description.toLowerCase().includes(normalizedQuery))
-  );
-  
-  const modelsByFolder = groupModelsByFolder(filtered);
-  modelList.innerHTML = renderModelList(modelsByFolder);
+  updateActiveNav();
 }
 
 // Home page
@@ -401,6 +493,50 @@ function renderModelPage(modelPath) {
   `;
 }
 
+// Source detail page
+function renderSourcePage(sourceName) {
+  const source = SOURCES_BY_NAME[sourceName];
+  
+  if (!source) {
+    return renderNotFound(`Source "${sourceName}" not found`);
+  }
+  
+  return `
+    <div class="model-header">
+      <div>
+        <div class="source-badge-header">SOURCE</div>
+        <h1 class="model-title">${source.name}</h1>
+        <p style="margin-top: 1rem; color: var(--text-secondary);">
+          External data source referenced by ${source.referenced_by.length} model${source.referenced_by.length !== 1 ? 's' : ''}.
+        </p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">Referenced By (${source.referenced_by.length})</h2>
+      <div class="dep-list">
+        ${source.referenced_by.map(modelPath => `
+          <a href="#/models/${encodeURIComponent(modelPath)}" class="dep-tag">${modelPath}</a>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">About External Sources</h2>
+      <div class="info-box">
+        <p>
+          External sources are tables or datasets that exist outside of this project's managed models.
+          They typically represent raw data from databases, data warehouses, or other systems that
+          serve as inputs to your data transformations.
+        </p>
+        <p style="margin-top: 0.75rem;">
+          This source (<code>${source.name}</code>) is referenced in the SQL of the models listed above.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
 // Lineage page
 function renderLineagePage() {
   return `
@@ -417,7 +553,7 @@ function renderLineagePage() {
     
     <div class="section">
       <h2 class="section-title">Legend</h2>
-      <div style="display: flex; gap: 2rem; color: var(--text-secondary); font-size: 0.875rem;">
+      <div style="display: flex; gap: 2rem; color: var(--text-secondary); font-size: 0.875rem; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           <div style="width: 12px; height: 12px; border-radius: 50%; background: var(--node-staging);"></div>
           staging
@@ -429,6 +565,10 @@ function renderLineagePage() {
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           <div style="width: 12px; height: 12px; border-radius: 50%; background: var(--node-default);"></div>
           other
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div style="width: 16px; height: 10px; border-radius: 2px; background: transparent; border: 2px dashed var(--accent-orange);"></div>
+          sources
         </div>
       </div>
     </div>
@@ -452,11 +592,16 @@ function initDAG() {
   
   // Create nodes and links data
   const nodes = CATALOG.lineage.nodes.map(path => {
-    const model = MODELS_BY_PATH[path];
+    const isSource = path.startsWith('source:');
+    const displayName = isSource ? path.slice(7) : path;
+    const model = isSource ? null : MODELS_BY_PATH[path];
+    const folder = isSource ? 'source' : path.split('.')[0];
+    
     return {
       id: path,
-      name: model ? model.name : path,
-      folder: path.split('.')[0]
+      name: model ? model.name : displayName,
+      folder: folder,
+      isSource: isSource
     };
   });
   
@@ -477,7 +622,7 @@ function initDAG() {
   
   svg.call(zoom);
   
-  // Create arrow marker
+  // Create arrow marker for regular edges
   svg.append('defs').append('marker')
     .attr('id', 'arrowhead')
     .attr('viewBox', '-0 -5 10 10')
@@ -489,6 +634,19 @@ function initDAG() {
     .append('path')
     .attr('d', 'M 0,-5 L 10,0 L 0,5')
     .attr('fill', '#30363d');
+  
+  // Create arrow marker for source edges (orange)
+  svg.select('defs').append('marker')
+    .attr('id', 'arrowhead-source')
+    .attr('viewBox', '-0 -5 10 10')
+    .attr('refX', 20)
+    .attr('refY', 0)
+    .attr('orient', 'auto')
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .append('path')
+    .attr('d', 'M 0,-5 L 10,0 L 0,5')
+    .attr('fill', '#d29922');
   
   // Create force simulation
   const simulation = d3.forceSimulation(nodes)
@@ -502,28 +660,50 @@ function initDAG() {
     .selectAll('line')
     .data(links)
     .join('line')
-    .attr('class', 'dag-link')
-    .attr('marker-end', 'url(#arrowhead)');
+    .attr('class', d => d.source.isSource || (typeof d.source === 'string' && d.source.startsWith('source:')) ? 'dag-link dag-link-source' : 'dag-link')
+    .attr('marker-end', d => {
+      const isSourceEdge = d.source.isSource || (typeof d.source === 'string' && d.source.startsWith('source:'));
+      return isSourceEdge ? 'url(#arrowhead-source)' : 'url(#arrowhead)';
+    });
   
-  // Create nodes
+  // Create nodes - different shapes for sources vs models
   const node = g.append('g')
     .selectAll('g')
     .data(nodes)
     .join('g')
-    .attr('class', 'dag-node')
+    .attr('class', d => d.isSource ? 'dag-node dag-node-source' : 'dag-node')
     .call(d3.drag()
       .on('start', dragstarted)
       .on('drag', dragged)
       .on('end', dragended))
     .on('click', (event, d) => {
-      navigateTo(`/models/${encodeURIComponent(d.id)}`);
+      if (d.isSource) {
+        navigateTo(`/sources/${encodeURIComponent(d.name)}`);
+      } else {
+        navigateTo(`/models/${encodeURIComponent(d.id)}`);
+      }
     });
   
-  // Node circles
-  node.append('circle')
+  // Model nodes: circles
+  node.filter(d => !d.isSource)
+    .append('circle')
     .attr('r', 12)
     .attr('fill', d => getNodeColor(d.folder))
     .attr('stroke', d => getNodeColor(d.folder));
+  
+  // Source nodes: rectangles with dashed border
+  node.filter(d => d.isSource)
+    .append('rect')
+    .attr('width', 24)
+    .attr('height', 16)
+    .attr('x', -12)
+    .attr('y', -8)
+    .attr('rx', 3)
+    .attr('ry', 3)
+    .attr('fill', 'rgba(210, 153, 34, 0.2)')
+    .attr('stroke', '#d29922')
+    .attr('stroke-dasharray', '4,2')
+    .attr('stroke-width', 2);
   
   // Node labels
   node.append('text')

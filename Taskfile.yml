@@ -1,6 +1,6 @@
 # https://taskfile.dev
 
-version: '3'
+version: "3"
 
 vars:
   MODELS_DIR: testdata/models
@@ -80,7 +80,7 @@ tasks:
     desc: Generate static documentation site
     deps: [build]
     cmds:
-      - ./dbgo docs build -models {{.MODELS_DIR}} -output ./docs-site -project "DBGo Project"
+      - ./dbgo docs build -models {{.MODELS_DIR}} -output docs-site -project "DBGo Project"
 
   docs:serve:
     desc: Build and serve documentation locally
