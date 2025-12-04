@@ -1,0 +1,62 @@
+(* Statement Grammar *)
+Statement       = [ "WITH" [ "RECURSIVE" ] CTEList ] SelectStatement .
+CTEList         = CTE { "," CTE } .
+CTE             = identifier "AS" "(" SelectStatement ")" .
+
+SelectStatement = SelectCore { SetOp SelectCore } .
+SetOp           = "UNION" [ "ALL" ] | "INTERSECT" | "EXCEPT" .
+
+SelectCore      = "SELECT" [ "DISTINCT" | "ALL" ] SelectList
+                  "FROM" FromClause
+                  [ "WHERE" Expression ]
+                  [ "GROUP" "BY" ExpressionList ]
+                  [ "HAVING" Expression ]
+                  [ "QUALIFY" Expression ]
+                  [ "ORDER" "BY" OrderByList ]
+                  [ "LIMIT" Expression [ "OFFSET" Expression ] ] .
+
+SelectList      = SelectItem { "," SelectItem } .
+SelectItem      = "*" 
+                | identifier "." "*"
+                | Expression [ [ "AS" ] identifier ] .
+
+FromClause      = TableRef { JoinClause } .
+JoinClause      = [ JoinType ] "JOIN" TableRef "ON" Expression
+                | "CROSS" "JOIN" TableRef
+                | "," TableRef .
+JoinType        = "LEFT" [ "OUTER" ] | "RIGHT" [ "OUTER" ] | "FULL" [ "OUTER" ] | "INNER" .
+
+TableRef        = TableName [ [ "AS" ] identifier ]
+                | "(" SelectStatement ")" [ "AS" ] identifier
+                | LateralClause .
+TableName       = [ identifier "." [ identifier "." ] ] identifier .
+LateralClause   = "LATERAL" "(" SelectStatement ")" [ "AS" ] identifier .
+
+/* Expression Grammar */
+Expression      = OrExpr .
+OrExpr          = AndExpr { "OR" AndExpr } .
+AndExpr         = NotExpr { "AND" NotExpr } .
+NotExpr         = [ "NOT" ] Comparison .
+
+Comparison      = Addition [ CompOp Addition ]
+                | Addition [ "NOT" ] "IN" "(" ExpressionList ")"
+                | Addition [ "NOT" ] "IN" "(" SelectStatement ")"  /* WHERE/HAVING only */
+                | Addition [ "NOT" ] "BETWEEN" Addition "AND" Addition
+                | Addition "IS" [ "NOT" ] "NULL"
+                | Addition [ "NOT" ] "LIKE" Addition .
+
+CompOp          = "=" | "!=" | "<>" | "<" | ">" | "<=" | ">=" .
+Addition        = Multiplication { ( "+" | "-" | "||" ) Multiplication } .
+Multiplication  = Unary { ( "*" | "/" | "%" ) Unary } .
+Unary           = [ "-" | "+" | "NOT" ] Primary .
+
+Primary         = Literal
+                | ColumnRef
+                | FunctionCall
+                | CaseExpr
+                | CastExpr
+                | "(" Expression ")"
+                | ArrayExpr
+                | StructExpr .
+
+Literal         = NUMBER | STRING | "TRUE" | "FALSE" | "NULL" .

@@ -81,3 +81,28 @@ tasks:
     cmds:
       - rm -f dbgo
       - rm -rf .dbgo
+
+  context:sqlglot:
+    desc: Shallow clone sqlglot repository into context/
+    cmds:
+      - rm -rf context/sqlglot
+      - git clone --depth 1 https://github.com/tobymao/sqlglot.git context/sqlglot
+
+  context:dbt-core:
+    desc: Shallow clone dbt-core repository into context/
+    cmds:
+      - rm -rf context/dbt-core
+      - git clone --depth 1 https://github.com/dbt-labs/dbt-core.git context/dbt-core
+
+  context:sqlmesh:
+    desc: Shallow clone sqlmesh repository into context/
+    cmds:
+      - rm -rf context/sqlmesh
+      - git clone --depth 1 https://github.com/TobikoData/sqlmesh.git context/sqlmesh
+
+  context:all:
+    desc: Shallow clone all context repositories
+    cmds:
+      - task: context:sqlglot
+      - task: context:dbt-core
+      - task: context:sqlmesh
