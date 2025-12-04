@@ -472,3 +472,55 @@ func TestParser_ParseContent_AutoDetectCTE(t *testing.T) {
 		t.Error("CTE 'customer_orders' should NOT be in sources")
 	}
 }
+
+func TestParser_ParseContent_ColumnLineage(t *testing.T) {
+	p := NewParser("/models")
+
+	content := `SELECT 
+		c.customer_id,
+		c.customer_name,
+		SUM(o.amount) as total_amount
+	FROM customers c
+	JOIN orders o ON c.customer_id = o.customer_id
+	GROUP BY c.customer_id, c.customer_name`
+
+	config, err := p.ParseContent("/models/summary.sql", content)
+	if err != nil {
+		t.Fatalf("failed to parse content: %v", err)
+	}
+
+	// Should have column lineage extracted
+	if len(config.Columns) != 3 {
+		t.Fatalf("expected 3 columns, got %d", len(config.Columns))
+	}
+
+	// Find columns by name
+	columnsByName := make(map[string]ColumnInfo)
+	for _, col := range config.Columns {
+		columnsByName[col.Name] = col
+	}
+
+	// customer_id should be direct from customers
+	if col, ok := columnsByName["customer_id"]; !ok {
+		t.Error("missing customer_id column")
+	} else {
+		if col.TransformType != "" {
+			t.Errorf("customer_id should be direct (no transform), got %q", col.TransformType)
+		}
+		if len(col.Sources) < 1 {
+			t.Error("customer_id should have at least one source")
+		}
+	}
+
+	// total_amount should be an expression (SUM)
+	if col, ok := columnsByName["total_amount"]; !ok {
+		t.Error("missing total_amount column")
+	} else {
+		if col.TransformType != "EXPR" {
+			t.Errorf("total_amount should be EXPR transform, got %q", col.TransformType)
+		}
+		if col.Function != "sum" {
+			t.Errorf("total_amount should have function 'sum', got %q", col.Function)
+		}
+	}
+}

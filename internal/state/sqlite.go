@@ -659,3 +659,290 @@ func (s *SQLiteStore) UpdateEnvironmentRef(name string, commitRef string) error 
 
 // Ensure SQLiteStore implements StateStore interface
 var _ StateStore = (*SQLiteStore)(nil)
+
+// --- Column lineage operations ---
+
+// SaveModelColumns saves column lineage information for a model.
+// This replaces any existing column information for the model.
+func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete existing column lineage first (due to foreign key)
+	_, err = tx.Exec(`DELETE FROM column_lineage WHERE model_path = ?`, modelPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing column lineage: %w", err)
+	}
+
+	// Delete existing columns
+	_, err = tx.Exec(`DELETE FROM model_columns WHERE model_path = ?`, modelPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing columns: %w", err)
+	}
+
+	// Insert new columns
+	colStmt, err := tx.Prepare(`INSERT INTO model_columns (model_path, column_name, column_index, transform_type, function_name) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare column insert: %w", err)
+	}
+	defer colStmt.Close()
+
+	lineageStmt, err := tx.Prepare(`INSERT INTO column_lineage (model_path, column_name, source_table, source_column) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare lineage insert: %w", err)
+	}
+	defer lineageStmt.Close()
+
+	for _, col := range columns {
+		// Insert column
+		_, err = colStmt.Exec(modelPath, col.Name, col.Index, col.TransformType, col.Function)
+		if err != nil {
+			return fmt.Errorf("failed to insert column %s: %w", col.Name, err)
+		}
+
+		// Insert source lineage for this column
+		for _, src := range col.Sources {
+			if src.Table == "" && src.Column == "" {
+				continue // Skip empty sources
+			}
+			_, err = lineageStmt.Exec(modelPath, col.Name, src.Table, src.Column)
+			if err != nil {
+				return fmt.Errorf("failed to insert lineage for column %s: %w", col.Name, err)
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// GetModelColumns retrieves column lineage information for a model.
+func (s *SQLiteStore) GetModelColumns(modelPath string) ([]ColumnInfo, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	// Get all columns for the model
+	colRows, err := s.db.Query(
+		`SELECT column_name, column_index, transform_type, function_name 
+		 FROM model_columns 
+		 WHERE model_path = ? 
+		 ORDER BY column_index`,
+		modelPath,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get columns: %w", err)
+	}
+	defer colRows.Close()
+
+	// Use index map instead of pointer map to avoid slice reallocation issues
+	columnsIdxMap := make(map[string]int)
+	var columns []ColumnInfo
+
+	for colRows.Next() {
+		var col ColumnInfo
+		var transformType, functionName sql.NullString
+
+		if err := colRows.Scan(&col.Name, &col.Index, &transformType, &functionName); err != nil {
+			return nil, fmt.Errorf("failed to scan column: %w", err)
+		}
+
+		if transformType.Valid {
+			col.TransformType = transformType.String
+		}
+		if functionName.Valid {
+			col.Function = functionName.String
+		}
+
+		columnsIdxMap[col.Name] = len(columns)
+		columns = append(columns, col)
+	}
+
+	if err := colRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating columns: %w", err)
+	}
+
+	// Get lineage for all columns
+	lineageRows, err := s.db.Query(
+		`SELECT column_name, source_table, source_column 
+		 FROM column_lineage 
+		 WHERE model_path = ?`,
+		modelPath,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get column lineage: %w", err)
+	}
+	defer lineageRows.Close()
+
+	for lineageRows.Next() {
+		var colName, sourceTable, sourceColumn string
+		if err := lineageRows.Scan(&colName, &sourceTable, &sourceColumn); err != nil {
+			return nil, fmt.Errorf("failed to scan lineage: %w", err)
+		}
+
+		if idx, ok := columnsIdxMap[colName]; ok {
+			columns[idx].Sources = append(columns[idx].Sources, SourceRef{
+				Table:  sourceTable,
+				Column: sourceColumn,
+			})
+		}
+	}
+
+	return columns, lineageRows.Err()
+}
+
+// DeleteModelColumns deletes all column information for a model.
+func (s *SQLiteStore) DeleteModelColumns(modelPath string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete lineage first (foreign key constraint)
+	_, err = tx.Exec(`DELETE FROM column_lineage WHERE model_path = ?`, modelPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete column lineage: %w", err)
+	}
+
+	// Delete columns
+	_, err = tx.Exec(`DELETE FROM model_columns WHERE model_path = ?`, modelPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete columns: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// TraceColumnBackward traces a column back to its ultimate sources.
+// It follows the lineage recursively to find all upstream columns.
+func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]TraceResult, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	query := `
+WITH RECURSIVE trace AS (
+    -- Start: get direct sources of the target column
+    SELECT 
+        cl.model_path,
+        cl.column_name,
+        cl.source_table,
+        cl.source_column,
+        1 as depth
+    FROM column_lineage cl
+    WHERE cl.model_path = ? AND cl.column_name = ?
+    
+    UNION ALL
+    
+    -- Recurse: follow source_table -> model -> its sources
+    SELECT 
+        cl.model_path,
+        cl.column_name,
+        cl.source_table,
+        cl.source_column,
+        t.depth + 1
+    FROM trace t
+    JOIN models m ON (m.name = t.source_table OR m.path = t.source_table)
+    JOIN column_lineage cl ON cl.model_path = m.path AND cl.column_name = t.source_column
+    WHERE t.depth < 20
+)
+SELECT DISTINCT 
+    source_table,
+    source_column,
+    depth,
+    CASE WHEN m.path IS NULL THEN 1 ELSE 0 END as is_external
+FROM trace t
+LEFT JOIN models m ON (m.name = t.source_table OR m.path = t.source_table)
+ORDER BY depth, source_table, source_column`
+
+	rows, err := s.db.Query(query, modelPath, columnName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to trace column backward: %w", err)
+	}
+	defer rows.Close()
+
+	var results []TraceResult
+	for rows.Next() {
+		var r TraceResult
+		var isExternal int
+		if err := rows.Scan(&r.ModelPath, &r.ColumnName, &r.Depth, &isExternal); err != nil {
+			return nil, fmt.Errorf("failed to scan trace result: %w", err)
+		}
+		r.IsExternal = isExternal == 1
+		results = append(results, r)
+	}
+
+	return results, rows.Err()
+}
+
+// TraceColumnForward traces where a column flows to downstream.
+// It follows the lineage recursively to find all downstream consumers.
+func (s *SQLiteStore) TraceColumnForward(modelPath, columnName string) ([]TraceResult, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	query := `
+WITH RECURSIVE trace AS (
+    -- Start: find columns that reference this model/column as a source
+    SELECT 
+        cl.model_path,
+        cl.column_name,
+        cl.source_table,
+        cl.source_column,
+        1 as depth
+    FROM column_lineage cl
+    JOIN models m ON (m.name = cl.source_table OR m.path = cl.source_table)
+    WHERE m.path = ? AND cl.source_column = ?
+    
+    UNION ALL
+    
+    -- Recurse: find what references the columns we found
+    SELECT 
+        cl.model_path,
+        cl.column_name,
+        cl.source_table,
+        cl.source_column,
+        t.depth + 1
+    FROM trace t
+    JOIN models m ON m.path = t.model_path
+    JOIN column_lineage cl ON (cl.source_table = m.name OR cl.source_table = m.path)
+                          AND cl.source_column = t.column_name
+    WHERE t.depth < 20
+)
+SELECT DISTINCT model_path, column_name, depth
+FROM trace
+ORDER BY depth, model_path, column_name`
+
+	rows, err := s.db.Query(query, modelPath, columnName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to trace column forward: %w", err)
+	}
+	defer rows.Close()
+
+	var results []TraceResult
+	for rows.Next() {
+		var r TraceResult
+		if err := rows.Scan(&r.ModelPath, &r.ColumnName, &r.Depth); err != nil {
+			return nil, fmt.Errorf("failed to scan trace result: %w", err)
+		}
+		results = append(results, r)
+	}
+
+	return results, rows.Err()
+}

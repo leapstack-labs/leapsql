@@ -53,8 +53,11 @@ function router() {
   } else if (hash.startsWith('/models/')) {
     const modelPath = decodeURIComponent(hash.slice(8));
     app.innerHTML = renderLayout(renderModelPage(modelPath));
-    // Highlight SQL after DOM is ready
-    setTimeout(() => highlightCode(), 0);
+    // Highlight SQL and init column lineage after DOM is ready
+    setTimeout(() => {
+      highlightCode();
+      initColumnLineage(modelPath);
+    }, 0);
   } else {
     app.innerHTML = renderLayout(renderNotFound());
   }
@@ -323,6 +326,67 @@ function renderModelPage(modelPath) {
       </div>
     ` : ''}
     
+    ${model.columns && model.columns.length > 0 ? `
+      <div class="section">
+        <h2 class="section-title">Columns (${model.columns.length})</h2>
+        <table class="data-table columns-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Transform</th>
+              <th>Sources</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${model.columns.map(col => `
+              <tr>
+                <td><code class="column-name">${escapeHtml(col.name)}</code></td>
+                <td>
+                  ${col.transform_type === 'EXPR' ? `
+                    <span class="transform-badge expr">${col.function || 'expression'}</span>
+                  ` : `
+                    <span class="transform-badge direct">direct</span>
+                  `}
+                </td>
+                <td>
+                  ${col.sources && col.sources.length > 0 ? `
+                    <div class="source-list">
+                      ${col.sources.map(src => `
+                        <span class="source-ref" title="${src.table}.${src.column}">
+                          ${src.table ? `<span class="source-table">${src.table}</span>.` : ''}<span class="source-column">${src.column}</span>
+                        </span>
+                      `).join('')}
+                    </div>
+                  ` : '<span class="no-sources">-</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : ''}
+    
+    <div class="section">
+      <h2 class="section-title">Column Lineage</h2>
+      <div class="column-lineage-container" id="column-lineage-container">
+        <svg id="column-lineage-svg"></svg>
+      </div>
+      <div class="column-lineage-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: var(--accent-green);"></div>
+          <span>Current model</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: var(--accent-blue);"></div>
+          <span>Source models</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: var(--accent-orange);"></div>
+          <span>External sources</span>
+        </div>
+      </div>
+    </div>
+    
     <div class="section">
       <h2 class="section-title">SQL</h2>
       <div class="code-block">
@@ -526,6 +590,235 @@ function getNodeColor(folder) {
     'seeds': '#d29922'
   };
   return colors[folder] || '#8b949e';
+}
+
+// Initialize column lineage visualization for a specific model
+function initColumnLineage(modelPath) {
+  const container = document.getElementById('column-lineage-container');
+  const svg = d3.select('#column-lineage-svg');
+  
+  if (!container || !svg.node() || !CATALOG.column_lineage) return;
+  
+  const model = MODELS_BY_PATH[modelPath];
+  if (!model || !model.columns || model.columns.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No column lineage data available for this model.</p></div>';
+    return;
+  }
+  
+  const width = container.clientWidth;
+  const height = 400;
+  
+  svg.attr('width', width).attr('height', height);
+  
+  // Clear existing
+  svg.selectAll('*').remove();
+  
+  // Filter nodes and edges relevant to this model
+  const relevantNodeIds = new Set();
+  const relevantEdges = [];
+  
+  // Add this model's columns
+  model.columns.forEach(col => {
+    const nodeId = modelPath + '.' + col.name;
+    relevantNodeIds.add(nodeId);
+    
+    // Find edges pointing to this column
+    CATALOG.column_lineage.edges.forEach(edge => {
+      if (edge.target === nodeId) {
+        relevantEdges.push(edge);
+        relevantNodeIds.add(edge.source);
+      }
+    });
+  });
+  
+  // If no lineage data, show message
+  if (relevantEdges.length === 0 && model.columns.length > 0) {
+    // Still show columns even without lineage edges
+    model.columns.forEach(col => {
+      col.sources.forEach(src => {
+        const sourceNodeId = src.table + '.' + src.column;
+        relevantNodeIds.add(sourceNodeId);
+        relevantEdges.push({
+          source: sourceNodeId,
+          target: modelPath + '.' + col.name
+        });
+      });
+    });
+  }
+  
+  if (relevantNodeIds.size === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No column lineage data available for this model.</p></div>';
+    return;
+  }
+  
+  // Build nodes data
+  const nodes = Array.from(relevantNodeIds).map(nodeId => {
+    const parts = nodeId.split('.');
+    const columnName = parts.pop();
+    const modelName = parts.join('.');
+    const isCurrentModel = modelName === modelPath;
+    const isModelSource = MODELS_BY_PATH[modelName] !== undefined;
+    
+    return {
+      id: nodeId,
+      model: modelName,
+      column: columnName,
+      isCurrentModel,
+      isModelSource
+    };
+  });
+  
+  // Build edges data
+  const edges = relevantEdges.map(edge => ({
+    source: edge.source,
+    target: edge.target
+  }));
+  
+  // Create a group for zoom/pan
+  const g = svg.append('g');
+  
+  // Add zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([0.3, 3])
+    .on('zoom', (event) => {
+      g.attr('transform', event.transform);
+    });
+  
+  svg.call(zoom);
+  
+  // Create arrow marker
+  svg.append('defs').append('marker')
+    .attr('id', 'col-arrowhead')
+    .attr('viewBox', '-0 -5 10 10')
+    .attr('refX', 8)
+    .attr('refY', 0)
+    .attr('orient', 'auto')
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .append('path')
+    .attr('d', 'M 0,-5 L 10,0 L 0,5')
+    .attr('fill', '#30363d');
+  
+  // Create force simulation
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(d => d.id).distance(100))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(60))
+    .force('x', d3.forceX(d => d.isCurrentModel ? width * 0.7 : width * 0.3).strength(0.1))
+    .force('y', d3.forceY(height / 2).strength(0.05));
+  
+  // Create links
+  const link = g.append('g')
+    .selectAll('line')
+    .data(edges)
+    .join('line')
+    .attr('class', 'column-lineage-link')
+    .attr('marker-end', 'url(#col-arrowhead)');
+  
+  // Create nodes
+  const node = g.append('g')
+    .selectAll('g')
+    .data(nodes)
+    .join('g')
+    .attr('class', 'column-lineage-node')
+    .call(d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended));
+  
+  // Node rectangles (column boxes)
+  node.append('rect')
+    .attr('rx', 4)
+    .attr('ry', 4)
+    .attr('width', d => Math.max(80, d.column.length * 8 + 16))
+    .attr('height', 32)
+    .attr('x', d => -Math.max(80, d.column.length * 8 + 16) / 2)
+    .attr('y', -16)
+    .attr('fill', d => {
+      if (d.isCurrentModel) return 'rgba(63, 185, 80, 0.2)';
+      if (d.isModelSource) return 'rgba(88, 166, 255, 0.2)';
+      return 'rgba(210, 153, 34, 0.2)';
+    })
+    .attr('stroke', d => {
+      if (d.isCurrentModel) return '#3fb950';
+      if (d.isModelSource) return '#58a6ff';
+      return '#d29922';
+    })
+    .attr('stroke-width', 1.5);
+  
+  // Node column labels
+  node.append('text')
+    .text(d => d.column)
+    .attr('text-anchor', 'middle')
+    .attr('y', 4)
+    .attr('fill', '#e6edf3')
+    .attr('font-size', '11px')
+    .attr('font-family', 'SF Mono, Consolas, monospace');
+  
+  // Node model labels (on hover tooltip)
+  node.append('title')
+    .text(d => `${d.model}.${d.column}`);
+  
+  // Model name labels above nodes (for source nodes)
+  node.filter(d => !d.isCurrentModel)
+    .append('text')
+    .text(d => d.model)
+    .attr('text-anchor', 'middle')
+    .attr('y', -24)
+    .attr('fill', '#8b949e')
+    .attr('font-size', '9px');
+  
+  // Update positions on tick
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+  
+  // Drag functions
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+  
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+  
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+  
+  // Fit to view after simulation settles
+  simulation.on('end', () => {
+    fitColumnLineageToView();
+  });
+  
+  function fitColumnLineageToView() {
+    const bounds = g.node().getBBox();
+    if (bounds.width === 0 || bounds.height === 0) return;
+    
+    const fullWidth = width;
+    const fullHeight = height;
+    const midX = bounds.x + bounds.width / 2;
+    const midY = bounds.y + bounds.height / 2;
+    const scale = 0.8 / Math.max(bounds.width / fullWidth, bounds.height / fullHeight);
+    const clampedScale = Math.min(Math.max(scale, 0.5), 1.5);
+    const translate = [fullWidth / 2 - clampedScale * midX, fullHeight / 2 - clampedScale * midY];
+    
+    svg.transition()
+      .duration(750)
+      .call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(clampedScale));
+  }
 }
 
 // Not found page

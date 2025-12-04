@@ -21,20 +21,36 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
+// SourceRef represents a source column reference in lineage.
+type SourceRef struct {
+	Table  string `json:"table"`
+	Column string `json:"column"`
+}
+
+// ColumnDoc represents column lineage information for documentation.
+type ColumnDoc struct {
+	Name          string      `json:"name"`
+	Index         int         `json:"index"`
+	TransformType string      `json:"transform_type,omitempty"` // "" (direct) or "EXPR"
+	Function      string      `json:"function,omitempty"`       // "sum", "count", etc.
+	Sources       []SourceRef `json:"sources"`                  // where this column comes from
+}
+
 // ModelDoc represents a model for documentation purposes.
 type ModelDoc struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Path         string    `json:"path"`
-	Materialized string    `json:"materialized"`
-	UniqueKey    string    `json:"unique_key,omitempty"`
-	SQL          string    `json:"sql"`
-	FilePath     string    `json:"file_path"`
-	Sources      []string  `json:"sources"`
-	Dependencies []string  `json:"dependencies"`
-	Dependents   []string  `json:"dependents"`
-	Description  string    `json:"description,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string      `json:"id"`
+	Name         string      `json:"name"`
+	Path         string      `json:"path"`
+	Materialized string      `json:"materialized"`
+	UniqueKey    string      `json:"unique_key,omitempty"`
+	SQL          string      `json:"sql"`
+	FilePath     string      `json:"file_path"`
+	Sources      []string    `json:"sources"`
+	Dependencies []string    `json:"dependencies"`
+	Dependents   []string    `json:"dependents"`
+	Columns      []ColumnDoc `json:"columns"`
+	Description  string      `json:"description,omitempty"`
+	UpdatedAt    time.Time   `json:"updated_at"`
 }
 
 // LineageEdge represents an edge in the dependency graph.
@@ -49,12 +65,32 @@ type LineageDoc struct {
 	Edges []LineageEdge `json:"edges"`
 }
 
+// ColumnLineageNode represents a node in the column lineage graph.
+type ColumnLineageNode struct {
+	ID     string `json:"id"`     // "model.column" format
+	Model  string `json:"model"`  // model path
+	Column string `json:"column"` // column name
+}
+
+// ColumnLineageEdge represents an edge in the column lineage graph.
+type ColumnLineageEdge struct {
+	Source string `json:"source"` // "model.column" format
+	Target string `json:"target"` // "model.column" format
+}
+
+// ColumnLineageDoc represents the full column-level lineage graph.
+type ColumnLineageDoc struct {
+	Nodes []ColumnLineageNode `json:"nodes"`
+	Edges []ColumnLineageEdge `json:"edges"`
+}
+
 // Catalog represents the full documentation catalog.
 type Catalog struct {
-	GeneratedAt time.Time   `json:"generated_at"`
-	ProjectName string      `json:"project_name"`
-	Models      []*ModelDoc `json:"models"`
-	Lineage     LineageDoc  `json:"lineage"`
+	GeneratedAt   time.Time        `json:"generated_at"`
+	ProjectName   string           `json:"project_name"`
+	Models        []*ModelDoc      `json:"models"`
+	Lineage       LineageDoc       `json:"lineage"`
+	ColumnLineage ColumnLineageDoc `json:"column_lineage"`
 }
 
 // Generator generates documentation from parsed models.
@@ -122,6 +158,7 @@ func (g *Generator) GenerateCatalog() *Catalog {
 			Sources:      sources,
 			Dependencies: deps,
 			Dependents:   []string{},
+			Columns:      convertColumns(model.Columns),
 			UpdatedAt:    time.Now().UTC(),
 		}
 
@@ -143,6 +180,9 @@ func (g *Generator) GenerateCatalog() *Catalog {
 
 	// Build lineage graph
 	catalog.Lineage = g.buildLineage(modelDocs)
+
+	// Build column lineage graph
+	catalog.ColumnLineage = g.buildColumnLineage(g.models, modelDocs)
 
 	return catalog
 }
@@ -166,6 +206,101 @@ func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc) LineageDoc {
 				Source: depPath,
 				Target: doc.Path,
 			})
+		}
+	}
+
+	return lineage
+}
+
+// convertColumns converts parser.ColumnInfo to ColumnDoc.
+func convertColumns(columns []parser.ColumnInfo) []ColumnDoc {
+	if columns == nil {
+		return []ColumnDoc{}
+	}
+
+	result := make([]ColumnDoc, 0, len(columns))
+	for _, col := range columns {
+		sources := make([]SourceRef, 0, len(col.Sources))
+		for _, src := range col.Sources {
+			sources = append(sources, SourceRef{
+				Table:  src.Table,
+				Column: src.Column,
+			})
+		}
+
+		result = append(result, ColumnDoc{
+			Name:          col.Name,
+			Index:         col.Index,
+			TransformType: col.TransformType,
+			Function:      col.Function,
+			Sources:       sources,
+		})
+	}
+	return result
+}
+
+// buildColumnLineage constructs the column-level lineage graph.
+func (g *Generator) buildColumnLineage(models []*parser.ModelConfig, modelDocs map[string]*ModelDoc) ColumnLineageDoc {
+	lineage := ColumnLineageDoc{
+		Nodes: []ColumnLineageNode{},
+		Edges: []ColumnLineageEdge{},
+	}
+
+	// Track which nodes we've added
+	nodeSet := make(map[string]bool)
+
+	for _, model := range models {
+		for _, col := range model.Columns {
+			// Add this column as a node
+			nodeID := model.Path + "." + col.Name
+			if !nodeSet[nodeID] {
+				lineage.Nodes = append(lineage.Nodes, ColumnLineageNode{
+					ID:     nodeID,
+					Model:  model.Path,
+					Column: col.Name,
+				})
+				nodeSet[nodeID] = true
+			}
+
+			// Add edges from source columns to this column
+			for _, src := range col.Sources {
+				if src.Table == "" || src.Column == "" {
+					continue
+				}
+
+				// Try to find the source model by name or path
+				sourceModelPath := ""
+				for _, m := range models {
+					if m.Name == src.Table || m.Path == src.Table {
+						sourceModelPath = m.Path
+						break
+					}
+				}
+
+				sourceNodeID := ""
+				if sourceModelPath != "" {
+					sourceNodeID = sourceModelPath + "." + src.Column
+				} else {
+					// External source (not a model)
+					sourceNodeID = src.Table + "." + src.Column
+				}
+
+				// Add source node if not exists
+				if !nodeSet[sourceNodeID] {
+					lineage.Nodes = append(lineage.Nodes, ColumnLineageNode{
+						ID:     sourceNodeID,
+						Model:  src.Table,
+						Column: src.Column,
+					})
+					nodeSet[sourceNodeID] = true
+				}
+
+				// Add edge from source to target
+				lineage.Edges = append(lineage.Edges, ColumnLineageEdge{
+					Source: sourceNodeID,
+					Target: nodeID,
+				})
+			}
 		}
 	}
 

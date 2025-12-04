@@ -194,6 +194,35 @@ func (e *Engine) Discover() error {
 		if err := e.store.RegisterModel(model); err != nil {
 			return fmt.Errorf("failed to register model %s: %w", m.Path, err)
 		}
+
+		// Store column lineage if available
+		if len(m.Columns) > 0 {
+			// Convert parser.ColumnInfo to state.ColumnInfo
+			stateColumns := make([]state.ColumnInfo, 0, len(m.Columns))
+			for _, col := range m.Columns {
+				// Convert parser.SourceRef to state.SourceRef
+				sources := make([]state.SourceRef, 0, len(col.Sources))
+				for _, src := range col.Sources {
+					sources = append(sources, state.SourceRef{
+						Table:  src.Table,
+						Column: src.Column,
+					})
+				}
+				stateColumns = append(stateColumns, state.ColumnInfo{
+					Name:          col.Name,
+					Index:         col.Index,
+					TransformType: col.TransformType,
+					Function:      col.Function,
+					Sources:       sources,
+				})
+			}
+
+			// Delete existing column lineage before saving (for re-discovery)
+			e.store.DeleteModelColumns(m.Path)
+			if err := e.store.SaveModelColumns(m.Path, stateColumns); err != nil {
+				return fmt.Errorf("failed to save column lineage for %s: %w", m.Path, err)
+			}
+		}
 	}
 
 	return nil

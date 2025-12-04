@@ -92,3 +92,29 @@ CREATE TRIGGER IF NOT EXISTS environments_updated_at
 BEGIN
     UPDATE environments SET updated_at = CURRENT_TIMESTAMP WHERE name = NEW.name;
 END;
+
+-- model_columns: output columns for each model
+CREATE TABLE IF NOT EXISTS model_columns (
+    model_path     TEXT NOT NULL,           -- e.g., "staging.stg_customers"
+    column_name    TEXT NOT NULL,
+    column_index   INTEGER NOT NULL,
+    transform_type TEXT DEFAULT '',         -- '' (direct) or 'EXPR'
+    function_name  TEXT DEFAULT '',         -- 'sum', 'count', etc.
+    PRIMARY KEY (model_path, column_name),
+    FOREIGN KEY (model_path) REFERENCES models(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_columns_path ON model_columns(model_path);
+
+-- column_lineage: column-to-column lineage (source columns for each output column)
+CREATE TABLE IF NOT EXISTS column_lineage (
+    model_path    TEXT NOT NULL,            -- model that defines this column
+    column_name   TEXT NOT NULL,            -- output column name
+    source_table  TEXT NOT NULL,            -- source table (model name or raw table)
+    source_column TEXT NOT NULL,            -- source column name
+    PRIMARY KEY (model_path, column_name, source_table, source_column),
+    FOREIGN KEY (model_path, column_name) REFERENCES model_columns(model_path, column_name) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_column_lineage_source ON column_lineage(source_table, source_column);
+CREATE INDEX IF NOT EXISTS idx_column_lineage_model ON column_lineage(model_path);

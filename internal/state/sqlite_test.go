@@ -41,7 +41,7 @@ func TestSQLiteStore_InitSchema(t *testing.T) {
 	}
 
 	// Verify tables exist by querying them
-	tables := []string{"runs", "models", "model_runs", "dependencies", "environments"}
+	tables := []string{"runs", "models", "model_runs", "dependencies", "environments", "model_columns", "column_lineage"}
 	for _, table := range tables {
 		rows, err := store.db.Query("SELECT 1 FROM " + table + " LIMIT 1")
 		if err != nil {
@@ -593,5 +593,402 @@ func TestSQLiteStore_UpdateEnvironmentRef(t *testing.T) {
 	env, _ := store.GetEnvironment("dev")
 	if env.CommitRef != "abc123" {
 		t.Errorf("expected commit_ref 'abc123', got %q", env.CommitRef)
+	}
+}
+
+// --- Column lineage tests ---
+
+func TestSQLiteStore_SaveModelColumns(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	// Register the model first (required for foreign key)
+	model := &Model{
+		Path:        "staging.stg_customers",
+		Name:        "stg_customers",
+		ContentHash: "abc123",
+	}
+	if err := store.RegisterModel(model); err != nil {
+		t.Fatalf("failed to register model: %v", err)
+	}
+
+	columns := []ColumnInfo{
+		{
+			Name:          "customer_id",
+			Index:         0,
+			TransformType: "",
+			Function:      "",
+			Sources: []SourceRef{
+				{Table: "raw_customers", Column: "id"},
+			},
+		},
+		{
+			Name:          "full_name",
+			Index:         1,
+			TransformType: "EXPR",
+			Function:      "concat",
+			Sources: []SourceRef{
+				{Table: "raw_customers", Column: "first_name"},
+				{Table: "raw_customers", Column: "last_name"},
+			},
+		},
+	}
+
+	err := store.SaveModelColumns("staging.stg_customers", columns)
+	if err != nil {
+		t.Fatalf("failed to save model columns: %v", err)
+	}
+
+	// Verify columns were saved
+	retrieved, err := store.GetModelColumns("staging.stg_customers")
+	if err != nil {
+		t.Fatalf("failed to get model columns: %v", err)
+	}
+
+	if len(retrieved) != 2 {
+		t.Fatalf("expected 2 columns, got %d", len(retrieved))
+	}
+
+	// Check first column
+	if retrieved[0].Name != "customer_id" {
+		t.Errorf("expected column name 'customer_id', got %q", retrieved[0].Name)
+	}
+	if len(retrieved[0].Sources) != 1 {
+		t.Errorf("expected 1 source for customer_id, got %d", len(retrieved[0].Sources))
+	}
+
+	// Check second column
+	if retrieved[1].Name != "full_name" {
+		t.Errorf("expected column name 'full_name', got %q", retrieved[1].Name)
+	}
+	if retrieved[1].TransformType != "EXPR" {
+		t.Errorf("expected transform_type 'EXPR', got %q", retrieved[1].TransformType)
+	}
+	if retrieved[1].Function != "concat" {
+		t.Errorf("expected function 'concat', got %q", retrieved[1].Function)
+	}
+	if len(retrieved[1].Sources) != 2 {
+		t.Errorf("expected 2 sources for full_name, got %d", len(retrieved[1].Sources))
+	}
+}
+
+func TestSQLiteStore_SaveModelColumns_Upsert(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	model := &Model{
+		Path:        "staging.stg_orders",
+		Name:        "stg_orders",
+		ContentHash: "abc123",
+	}
+	if err := store.RegisterModel(model); err != nil {
+		t.Fatalf("failed to register model: %v", err)
+	}
+
+	// Initial save
+	initialColumns := []ColumnInfo{
+		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
+	}
+	if err := store.SaveModelColumns("staging.stg_orders", initialColumns); err != nil {
+		t.Fatalf("failed to save initial columns: %v", err)
+	}
+
+	// Update with different columns (should replace)
+	updatedColumns := []ColumnInfo{
+		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "order_id"}}},
+		{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
+	}
+	if err := store.SaveModelColumns("staging.stg_orders", updatedColumns); err != nil {
+		t.Fatalf("failed to save updated columns: %v", err)
+	}
+
+	retrieved, err := store.GetModelColumns("staging.stg_orders")
+	if err != nil {
+		t.Fatalf("failed to get model columns: %v", err)
+	}
+
+	if len(retrieved) != 2 {
+		t.Fatalf("expected 2 columns after update, got %d", len(retrieved))
+	}
+
+	// Check that the source was updated
+	if len(retrieved[0].Sources) != 1 || retrieved[0].Sources[0].Column != "order_id" {
+		t.Errorf("expected source column 'order_id', got %v", retrieved[0].Sources)
+	}
+}
+
+func TestSQLiteStore_GetModelColumns_NotFound(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	columns, err := store.GetModelColumns("nonexistent.model")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(columns) != 0 {
+		t.Errorf("expected empty slice for nonexistent model, got %d columns", len(columns))
+	}
+}
+
+func TestSQLiteStore_DeleteModelColumns(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	model := &Model{
+		Path:        "staging.stg_products",
+		Name:        "stg_products",
+		ContentHash: "abc123",
+	}
+	if err := store.RegisterModel(model); err != nil {
+		t.Fatalf("failed to register model: %v", err)
+	}
+
+	columns := []ColumnInfo{
+		{Name: "product_id", Index: 0, Sources: []SourceRef{{Table: "raw_products", Column: "id"}}},
+		{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_products", Column: "name"}}},
+	}
+	if err := store.SaveModelColumns("staging.stg_products", columns); err != nil {
+		t.Fatalf("failed to save columns: %v", err)
+	}
+
+	// Delete columns
+	err := store.DeleteModelColumns("staging.stg_products")
+	if err != nil {
+		t.Fatalf("failed to delete columns: %v", err)
+	}
+
+	// Verify deletion
+	retrieved, err := store.GetModelColumns("staging.stg_products")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(retrieved) != 0 {
+		t.Errorf("expected 0 columns after deletion, got %d", len(retrieved))
+	}
+}
+
+func TestSQLiteStore_TraceColumnBackward(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	// Create a chain of models:
+	// raw_customers -> stg_customers -> customer_summary
+	// The trace should show the upstream lineage
+
+	stgModel := &Model{
+		Path:        "staging.stg_customers",
+		Name:        "stg_customers",
+		ContentHash: "abc",
+	}
+	martModel := &Model{
+		Path:        "marts.customer_summary",
+		Name:        "customer_summary",
+		ContentHash: "def",
+	}
+	if err := store.RegisterModel(stgModel); err != nil {
+		t.Fatalf("failed to register stg model: %v", err)
+	}
+	if err := store.RegisterModel(martModel); err != nil {
+		t.Fatalf("failed to register mart model: %v", err)
+	}
+
+	// stg_customers gets customer_id from raw_customers.id
+	stgColumns := []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+	}
+	if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
+		t.Fatalf("failed to save stg columns: %v", err)
+	}
+
+	// customer_summary gets customer_id from stg_customers.customer_id
+	martColumns := []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+	}
+	if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
+		t.Fatalf("failed to save mart columns: %v", err)
+	}
+
+	// Trace backward from customer_summary.customer_id
+	results, err := store.TraceColumnBackward("marts.customer_summary", "customer_id")
+	if err != nil {
+		t.Fatalf("failed to trace column backward: %v", err)
+	}
+
+	// Should find at least the direct source (stg_customers.customer_id)
+	if len(results) == 0 {
+		t.Fatal("expected at least 1 trace result, got 0")
+	}
+
+	// First result should be depth 1 (direct source)
+	foundStgCustomers := false
+	foundRawCustomers := false
+	for _, r := range results {
+		if r.ModelPath == "stg_customers" && r.ColumnName == "customer_id" && r.Depth == 1 {
+			foundStgCustomers = true
+			if r.IsExternal {
+				t.Error("stg_customers should not be marked as external")
+			}
+		}
+		if r.ModelPath == "raw_customers" && r.ColumnName == "id" && r.Depth == 2 {
+			foundRawCustomers = true
+			if !r.IsExternal {
+				t.Error("raw_customers should be marked as external (not a registered model)")
+			}
+		}
+	}
+
+	if !foundStgCustomers {
+		t.Error("did not find stg_customers.customer_id at depth 1")
+	}
+	if !foundRawCustomers {
+		t.Error("did not find raw_customers.id at depth 2")
+	}
+}
+
+func TestSQLiteStore_TraceColumnForward(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	// Create models: stg_customers -> customer_summary
+	stgModel := &Model{
+		Path:        "staging.stg_customers",
+		Name:        "stg_customers",
+		ContentHash: "abc",
+	}
+	martModel := &Model{
+		Path:        "marts.customer_summary",
+		Name:        "customer_summary",
+		ContentHash: "def",
+	}
+	if err := store.RegisterModel(stgModel); err != nil {
+		t.Fatalf("failed to register stg model: %v", err)
+	}
+	if err := store.RegisterModel(martModel); err != nil {
+		t.Fatalf("failed to register mart model: %v", err)
+	}
+
+	// stg_customers has customer_id
+	stgColumns := []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+		{Name: "email", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "email"}}},
+	}
+	if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
+		t.Fatalf("failed to save stg columns: %v", err)
+	}
+
+	// customer_summary uses stg_customers.customer_id
+	martColumns := []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+		{Name: "contact", Index: 1, Sources: []SourceRef{{Table: "stg_customers", Column: "email"}}},
+	}
+	if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
+		t.Fatalf("failed to save mart columns: %v", err)
+	}
+
+	// Trace forward from stg_customers.customer_id - where does it go?
+	results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
+	if err != nil {
+		t.Fatalf("failed to trace column forward: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("expected at least 1 trace result, got 0")
+	}
+
+	// Should find customer_summary.customer_id at depth 1
+	found := false
+	for _, r := range results {
+		if r.ModelPath == "marts.customer_summary" && r.ColumnName == "customer_id" && r.Depth == 1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("did not find marts.customer_summary.customer_id at depth 1")
+	}
+}
+
+func TestSQLiteStore_TraceColumnForward_MultipleConsumers(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	// Create models: stg_customers -> (customer_summary, customer_metrics)
+	stgModel := &Model{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"}
+	summaryModel := &Model{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "def"}
+	metricsModel := &Model{Path: "marts.customer_metrics", Name: "customer_metrics", ContentHash: "ghi"}
+
+	for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
+		if err := store.RegisterModel(m); err != nil {
+			t.Fatalf("failed to register model %s: %v", m.Path, err)
+		}
+	}
+
+	// stg_customers has customer_id
+	if err := store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw", Column: "id"}}},
+	}); err != nil {
+		t.Fatalf("failed to save stg columns: %v", err)
+	}
+
+	// Both mart models use stg_customers.customer_id
+	if err := store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
+		{Name: "cust_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+	}); err != nil {
+		t.Fatalf("failed to save summary columns: %v", err)
+	}
+	if err := store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+	}); err != nil {
+		t.Fatalf("failed to save metrics columns: %v", err)
+	}
+
+	// Trace forward - should find both consumers
+	results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
+	if err != nil {
+		t.Fatalf("failed to trace column forward: %v", err)
+	}
+
+	if len(results) < 2 {
+		t.Fatalf("expected at least 2 trace results, got %d", len(results))
+	}
+
+	foundSummary := false
+	foundMetrics := false
+	for _, r := range results {
+		if r.ModelPath == "marts.customer_summary" {
+			foundSummary = true
+		}
+		if r.ModelPath == "marts.customer_metrics" {
+			foundMetrics = true
+		}
+	}
+
+	if !foundSummary {
+		t.Error("did not find marts.customer_summary in forward trace")
+	}
+	if !foundMetrics {
+		t.Error("did not find marts.customer_metrics in forward trace")
+	}
+}
+
+func TestSQLiteStore_TraceColumn_EmptyResults(t *testing.T) {
+	store := setupTestStore(t)
+	defer store.Close()
+
+	// Trace a column that doesn't exist
+	backward, err := store.TraceColumnBackward("nonexistent.model", "col")
+	if err != nil {
+		t.Fatalf("unexpected error on backward trace: %v", err)
+	}
+	if len(backward) != 0 {
+		t.Errorf("expected empty backward trace, got %d results", len(backward))
+	}
+
+	forward, err := store.TraceColumnForward("nonexistent.model", "col")
+	if err != nil {
+		t.Fatalf("unexpected error on forward trace: %v", err)
+	}
+	if len(forward) != 0 {
+		t.Errorf("expected empty forward trace, got %d results", len(forward))
 	}
 }

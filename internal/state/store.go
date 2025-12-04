@@ -76,6 +76,29 @@ type Environment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// SourceRef represents a source column reference in lineage.
+type SourceRef struct {
+	Table  string `json:"table"`
+	Column string `json:"column"`
+}
+
+// ColumnInfo represents column lineage information for a model.
+type ColumnInfo struct {
+	Name          string      `json:"name"`
+	Index         int         `json:"index"`
+	TransformType string      `json:"transform_type"` // "" (direct) or "EXPR"
+	Function      string      `json:"function"`       // "sum", "count", etc.
+	Sources       []SourceRef `json:"sources"`        // where this column comes from
+}
+
+// TraceResult represents a single node in a column lineage trace.
+type TraceResult struct {
+	ModelPath  string `json:"model_path"`
+	ColumnName string `json:"column_name"`
+	Depth      int    `json:"depth"`
+	IsExternal bool   `json:"is_external"` // true if source_table is not a known model
+}
+
 // StateStore defines the interface for state management operations.
 type StateStore interface {
 	// Open opens a connection to the state store at the given path.
@@ -115,4 +138,11 @@ type StateStore interface {
 	CreateEnvironment(name string) (*Environment, error)
 	GetEnvironment(name string) (*Environment, error)
 	UpdateEnvironmentRef(name string, commitRef string) error
+
+	// Column lineage operations
+	SaveModelColumns(modelPath string, columns []ColumnInfo) error
+	GetModelColumns(modelPath string) ([]ColumnInfo, error)
+	DeleteModelColumns(modelPath string) error
+	TraceColumnBackward(modelPath, columnName string) ([]TraceResult, error)
+	TraceColumnForward(modelPath, columnName string) ([]TraceResult, error)
 }

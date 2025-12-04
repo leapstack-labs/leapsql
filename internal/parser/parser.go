@@ -30,6 +30,8 @@ type ModelConfig struct {
 	// Sources are all table names referenced in the SQL (auto-detected via lineage parser)
 	// This includes both model references and external/raw tables
 	Sources []string
+	// Columns contains column-level lineage information
+	Columns []ColumnInfo
 	// SQL is the raw SQL content (excluding pragmas)
 	SQL string
 	// RawContent is the full file content including pragmas
@@ -42,6 +44,21 @@ type ModelConfig struct {
 type Conditional struct {
 	Condition string
 	Content   string
+}
+
+// SourceRef represents a source column reference in lineage.
+type SourceRef struct {
+	Table  string
+	Column string
+}
+
+// ColumnInfo represents column lineage information.
+type ColumnInfo struct {
+	Name          string
+	Index         int
+	TransformType string      // "" (direct) or "EXPR"
+	Function      string      // "sum", "count", etc.
+	Sources       []SourceRef // where this column comes from
 }
 
 // Parser parses SQL model files and extracts pragmas.
@@ -152,26 +169,58 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 
 	config.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 
-	// Auto-detect table sources using the lineage parser
+	// Auto-detect table sources and column lineage using the lineage parser
 	if config.SQL != "" {
-		sources, err := extractTableSources(config.SQL)
+		result, err := extractLineage(config.SQL)
 		if err == nil {
-			config.Sources = sources
+			config.Sources = result.Sources
+			config.Columns = result.Columns
 		}
-		// If lineage extraction fails, we continue without sources
+		// If lineage extraction fails, we continue without sources/columns
 		// The model may have syntax errors or use unsupported SQL features
 	}
 
 	return config, nil
 }
 
-// extractTableSources uses the lineage parser to extract all table names from SQL.
-func extractTableSources(sql string) ([]string, error) {
+// lineageResult holds both table sources and column lineage information.
+type lineageResult struct {
+	Sources []string
+	Columns []ColumnInfo
+}
+
+// extractLineage uses the lineage parser to extract all table sources and column lineage from SQL.
+func extractLineage(sql string) (*lineageResult, error) {
 	modelLineage, err := lineage.ExtractLineage(sql, nil)
 	if err != nil {
 		return nil, err
 	}
-	return modelLineage.Sources, nil
+
+	// Convert lineage.ColumnLineage to parser.ColumnInfo
+	columns := make([]ColumnInfo, 0, len(modelLineage.Columns))
+	for i, col := range modelLineage.Columns {
+		// Convert source columns
+		sources := make([]SourceRef, 0, len(col.Sources))
+		for _, src := range col.Sources {
+			sources = append(sources, SourceRef{
+				Table:  src.Table,
+				Column: src.Column,
+			})
+		}
+
+		columns = append(columns, ColumnInfo{
+			Name:          col.Name,
+			Index:         i,
+			TransformType: string(col.Transform),
+			Function:      col.Function,
+			Sources:       sources,
+		})
+	}
+
+	return &lineageResult{
+		Sources: modelLineage.Sources,
+		Columns: columns,
+	}, nil
 }
 
 // parseConfig parses config pragma key-value pairs.
