@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <!-- SQL asterisk - white version for dark backgrounds -->
-  <circle cx="90" cy="90" r="17" fill="#fff"/>
-  <line x1="90" y1="20" x2="90" y2="160" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
-  <line x1="20" y1="90" x2="160" y2="90" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
-  <line x1="40" y1="40" x2="140" y2="140" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
-  <line x1="140" y1="40" x2="40" y2="140" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
-</svg>

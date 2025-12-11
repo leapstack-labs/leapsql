@@ -5,8 +5,7 @@ hero:
   text: SQL Transformation Framework
   tagline: Transform your data with pure SQL. No ref() functions, no boilerplate - just write SQL and let LeapSQL handle the rest.
   image:
-    dark: /logo-index-dark.svg
-    light: /logo-index-light.svg
+    src: /favicon.svg
     alt: LeapSQL Logo
   actions:
     - theme: brand
