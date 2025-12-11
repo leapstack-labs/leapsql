@@ -96,6 +96,13 @@ tasks:
       - rm -rf .leapsql-docs
       - rm -rf docs-site
 
+  docs:dev:
+    desc: Start Astro docs development server
+    dir: docs
+    cmds:
+      - pnpm install
+      - pnpm dev
+
   context:sqlglot:
     desc: Shallow clone sqlglot repository into context/
     cmds:

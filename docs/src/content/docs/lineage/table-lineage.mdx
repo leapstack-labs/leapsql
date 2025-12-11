@@ -1,0 +1,373 @@
+---
+title: Table Lineage
+description: Understanding and using table-level lineage
+---
+
+Table lineage shows the dependencies between models - which tables each model reads from and which models depend on it.
+
+## How Table Lineage Works
+
+LeapSQL analyzes your SQL to identify table references:
+
+```sql
+/*---
+name: customer_orders
+---*/
+
+SELECT
+    c.customer_id,
+    c.name,
+    o.order_id,
+    o.amount
+FROM stg_customers c
+JOIN stg_orders o ON c.customer_id = o.customer_id
+```
+
+LeapSQL detects:
+- **Upstream dependencies**: `stg_customers`, `stg_orders`
+- **This model creates**: `customer_orders`
+
+## Viewing Table Lineage
+
+### DAG Command
+
+```bash
+leapsql dag
+```
+
+Output:
+```
+raw_customers
+└── stg_customers
+    └── customer_orders
+        └── customer_summary
+        └── customer_report
+
+raw_orders
+└── stg_orders
+    └── customer_orders
+    └── order_metrics
+```
+
+### Specific Model
+
+```bash
+leapsql dag --select customer_orders
+```
+
+Shows lineage for just that model and its connections.
+
+### Upstream Only
+
+```bash
+leapsql dag --select +customer_orders
+```
+
+Shows only what `customer_orders` depends on.
+
+### Downstream Only
+
+```bash
+leapsql dag --select customer_orders+
+```
+
+Shows only what depends on `customer_orders`.
+
+## Detection Details
+
+### FROM Clauses
+
+```sql
+SELECT * FROM customers
+-- Dependency: customers
+```
+
+### JOIN Clauses
+
+```sql
+SELECT *
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+LEFT JOIN products p ON o.product_id = p.id
+-- Dependencies: customers, orders, products
+```
+
+### Subqueries
+
+```sql
+SELECT *
+FROM (SELECT * FROM customers) c
+WHERE c.id IN (SELECT customer_id FROM vip_list)
+-- Dependencies: customers, vip_list
+```
+
+### CTEs
+
+```sql
+WITH active_customers AS (
+    SELECT * FROM customers WHERE status = 'active'
+)
+SELECT * FROM active_customers
+-- Dependency: customers (CTE name is not a dependency)
+```
+
+### UNION/INTERSECT/EXCEPT
+
+```sql
+SELECT * FROM orders_2023
+UNION ALL
+SELECT * FROM orders_2024
+INTERSECT
+SELECT * FROM valid_orders
+-- Dependencies: orders_2023, orders_2024, valid_orders
+```
+
+### INSERT Targets
+
+```sql
+INSERT INTO summary_table
+SELECT * FROM source_table
+-- Dependencies: source_table
+-- Target: summary_table (handled separately)
+```
+
+## Dependency Resolution
+
+### Resolution Order
+
+When LeapSQL encounters a table name, it checks:
+
+1. **Models**: Is there a `.sql` file defining this model?
+2. **Seeds**: Is there a `.csv` file that creates this table?
+3. **External**: Assume it exists in the database
+
+### Schema-Qualified Names
+
+```sql
+SELECT * FROM analytics.customers
+-- Looks for: customers model in analytics schema
+-- Or: external table analytics.customers
+```
+
+### Ambiguous Names
+
+If a table name matches multiple sources:
+
+```sql
+SELECT * FROM customers
+-- Could be: models/customers.sql
+-- Or: seeds/customers.csv
+-- Or: existing database table
+
+-- LeapSQL prioritizes: models > seeds > external
+```
+
+## Using Lineage for Execution
+
+### Run with Dependencies
+
+```bash
+# Run customer_orders and everything it needs
+leapsql run --select +customer_orders
+```
+
+Build order:
+1. `stg_customers`
+2. `stg_orders`
+3. `customer_orders`
+
+### Run with Dependents
+
+```bash
+# Run customer_orders and everything that uses it
+leapsql run --select customer_orders+
+```
+
+Build order:
+1. `customer_orders`
+2. `customer_summary` (depends on customer_orders)
+3. `customer_report` (depends on customer_orders)
+
+### Full Lineage
+
+```bash
+# Run entire lineage chain
+leapsql run --select +customer_orders+
+```
+
+## Lineage in State Database
+
+Table lineage is stored in `.leapsql/state.db`:
+
+```sql
+-- View all dependencies
+SELECT 
+    model_name,
+    depends_on
+FROM dependencies
+ORDER BY model_name;
+```
+
+Output:
+```
+model_name      | depends_on
+----------------|----------------
+customer_orders | stg_customers
+customer_orders | stg_orders
+customer_summary| customer_orders
+stg_customers   | raw_customers
+stg_orders      | raw_orders
+```
+
+### Query Specific Model
+
+```sql
+-- What does customer_orders depend on?
+SELECT depends_on 
+FROM dependencies 
+WHERE model_name = 'customer_orders';
+
+-- What depends on customer_orders?
+SELECT model_name 
+FROM dependencies 
+WHERE depends_on = 'customer_orders';
+```
+
+## Circular Dependencies
+
+LeapSQL detects and prevents circular dependencies:
+
+```
+A depends on B
+B depends on C
+C depends on A  -- CYCLE!
+```
+
+Error message:
+```
+Error: circular dependency detected: A -> B -> C -> A
+```
+
+### Resolving Cycles
+
+1. **Review the logic**: Is the cycle actually necessary?
+2. **Break the cycle**: 
+   - Combine models
+   - Extract shared logic
+   - Use incremental patterns
+
+## External Dependencies
+
+Tables not defined in your project are external dependencies:
+
+```sql
+SELECT * FROM external_system.api_data
+```
+
+External dependencies:
+- Don't affect build order (assumed to exist)
+- Show warnings if missing at runtime
+- Can be documented in frontmatter
+
+### Documenting External Dependencies
+
+```sql
+/*---
+name: enriched_customers
+meta:
+  external_dependencies:
+    - name: salesforce.contacts
+      refresh: hourly
+      owner: salesforce-team
+    - name: stripe.customers  
+      refresh: daily
+      owner: payments-team
+---*/
+```
+
+## Best Practices
+
+### 1. Keep Dependency Chains Shallow
+
+```
+Good: source -> staging -> mart (2 levels)
+Bad:  source -> stg -> int1 -> int2 -> int3 -> mart (5 levels)
+```
+
+Deep chains are:
+- Harder to debug
+- Slower to run
+- More fragile
+
+### 2. Use Clear Naming
+
+Names should indicate the dependency relationship:
+
+```
+stg_customers      -- staging layer
+int_customer_orders -- intermediate (depends on staging)
+fct_customer_metrics -- fact table (depends on intermediate)
+```
+
+### 3. Group Related Models
+
+Organize models to reflect dependencies:
+
+```
+models/
+├── staging/           # No internal dependencies
+│   ├── stg_customers.sql
+│   └── stg_orders.sql
+├── intermediate/      # Depends on staging
+│   └── int_customer_orders.sql
+└── marts/             # Depends on intermediate
+    └── fct_customers.sql
+```
+
+### 4. Document Cross-Domain Dependencies
+
+When models depend on other teams' models:
+
+```sql
+/*---
+name: marketing_customers
+meta:
+  cross_domain_dependencies:
+    - model: core.dim_customers
+      team: core-data
+      contract: v2.1
+---*/
+```
+
+## Troubleshooting
+
+### Missing Dependencies
+
+If a model doesn't recognize a dependency:
+
+1. Check table name spelling
+2. Verify the source model exists
+3. Check for schema qualification issues
+4. Ensure seeds are loaded
+
+### Unexpected Dependencies
+
+If LeapSQL detects wrong dependencies:
+
+1. Check for table names that match model names
+2. Look for commented-out code being parsed
+3. Review template-generated SQL
+
+### Slow DAG Computation
+
+If lineage takes too long:
+
+1. Reduce number of models
+2. Simplify complex SQL
+3. Check for parsing errors
+
+## Next Steps
+
+- [Column Lineage](/lineage/column-lineage/) - Track data at column level
+- [Dependencies](/concepts/dependencies/) - Dependency detection details
+- [DAG Command](/cli/dag/) - CLI reference

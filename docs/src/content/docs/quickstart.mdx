@@ -1,0 +1,170 @@
+---
+title: Quickstart
+description: Get up and running with LeapSQL in 5 minutes
+---
+
+This guide will help you create your first LeapSQL project and run your first transformation.
+
+## Prerequisites
+
+- Go 1.21 or later (for building from source)
+- DuckDB (automatically managed by LeapSQL)
+
+## Installation
+
+```bash
+# Install from source
+go install github.com/yacobolo/leapsql/cmd/leapsql@latest
+
+# Verify installation
+leapsql version
+```
+
+## Create Your First Project
+
+### 1. Set Up the Directory Structure
+
+```bash
+mkdir my-project
+cd my-project
+
+# Create the required directories
+mkdir -p models/staging models/marts seeds macros
+```
+
+### 2. Add Seed Data
+
+Create a seed file with sample data:
+
+```csv title="seeds/raw_customers.csv"
+id,name,email,created_at
+1,Alice,alice@example.com,2024-01-15
+2,Bob,bob@example.com,2024-01-16
+3,Charlie,charlie@example.com,2024-01-17
+```
+
+```csv title="seeds/raw_orders.csv"
+id,customer_id,amount,order_date
+1,1,100.00,2024-01-20
+2,1,50.00,2024-01-21
+3,2,75.00,2024-01-22
+4,3,200.00,2024-01-23
+```
+
+### 3. Load Seed Data
+
+```bash
+leapsql seed
+```
+
+This creates tables from your CSV files in the DuckDB database.
+
+### 4. Create Your First Model
+
+Create a staging model that cleans up the raw data:
+
+```sql title="models/staging/stg_customers.sql"
+/*---
+name: stg_customers
+materialized: view
+---*/
+
+SELECT
+    id as customer_id,
+    TRIM(name) as customer_name,
+    LOWER(email) as email,
+    created_at::DATE as signup_date
+FROM raw_customers
+```
+
+### 5. Create a Mart Model
+
+Create a model that aggregates customer data:
+
+```sql title="models/marts/customer_summary.sql"
+/*---
+name: customer_summary
+materialized: table
+---*/
+
+SELECT
+    c.customer_id,
+    c.customer_name,
+    c.email,
+    c.signup_date,
+    COUNT(o.id) as total_orders,
+    COALESCE(SUM(o.amount), 0) as total_spent,
+    MAX(o.order_date) as last_order_date
+FROM stg_customers c
+LEFT JOIN raw_orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.customer_name, c.email, c.signup_date
+```
+
+### 6. Run Your Models
+
+```bash
+# Run all models
+leapsql run
+
+# Or run a specific model
+leapsql run --select customer_summary
+```
+
+### 7. Explore the Results
+
+```bash
+# List all models and their status
+leapsql list
+
+# View the dependency graph
+leapsql dag
+```
+
+## What Just Happened?
+
+1. **Seed loading**: LeapSQL loaded your CSV files into DuckDB tables
+2. **Dependency detection**: LeapSQL analyzed your SQL and determined that:
+   - `stg_customers` depends on `raw_customers`
+   - `customer_summary` depends on `stg_customers` and `raw_orders`
+3. **Ordered execution**: Models were run in the correct order based on dependencies
+4. **Lineage tracking**: LeapSQL recorded how columns flow through your transformations
+
+## Add a Macro
+
+Create a reusable macro for common transformations:
+
+```python title="macros/utils.star"
+def cents_to_dollars(column):
+    """Convert cents to dollars with 2 decimal places"""
+    return "ROUND({} / 100.0, 2)".format(column)
+
+def safe_divide(numerator, denominator):
+    """Division that returns NULL instead of error on zero"""
+    return "CASE WHEN {} = 0 THEN NULL ELSE {} / {} END".format(
+        denominator, numerator, denominator
+    )
+```
+
+Use it in a model:
+
+```sql title="models/marts/order_metrics.sql"
+/*---
+name: order_metrics
+materialized: table
+---*/
+
+SELECT
+    customer_id,
+    COUNT(*) as order_count,
+    {{ utils.cents_to_dollars('SUM(amount_cents)') }} as total_dollars,
+    {{ utils.safe_divide('SUM(amount)', 'COUNT(*)') }} as avg_order_value
+FROM raw_orders
+GROUP BY customer_id
+```
+
+## Next Steps
+
+- [Project Structure](/project-structure/) - Learn the recommended directory layout
+- [Models](/concepts/models/) - Deep dive into model configuration
+- [Templating](/templating/overview/) - Master Starlark templating
+- [CLI Reference](/cli/overview/) - Explore all available commands

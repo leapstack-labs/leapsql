@@ -1,40 +1,58 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: LeapSQL
+description: A modern SQL transformation framework with automatic dependency detection and column-level lineage
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
-  image:
-    file: ../../assets/houston.webp
+  tagline: Transform your data with pure SQL. No ref() functions, no boilerplate - just write SQL and let LeapSQL handle the rest.
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Get Started
+      link: /quickstart/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
-      icon: external
+    - text: View on GitHub
+      link: https://github.com/yacobolo/leapsql
       variant: minimal
+      icon: external
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## Why LeapSQL?
 
-<CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
-	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
-	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
-	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
-	</Card>
+<CardGrid>
+  <Card title="Pure SQL" icon="document">
+    Write standard SQL without learning a new DSL. Dependencies are automatically detected from your queries.
+  </Card>
+  <Card title="Column-Level Lineage" icon="random">
+    Track data flow at the column level. Know exactly where each field comes from and how it's transformed.
+  </Card>
+  <Card title="Starlark Macros" icon="setting">
+    Create reusable SQL patterns with Starlark, a Python-like language that's safe and deterministic.
+  </Card>
+  <Card title="Fast Execution" icon="rocket">
+    Built in Go for speed. Run transformations on DuckDB for lightning-fast local development.
+  </Card>
 </CardGrid>
+
+## Quick Example
+
+```sql
+/*---
+name: customers
+materialized: table
+---*/
+
+SELECT
+    c.id,
+    c.name,
+    c.email,
+    COUNT(o.id) as order_count,
+    SUM(o.amount) as total_spent
+FROM raw_customers c
+LEFT JOIN raw_orders o ON c.id = o.customer_id
+GROUP BY c.id, c.name, c.email
+```
+
+LeapSQL automatically:
+- Detects that this model depends on `raw_customers` and `raw_orders`
+- Tracks that `order_count` comes from `orders.id` and `total_spent` from `orders.amount`
+- Builds and runs models in the correct order

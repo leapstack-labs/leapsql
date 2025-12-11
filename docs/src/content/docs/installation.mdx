@@ -1,0 +1,144 @@
+---
+title: Installation
+description: How to install LeapSQL on your system
+---
+
+LeapSQL is distributed as a single binary with no external dependencies. Choose the installation method that works best for your environment.
+
+## From Source (Recommended)
+
+If you have Go 1.21+ installed:
+
+```bash
+go install github.com/yacobolo/leapsql/cmd/leapsql@latest
+```
+
+This installs the `leapsql` binary to your `$GOPATH/bin` directory.
+
+## Pre-built Binaries
+
+Download the latest release for your platform from the [releases page](https://github.com/yacobolo/leapsql/releases).
+
+### macOS
+
+```bash
+# Intel Mac
+curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-darwin-amd64 -o leapsql
+chmod +x leapsql
+sudo mv leapsql /usr/local/bin/
+
+# Apple Silicon
+curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-darwin-arm64 -o leapsql
+chmod +x leapsql
+sudo mv leapsql /usr/local/bin/
+```
+
+### Linux
+
+```bash
+# x86_64
+curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-linux-amd64 -o leapsql
+chmod +x leapsql
+sudo mv leapsql /usr/local/bin/
+
+# ARM64
+curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-linux-arm64 -o leapsql
+chmod +x leapsql
+sudo mv leapsql /usr/local/bin/
+```
+
+### Windows
+
+```powershell
+# Download the Windows binary
+Invoke-WebRequest -Uri "https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-windows-amd64.exe" -OutFile "leapsql.exe"
+
+# Add to PATH or move to a directory in your PATH
+```
+
+## Verify Installation
+
+After installation, verify that LeapSQL is working:
+
+```bash
+leapsql version
+```
+
+You should see output like:
+
+```
+LeapSQL version 0.1.0
+```
+
+## Database Dependencies
+
+### DuckDB
+
+LeapSQL uses DuckDB as its default database engine. DuckDB is embedded directly into LeapSQL - no separate installation is required.
+
+The DuckDB database file is created automatically in your project directory when you first run LeapSQL.
+
+## Project Setup
+
+Once installed, you can create a new project:
+
+```bash
+# Create project directory
+mkdir my-project
+cd my-project
+
+# Create the standard directory structure
+mkdir -p models/staging models/marts seeds macros
+
+# Initialize by running your first command
+leapsql list
+```
+
+This creates the `.leapsql/` directory containing:
+- `state.db` - SQLite database tracking run history and lineage
+- `data.db` - DuckDB database containing your actual data
+
+## Configuration
+
+LeapSQL uses sensible defaults and requires minimal configuration. Optional configuration can be provided via environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LEAPSQL_MODELS_DIR` | Directory containing SQL models | `models/` |
+| `LEAPSQL_SEEDS_DIR` | Directory containing seed CSV files | `seeds/` |
+| `LEAPSQL_MACROS_DIR` | Directory containing Starlark macros | `macros/` |
+| `LEAPSQL_TARGET` | Target environment name | `dev` |
+
+## Troubleshooting
+
+### Command not found
+
+If you get "command not found" after installation:
+
+1. Ensure the binary is in your PATH
+2. For Go installs, ensure `$GOPATH/bin` is in your PATH:
+   ```bash
+   export PATH=$PATH:$(go env GOPATH)/bin
+   ```
+
+### Permission denied
+
+If you get permission errors:
+
+```bash
+chmod +x /path/to/leapsql
+```
+
+### DuckDB errors
+
+DuckDB is embedded in LeapSQL, but if you encounter issues:
+
+1. Ensure you have write permissions in the project directory
+2. Check that `.leapsql/data.db` isn't locked by another process
+3. Try deleting `.leapsql/data.db` to start fresh
+
+## Next Steps
+
+- [Quickstart](/quickstart/) - Create your first project
+- [Project Structure](/project-structure/) - Learn the directory layout
+- [CLI Reference](/cli/overview/) - Explore available commands

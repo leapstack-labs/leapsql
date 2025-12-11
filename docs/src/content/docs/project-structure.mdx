@@ -1,0 +1,216 @@
+---
+title: Project Structure
+description: Learn how to organize your LeapSQL project
+---
+
+LeapSQL follows a convention-over-configuration approach with a simple, intuitive directory structure.
+
+## Standard Layout
+
+```
+my-project/
+├── .leapsql/              # Auto-generated, git-ignored
+│   ├── state.db           # Run history and lineage (SQLite)
+│   └── data.db            # Your data (DuckDB)
+├── models/                # SQL model files
+│   ├── staging/           # Staging models (data cleaning)
+│   │   ├── stg_customers.sql
+│   │   └── stg_orders.sql
+│   └── marts/             # Mart models (business logic)
+│       ├── customer_summary.sql
+│       └── order_metrics.sql
+├── seeds/                 # Static data files (CSV)
+│   ├── raw_customers.csv
+│   └── raw_orders.csv
+└── macros/                # Reusable Starlark macros
+    └── utils.star
+```
+
+## Directory Details
+
+### `.leapsql/`
+
+Auto-generated directory containing LeapSQL's internal state. This should be added to `.gitignore`.
+
+| File | Purpose |
+|------|---------|
+| `state.db` | SQLite database storing run history, model metadata, and column lineage |
+| `data.db` | DuckDB database containing your actual data tables and views |
+
+### `models/`
+
+Contains your SQL transformation files. Models can be organized in subdirectories for better organization.
+
+**Naming conventions:**
+- Use lowercase with underscores: `customer_summary.sql`
+- Prefix staging models with `stg_`: `stg_customers.sql`
+- Prefix intermediate models with `int_`: `int_customer_orders.sql`
+- Use descriptive names for mart models: `customer_lifetime_value.sql`
+
+**Subdirectory conventions:**
+- `staging/` - Light transformations: renaming, casting, basic cleaning
+- `intermediate/` - Complex joins and business logic building blocks
+- `marts/` - Final models ready for consumption by BI tools
+
+### `seeds/`
+
+Contains static CSV files that are loaded directly into your database.
+
+**Common uses:**
+- Reference data (country codes, status mappings)
+- Sample data for development
+- Static lookup tables
+
+**Requirements:**
+- Files must be valid CSV format
+- First row must contain column headers
+- File name (without `.csv`) becomes the table name
+
+### `macros/`
+
+Contains Starlark (`.star`) files with reusable functions.
+
+**Key features:**
+- Functions are namespaced by filename (e.g., `utils.star` exports to `utils` namespace)
+- All `.star` files are automatically loaded
+- Can import from other `.star` files
+
+## Model File Structure
+
+Each SQL model file has two parts:
+
+### 1. Frontmatter (Optional)
+
+YAML configuration wrapped in `/*--- ---*/`:
+
+```sql
+/*---
+name: customer_summary
+materialized: table
+owner: analytics-team
+tags:
+  - customers
+  - core
+---*/
+```
+
+### 2. SQL Query
+
+Standard SQL that defines the model:
+
+```sql
+SELECT
+    customer_id,
+    customer_name,
+    total_orders
+FROM stg_customers
+```
+
+## File Discovery
+
+LeapSQL automatically discovers files based on:
+
+| Type | Pattern | Location |
+|------|---------|----------|
+| Models | `**/*.sql` | `models/` directory (recursive) |
+| Seeds | `*.csv` | `seeds/` directory (non-recursive) |
+| Macros | `*.star` | `macros/` directory (non-recursive) |
+
+## Example: E-commerce Project
+
+```
+ecommerce-analytics/
+├── .leapsql/
+├── models/
+│   ├── staging/
+│   │   ├── stg_customers.sql      # Clean customer data
+│   │   ├── stg_orders.sql         # Clean order data
+│   │   └── stg_products.sql       # Clean product data
+│   ├── intermediate/
+│   │   ├── int_customer_orders.sql    # Customer order aggregations
+│   │   └── int_product_sales.sql      # Product sales metrics
+│   └── marts/
+│       ├── customers/
+│       │   ├── dim_customers.sql       # Customer dimension
+│       │   └── fct_customer_orders.sql # Customer order facts
+│       └── products/
+│           ├── dim_products.sql        # Product dimension
+│           └── fct_product_sales.sql   # Product sales facts
+├── seeds/
+│   ├── country_codes.csv          # ISO country mappings
+│   └── order_statuses.csv         # Order status definitions
+└── macros/
+    ├── utils.star                 # General utilities
+    └── metrics.star               # Metric calculations
+```
+
+## Best Practices
+
+### 1. Keep Staging Simple
+
+Staging models should only:
+- Rename columns to consistent conventions
+- Cast data types
+- Filter out invalid records
+- Add basic computed columns
+
+```sql
+/*---
+name: stg_customers
+materialized: view
+---*/
+
+SELECT
+    id as customer_id,
+    TRIM(name) as customer_name,
+    LOWER(email) as email,
+    created_at::DATE as signup_date
+FROM raw_customers
+WHERE email IS NOT NULL
+```
+
+### 2. Use Intermediate Models
+
+Break complex transformations into intermediate steps:
+
+```sql
+/*---
+name: int_customer_order_summary
+materialized: view
+---*/
+
+SELECT
+    customer_id,
+    COUNT(*) as order_count,
+    SUM(amount) as total_spent,
+    MIN(order_date) as first_order,
+    MAX(order_date) as last_order
+FROM stg_orders
+GROUP BY customer_id
+```
+
+### 3. Materialize Strategically
+
+- **Views** for simple transformations and staging models
+- **Tables** for complex aggregations and frequently queried models
+- **Incremental** for large fact tables with append-only data
+
+### 4. Document with Tags
+
+Use tags to categorize and filter models:
+
+```sql
+/*---
+name: customer_summary
+tags:
+  - customers
+  - pii
+  - daily-refresh
+---*/
+```
+
+## Next Steps
+
+- [Models](/concepts/models/) - Learn about model configuration
+- [Frontmatter](/concepts/frontmatter/) - All frontmatter options
+- [Macros](/macros/overview/) - Create reusable SQL patterns
