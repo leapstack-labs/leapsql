@@ -1,0 +1,472 @@
+---
+title: Built-in Functions
+description: Starlark standard library and LeapSQL built-ins
+---
+
+LeapSQL macros have access to Starlark's standard library plus some LeapSQL-specific functions.
+
+## Starlark Standard Library
+
+### String Functions
+
+#### String Methods
+
+```python
+# Case conversion
+"hello".upper()          # "HELLO"
+"HELLO".lower()          # "hello"
+"hello".capitalize()     # "Hello"
+"hello world".title()    # "Hello World"
+
+# Whitespace
+"  hello  ".strip()      # "hello"
+"  hello  ".lstrip()     # "hello  "
+"  hello  ".rstrip()     # "  hello"
+
+# Search
+"hello".startswith("he")  # True
+"hello".endswith("lo")    # True
+"hello".find("l")         # 2 (index of first 'l')
+"hello".count("l")        # 2
+
+# Replace
+"hello".replace("l", "L") # "heLLo"
+
+# Split/Join
+"a,b,c".split(",")        # ["a", "b", "c"]
+",".join(["a", "b", "c"]) # "a,b,c"
+```
+
+#### String Formatting
+
+```python
+# .format() method
+"Hello, {}!".format("World")
+# "Hello, World!"
+
+"{} + {} = {}".format(1, 2, 3)
+# "1 + 2 = 3"
+
+"Name: {name}, Age: {age}".format(name="Alice", age=30)
+# "Name: Alice, Age: 30"
+
+# Repeated placeholder
+"{0} {0} {1}".format("hello", "world")
+# "hello hello world"
+```
+
+#### String Checks
+
+```python
+"hello".isalpha()    # True (all alphabetic)
+"12345".isdigit()    # True (all digits)
+"hello123".isalnum() # True (alphanumeric)
+"   ".isspace()      # True (all whitespace)
+```
+
+### List Functions
+
+#### Creation and Access
+
+```python
+# Create
+my_list = [1, 2, 3]
+empty = []
+
+# Access
+my_list[0]    # 1 (first element)
+my_list[-1]   # 3 (last element)
+my_list[1:3]  # [2, 3] (slice)
+
+# Length
+len(my_list)  # 3
+```
+
+#### List Operations
+
+```python
+# Concatenation
+[1, 2] + [3, 4]  # [1, 2, 3, 4]
+
+# Repetition
+[1, 2] * 3  # [1, 2, 1, 2, 1, 2]
+
+# Membership
+2 in [1, 2, 3]      # True
+4 in [1, 2, 3]      # False
+4 not in [1, 2, 3]  # True
+```
+
+#### List Methods
+
+```python
+# Note: Lists in Starlark are immutable by default in many contexts
+# These operations return new lists
+
+# append (in a mutable context)
+my_list = [1, 2]
+my_list.append(3)  # [1, 2, 3]
+
+# extend
+my_list.extend([4, 5])  # [1, 2, 3, 4, 5]
+
+# index
+[1, 2, 3].index(2)  # 1
+
+# remove
+my_list.remove(2)  # Removes first occurrence of 2
+```
+
+#### List Comprehensions
+
+```python
+# Transform
+[x * 2 for x in [1, 2, 3]]
+# [2, 4, 6]
+
+# Filter
+[x for x in [1, 2, 3, 4] if x > 2]
+# [3, 4]
+
+# Transform and filter
+[x * 2 for x in [1, 2, 3, 4] if x > 2]
+# [6, 8]
+
+# Nested
+[[i, j] for i in [1, 2] for j in [3, 4]]
+# [[1, 3], [1, 4], [2, 3], [2, 4]]
+```
+
+### Dictionary Functions
+
+#### Creation and Access
+
+```python
+# Create
+my_dict = {"a": 1, "b": 2}
+empty = {}
+
+# Access
+my_dict["a"]          # 1
+my_dict.get("a")      # 1
+my_dict.get("c", 0)   # 0 (with default)
+
+# Check membership
+"a" in my_dict        # True
+"c" in my_dict        # False
+```
+
+#### Dictionary Methods
+
+```python
+my_dict = {"a": 1, "b": 2}
+
+# Keys, values, items
+my_dict.keys()    # ["a", "b"]
+my_dict.values()  # [1, 2]
+my_dict.items()   # [("a", 1), ("b", 2)]
+
+# Get with default
+my_dict.get("c", "default")  # "default"
+
+# Update (in mutable context)
+my_dict.update({"c": 3})
+
+# Pop
+my_dict.pop("a")  # Returns 1, removes "a"
+my_dict.pop("z", "not found")  # Returns "not found"
+```
+
+#### Dictionary Comprehensions
+
+```python
+# Create from list
+{x: x * 2 for x in [1, 2, 3]}
+# {1: 2, 2: 4, 3: 6}
+
+# Filter
+{k: v for k, v in {"a": 1, "b": 2, "c": 3}.items() if v > 1}
+# {"b": 2, "c": 3}
+
+# Transform keys
+{k.upper(): v for k, v in {"a": 1, "b": 2}.items()}
+# {"A": 1, "B": 2}
+```
+
+### Built-in Functions
+
+#### Type Conversion
+
+```python
+int("42")        # 42
+int(3.14)        # 3
+float("3.14")    # 3.14
+str(42)          # "42"
+bool(1)          # True
+bool(0)          # False
+list("abc")      # ["a", "b", "c"]
+dict([("a", 1)]) # {"a": 1}
+```
+
+#### Math Functions
+
+```python
+abs(-5)          # 5
+min(1, 2, 3)     # 1
+max(1, 2, 3)     # 3
+min([1, 2, 3])   # 1 (works with lists too)
+sum([1, 2, 3])   # 6
+```
+
+#### Sequence Functions
+
+```python
+len([1, 2, 3])       # 3
+len("hello")         # 5
+len({"a": 1})        # 1
+
+range(5)             # [0, 1, 2, 3, 4]
+range(1, 5)          # [1, 2, 3, 4]
+range(0, 10, 2)      # [0, 2, 4, 6, 8]
+
+sorted([3, 1, 2])    # [1, 2, 3]
+reversed([1, 2, 3])  # [3, 2, 1]
+
+enumerate(["a", "b"])  # [(0, "a"), (1, "b")]
+zip([1, 2], ["a", "b"]) # [(1, "a"), (2, "b")]
+```
+
+#### Boolean Functions
+
+```python
+all([True, True, True])   # True
+all([True, False, True])  # False
+any([False, True, False]) # True
+any([False, False])       # False
+```
+
+#### Other Built-ins
+
+```python
+type(42)         # "int"
+type("hello")    # "string"
+type([1, 2])     # "list"
+type({"a": 1})   # "dict"
+
+hasattr(obj, "method")  # Check if object has attribute
+getattr(obj, "method")  # Get attribute value
+
+repr("hello")    # "'hello'" (string representation)
+hash("hello")    # Integer hash value
+```
+
+### Control Flow
+
+#### If Expressions
+
+```python
+# Ternary-style
+result = "yes" if condition else "no"
+
+# In macro
+def conditional_sql(include):
+    return "column" if include else "'redacted'"
+```
+
+#### For Loops
+
+```python
+def build_columns(cols):
+    result = []
+    for col in cols:
+        result.append(col)
+    return ", ".join(result)
+```
+
+#### Error Handling
+
+```python
+def validated(value):
+    if not value:
+        fail("Value is required")  # Raises error
+    return value
+```
+
+## LeapSQL Built-ins
+
+### Global Objects
+
+These are available in the template context:
+
+```python
+# Environment variables
+env.MY_VAR
+env.get("MY_VAR", "default")
+
+# Project configuration
+config.project_name
+config.version
+
+# Current target
+target.name
+target.schema
+
+# Current model metadata
+this.name
+this.materialized
+this.tags
+this.meta
+```
+
+### Utility Functions
+
+#### var()
+
+Get a variable with optional default:
+
+```python
+var("start_date", "2024-01-01")
+var("required_param")  # Fails if not set
+```
+
+#### fail()
+
+Stop execution with an error:
+
+```python
+def require_prod():
+    if target.name != "prod":
+        fail("This model can only run in production")
+```
+
+#### print()
+
+Debug output (visible in logs):
+
+```python
+def debug_function(value):
+    print("Received value:", value)
+    return value
+```
+
+## Example: Using Built-ins in Macros
+
+### String Processing
+
+```python title="macros/strings.star"
+def snake_to_camel(name):
+    """Convert snake_case to camelCase."""
+    parts = name.split("_")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+def pluralize(word):
+    """Simple English pluralization."""
+    if word.endswith("s"):
+        return word + "es"
+    elif word.endswith("y"):
+        return word[:-1] + "ies"
+    else:
+        return word + "s"
+```
+
+### List Processing
+
+```python title="macros/lists.star"
+def unique(items):
+    """Remove duplicates while preserving order."""
+    seen = {}
+    result = []
+    for item in items:
+        if item not in seen:
+            seen[item] = True
+            result.append(item)
+    return result
+
+def chunk(items, size):
+    """Split list into chunks of given size."""
+    return [items[i:i+size] for i in range(0, len(items), size)]
+```
+
+### Dictionary Processing
+
+```python title="macros/dicts.star"
+def merge_dicts(*dicts):
+    """Merge multiple dictionaries."""
+    result = {}
+    for d in dicts:
+        result.update(d)
+    return result
+
+def filter_dict(d, keys):
+    """Keep only specified keys from dict."""
+    return {k: v for k, v in d.items() if k in keys}
+```
+
+### SQL Generation
+
+```python title="macros/sql.star"
+def columns_except(all_cols, exclude):
+    """Return columns except those in exclude list."""
+    return [c for c in all_cols if c not in exclude]
+
+def aliased_columns(cols, prefix):
+    """Add prefix alias to columns."""
+    return ["{} as {}_{}".format(c, prefix, c) for c in cols]
+
+def null_safe_equals(col1, col2):
+    """NULL-safe equality comparison."""
+    return "({0} = {1} OR ({0} IS NULL AND {1} IS NULL))".format(col1, col2)
+```
+
+## Limitations
+
+### Not Available in Starlark
+
+These Python features are NOT available:
+
+```python
+# No imports
+import os  # Error!
+
+# No file I/O
+open("file.txt")  # Error!
+
+# No network
+requests.get(...)  # Error!
+
+# No exec/eval
+exec("code")  # Error!
+
+# No classes
+class MyClass:  # Error!
+    pass
+```
+
+### Starlark Differences from Python
+
+```python
+# No while loops
+while condition:  # Error!
+    pass
+
+# No try/except
+try:  # Error!
+    risky()
+except:
+    pass
+
+# No *args/**kwargs (limited support)
+def func(*args):  # Limited support
+    pass
+
+# Integers only (no arbitrary precision)
+very_large = 10 ** 100  # May overflow
+
+# Strings are immutable (as in Python, but no mutation methods)
+```
+
+## Next Steps
+
+- [Writing Macros](/macros/writing-macros) - Create custom macros
+- [Using Macros](/macros/using-macros) - Call macros in models
+- [Templating](/templating/overview) - Template syntax

@@ -1,0 +1,34 @@
+.dark [img-light] {
+  display: none;
+}
+
+html:not(.dark) [img-dark] {
+  display: none;
+}
+
+details summary {
+  cursor: pointer;
+}
+
+.vp-doc [class*="language-"] code {
+  color: var(--vp-c-text-1)
+}
+
+.VPHomeHero .image-src {
+  max-width: 112px;
+  max-height: 112px;
+}
+
+@media (min-width: 640px) {
+  .VPHomeHero .image-src {
+    max-width: 144px;
+    max-height: 144px;
+  }
+}
+
+@media (min-width:960px) {
+  .VPHomeHero .image-src {
+    max-width: 176px;
+    max-height: 176px;
+  }
+}

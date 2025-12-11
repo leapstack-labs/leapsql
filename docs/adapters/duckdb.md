@@ -1,0 +1,211 @@
+---
+title: DuckDB Adapter
+description: Using DuckDB as your data warehouse with LeapSQL
+---
+
+# DuckDB Adapter
+
+DuckDB is the default and recommended database adapter for LeapSQL. It provides a high-performance analytical database that runs embedded within your application.
+
+## Why DuckDB?
+
+- **Zero configuration**: No server to install or manage
+- **High performance**: Optimized for analytical queries
+- **SQL standard**: Rich SQL support including window functions, CTEs, and more
+- **File-based**: Persist data to disk or run entirely in-memory
+- **CSV native**: Built-in support for reading CSV files directly
+
+## Configuration
+
+### CLI Usage
+
+```bash
+# In-memory database (default)
+leapsql run
+
+# Persistent database file
+leapsql run -database ./warehouse.duckdb
+```
+
+### Programmatic Usage
+
+```go
+import "github.com/leapstack-labs/leapsql/internal/adapter"
+
+db := adapter.NewDuckDBAdapter()
+
+// In-memory
+cfg := adapter.Config{Path: ":memory:"}
+
+// Or persistent
+cfg := adapter.Config{Path: "./warehouse.duckdb"}
+
+err := db.Connect(ctx, cfg)
+```
+
+## Features
+
+### In-Memory Mode
+
+When no database path is specified (or using `:memory:`), DuckDB creates a temporary in-memory database:
+
+- **Fast**: No disk I/O overhead
+- **Temporary**: Data is lost when the process exits
+- **Ideal for**: Development, testing, one-off analyses
+
+```bash
+leapsql run  # Uses in-memory by default
+```
+
+### Persistent Mode
+
+Specify a file path to persist data across sessions:
+
+- **Durable**: Data survives process restarts
+- **Shareable**: Database file can be copied or backed up
+- **Ideal for**: Production use, data that needs to persist
+
+```bash
+leapsql run -database ./data/warehouse.duckdb
+```
+
+### CSV Loading
+
+The DuckDB adapter uses `read_csv_auto` for automatic CSV loading:
+
+```sql
+CREATE OR REPLACE TABLE tablename 
+AS SELECT * FROM read_csv_auto('path/to/file.csv', header=true)
+```
+
+Features:
+- Automatic type inference
+- Header detection
+- Handles various CSV dialects
+- Fast parallel reading
+
+### Schema Support
+
+DuckDB uses `main` as the default schema. You can reference tables with full qualification:
+
+```sql
+SELECT * FROM main.customers
+```
+
+## Supported SQL Features
+
+DuckDB supports a rich SQL dialect including:
+
+### Window Functions
+
+```sql
+SELECT 
+    customer_id,
+    order_date,
+    amount,
+    SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date) as running_total
+FROM orders
+```
+
+### Common Table Expressions (CTEs)
+
+```sql
+WITH customer_totals AS (
+    SELECT customer_id, SUM(amount) as total
+    FROM orders
+    GROUP BY customer_id
+)
+SELECT * FROM customer_totals WHERE total > 1000
+```
+
+### Advanced Aggregations
+
+```sql
+SELECT 
+    customer_id,
+    ARRAY_AGG(product_id) as products,
+    MAP(LIST(product_id), LIST(quantity)) as product_quantities
+FROM order_items
+GROUP BY customer_id
+```
+
+### JSON Functions
+
+```sql
+SELECT 
+    data->>'name' as name,
+    data->'address'->>'city' as city
+FROM json_table
+```
+
+## Metadata Queries
+
+The adapter retrieves metadata using DuckDB's information schema:
+
+```sql
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    ordinal_position
+FROM information_schema.columns 
+WHERE table_schema = 'main' AND table_name = 'users'
+ORDER BY ordinal_position
+```
+
+## Performance Tips
+
+### Use Appropriate Types
+
+DuckDB infers types from CSV files, but explicit casting can improve performance:
+
+```sql
+SELECT 
+    CAST(id AS INTEGER) as id,
+    CAST(created_at AS TIMESTAMP) as created_at
+FROM {{ ref('raw_events') }}
+```
+
+### Leverage Parallelism
+
+DuckDB automatically parallelizes queries. For best results:
+- Use columnar operations over row-by-row processing
+- Prefer set-based operations
+- Use window functions instead of self-joins where possible
+
+### Persistent Database for Large Data
+
+For datasets that take time to load, use a persistent database to avoid reloading on every run:
+
+```bash
+# First run loads seeds and builds models
+leapsql run -database ./warehouse.duckdb
+
+# Subsequent runs are faster (seeds already loaded)
+leapsql run -database ./warehouse.duckdb
+```
+
+## Limitations
+
+- **Single process**: DuckDB doesn't support concurrent writes from multiple processes
+- **File locking**: The database file is locked during use
+- **Memory**: Large queries may require significant RAM in in-memory mode
+
+## Error Handling
+
+Common errors and solutions:
+
+### "database is locked"
+
+Another process has the database open. Ensure only one LeapSQL process accesses the database at a time.
+
+### "out of memory"
+
+The query requires more RAM than available. Solutions:
+- Use a persistent database (enables disk spilling)
+- Optimize your query to process less data
+- Increase available memory
+
+### "file not found" for CSV
+
+Ensure the CSV path is correct. LeapSQL converts paths to absolute paths before loading.

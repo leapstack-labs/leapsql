@@ -1,6 +1,7 @@
 *plan.md
 docs-site/
 .leapsql-docs/
+session-ses*.md
 
 # Binaries
 /leapsql

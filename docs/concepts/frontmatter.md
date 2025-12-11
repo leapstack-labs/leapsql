@@ -1,0 +1,334 @@
+---
+title: Frontmatter
+description: Configure your models with YAML frontmatter
+---
+
+Frontmatter is optional YAML configuration at the top of your SQL model files. It controls how LeapSQL builds and manages your models.
+
+## Syntax
+
+Frontmatter is wrapped in a special SQL comment block:
+
+```sql
+/*---
+name: my_model
+materialized: table
+---*/
+
+SELECT * FROM source_table
+```
+
+The `/*---` and `---*/` delimiters distinguish frontmatter from regular SQL comments.
+
+## Available Fields
+
+### name
+
+The unique identifier for your model.
+
+```sql
+/*---
+name: customer_orders
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string` |
+| Required | No |
+| Default | Filename without `.sql` extension |
+
+If not specified, the model name is derived from the filename. A file named `customer_orders.sql` creates a model named `customer_orders`.
+
+### materialized
+
+How the model is persisted in the database.
+
+```sql
+/*---
+name: daily_metrics
+materialized: table
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string` |
+| Required | No |
+| Default | `table` |
+| Options | `table`, `view`, `incremental` |
+
+See [Materializations](/concepts/materializations) for detailed documentation.
+
+### unique_key
+
+Column(s) used to identify unique rows for incremental models.
+
+```sql
+/*---
+name: order_facts
+materialized: incremental
+unique_key: order_id
+---*/
+```
+
+For composite keys, use an array:
+
+```sql
+/*---
+name: daily_user_metrics
+materialized: incremental
+unique_key:
+  - user_id
+  - date
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string` or `string[]` |
+| Required | Only for `incremental` materialization |
+| Default | None |
+
+### schema
+
+Target schema for the model output.
+
+```sql
+/*---
+name: customer_summary
+schema: analytics
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string` |
+| Required | No |
+| Default | Default schema |
+
+### owner
+
+Team or individual responsible for this model.
+
+```sql
+/*---
+name: revenue_metrics
+owner: finance-team
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string` |
+| Required | No |
+| Default | None |
+
+Useful for documentation and governance. The owner field is stored in the state database and can be queried.
+
+### tags
+
+Labels for categorizing and filtering models.
+
+```sql
+/*---
+name: customer_pii
+tags:
+  - pii
+  - customers
+  - daily
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `string[]` |
+| Required | No |
+| Default | `[]` |
+
+Tags can be used to:
+- Filter models when running (`--tag`)
+- Document data classification
+- Group related models
+
+### tests
+
+Data quality tests to run against the model.
+
+```sql
+/*---
+name: orders
+tests:
+  - unique:
+      column: order_id
+  - not_null:
+      column: customer_id
+  - accepted_values:
+      column: status
+      values: ['pending', 'shipped', 'delivered', 'cancelled']
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `object[]` |
+| Required | No |
+| Default | `[]` |
+
+### meta
+
+Arbitrary metadata for documentation and tooling.
+
+```sql
+/*---
+name: customer_ltv
+meta:
+  purpose: Calculate customer lifetime value for segmentation
+  owner_email: analytics@example.com
+  refresh_schedule: "0 6 * * *"
+  slack_channel: "#data-alerts"
+---*/
+```
+
+| Property | Value |
+|----------|-------|
+| Type | `object` |
+| Required | No |
+| Default | `{}` |
+
+The `meta` field accepts any valid YAML structure. It's stored but not interpreted by LeapSQL.
+
+## Complete Example
+
+```sql
+/*---
+name: customer_360
+materialized: table
+schema: marts
+owner: customer-analytics
+tags:
+  - customers
+  - pii
+  - core
+tests:
+  - unique:
+      column: customer_id
+  - not_null:
+      column: customer_id
+  - not_null:
+      column: email
+meta:
+  purpose: Unified customer view combining all customer data sources
+  refresh: daily at 6am UTC
+  dependencies_external:
+    - salesforce.contacts
+    - stripe.customers
+---*/
+
+SELECT
+    c.customer_id,
+    c.email,
+    c.name,
+    c.created_at,
+    o.total_orders,
+    o.total_revenue,
+    o.first_order_date,
+    o.last_order_date,
+    CASE
+        WHEN o.total_revenue > 10000 THEN 'enterprise'
+        WHEN o.total_revenue > 1000 THEN 'business'
+        WHEN o.total_revenue > 100 THEN 'pro'
+        ELSE 'free'
+    END as customer_tier
+FROM stg_customers c
+LEFT JOIN int_customer_metrics o ON c.customer_id = o.customer_id
+```
+
+## Accessing Frontmatter in Templates
+
+The `this` global variable provides access to the current model's frontmatter:
+
+```sql
+/*---
+name: dynamic_model
+materialized: table
+meta:
+  date_column: created_at
+---*/
+
+SELECT *
+FROM source_table
+WHERE {{ this.meta.date_column }} >= '2024-01-01'
+```
+
+Available `this` properties:
+- `this.name` - Model name
+- `this.materialized` - Materialization type
+- `this.schema` - Target schema
+- `this.owner` - Owner
+- `this.tags` - List of tags
+- `this.meta` - Meta dictionary
+
+## Frontmatter Validation
+
+LeapSQL validates frontmatter when parsing models:
+
+```sql
+/*---
+name: invalid_model
+materialized: invalid_value  -- Error: must be table, view, or incremental
+---*/
+```
+
+Validation errors are reported with the file path and line number.
+
+## Best Practices
+
+### 1. Always Specify Materialization
+
+Be explicit about how models should be built:
+
+```sql
+/*---
+name: staging_customers
+materialized: view  -- Explicit is better than implicit
+---*/
+```
+
+### 2. Use Tags Consistently
+
+Establish naming conventions for tags:
+
+- `pii` - Contains personally identifiable information
+- `daily`, `hourly` - Refresh frequency
+- `core` - Critical business models
+- `deprecated` - Models scheduled for removal
+
+### 3. Document with Meta
+
+Use the `meta` field for information that helps future maintainers:
+
+```sql
+/*---
+meta:
+  created: 2024-01-15
+  jira_ticket: DATA-1234
+  notes: |
+    This model denormalizes customer data for BI tools.
+    See confluence page: /wiki/customer-data-model
+---*/
+```
+
+### 4. Keep Names Consistent
+
+Use a consistent naming pattern:
+- `stg_` prefix for staging models
+- `int_` prefix for intermediate models
+- `fct_` prefix for fact tables
+- `dim_` prefix for dimension tables
+
+## Next Steps
+
+- [Materializations](/concepts/materializations) - Deep dive into table, view, incremental
+- [Models](/concepts/models) - Model fundamentals
+- [Templating Globals](/templating/globals) - Using `this` and other globals

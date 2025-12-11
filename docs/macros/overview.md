@@ -1,0 +1,303 @@
+---
+title: Macros Overview
+description: Reusable SQL patterns with Starlark macros
+---
+
+Macros are reusable functions written in Starlark that generate SQL snippets. They help you DRY up your SQL code and create consistent patterns across your project.
+
+## What are Macros?
+
+Macros are Starlark functions that return SQL strings. They're defined in `.star` files in your `macros/` directory and automatically become available in your templates.
+
+```python title="macros/utils.star"
+def cents_to_dollars(column):
+    """Convert cents to dollars with 2 decimal places"""
+    return "ROUND({} / 100.0, 2)".format(column)
+```
+
+```sql title="models/orders.sql"
+SELECT
+    order_id,
+    {{ utils.cents_to_dollars('amount_cents') }} as amount_dollars
+FROM raw_orders
+```
+
+**Rendered SQL:**
+```sql
+SELECT
+    order_id,
+    ROUND(amount_cents / 100.0, 2) as amount_dollars
+FROM raw_orders
+```
+
+## Why Use Macros?
+
+### 1. Consistency
+
+Define patterns once, use everywhere:
+
+```python
+def standard_timestamps():
+    return """
+        created_at,
+        updated_at,
+        CURRENT_TIMESTAMP as _loaded_at
+    """
+```
+
+### 2. Reduce Errors
+
+Complex SQL is written once and tested:
+
+```python
+def safe_divide(numerator, denominator, default=0):
+    return "COALESCE({} / NULLIF({}, 0), {})".format(
+        numerator, denominator, default
+    )
+```
+
+### 3. Encapsulate Business Logic
+
+```python
+def customer_tier(revenue_column):
+    return """
+        CASE
+            WHEN {} > 10000 THEN 'enterprise'
+            WHEN {} > 1000 THEN 'business'
+            WHEN {} > 100 THEN 'starter'
+            ELSE 'free'
+        END
+    """.format(revenue_column, revenue_column, revenue_column)
+```
+
+### 4. Environment Abstraction
+
+```python
+def date_trunc(unit, column):
+    # Could vary by database dialect
+    return "DATE_TRUNC('{}', {})".format(unit, column)
+```
+
+## Quick Start
+
+### 1. Create a Macro File
+
+```python title="macros/utils.star"
+def hello(name):
+    return "Hello, {}!".format(name)
+
+def add_numbers(a, b):
+    return str(a + b)
+```
+
+### 2. Use in a Model
+
+```sql title="models/example.sql"
+/*---
+name: example
+---*/
+
+SELECT 
+    '{{ utils.hello("World") }}' as greeting,
+    {{ utils.add_numbers(1, 2) }} as sum
+```
+
+### 3. See the Result
+
+```sql
+SELECT 
+    'Hello, World!' as greeting,
+    3 as sum
+```
+
+## Macro Organization
+
+### File-based Namespacing
+
+Macros are namespaced by filename:
+
+```
+macros/
+├── utils.star      → {{ utils.function() }}
+├── metrics.star    → {{ metrics.function() }}
+└── dates.star      → {{ dates.function() }}
+```
+
+### Grouping Related Macros
+
+```python title="macros/metrics.star"
+# All metric-related macros in one file
+
+def growth_rate(current, previous):
+    return safe_divide(
+        "{} - {}".format(current, previous),
+        previous
+    ) + " * 100"
+
+def moving_average(column, window=7):
+    return "AVG({}) OVER (ORDER BY date ROWS {} PRECEDING)".format(
+        column, window - 1
+    )
+
+def year_over_year(column, date_column):
+    return "{} - LAG({}, 365) OVER (ORDER BY {})".format(
+        column, column, date_column
+    )
+```
+
+## Starlark Basics
+
+Macros use Starlark, a Python-like language:
+
+### Variables and Types
+
+```python
+# Strings
+name = "example"
+sql = 'SELECT * FROM {}'.format(name)
+
+# Numbers
+count = 42
+price = 99.99
+
+# Lists
+columns = ["id", "name", "email"]
+joined = ", ".join(columns)
+
+# Dictionaries
+config = {"schema": "public", "limit": 1000}
+schema = config["schema"]
+```
+
+### Functions
+
+```python
+def my_function(required_arg, optional_arg="default"):
+    """Docstring describing the function"""
+    return "Result: {} {}".format(required_arg, optional_arg)
+```
+
+### String Formatting
+
+```python
+# .format() method
+"SELECT {} FROM {}".format("*", "users")
+
+# Multiple values
+"WHERE {} = {} AND {} = {}".format("a", 1, "b", 2)
+
+# Named placeholders
+"SELECT {cols} FROM {table}".format(cols="*", table="users")
+```
+
+### Control Flow
+
+```python
+def conditional_sql(include_email):
+    if include_email:
+        return "id, name, email"
+    else:
+        return "id, name"
+
+def build_column_list(columns):
+    result = []
+    for col in columns:
+        result.append(col)
+    return ", ".join(result)
+```
+
+## Common Patterns
+
+### SQL Snippets
+
+```python
+def select_star_from(table):
+    return "SELECT * FROM {}".format(table)
+
+def where_date_range(column, start, end):
+    return "WHERE {} BETWEEN '{}' AND '{}'".format(column, start, end)
+```
+
+### Column Transformations
+
+```python
+def coalesce_zero(column):
+    return "COALESCE({}, 0)".format(column)
+
+def trim_lower(column):
+    return "LOWER(TRIM({}))".format(column)
+```
+
+### Aggregations
+
+```python
+def sum_if(column, condition):
+    return "SUM(CASE WHEN {} THEN {} ELSE 0 END)".format(condition, column)
+
+def count_distinct(column):
+    return "COUNT(DISTINCT {})".format(column)
+```
+
+## Best Practices
+
+### 1. Keep Macros Focused
+
+```python
+# Good: Single responsibility
+def cents_to_dollars(column):
+    return "ROUND({} / 100.0, 2)".format(column)
+
+# Bad: Too many responsibilities
+def format_money_and_log_and_validate(column, log_level, schema):
+    # Too complex!
+    pass
+```
+
+### 2. Document Your Macros
+
+```python
+def safe_divide(numerator, denominator, default=0):
+    """
+    Safely divide two columns, returning default if denominator is zero.
+    
+    Args:
+        numerator: Column or expression for numerator
+        denominator: Column or expression for denominator  
+        default: Value to return if denominator is 0 (default: 0)
+    
+    Example:
+        {{ utils.safe_divide('revenue', 'orders') }}
+        → COALESCE(revenue / NULLIF(orders, 0), 0)
+    """
+    return "COALESCE({} / NULLIF({}, 0), {})".format(
+        numerator, denominator, default
+    )
+```
+
+### 3. Use Descriptive Names
+
+```python
+# Good
+def customer_lifetime_value_tier(ltv_column):
+    pass
+
+# Bad
+def clt(c):
+    pass
+```
+
+### 4. Handle Edge Cases
+
+```python
+def in_list(column, values):
+    if not values:
+        return "FALSE"  # Handle empty list
+    quoted = ["'{}'".format(v) for v in values]
+    return "{} IN ({})".format(column, ", ".join(quoted))
+```
+
+## Next Steps
+
+- [Writing Macros](/macros/writing-macros) - Detailed macro authoring guide
+- [Using Macros](/macros/using-macros) - How to use macros in models
+- [Built-in Functions](/macros/builtins) - Available Starlark functions

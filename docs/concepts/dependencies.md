@@ -1,0 +1,313 @@
+---
+title: Dependencies
+description: How LeapSQL automatically detects and manages model dependencies
+---
+
+One of LeapSQL's key features is automatic dependency detection. Unlike other tools that require explicit `ref()` functions, LeapSQL analyzes your SQL to understand which models depend on which tables.
+
+## How Dependency Detection Works
+
+LeapSQL parses your SQL using a full SQL parser to identify all table references:
+
+```sql
+/*---
+name: customer_orders
+---*/
+
+SELECT
+    c.customer_id,
+    c.name,
+    o.order_id,
+    o.amount
+FROM stg_customers c
+JOIN stg_orders o ON c.customer_id = o.customer_id
+```
+
+LeapSQL automatically detects that `customer_orders` depends on:
+- `stg_customers`
+- `stg_orders`
+
+### What Gets Detected
+
+The parser finds table references in:
+
+- **FROM clauses**: `FROM customers`
+- **JOIN clauses**: `JOIN orders ON ...`
+- **Subqueries**: `SELECT * FROM (SELECT * FROM users)`
+- **CTEs**: `WITH cte AS (SELECT * FROM source) SELECT * FROM cte`
+- **UNION/INTERSECT/EXCEPT**: `SELECT * FROM a UNION SELECT * FROM b`
+- **INSERT targets**: `INSERT INTO target SELECT * FROM source`
+
+### What Doesn't Create Dependencies
+
+- **CTE names**: CTEs are internal to your query, not external dependencies
+- **Aliases**: Table aliases don't create dependencies
+- **Function calls**: `SELECT my_function()` isn't a dependency
+
+## The Dependency Graph (DAG)
+
+LeapSQL builds a Directed Acyclic Graph (DAG) from your model dependencies:
+
+```
+raw_customers ─┐
+               ├──> stg_customers ─┐
+               │                   ├──> customer_orders ──> customer_summary
+raw_orders ────┴──> stg_orders ────┘
+```
+
+This graph determines:
+1. **Build order**: Models are built in topological order
+2. **Parallelization**: Independent models can run in parallel
+3. **Impact analysis**: Know what's affected by a change
+
+### Viewing the DAG
+
+```bash
+# View the dependency graph
+leapsql dag
+
+# Output:
+# raw_customers
+# └── stg_customers
+#     └── customer_orders
+#         └── customer_summary
+# raw_orders
+# └── stg_orders
+#     └── customer_orders
+```
+
+## Dependency Resolution
+
+When you run LeapSQL, dependencies are resolved in this order:
+
+1. **Parse all models** to extract dependencies
+2. **Build the DAG** from the dependency relationships
+3. **Detect cycles** (and fail if found)
+4. **Topologically sort** to determine build order
+5. **Execute models** in the sorted order
+
+### Dependency Sources
+
+LeapSQL matches table references against these sources (in order):
+
+1. **Other models** in your project
+2. **Seed tables** from loaded CSV files
+3. **External tables** already in your database
+
+```sql
+-- LeapSQL checks if 'stg_customers' is:
+-- 1. A model defined in models/*.sql
+-- 2. A seed from seeds/*.csv
+-- 3. An existing table in the database
+SELECT * FROM stg_customers
+```
+
+## Managing Dependencies
+
+### Selecting Models with Dependencies
+
+The `--select` flag supports dependency modifiers:
+
+```bash
+# Run a model and all its upstream dependencies
+leapsql run --select +customer_summary
+
+# Run a model and all downstream models that depend on it
+leapsql run --select stg_customers+
+
+# Run a model with both upstream and downstream
+leapsql run --select +customer_orders+
+```
+
+### Understanding Selection Syntax
+
+| Syntax | Description |
+|--------|-------------|
+| `model_name` | Just this model |
+| `+model_name` | This model and all upstream dependencies |
+| `model_name+` | This model and all downstream dependents |
+| `+model_name+` | Full lineage (upstream and downstream) |
+
+### Example
+
+Given this DAG:
+```
+A ──> B ──> C ──> D
+```
+
+| Command | Models Run |
+|---------|------------|
+| `--select B` | B |
+| `--select +B` | A, B |
+| `--select B+` | B, C, D |
+| `--select +B+` | A, B, C, D |
+
+## Handling Complex Dependencies
+
+### Subqueries
+
+Dependencies in subqueries are detected:
+
+```sql
+SELECT *
+FROM (
+    SELECT customer_id, SUM(amount) as total
+    FROM orders  -- Detected as dependency
+    GROUP BY customer_id
+) customer_totals
+JOIN customers c ON customer_totals.customer_id = c.id  -- Also detected
+```
+
+### CTEs (Common Table Expressions)
+
+CTEs are handled correctly - the CTE name doesn't create a dependency, but tables referenced inside it do:
+
+```sql
+WITH customer_orders AS (
+    -- 'orders' is detected as a dependency
+    SELECT customer_id, COUNT(*) as order_count
+    FROM orders
+    GROUP BY customer_id
+)
+-- 'customer_orders' is NOT a dependency (it's a CTE)
+-- 'customers' IS a dependency
+SELECT c.*, co.order_count
+FROM customers c
+LEFT JOIN customer_orders co ON c.id = co.customer_id
+```
+
+### Multiple Queries
+
+If a model contains multiple statements, all dependencies are collected:
+
+```sql
+-- Both dependencies are detected
+INSERT INTO summary
+SELECT * FROM source_a;
+
+INSERT INTO summary
+SELECT * FROM source_b;
+```
+
+## Circular Dependency Detection
+
+LeapSQL detects and prevents circular dependencies:
+
+```
+A ──> B ──> C ──> A  (CYCLE!)
+```
+
+If detected, you'll see an error:
+
+```
+Error: circular dependency detected: A -> B -> C -> A
+```
+
+### Resolving Cycles
+
+1. **Identify the cycle** from the error message
+2. **Analyze the logic** - is the cycle necessary?
+3. **Break the cycle** by:
+   - Combining models
+   - Restructuring the transformation
+   - Using incremental patterns for truly circular data flows
+
+## External Dependencies
+
+Tables that aren't models or seeds are treated as external dependencies:
+
+```sql
+-- If 'external_api_data' isn't a model or seed,
+-- LeapSQL assumes it exists in the database
+SELECT * FROM external_api_data
+```
+
+External dependencies:
+- Don't affect build order
+- Are assumed to exist at runtime
+- Show warnings if they don't exist
+
+## Best Practices
+
+### 1. Keep Dependency Chains Shallow
+
+Deep chains are harder to debug and slower to run:
+
+```
+Good: source -> staging -> mart (2 hops)
+Bad:  source -> stg -> int1 -> int2 -> int3 -> mart (5 hops)
+```
+
+### 2. Name Models Clearly
+
+Clear names make the DAG easier to understand:
+
+```sql
+-- Good: Clear dependency visible in the name
+stg_customers -> int_customer_orders -> fct_customer_metrics
+
+-- Bad: Unclear relationship
+data1 -> transform -> final
+```
+
+### 3. Use Tags for Organization
+
+Tags help manage related models:
+
+```sql
+/*---
+tags: [customers, core]
+---*/
+```
+
+```bash
+# Run all customer-related models
+leapsql run --tag customers
+```
+
+### 4. Document External Dependencies
+
+Use frontmatter to document external tables:
+
+```sql
+/*---
+name: customer_enriched
+meta:
+  external_dependencies:
+    - salesforce.contacts (synced hourly)
+    - stripe.customers (synced daily)
+---*/
+```
+
+## Troubleshooting
+
+### "Model not found" Errors
+
+If LeapSQL can't find a referenced model:
+
+1. Check spelling of the table name
+2. Verify the model file exists
+3. Check if it's a seed that needs to be loaded first
+4. Verify the table exists in the database (for external deps)
+
+### Unexpected Dependencies
+
+If LeapSQL detects wrong dependencies:
+
+1. Check for table names that match model names
+2. Use schema qualifiers to be explicit: `schema.table_name`
+3. Review subqueries and CTEs for hidden references
+
+### Performance Issues
+
+If the DAG is slow to compute:
+
+1. Reduce the number of models
+2. Combine small models that are always run together
+3. Use `--select` to run only needed models
+
+## Next Steps
+
+- [Models](/concepts/models) - Model configuration
+- [DAG Command](/cli/dag) - Visualizing dependencies
+- [Run Command](/cli/run) - Running models with selection

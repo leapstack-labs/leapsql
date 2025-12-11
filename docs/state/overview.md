@@ -1,0 +1,206 @@
+---
+title: State Management
+description: How LeapSQL tracks runs, models, and execution history
+---
+
+# State Management
+
+LeapSQL uses a SQLite database to track pipeline state, including runs, models, execution history, and dependencies. This enables incremental builds, change detection, and execution auditing.
+
+## State Database Location
+
+By default, state is stored in `.leapsql/state.db`:
+
+```
+project/
+├── .leapsql/
+│   └── state.db      # State database
+├── models/
+├── seeds/
+└── macros/
+```
+
+Override with the `--state` flag:
+
+```bash
+leapsql run --state ./custom/path/state.db
+```
+
+## What's Tracked
+
+The state database stores:
+
+- **Runs** - Pipeline execution sessions
+- **Models** - Registered model metadata
+- **Model Runs** - Individual model executions within runs
+- **Dependencies** - Model dependency relationships
+- **Environments** - Virtual environment configurations
+- **Column Lineage** - Column-to-column data flow
+
+## Schema Overview
+
+```sql
+-- Pipeline runs
+CREATE TABLE runs (
+    id TEXT PRIMARY KEY,
+    environment TEXT NOT NULL,
+    status TEXT NOT NULL,         -- running, completed, failed, cancelled
+    started_at DATETIME NOT NULL,
+    completed_at DATETIME,
+    error TEXT
+);
+
+-- Registered models
+CREATE TABLE models (
+    id TEXT PRIMARY KEY,
+    path TEXT NOT NULL UNIQUE,    -- e.g., "staging.stg_customers"
+    name TEXT NOT NULL,
+    materialized TEXT NOT NULL,   -- table, view, incremental
+    content_hash TEXT NOT NULL,   -- For change detection
+    owner TEXT,
+    schema_name TEXT,
+    tags TEXT,                    -- JSON array
+    created_at DATETIME,
+    updated_at DATETIME
+);
+
+-- Model execution history
+CREATE TABLE model_runs (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    status TEXT NOT NULL,         -- pending, running, success, failed, skipped
+    rows_affected INTEGER,
+    started_at DATETIME,
+    completed_at DATETIME,
+    execution_ms INTEGER,
+    error TEXT
+);
+
+-- Dependency graph edges
+CREATE TABLE dependencies (
+    model_id TEXT NOT NULL,
+    parent_id TEXT NOT NULL,
+    PRIMARY KEY (model_id, parent_id)
+);
+```
+
+## Run Statuses
+
+| Status | Description |
+|--------|-------------|
+| `running` | Pipeline is currently executing |
+| `completed` | All models executed successfully |
+| `failed` | One or more models failed |
+| `cancelled` | Execution was cancelled |
+
+## Model Run Statuses
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Queued for execution |
+| `running` | Currently executing |
+| `success` | Executed successfully |
+| `failed` | Execution failed |
+| `skipped` | Skipped (dependency failed or unchanged) |
+
+## Change Detection
+
+LeapSQL computes a content hash for each model based on:
+
+- Model SQL content
+- Frontmatter configuration
+- Template rendering result
+
+When running, LeapSQL compares the current hash to the stored hash to detect changes:
+
+```go
+// Hash includes rendered SQL + frontmatter
+hash := sha256(renderedSQL + frontmatterConfig)
+```
+
+This enables:
+- **Incremental builds** - Only run changed models
+- **Dependency cascading** - Run downstream models when upstream changes
+- **Audit trail** - Track what version of code produced each output
+
+## State Store Interface
+
+The state management system implements the `StateStore` interface:
+
+```go
+type StateStore interface {
+    // Connection
+    Open(path string) error
+    Close() error
+    InitSchema() error
+    
+    // Run operations
+    CreateRun(env string) (*Run, error)
+    GetRun(id string) (*Run, error)
+    CompleteRun(id string, status RunStatus, errMsg string) error
+    GetLatestRun(env string) (*Run, error)
+    
+    // Model operations
+    RegisterModel(model *Model) error
+    GetModelByID(id string) (*Model, error)
+    GetModelByPath(path string) (*Model, error)
+    UpdateModelHash(id string, contentHash string) error
+    ListModels() ([]*Model, error)
+    
+    // Model run operations
+    RecordModelRun(modelRun *ModelRun) error
+    UpdateModelRun(id string, status ModelRunStatus, rowsAffected int64, errMsg string) error
+    GetModelRunsForRun(runID string) ([]*ModelRun, error)
+    GetLatestModelRun(modelID string) (*ModelRun, error)
+    
+    // Dependency operations
+    SetDependencies(modelID string, parentIDs []string) error
+    GetDependencies(modelID string) ([]string, error)
+    GetDependents(modelID string) ([]string, error)
+}
+```
+
+## Best Practices
+
+### Version Control
+
+The state database contains machine-generated data and should typically be gitignored:
+
+```gitignore
+# .gitignore
+.leapsql/
+```
+
+### Backup
+
+For production environments, back up the state database before major operations:
+
+```bash
+cp .leapsql/state.db .leapsql/state.db.backup
+```
+
+### Multiple Environments
+
+Use separate state databases for different environments:
+
+```bash
+# Development
+leapsql run --state .leapsql/dev.db --env dev
+
+# Production
+leapsql run --state .leapsql/prod.db --env prod
+```
+
+### Inspecting State
+
+You can query the state database directly with any SQLite client:
+
+```bash
+sqlite3 .leapsql/state.db "SELECT * FROM runs ORDER BY started_at DESC LIMIT 5"
+```
+
+## Related
+
+- [Run History](/state/runs) - Querying run history
+- [CLI Reference](/cli/) - Command-line options
