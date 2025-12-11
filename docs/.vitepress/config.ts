@@ -7,6 +7,7 @@ import { description, github, name, ogImage, ogUrl } from './meta'
 export default defineConfig({
   title: name,
   description,
+  base: '/leapsql/',
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
     ['meta', { property: 'og:type', content: 'website' }],

@@ -1,7 +1,7 @@
 export const name = 'LeapSQL'
 export const description = 'A modern SQL transformation framework with automatic dependency detection and column-level lineage'
 
-export const ogUrl = 'https://leapsql.dev/'
+export const ogUrl = 'https://leapstack-labs.github.io/leapsql/'
 export const ogImage = `${ogUrl}og.png`
 
 export const github = 'https://github.com/leapstack-labs/leapsql'
