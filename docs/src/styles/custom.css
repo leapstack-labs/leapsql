@@ -1,0 +1,15 @@
+/* Force dark mode only */
+:root {
+  color-scheme: dark;
+}
+
+/* Hide the theme toggle button */
+starlight-theme-select {
+  display: none;
+}
+
+/* Force dark theme even when light is selected */
+:root,
+:root[data-theme="light"] {
+  --sl-color-bg: var(--sl-color-black);
+}

@@ -1,0 +1,104 @@
+---
+import config from "virtual:starlight/user-config";
+import type { Props } from "@astrojs/starlight/props";
+
+import Search from "virtual:starlight/components/Search";
+import SiteTitle from "virtual:starlight/components/SiteTitle";
+import { Icon } from "@astrojs/starlight/components";
+
+/**
+ * Render the `Search` component if Pagefind is enabled or the default search component has been overridden.
+ */
+const shouldRenderSearch =
+	config.pagefind ||
+	config.components.Search !== "@astrojs/starlight/components/Search.astro";
+
+const links = config.social || [];
+---
+
+<div class="header sl-flex">
+	<div class="title-wrapper sl-flex">
+		<SiteTitle {...Astro.props} />
+	</div>
+	<div class="sl-flex-grow"></div>
+	<div class="sl-hidden md:sl-flex right-group">
+		{
+			links.length > 0 && (
+				<div class="sl-flex social-icons">
+					{links.map(({ href, icon, label }) => (
+						<a href={href} rel="me" target="_blank" aria-label={label}>
+							<Icon name={icon} size="1rem" />
+						</a>
+					))}
+				</div>
+			)
+		}
+		{shouldRenderSearch && <Search {...Astro.props} />}
+	</div>
+</div>
+
+<style>
+	.header {
+		gap: calc(var(--sl-nav-gap) * 2);
+		justify-content: space-between;
+		align-items: center;
+		height: 100%;
+	}
+
+	.title-wrapper {
+		overflow: clip;
+		padding: calc(0.25rem + 2px) 0.25rem calc(0.25rem - 2px);
+		margin: -0.25rem;
+	}
+
+	.right-group {
+		gap: 1.5rem;
+		align-items: center;
+		margin-inline-start: auto;
+	}
+
+	.social-icons {
+		gap: 1rem;
+		align-items: center;
+	}
+
+	.social-icons a {
+		line-height: 1;
+	}
+
+	.social-icons a svg {
+		color: var(--sl-color-gray-3);
+	}
+
+	.social-icons a:hover svg {
+		color: var(--sl-color-text);
+	}
+
+	@media (min-width: 50rem) {
+		:global(:root[data-has-sidebar]) {
+			--__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
+		}
+		:global(:root:not([data-has-toc])) {
+			--__toc-width: 0rem;
+		}
+		.header {
+			--__sidebar-width: max(0rem, var(--sl-content-inline-start, 0rem) - var(--sl-nav-pad-x));
+			--__main-column-fr: calc(
+				(
+						100% + var(--__sidebar-pad, 0rem) - var(--__toc-width, var(--sl-sidebar-width)) -
+							(2 * var(--__toc-width, var(--sl-nav-pad-x))) - var(--sl-content-inline-start, 0rem) -
+							var(--sl-content-width)
+					) / 2
+			);
+			display: grid;
+			grid-template-columns:
+				minmax(
+					calc(var(--__sidebar-width) + max(0rem, var(--__main-column-fr) - var(--sl-nav-gap))),
+					auto
+				)
+				1fr
+				auto;
+			align-content: center;
+		}
+	}
+</style>
