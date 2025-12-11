@@ -3,6 +3,8 @@ title: Control Flow
 description: Conditionals and loops in LeapSQL templates
 ---
 
+# Control Flow
+
 Control flow statements let you conditionally include SQL and generate repetitive patterns. They use the `{* *}` syntax.
 
 ## If Statements

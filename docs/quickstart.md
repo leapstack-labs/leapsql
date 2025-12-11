@@ -11,7 +11,7 @@ This guide will help you create your first LeapSQL project and run your first tr
 
 ```bash
 # Install from source
-go install github.com/yacobolo/leapsql/cmd/leapsql@latest
+go install github.com/leapstack-labs/leapsql/cmd/leapsql@latest
 
 # Verify installation
 leapsql version

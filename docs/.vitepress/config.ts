@@ -1,7 +1,7 @@
 import type { DefaultTheme } from 'vitepress'
 import UnoCSS from 'unocss/vite'
 import { defineConfig } from 'vitepress'
-import llmstxt from 'vitepress-plugin-llms'
+import llmstxt, { copyOrDownloadAsMarkdownButtons } from 'vitepress-plugin-llms'
 import { description, github, name, ogImage, ogUrl } from './meta'
 
 export default defineConfig({
@@ -43,6 +43,11 @@ export default defineConfig({
 
     search: {
       provider: 'local',
+    },
+  },
+  markdown: {
+    config(md) {
+      md.use(copyOrDownloadAsMarkdownButtons)
     },
   },
 })

@@ -3,6 +3,8 @@ title: Seeds
 description: Loading static data from CSV files
 ---
 
+# Seeds
+
 Seeds are CSV files that LeapSQL loads directly into your database as tables. They're useful for static reference data, lookup tables, and sample data for development.
 
 ## What are Seeds?

@@ -4,5 +4,5 @@ export const description = 'A modern SQL transformation framework with automatic
 export const ogUrl = 'https://leapsql.dev/'
 export const ogImage = `${ogUrl}og.png`
 
-export const github = 'https://github.com/yacobolo/leapsql'
-export const releases = 'https://github.com/yacobolo/leapsql/releases'
+export const github = 'https://github.com/leapstack-labs/leapsql'
+export const releases = 'https://github.com/leapstack-labs/leapsql/releases'

@@ -3,6 +3,8 @@ title: Frontmatter
 description: Configure your models with YAML frontmatter
 ---
 
+# Frontmatter
+
 Frontmatter is optional YAML configuration at the top of your SQL model files. It controls how LeapSQL builds and manages your models.
 
 ## Syntax

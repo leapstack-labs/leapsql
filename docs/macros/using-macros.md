@@ -3,6 +3,8 @@ title: Using Macros
 description: How to call macros in your SQL models
 ---
 
+# Using Macros
+
 This guide covers how to use macros effectively in your LeapSQL models.
 
 ## Basic Usage

@@ -10,7 +10,7 @@ hero:
       link: /quickstart
     - theme: alt
       text: GitHub
-      link: https://github.com/yacobolo/leapsql
+      link: https://github.com/leapstack-labs/leapsql
 
 features:
   - title: Pure SQL
@@ -43,6 +43,7 @@ GROUP BY c.id, c.name, c.email
 ```
 
 LeapSQL automatically:
+
 - Detects that this model depends on `raw_customers` and `raw_orders`
 - Tracks that `order_count` comes from `orders.id` and `total_spent` from `orders.amount`
 - Builds and runs models in the correct order

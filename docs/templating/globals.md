@@ -3,6 +3,8 @@ title: Global Variables
 description: Built-in variables available in LeapSQL templates
 ---
 
+# Global Variables
+
 LeapSQL provides several global variables that are available in all templates. These let you access environment configuration, model metadata, and more.
 
 ## Available Globals

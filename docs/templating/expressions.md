@@ -3,6 +3,8 @@ title: Expressions
 description: Template expression syntax and evaluation
 ---
 
+# Expressions
+
 Expressions are the core of LeapSQL templating. They evaluate Starlark code and insert the result into your SQL.
 
 ## Syntax

@@ -3,6 +3,8 @@ title: Macros Overview
 description: Reusable SQL patterns with Starlark macros
 ---
 
+# Macros Overview
+
 Macros are reusable functions written in Starlark that generate SQL snippets. They help you DRY up your SQL code and create consistent patterns across your project.
 
 ## What are Macros?

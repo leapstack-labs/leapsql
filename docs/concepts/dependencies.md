@@ -3,6 +3,8 @@ title: Dependencies
 description: How LeapSQL automatically detects and manages model dependencies
 ---
 
+# Dependencies
+
 One of LeapSQL's key features is automatic dependency detection. Unlike other tools that require explicit `ref()` functions, LeapSQL analyzes your SQL to understand which models depend on which tables.
 
 ## How Dependency Detection Works

@@ -7,25 +7,25 @@ LeapSQL is distributed as a single binary with no external dependencies. Choose 
 If you have Go 1.21+ installed:
 
 ```bash
-go install github.com/yacobolo/leapsql/cmd/leapsql@latest
+go install github.com/leapstack-labs/leapsql/cmd/leapsql@latest
 ```
 
 This installs the `leapsql` binary to your `$GOPATH/bin` directory.
 
 ## Pre-built Binaries
 
-Download the latest release for your platform from the [releases page](https://github.com/yacobolo/leapsql/releases).
+Download the latest release for your platform from the [releases page](https://github.com/leapstack-labs/leapsql/releases).
 
 ### macOS
 
 ```bash
 # Intel Mac
-curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-darwin-amd64 -o leapsql
+curl -L https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-darwin-amd64 -o leapsql
 chmod +x leapsql
 sudo mv leapsql /usr/local/bin/
 
 # Apple Silicon
-curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-darwin-arm64 -o leapsql
+curl -L https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-darwin-arm64 -o leapsql
 chmod +x leapsql
 sudo mv leapsql /usr/local/bin/
 ```
@@ -34,12 +34,12 @@ sudo mv leapsql /usr/local/bin/
 
 ```bash
 # x86_64
-curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-linux-amd64 -o leapsql
+curl -L https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-linux-amd64 -o leapsql
 chmod +x leapsql
 sudo mv leapsql /usr/local/bin/
 
 # ARM64
-curl -L https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-linux-arm64 -o leapsql
+curl -L https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-linux-arm64 -o leapsql
 chmod +x leapsql
 sudo mv leapsql /usr/local/bin/
 ```
@@ -48,7 +48,7 @@ sudo mv leapsql /usr/local/bin/
 
 ```powershell
 # Download the Windows binary
-Invoke-WebRequest -Uri "https://github.com/yacobolo/leapsql/releases/latest/download/leapsql-windows-amd64.exe" -OutFile "leapsql.exe"
+Invoke-WebRequest -Uri "https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-windows-amd64.exe" -OutFile "leapsql.exe"
 
 # Add to PATH or move to a directory in your PATH
 ```
@@ -92,6 +92,7 @@ leapsql list
 ```
 
 This creates the `.leapsql/` directory containing:
+
 - `state.db` - SQLite database tracking run history and lineage
 - `data.db` - DuckDB database containing your actual data
 
@@ -99,12 +100,12 @@ This creates the `.leapsql/` directory containing:
 
 LeapSQL uses sensible defaults and requires minimal configuration. Optional configuration can be provided via environment variables:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LEAPSQL_MODELS_DIR` | Directory containing SQL models | `models/` |
-| `LEAPSQL_SEEDS_DIR` | Directory containing seed CSV files | `seeds/` |
+| Variable             | Description                          | Default   |
+| -------------------- | ------------------------------------ | --------- |
+| `LEAPSQL_MODELS_DIR` | Directory containing SQL models      | `models/` |
+| `LEAPSQL_SEEDS_DIR`  | Directory containing seed CSV files  | `seeds/`  |
 | `LEAPSQL_MACROS_DIR` | Directory containing Starlark macros | `macros/` |
-| `LEAPSQL_TARGET` | Target environment name | `dev` |
+| `LEAPSQL_TARGET`     | Target environment name              | `dev`     |
 
 ## Troubleshooting
 

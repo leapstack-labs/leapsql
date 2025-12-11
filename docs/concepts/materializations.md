@@ -3,6 +3,8 @@ title: Materializations
 description: How LeapSQL persists your model outputs
 ---
 
+# Materializations
+
 Materializations define how LeapSQL creates and updates your model outputs in the database. Choose the right materialization strategy based on your data volume, query patterns, and freshness requirements.
 
 ## Available Materializations

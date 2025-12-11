@@ -3,6 +3,8 @@ title: Models
 description: Understanding SQL models in LeapSQL
 ---
 
+# Models
+
 Models are the core building blocks of LeapSQL. Each model is a SQL file that defines a transformation, producing a table or view in your database.
 
 ## What is a Model?

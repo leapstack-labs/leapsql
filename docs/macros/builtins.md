@@ -3,6 +3,8 @@ title: Built-in Functions
 description: Starlark standard library and LeapSQL built-ins
 ---
 
+# Built-in Functions
+
 LeapSQL macros have access to Starlark's standard library plus some LeapSQL-specific functions.
 
 ## Starlark Standard Library

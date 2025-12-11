@@ -3,6 +3,8 @@ title: Writing Macros
 description: How to create custom Starlark macros
 ---
 
+# Writing Macros
+
 This guide covers everything you need to know to write effective macros in LeapSQL.
 
 ## Macro File Structure

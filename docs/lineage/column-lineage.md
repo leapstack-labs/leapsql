@@ -12,6 +12,7 @@ Column-level lineage provides granular tracking of how individual columns flow t
 Column-level lineage answers the question: "Where does this output column's data come from?"
 
 For each output column, LeapSQL tracks:
+
 - **Source columns** - The input columns that contribute to the output
 - **Source tables** - Which tables those columns belong to
 - **Transform type** - Whether the data is passed through directly or transformed
@@ -38,10 +39,10 @@ Direct transforms preserve the exact values from the source column. Functions th
 A column is derived from computation, aggregation, or multiple sources:
 
 ```sql
-SELECT 
+SELECT
     price * quantity AS total,    -- Expression (2 source columns)
     COUNT(*) AS order_count,      -- Aggregate function
-    SUM(amount) AS revenue,       -- Aggregate function  
+    SUM(amount) AS revenue,       -- Aggregate function
     'literal' AS label            -- No source columns
 FROM orders
 ```
@@ -51,10 +52,10 @@ FROM orders
 Use the `ExtractLineage` function to analyze SQL:
 
 ```go
-import "github.com/yacobolo/leapsql/pkg/lineage"
+import "github.com/leapstack-labs/leapsql/pkg/lineage"
 
 sql := `
-SELECT 
+SELECT
     u.id,
     u.name,
     COUNT(o.id) AS order_count,
@@ -81,15 +82,16 @@ for _, col := range result.Columns {
 ```
 
 Output:
+
 ```
 Column: id
   Transform: DIRECT
-  Function: 
+  Function:
   Source: users.id
 
 Column: name
   Transform: DIRECT
-  Function: 
+  Function:
   Source: users.name
 
 Column: order_count
@@ -128,7 +130,7 @@ Without schema, star expressions are tracked as a single `*` column.
 Columns combined with operators track all source columns:
 
 ```sql
-SELECT 
+SELECT
     first_name || ' ' || last_name AS full_name,
     price * quantity AS line_total,
     amount / 100 AS amount_dollars
@@ -144,9 +146,9 @@ FROM order_items
 CASE tracks all columns referenced in conditions and results:
 
 ```sql
-SELECT 
+SELECT
     id,
-    CASE 
+    CASE
         WHEN status = 'active' THEN 'Active'
         WHEN status = 'pending' THEN 'Pending'
         ELSE 'Unknown'
@@ -159,7 +161,7 @@ FROM users
 ### COALESCE and NULL Handling
 
 ```sql
-SELECT 
+SELECT
     COALESCE(nickname, first_name, 'Anonymous') AS display_name
 FROM users
 ```
@@ -171,7 +173,7 @@ FROM users
 Aggregates are tracked with their function name:
 
 ```sql
-SELECT 
+SELECT
     customer_id,
     COUNT(*) AS order_count,
     SUM(amount) AS total,
@@ -182,21 +184,21 @@ FROM orders
 GROUP BY customer_id
 ```
 
-| Column | Sources | Transform | Function |
-|--------|---------|-----------|----------|
-| customer_id | orders.customer_id | DIRECT | - |
-| order_count | - | EXPR | count |
-| total | orders.amount | EXPR | sum |
-| average | orders.amount | EXPR | avg |
-| minimum | orders.amount | EXPR | min |
-| maximum | orders.amount | EXPR | max |
+| Column      | Sources            | Transform | Function |
+| ----------- | ------------------ | --------- | -------- |
+| customer_id | orders.customer_id | DIRECT    | -        |
+| order_count | -                  | EXPR      | count    |
+| total       | orders.amount      | EXPR      | sum      |
+| average     | orders.amount      | EXPR      | avg      |
+| minimum     | orders.amount      | EXPR      | min      |
+| maximum     | orders.amount      | EXPR      | max      |
 
 ## Window Function Tracking
 
 Window functions are tracked similarly to aggregates:
 
 ```sql
-SELECT 
+SELECT
     id,
     amount,
     SUM(amount) OVER (PARTITION BY customer_id ORDER BY created_at) AS running_total,
@@ -205,13 +207,13 @@ SELECT
 FROM orders
 ```
 
-| Column | Transform | Function |
-|--------|-----------|----------|
-| id | DIRECT | - |
-| amount | DIRECT | - |
-| running_total | EXPR | sum |
-| row_num | EXPR | row_number |
-| prev_amount | EXPR | lag |
+| Column        | Transform | Function   |
+| ------------- | --------- | ---------- |
+| id            | DIRECT    | -          |
+| amount        | DIRECT    | -          |
+| running_total | EXPR      | sum        |
+| row_num       | EXPR      | row_number |
+| prev_amount   | EXPR      | lag        |
 
 ## CTE and Subquery Lineage
 
@@ -219,7 +221,7 @@ LeapSQL traces lineage through CTEs and subqueries to underlying physical tables
 
 ```sql
 WITH monthly_totals AS (
-    SELECT 
+    SELECT
         customer_id,
         DATE_TRUNC('month', created_at) AS month,
         SUM(amount) AS total
@@ -231,6 +233,7 @@ FROM monthly_totals
 ```
 
 The output columns trace back to `orders`, not `monthly_totals`:
+
 - Sources: `["orders"]`
 - Columns reference the underlying `orders` table
 
@@ -239,7 +242,7 @@ The output columns trace back to `orders`, not `monthly_totals`:
 Columns from joined tables maintain their source attribution:
 
 ```sql
-SELECT 
+SELECT
     u.name AS customer_name,
     o.amount,
     p.name AS product_name
@@ -248,11 +251,11 @@ JOIN orders o ON u.id = o.user_id
 JOIN products p ON o.product_id = p.id
 ```
 
-| Column | Source Table |
-|--------|--------------|
-| customer_name | users |
-| amount | orders |
-| product_name | products |
+| Column        | Source Table |
+| ------------- | ------------ |
+| customer_name | users        |
+| amount        | orders       |
+| product_name  | products     |
 
 ## Set Operation Lineage
 
@@ -274,18 +277,18 @@ Set operations always result in EXPR transforms since values come from multiple 
 Functions that generate values without input columns have no sources:
 
 ```sql
-SELECT 
+SELECT
     id,
     NOW() AS current_time,
     RANDOM() AS rand_value
 FROM users
 ```
 
-| Column | Sources | Transform |
-|--------|---------|-----------|
-| id | users.id | DIRECT |
-| current_time | (none) | EXPR |
-| rand_value | (none) | EXPR |
+| Column       | Sources  | Transform |
+| ------------ | -------- | --------- |
+| id           | users.id | DIRECT    |
+| current_time | (none)   | EXPR      |
+| rand_value   | (none)   | EXPR      |
 
 ## Use Cases
 
@@ -316,7 +319,7 @@ piiColumns := map[string]bool{
 for _, col := range result.Columns {
     for _, src := range col.Sources {
         if piiColumns[src.Column] {
-            fmt.Printf("Output %s contains PII from %s.%s\n", 
+            fmt.Printf("Output %s contains PII from %s.%s\n",
                 col.Name, src.Table, src.Column)
         }
     }

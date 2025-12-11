@@ -5,3 +5,5 @@ marco external packages main.star
 macro package management: packages.yaml packages-lock.yaml
 profiles.yml
 dialect specific config
+lsp
+cli prettify

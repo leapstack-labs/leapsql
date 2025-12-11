@@ -3,6 +3,8 @@ title: Templating Overview
 description: Dynamic SQL generation with Starlark templating
 ---
 
+# Templating Overview
+
 LeapSQL uses Starlark templating to generate dynamic SQL. This lets you create reusable patterns, inject variables, and build complex queries programmatically.
 
 ## What is Starlark?
