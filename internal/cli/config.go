@@ -37,7 +37,7 @@ const (
 	DefaultMacrosDir = "macros"
 	DefaultStateFile = ".leapsql/state.db"
 	DefaultEnv       = "dev"
-	DefaultOutput    = "text"
+	DefaultOutput    = "auto" // Auto-detect: TTY=text, non-TTY=markdown
 )
 
 // LoadConfig loads configuration from file, environment variables, and flags.

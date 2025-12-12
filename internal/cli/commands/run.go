@@ -33,7 +33,11 @@ func NewRunCommand() *cobra.Command {
 		Long: `Execute SQL models in dependency order.
 
 By default, runs all discovered models. Use --select to run specific models.
-Use --downstream to also run models that depend on the selected models.`,
+Use --downstream to also run models that depend on the selected models.
+
+Output adapts to environment:
+  - Terminal: Animated progress with spinner
+  - Piped/Scripted: Static progress messages`,
 		Example: `  # Run all models
   leapsql run
 
@@ -46,7 +50,7 @@ Use --downstream to also run models that depend on the selected models.`,
   # Run with JSON output for CI/CD integration
   leapsql run --json`,
 		Aliases: []string{"build"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runRun(cmd, opts)
 		},
 	}
@@ -72,9 +76,16 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 
 	verbose := viper.GetBool("verbose")
 
+	// Create renderer
+	mode := output.OutputMode(cfg.OutputFormat)
+	if opts.JSONOutput {
+		mode = output.ModeJSON
+	}
+	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
+
 	// Load seeds
 	if verbose && !opts.JSONOutput {
-		fmt.Println("Loading seeds...")
+		r.Muted("Loading seeds...")
 	}
 	if err := eng.LoadSeeds(ctx); err != nil {
 		return fmt.Errorf("failed to load seeds: %w", err)
@@ -82,65 +93,114 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 
 	// Discover models
 	if verbose && !opts.JSONOutput {
-		fmt.Println("Discovering models...")
+		r.Muted("Discovering models...")
 	}
 	if err := eng.Discover(); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 
 	if opts.JSONOutput {
-		return runWithJSON(eng, cfg.Environment, opts.Select, opts.Downstream)
+		return runWithJSON(eng, r, cfg.Environment, opts.Select, opts.Downstream)
 	}
-	return runWithText(eng, cfg.Environment, opts.Select, opts.Downstream, startTime)
+	return runWithRenderer(eng, r, cfg.Environment, opts.Select, opts.Downstream, startTime)
 }
 
-// runWithText executes models with text output.
-func runWithText(eng *engine.Engine, envName string, selectModels string, downstream bool, startTime time.Time) error {
+// runWithRenderer executes models with adaptive output.
+func runWithRenderer(eng *engine.Engine, r *output.Renderer, envName string, selectModels string, downstream bool, startTime time.Time) error {
 	ctx := context.Background()
 	models := eng.GetModels()
-	fmt.Printf("Found %d models\n", len(models))
 
-	// Run models
+	effectiveMode := r.EffectiveMode()
+
+	if effectiveMode == output.ModeMarkdown {
+		r.Println(output.FormatHeader(1, "Run Results"))
+		r.Println("")
+	} else {
+		r.Printf("Found %d models\n", len(models))
+	}
+
+	// Determine models to run
+	var modelsToRun []string
 	if selectModels != "" {
-		// Run selected models
 		selected := strings.Split(selectModels, ",")
 		for i := range selected {
 			selected[i] = strings.TrimSpace(selected[i])
 		}
+		modelsToRun = selected
+	}
+
+	// Create progress tracker for TTY mode
+	var progress *output.Progress
+	if r.IsTTY() && effectiveMode == output.ModeText {
+		total := len(models)
+		if selectModels != "" {
+			total = len(modelsToRun)
+		}
+		progress = r.NewProgress(total, "Running models")
+		progress.Start()
+	}
+
+	// Run models
+	var result *state.Run
+	var runErr error
+	if selectModels != "" {
 		downstreamStr := ""
 		if downstream {
 			downstreamStr = " (+ downstream)"
 		}
-		fmt.Printf("Running %d selected models%s...\n", len(selected), downstreamStr)
-		result, err := eng.RunSelected(ctx, envName, selected, downstream)
-		if err != nil {
-			return fmt.Errorf("run failed: %w", err)
+		if effectiveMode == output.ModeMarkdown {
+			r.Println(output.FormatKeyValue("Selected", fmt.Sprintf("%d models%s", len(modelsToRun), downstreamStr)))
+		} else if progress == nil {
+			r.Printf("Running %d selected models%s...\n", len(modelsToRun), downstreamStr)
 		}
-		fmt.Printf("Run %s: %s\n", result.ID, result.Status)
-		if result.Error != "" {
-			fmt.Printf("Error: %s\n", result.Error)
-		}
+		result, runErr = eng.RunSelected(ctx, envName, modelsToRun, downstream)
 	} else {
-		// Run all models
-		fmt.Println("Running all models...")
-		result, err := eng.Run(ctx, envName)
-		if err != nil {
-			return fmt.Errorf("run failed: %w", err)
+		if effectiveMode == output.ModeMarkdown {
+			r.Println(output.FormatKeyValue("Mode", "All models"))
+		} else if progress == nil {
+			r.Println("Running all models...")
 		}
-		fmt.Printf("Run %s: %s\n", result.ID, result.Status)
-		if result.Error != "" {
-			fmt.Printf("Error: %s\n", result.Error)
+		result, runErr = eng.Run(ctx, envName)
+	}
+
+	// Complete progress
+	if progress != nil {
+		if runErr != nil || (result != nil && result.Status == state.RunStatusFailed) {
+			progress.Fail("Run failed")
+		} else {
+			progress.Complete("Run completed")
+		}
+	}
+
+	// Output results
+	if result != nil {
+		if effectiveMode == output.ModeMarkdown {
+			r.Println("")
+			r.Println(output.FormatKeyValue("Run ID", result.ID))
+			r.Println(output.FormatKeyValue("Status", string(result.Status)))
+			if result.Error != "" {
+				r.Println(output.FormatKeyValue("Error", result.Error))
+			}
+		} else {
+			r.Printf("Run %s: %s\n", result.ID, result.Status)
+			if result.Error != "" {
+				r.Error(result.Error)
+			}
 		}
 	}
 
 	elapsed := time.Since(startTime)
-	fmt.Printf("Completed in %s\n", elapsed.Round(time.Millisecond))
+	if effectiveMode == output.ModeMarkdown {
+		r.Println(output.FormatKeyValue("Duration", elapsed.Round(time.Millisecond).String()))
+	} else {
+		r.Muted(fmt.Sprintf("Completed in %s", elapsed.Round(time.Millisecond)))
+	}
 
-	return nil
+	return runErr
 }
 
 // runWithJSON executes models with JSON lines output.
-func runWithJSON(eng *engine.Engine, envName string, selectModels string, downstream bool) error {
+func runWithJSON(eng *engine.Engine, r *output.Renderer, envName string, selectModels string, downstream bool) error {
 	ctx := context.Background()
 	graph := eng.GetGraph()
 	store := eng.GetStateStore()
@@ -172,7 +232,7 @@ func runWithJSON(eng *engine.Engine, envName string, selectModels string, downst
 	runStartTime := time.Now()
 
 	// Emit run_start event
-	emitRunEvent(output.RunEvent{
+	emitRunEvent(r, output.RunEvent{
 		Event:  "run_start",
 		RunID:  runID,
 		Models: modelPaths,
@@ -206,7 +266,7 @@ func runWithJSON(eng *engine.Engine, envName string, selectModels string, downst
 				}
 
 				// Emit model events
-				emitRunEvent(output.RunEvent{
+				emitRunEvent(r, output.RunEvent{
 					Event: "model_start",
 					RunID: runID,
 					Model: modelPath,
@@ -231,7 +291,7 @@ func runWithJSON(eng *engine.Engine, envName string, selectModels string, downst
 					event.Error = mr.Error
 					event.File = filePath
 				}
-				emitRunEvent(event)
+				emitRunEvent(r, event)
 			}
 		}
 	}
@@ -243,7 +303,7 @@ func runWithJSON(eng *engine.Engine, envName string, selectModels string, downst
 		runStatus = "failed"
 	}
 
-	emitRunEvent(output.RunEvent{
+	emitRunEvent(r, output.RunEvent{
 		Event:       "run_complete",
 		RunID:       runID,
 		Status:      runStatus,
@@ -257,10 +317,10 @@ func runWithJSON(eng *engine.Engine, envName string, selectModels string, downst
 }
 
 // emitRunEvent outputs a run event as a JSON line.
-func emitRunEvent(event output.RunEvent) {
+func emitRunEvent(r *output.Renderer, event output.RunEvent) {
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	data, _ := json.Marshal(event)
-	fmt.Println(string(data))
+	r.Println(string(data))
 }
 
 // Helper functions shared across commands

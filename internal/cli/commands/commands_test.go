@@ -15,8 +15,8 @@ func TestNewLineageCommand(t *testing.T) {
 		t.Error("Short should not be empty")
 	}
 
-	// Verify flags exist
-	flags := []string{"output", "upstream", "downstream", "depth"}
+	// Verify flags exist (output is a global flag on root, not local)
+	flags := []string{"upstream", "downstream", "depth"}
 	for _, flag := range flags {
 		if cmd.Flags().Lookup(flag) == nil {
 			t.Errorf("flag %q should exist", flag)
@@ -51,10 +51,7 @@ func TestNewListCommand(t *testing.T) {
 		t.Error("Short should not be empty")
 	}
 
-	// Verify output flag exists
-	if cmd.Flags().Lookup("output") == nil {
-		t.Error("--output flag should exist")
-	}
+	// Note: --output flag is a global persistent flag on root command, not local to list
 }
 
 func TestNewRunCommand(t *testing.T) {

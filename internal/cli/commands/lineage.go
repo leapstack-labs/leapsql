@@ -3,8 +3,8 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/dag"
@@ -14,10 +14,9 @@ import (
 
 // LineageOptions holds options for the lineage command.
 type LineageOptions struct {
-	OutputFormat string
-	Upstream     bool
-	Downstream   bool
-	Depth        int
+	Upstream   bool
+	Downstream bool
+	Depth      int
 }
 
 // NewLineageCommand creates the lineage command.
@@ -30,7 +29,11 @@ func NewLineageCommand() *cobra.Command {
 		Long: `Display the upstream dependencies and downstream dependents of a model.
 
 The lineage shows how data flows through your models, helping you understand
-the impact of changes and debug data issues.`,
+the impact of changes and debug data issues.
+
+Output adapts to environment:
+  - Terminal: Styled tree with colored arrows
+  - Piped/Scripted: Markdown format (agent-friendly)`,
 		Example: `  # Show full lineage for a model
   leapsql lineage staging.stg_customers
 
@@ -51,7 +54,6 @@ the impact of changes and debug data issues.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "text", "Output format (text|json)")
 	cmd.Flags().BoolVar(&opts.Upstream, "upstream", true, "Include upstream dependencies")
 	cmd.Flags().BoolVar(&opts.Downstream, "downstream", true, "Include downstream dependents")
 	cmd.Flags().IntVar(&opts.Depth, "depth", 0, "Max traversal depth (0 = unlimited)")
@@ -83,32 +85,88 @@ func runLineage(cmd *cobra.Command, modelPath string, opts *LineageOptions) erro
 		}
 	}
 
-	if opts.OutputFormat == "json" {
-		return lineageJSON(eng, modelPath, opts.Upstream, opts.Downstream, opts.Depth)
+	// Create renderer
+	mode := output.OutputMode(cfg.OutputFormat)
+	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
+
+	effectiveMode := r.EffectiveMode()
+	switch effectiveMode {
+	case output.ModeJSON:
+		return lineageJSON(eng, r, modelPath, opts.Upstream, opts.Downstream, opts.Depth)
+	case output.ModeMarkdown:
+		return lineageMarkdown(eng, r, modelPath, opts.Upstream, opts.Downstream, opts.Depth)
+	default:
+		return lineageText(eng, r, modelPath, opts.Upstream, opts.Downstream, opts.Depth)
 	}
-	return lineageText(eng, modelPath, opts.Upstream, opts.Downstream, opts.Depth)
 }
 
-// lineageText outputs lineage in text format.
-func lineageText(eng *engine.Engine, modelPath string, upstream, downstream bool, depth int) error {
+// lineageText outputs lineage in styled text format.
+func lineageText(eng *engine.Engine, r *output.Renderer, modelPath string, upstream, downstream bool, depth int) error {
 	graph := eng.GetGraph()
+	styles := r.Styles()
 
-	fmt.Printf("Lineage for: %s\n\n", modelPath)
+	r.Header(1, fmt.Sprintf("Lineage: %s", modelPath))
 
 	if upstream {
 		upstreamNodes := getUpstreamWithDepth(graph, modelPath, depth)
-		fmt.Printf("Upstream dependencies (%d):\n", len(upstreamNodes))
+		r.Println(styles.Header2.Render(fmt.Sprintf("Upstream (%d):", len(upstreamNodes))))
 		for _, node := range upstreamNodes {
-			fmt.Printf("  - %s\n", node)
+			nodeType := getNodeType(eng, node)
+			r.Printf("    %s %s %s\n",
+				styles.Dependency.Render("\u2190"), // left arrow
+				styles.ModelPath.Render(node),
+				styles.Muted.Render("("+nodeType+")"))
 		}
-		fmt.Println()
+		r.Println("")
 	}
 
 	if downstream {
 		downstreamNodes := getDownstreamWithDepth(graph, modelPath, depth)
-		fmt.Printf("Downstream dependents (%d):\n", len(downstreamNodes))
+		r.Println(styles.Header2.Render(fmt.Sprintf("Downstream (%d):", len(downstreamNodes))))
 		for _, node := range downstreamNodes {
-			fmt.Printf("  - %s\n", node)
+			r.Printf("    %s %s\n",
+				styles.Success.Render("\u2192"), // right arrow
+				styles.ModelPath.Render(node))
+		}
+	}
+
+	return nil
+}
+
+// lineageMarkdown outputs lineage in markdown format.
+func lineageMarkdown(eng *engine.Engine, r *output.Renderer, modelPath string, upstream, downstream bool, depth int) error {
+	graph := eng.GetGraph()
+
+	r.Println(output.FormatHeader(1, fmt.Sprintf("Lineage: %s", modelPath)))
+	r.Println("")
+
+	if upstream {
+		upstreamNodes := getUpstreamWithDepth(graph, modelPath, depth)
+		r.Println(output.FormatHeader(2, fmt.Sprintf("Upstream (%d)", len(upstreamNodes))))
+		if len(upstreamNodes) > 0 {
+			var items []string
+			for _, node := range upstreamNodes {
+				nodeType := getNodeType(eng, node)
+				items = append(items, fmt.Sprintf("%s (%s)", node, nodeType))
+			}
+			r.Print(output.FormatList(items))
+		} else {
+			r.Println("*No upstream dependencies*")
+		}
+		r.Println("")
+	}
+
+	if downstream {
+		downstreamNodes := getDownstreamWithDepth(graph, modelPath, depth)
+		r.Println(output.FormatHeader(2, fmt.Sprintf("Downstream (%d)", len(downstreamNodes))))
+		if len(downstreamNodes) > 0 {
+			var items []string
+			for _, node := range downstreamNodes {
+				items = append(items, node)
+			}
+			r.Print(output.FormatList(items))
+		} else {
+			r.Println("*No downstream dependents*")
 		}
 	}
 
@@ -116,7 +174,7 @@ func lineageText(eng *engine.Engine, modelPath string, upstream, downstream bool
 }
 
 // lineageJSON outputs lineage in JSON format.
-func lineageJSON(eng *engine.Engine, modelPath string, upstream, downstream bool, depth int) error {
+func lineageJSON(eng *engine.Engine, r *output.Renderer, modelPath string, upstream, downstream bool, depth int) error {
 	models := eng.GetModels()
 	graph := eng.GetGraph()
 
@@ -185,9 +243,22 @@ func lineageJSON(eng *engine.Engine, modelPath string, upstream, downstream bool
 	lineageOutput.Stats.UpstreamCount = len(upstreamNodes)
 	lineageOutput.Stats.DownstreamCount = len(downstreamNodes)
 
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(r.Writer())
 	enc.SetIndent("", "  ")
 	return enc.Encode(lineageOutput)
+}
+
+// getNodeType returns the type of a node (model, source, seed).
+func getNodeType(eng *engine.Engine, nodeID string) string {
+	models := eng.GetModels()
+	if m, ok := models[nodeID]; ok {
+		return m.Materialized
+	}
+	// Check if it's a seed by looking at the naming convention
+	if strings.HasPrefix(nodeID, "raw_") || strings.HasPrefix(nodeID, "seed_") {
+		return "seed"
+	}
+	return "source"
 }
 
 // getUpstreamWithDepth returns upstream nodes with optional depth limit.

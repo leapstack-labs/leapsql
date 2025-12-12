@@ -3,7 +3,6 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,46 +15,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ListOptions holds options for the list command.
-type ListOptions struct {
-	OutputFormat string
-}
-
 // NewListCommand creates the list command.
 func NewListCommand() *cobra.Command {
-	opts := &ListOptions{}
-
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all models and their dependencies",
 		Long: `List all discovered models with their metadata, dependencies, and last run status.
 
-The output includes model paths, materialization types, dependencies,
-and execution history from the state database.`,
-		Example: `  # List all models in text format
+Output adapts to environment:
+  - Terminal: Styled, colored output
+  - Piped/Scripted: Markdown format (agent-friendly)
+  
+Use --output to override: auto, text, markdown, json`,
+		Example: `  # List all models (auto-detect output format)
   leapsql list
 
   # List models as JSON
   leapsql list --output json
 
+  # List models as Markdown (for agents/scripts)
+  leapsql list --output markdown
+
   # List models with verbose output
   leapsql list -v`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd, opts)
+			return runList(cmd)
 		},
 	}
-
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "text", "Output format (text|json)")
-
-	// Register completion for output flag
-	cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"text", "json"}, cobra.ShellCompDirectiveNoFileComp
-	})
 
 	return cmd
 }
 
-func runList(cmd *cobra.Command, opts *ListOptions) error {
+func runList(cmd *cobra.Command) error {
 	cfg := getConfig()
 
 	eng, err := createEngine(cfg)
@@ -69,19 +60,27 @@ func runList(cmd *cobra.Command, opts *ListOptions) error {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 
-	w := cmd.OutOrStdout()
-	if opts.OutputFormat == "json" {
-		return listJSON(eng, w)
+	// Create renderer based on output format
+	mode := output.OutputMode(cfg.OutputFormat)
+	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
+
+	effectiveMode := r.EffectiveMode()
+	switch effectiveMode {
+	case output.ModeJSON:
+		return listJSON(eng, r)
+	case output.ModeMarkdown:
+		return listMarkdown(eng, r)
+	default:
+		return listText(eng, r)
 	}
-	return listText(eng, w)
 }
 
-// listText outputs models in text format.
-func listText(eng *engine.Engine, w io.Writer) error {
+// listText outputs models in styled text format.
+func listText(eng *engine.Engine, r *output.Renderer) error {
 	models := eng.GetModels()
 	graph := eng.GetGraph()
 
-	fmt.Fprintf(w, "Models (%d total):\n\n", len(models))
+	r.Header(1, fmt.Sprintf("Models (%d total)", len(models)))
 
 	// Get execution order
 	sorted, err := graph.TopologicalSort()
@@ -96,19 +95,68 @@ func listText(eng *engine.Engine, w io.Writer) error {
 		}
 
 		deps := graph.GetParents(node.ID)
-		depStr := ""
-		if len(deps) > 0 {
-			depStr = fmt.Sprintf(" <- %s", strings.Join(deps, ", "))
+		r.ModelLine(i+1, m.Path, m.Materialized, deps)
+	}
+
+	return nil
+}
+
+// listMarkdown outputs models in markdown format.
+func listMarkdown(eng *engine.Engine, r *output.Renderer) error {
+	models := eng.GetModels()
+	graph := eng.GetGraph()
+	store := eng.GetStateStore()
+
+	r.Println(output.FormatHeader(1, fmt.Sprintf("Models (%d total)", len(models))))
+	r.Println("")
+
+	// Get execution order
+	sorted, err := graph.TopologicalSort()
+	if err != nil {
+		return fmt.Errorf("failed to sort models: %w", err)
+	}
+
+	for _, node := range sorted {
+		m := models[node.ID]
+		if m == nil {
+			continue
 		}
 
-		fmt.Fprintf(w, "  %2d. %-35s [%s]%s\n", i+1, m.Path, m.Materialized, depStr)
+		r.Println(output.FormatHeader(2, m.Path))
+
+		r.Println(output.FormatKeyValue("Materialized", m.Materialized))
+		r.Println(output.FormatKeyValue("File", m.FilePath))
+
+		deps := graph.GetParents(node.ID)
+		if len(deps) > 0 {
+			r.Println(output.FormatKeyValue("Dependencies", strings.Join(deps, ", ")))
+		}
+
+		dependents := graph.GetChildren(node.ID)
+		if len(dependents) > 0 {
+			r.Println(output.FormatKeyValue("Dependents", strings.Join(dependents, ", ")))
+		}
+
+		// Add last run info if available
+		if store != nil {
+			if stateModel, err := store.GetModelByPath(m.Path); err == nil && stateModel != nil {
+				if lastRun, err := store.GetLatestModelRun(stateModel.ID); err == nil && lastRun != nil {
+					r.Println(output.FormatKeyValue("Last Run", string(lastRun.Status)))
+					if lastRun.RowsAffected > 0 {
+						r.Println(output.FormatKeyValue("Rows", fmt.Sprintf("%d", lastRun.RowsAffected)))
+					}
+				}
+			}
+		}
+
+		r.Println("")
 	}
 
 	return nil
 }
 
 // listJSON outputs models and macros in JSON format.
-func listJSON(eng *engine.Engine, w io.Writer) error {
+func listJSON(eng *engine.Engine, r *output.Renderer) error {
 	models := eng.GetModels()
 	graph := eng.GetGraph()
 	store := eng.GetStateStore()
@@ -218,7 +266,7 @@ func listJSON(eng *engine.Engine, w io.Writer) error {
 		}
 	}
 
-	enc := json.NewEncoder(w)
+	enc := json.NewEncoder(r.Writer())
 	enc.SetIndent("", "  ")
 	return enc.Encode(listOutput)
 }

@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/spf13/cobra"
 )
 
@@ -14,22 +16,32 @@ func NewRenderCommand() *cobra.Command {
 		Long: `Render the final SQL for a model with all templates and macros expanded.
 
 This is useful for debugging template issues and seeing the exact SQL
-that will be executed.`,
+that will be executed.
+
+Output adapts to environment:
+  - Terminal: Plain SQL (suitable for syntax highlighting)
+  - Piped/Scripted: Markdown with code block`,
 		Example: `  # Render a model's SQL
   leapsql render staging.stg_customers
 
   # Render and save to file
-  leapsql render staging.stg_customers > rendered.sql`,
+  leapsql render staging.stg_customers > rendered.sql
+
+  # Render as JSON
+  leapsql render staging.stg_customers --output json
+
+  # Render as Markdown (with code block)
+  leapsql render staging.stg_customers --output markdown`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRender(args[0])
+			return runRender(cmd, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func runRender(modelPath string) error {
+func runRender(cmd *cobra.Command, modelPath string) error {
 	cfg := getConfig()
 
 	eng, err := createEngine(cfg)
@@ -47,6 +59,28 @@ func runRender(modelPath string) error {
 		return fmt.Errorf("failed to render model: %w", err)
 	}
 
-	fmt.Println(sql)
+	// Create renderer
+	mode := output.OutputMode(cfg.OutputFormat)
+	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
+
+	effectiveMode := r.EffectiveMode()
+	switch effectiveMode {
+	case output.ModeJSON:
+		renderOutput := output.RenderOutput{
+			Model: modelPath,
+			SQL:   sql,
+		}
+		enc := json.NewEncoder(r.Writer())
+		enc.SetIndent("", "  ")
+		return enc.Encode(renderOutput)
+	case output.ModeMarkdown:
+		r.Println(output.FormatHeader(1, fmt.Sprintf("Rendered SQL: %s", modelPath)))
+		r.Println("")
+		r.Println(output.FormatCodeBlock("sql", sql))
+	default:
+		// Text mode: just output the SQL directly
+		r.Println(sql)
+	}
+
 	return nil
 }

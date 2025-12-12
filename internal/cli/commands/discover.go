@@ -1,11 +1,13 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/macro"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/spf13/cobra"
@@ -20,13 +22,20 @@ func NewDiscoverCommand() *cobra.Command {
 		Long: `Index macros and models into the SQLite state database.
 
 This enables IDE features like autocomplete, hover documentation,
-and go-to-definition through the LSP server.`,
+and go-to-definition through the LSP server.
+
+Output adapts to environment:
+  - Terminal: Styled summary with success indicator
+  - Piped/Scripted: Markdown format (agent-friendly)`,
 		Example: `  # Discover all macros and models
   leapsql discover
 
   # Discover with custom macros directory
-  leapsql discover --macros-dir ./custom-macros`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+  leapsql discover --macros-dir ./custom-macros
+
+  # Output as JSON
+  leapsql discover --output json`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDiscover(cmd)
 		},
 	}
@@ -37,6 +46,10 @@ and go-to-definition through the LSP server.`,
 func runDiscover(cmd *cobra.Command) error {
 	cfg := getConfig()
 	verbose := viper.GetBool("verbose")
+
+	// Create renderer
+	mode := output.OutputMode(cfg.OutputFormat)
+	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
@@ -59,25 +72,83 @@ func runDiscover(cmd *cobra.Command) error {
 	}
 
 	// Discover macros
-	macroCount, funcCount, err := discoverMacros(store, cfg.MacrosDir, verbose)
+	namespaces, macroCount, funcCount, err := discoverMacrosWithDetails(store, cfg.MacrosDir, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to discover macros: %w", err)
 	}
 
-	fmt.Printf("Discovered %d macro namespaces with %d functions\n", macroCount, funcCount)
-	fmt.Printf("State saved to %s\n", cfg.StatePath)
+	effectiveMode := r.EffectiveMode()
+	switch effectiveMode {
+	case output.ModeJSON:
+		return discoverJSON(r, namespaces, macroCount, funcCount, cfg.StatePath)
+	case output.ModeMarkdown:
+		return discoverMarkdown(r, namespaces, macroCount, funcCount, cfg.StatePath)
+	default:
+		return discoverText(r, namespaces, macroCount, funcCount, cfg.StatePath)
+	}
+}
+
+// discoverText outputs discovery results in styled text format.
+func discoverText(r *output.Renderer, namespaces []output.DiscoverNamespace, macroCount, funcCount int, statePath string) error {
+	r.Success(fmt.Sprintf("Discovered %d macro namespaces with %d functions", macroCount, funcCount))
+	r.Muted(fmt.Sprintf("State saved to %s", statePath))
+
+	if len(namespaces) > 0 && r.IsTTY() {
+		r.Println("")
+		r.Header(2, "Namespaces")
+		for _, ns := range namespaces {
+			r.Printf("  - %s (%d functions)\n", ns.Name, len(ns.Functions))
+		}
+	}
 
 	return nil
 }
 
-// discoverMacros scans the macros directory and indexes all .star files.
-func discoverMacros(store state.StateStore, dir string, verbose bool) (int, int, error) {
+// discoverMarkdown outputs discovery results in markdown format.
+func discoverMarkdown(r *output.Renderer, namespaces []output.DiscoverNamespace, macroCount, funcCount int, statePath string) error {
+	r.Println(output.FormatHeader(1, "Discovery Results"))
+	r.Println("")
+	r.Println(output.FormatKeyValue("Macro Namespaces", fmt.Sprintf("%d", macroCount)))
+	r.Println(output.FormatKeyValue("Total Functions", fmt.Sprintf("%d", funcCount)))
+	r.Println(output.FormatKeyValue("State Path", statePath))
+	r.Println("")
+
+	if len(namespaces) > 0 {
+		r.Println(output.FormatHeader(2, "Namespaces"))
+		for _, ns := range namespaces {
+			r.Printf("- %s (%d functions)\n", ns.Name, len(ns.Functions))
+		}
+	}
+
+	return nil
+}
+
+// discoverJSON outputs discovery results in JSON format.
+func discoverJSON(r *output.Renderer, namespaces []output.DiscoverNamespace, macroCount, funcCount int, statePath string) error {
+	discoverOutput := output.DiscoverOutput{
+		Namespaces: namespaces,
+		Summary: output.DiscoverSummary{
+			TotalNamespaces: macroCount,
+			TotalFunctions:  funcCount,
+			StatePath:       statePath,
+		},
+	}
+
+	enc := json.NewEncoder(r.Writer())
+	enc.SetIndent("", "  ")
+	return enc.Encode(discoverOutput)
+}
+
+// discoverMacrosWithDetails scans the macros directory and indexes all .star files.
+// Returns namespace details for output formatting.
+func discoverMacrosWithDetails(store state.StateStore, dir string, verbose bool) ([]output.DiscoverNamespace, int, int, error) {
 	// Check if macros directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		fmt.Printf("Macros directory not found: %s (skipping)\n", dir)
-		return 0, 0, nil
+		return nil, 0, 0, nil
 	}
 
+	var namespaces []output.DiscoverNamespace
 	var namespaceCount, functionCount int
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -113,6 +184,7 @@ func discoverMacros(store state.StateStore, dir string, verbose bool) (int, int,
 		}
 
 		var funcs []*state.MacroFunction
+		var funcNames []string
 		for _, f := range parsed.Functions {
 			funcs = append(funcs, &state.MacroFunction{
 				Namespace: parsed.Name,
@@ -121,6 +193,7 @@ func discoverMacros(store state.StateStore, dir string, verbose bool) (int, int,
 				Docstring: f.Docstring,
 				Line:      f.Line,
 			})
+			funcNames = append(funcNames, f.Name)
 		}
 
 		// Save to database
@@ -133,11 +206,16 @@ func discoverMacros(store state.StateStore, dir string, verbose bool) (int, int,
 			fmt.Printf("  Indexed: %s (%d functions)\n", parsed.Name, len(funcs))
 		}
 
+		namespaces = append(namespaces, output.DiscoverNamespace{
+			Name:      parsed.Name,
+			FilePath:  absPath,
+			Functions: funcNames,
+		})
 		namespaceCount++
 		functionCount += len(funcs)
 
 		return nil
 	})
 
-	return namespaceCount, functionCount, err
+	return namespaces, namespaceCount, functionCount, err
 }

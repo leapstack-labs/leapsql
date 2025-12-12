@@ -20,6 +20,11 @@ tasks:
     cmds:
       - go build -o leapsql ./cmd/leapsql
 
+  install:
+    desc: Install leapsql CLI to $GOPATH/bin
+    cmds:
+      - go install ./cmd/leapsql
+
   test:
     desc: Run all tests (package summary, shows failures inline)
     cmds:

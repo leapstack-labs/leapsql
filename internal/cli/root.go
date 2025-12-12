@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/commands"
+	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,6 +27,9 @@ var (
 
 // configKey is used to store config in context.
 type configKey struct{}
+
+// rendererKey is used to store renderer in context.
+type rendererKey struct{}
 
 // NewRootCmd creates and returns the root command.
 func NewRootCmd() *cobra.Command {
@@ -52,6 +56,11 @@ then execute them in the correct order with state tracking and lineage.`,
 
 			// Store config in context
 			ctx := context.WithValue(cmd.Context(), configKey{}, cfg)
+
+			// Create and store renderer based on output mode
+			mode := output.OutputMode(cfg.OutputFormat)
+			renderer := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
+			ctx = context.WithValue(ctx, rendererKey{}, renderer)
 			cmd.SetContext(ctx)
 
 			// Print config file used (if verbose)
@@ -81,7 +90,12 @@ Built with Go and DuckDB
 	rootCmd.PersistentFlags().String("state", "", "Path to state database")
 	rootCmd.PersistentFlags().String("env", "", "Environment name")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
-	rootCmd.PersistentFlags().StringP("output", "o", "", "Output format (text|json|table)")
+	rootCmd.PersistentFlags().StringP("output", "o", "", "Output format (auto|text|markdown|json)")
+
+	// Register completion for output flag
+	rootCmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"auto", "text", "markdown", "json"}, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	// Bind flags to viper
 	viper.BindPFlag("models_dir", rootCmd.PersistentFlags().Lookup("models-dir"))
@@ -133,6 +147,15 @@ func GetConfig(ctx context.Context) *Config {
 		StatePath:   DefaultStateFile,
 		Environment: DefaultEnv,
 	}
+}
+
+// GetRenderer retrieves the renderer from the command context.
+func GetRenderer(ctx context.Context) *output.Renderer {
+	if r, ok := ctx.Value(rendererKey{}).(*output.Renderer); ok {
+		return r
+	}
+	// Return default renderer if none in context
+	return output.NewRenderer(os.Stdout, os.Stderr, output.ModeAuto)
 }
 
 // CreateEngine creates an engine from the current configuration.
