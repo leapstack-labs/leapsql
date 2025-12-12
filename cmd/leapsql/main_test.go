@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,8 +110,19 @@ func TestListCommandJSON(t *testing.T) {
 		t.Errorf("list --json command error = %v", err)
 	}
 
-	// JSON output goes to stdout, not the buffer
-	// So we just verify no error occurred
+	// Validate JSON structure
+	var result map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+
+	// Verify expected top-level keys exist
+	expectedKeys := []string{"models", "macros", "summary"}
+	for _, key := range expectedKeys {
+		if _, ok := result[key]; !ok {
+			t.Errorf("JSON output should contain key %q", key)
+		}
+	}
 }
 
 func TestDAGCommand(t *testing.T) {
@@ -268,6 +280,31 @@ func TestLineageCommand(t *testing.T) {
 	}
 }
 
+func TestLineageCommandInvalidModel(t *testing.T) {
+	td := testdataDir(t)
+	tmpDir := t.TempDir()
+
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"lineage", "nonexistent.model",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("lineage with invalid model should return an error")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error should mention 'not found', got: %v", err)
+	}
+}
+
 func TestRenderCommand(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
@@ -287,6 +324,28 @@ func TestRenderCommand(t *testing.T) {
 	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("render command error = %v", err)
+	}
+}
+
+func TestRenderCommandInvalidModel(t *testing.T) {
+	td := testdataDir(t)
+	tmpDir := t.TempDir()
+
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"render", "nonexistent.model",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("render with invalid model should return an error")
 	}
 }
 
