@@ -1,0 +1,150 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "LeapSQL",
+  "scopeName": "source.leapsql",
+  "patterns": [
+    { "include": "#frontmatter" },
+    { "include": "#template-statement" },
+    { "include": "#template-expression" },
+    { "include": "#sql" }
+  ],
+  "repository": {
+    "frontmatter": {
+      "name": "meta.frontmatter.leapsql",
+      "begin": "^\\s*(/\\*---)\\s*$",
+      "end": "^\\s*(---\\*/)\\s*$",
+      "beginCaptures": {
+        "1": { "name": "comment.block.frontmatter.begin.leapsql" }
+      },
+      "endCaptures": {
+        "1": { "name": "comment.block.frontmatter.end.leapsql" }
+      },
+      "contentName": "meta.embedded.block.yaml",
+      "patterns": [
+        { "include": "source.yaml" }
+      ]
+    },
+    "template-statement": {
+      "name": "meta.template.statement.leapsql",
+      "begin": "(\\{\\*)",
+      "end": "(\\*\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.interpolation.begin.leapsql" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.section.interpolation.end.leapsql" }
+      },
+      "contentName": "meta.embedded.block.python",
+      "patterns": [
+        { "include": "#template-keywords" },
+        { "include": "#template-builtins" },
+        { "include": "source.python" }
+      ]
+    },
+    "template-expression": {
+      "name": "meta.template.expression.leapsql",
+      "begin": "(\\{\\{)",
+      "end": "(\\}\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.interpolation.begin.leapsql" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.section.interpolation.end.leapsql" }
+      },
+      "contentName": "meta.embedded.block.python",
+      "patterns": [
+        { "include": "#template-builtins" },
+        { "include": "source.python" }
+      ]
+    },
+    "template-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.leapsql",
+          "match": "\\b(if|elif|else|endif|for|endfor|set|endset|macro|endmacro)\\b"
+        }
+      ]
+    },
+    "template-builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.leapsql",
+          "match": "\\b(ref|source|config|this|env|var|run_query|log|exceptions|adapter|return|modules)\\b"
+        }
+      ]
+    },
+    "sql": {
+      "patterns": [
+        { "include": "#sql-comment-line" },
+        { "include": "#sql-comment-block" },
+        { "include": "#sql-string-single" },
+        { "include": "#sql-string-double" },
+        { "include": "#sql-constants" },
+        { "include": "#sql-keywords-dml" },
+        { "include": "#sql-keywords-ddl" },
+        { "include": "#sql-keywords-other" },
+        { "include": "#sql-operators" },
+        { "include": "#sql-functions" },
+        { "include": "#sql-numbers" },
+        { "include": "#sql-identifiers" }
+      ]
+    },
+    "sql-comment-line": {
+      "name": "comment.line.double-dash.sql",
+      "match": "--.*$"
+    },
+    "sql-comment-block": {
+      "name": "comment.block.sql",
+      "begin": "/\\*(?!---)",
+      "end": "\\*/"
+    },
+    "sql-string-single": {
+      "name": "string.quoted.single.sql",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        { "name": "constant.character.escape.sql", "match": "''" }
+      ]
+    },
+    "sql-string-double": {
+      "name": "string.quoted.double.sql",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.sql", "match": "\"\"" }
+      ]
+    },
+    "sql-keywords-dml": {
+      "name": "keyword.other.DML.sql",
+      "match": "(?i)\\b(SELECT|INSERT|UPDATE|DELETE|MERGE|UPSERT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|FULL|ON|AND|OR|NOT|IN|EXISTS|BETWEEN|LIKE|ILIKE|IS|AS|DISTINCT|ALL|UNION|INTERSECT|EXCEPT|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|FETCH|FIRST|NEXT|ROWS|ONLY|WITH|RECURSIVE|VALUES|INTO|SET|RETURNING|USING|NATURAL|LATERAL|QUALIFY|WINDOW|PARTITION|OVER|FILTER|WITHIN|IGNORE|RESPECT|NULLS|PRECEDING|FOLLOWING|UNBOUNDED|CURRENT|ROW|RANGE|GROUPS)\\b"
+    },
+    "sql-keywords-ddl": {
+      "name": "keyword.other.DDL.sql",
+      "match": "(?i)\\b(CREATE|ALTER|DROP|TRUNCATE|TABLE|VIEW|INDEX|SCHEMA|DATABASE|SEQUENCE|FUNCTION|PROCEDURE|TRIGGER|CONSTRAINT|PRIMARY|FOREIGN|KEY|REFERENCES|UNIQUE|CHECK|DEFAULT|CASCADE|RESTRICT|NO|ACTION|TEMP|TEMPORARY|IF|EXISTS|REPLACE|OR|MATERIALIZED|COLUMN|ADD|RENAME|TO|OWNER|GRANT|REVOKE|COMMENT)\\b"
+    },
+    "sql-keywords-other": {
+      "name": "keyword.other.sql",
+      "match": "(?i)\\b(CASE|WHEN|THEN|ELSE|END|CAST|CONVERT|NULLIF|GREATEST|LEAST|EXTRACT|INTERVAL|AT|TIME|ZONE|ASC|DESC|EXPLAIN|ANALYZE|VERBOSE|FORMAT|BEGIN|COMMIT|ROLLBACK|TRANSACTION|SAVEPOINT|RELEASE|PIVOT|UNPIVOT|TABLESAMPLE|BERNOULLI|SYSTEM|CUBE|ROLLUP|GROUPING|SETS|ANY|SOME|ARRAY|STRUCT|MAP|UNNEST|ORDINALITY|COPY|EXPORT|IMPORT)\\b"
+    },
+    "sql-operators": {
+      "name": "keyword.operator.sql",
+      "match": "(=|<>|!=|<|>|<=|>=|\\|\\||\\+|-|\\*|/|%|&|\\||\\^|~|<<|>>|::)"
+    },
+    "sql-functions": {
+      "name": "support.function.sql",
+      "match": "(?i)\\b(COUNT|SUM|AVG|MIN|MAX|ABS|CEIL|CEILING|FLOOR|ROUND|TRUNC|TRUNCATE|MOD|POWER|SQRT|EXP|LN|LOG|LOG10|LOG2|SIGN|RANDOM|PI|LENGTH|CHAR_LENGTH|UPPER|LOWER|INITCAP|TRIM|LTRIM|RTRIM|LPAD|RPAD|SUBSTRING|SUBSTR|POSITION|STRPOS|OVERLAY|REPLACE|TRANSLATE|CONCAT|CONCAT_WS|REPEAT|REVERSE|SPLIT_PART|REGEXP_REPLACE|REGEXP_MATCHES|REGEXP_EXTRACT|TO_CHAR|TO_NUMBER|TO_DATE|TO_TIMESTAMP|DATE_PART|DATE_TRUNC|AGE|NOW|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP|LOCALTIME|LOCALTIMESTAMP|MAKE_DATE|MAKE_TIME|MAKE_TIMESTAMP|ARRAY_AGG|STRING_AGG|LISTAGG|BOOL_AND|BOOL_OR|JSON_AGG|JSONB_AGG|RANK|DENSE_RANK|ROW_NUMBER|NTILE|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE|CUME_DIST|PERCENT_RANK|STDDEV|VARIANCE|CORR|COALESCE|NULLIF|GREATEST|LEAST|IFNULL|NVL|NVL2|HASH|MD5|SHA256|UUID|GEN_RANDOM_UUID|UNNEST|GENERATE_SERIES|READ_CSV|READ_PARQUET|READ_JSON|STRFTIME|STRPTIME|DATE_ADD|DATE_SUB|DATE_DIFF|DATEDIFF|YEAR|MONTH|DAY|HOUR|MINUTE|SECOND|TRY_CAST|SAFE_CAST|TYPEOF|PG_TYPEOF)\\b(?=\\s*\\()"
+    },
+    "sql-constants": {
+      "name": "constant.language.sql",
+      "match": "(?i)\\b(TRUE|FALSE|NULL|UNKNOWN)\\b"
+    },
+    "sql-numbers": {
+      "name": "constant.numeric.sql",
+      "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b"
+    },
+    "sql-identifiers": {
+      "name": "variable.other.sql",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    }
+  }
+}

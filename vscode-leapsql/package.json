@@ -1,0 +1,97 @@
+{
+  "name": "leapsql",
+  "displayName": "LeapSQL",
+  "description": "Language support for LeapSQL - SQL with templating and macros",
+  "version": "0.1.0",
+  "publisher": "leapsql",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leapsql/leapsql"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "sql",
+    "leapsql",
+    "dbt",
+    "data",
+    "analytics"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/models/**/*.sql",
+    "workspaceContains:**/macros/**/*.star"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "leapsql",
+        "aliases": [
+          "LeapSQL",
+          "leapsql"
+        ],
+        "extensions": [
+          ".sql"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "leapsql",
+        "scopeName": "source.leapsql",
+        "path": "./syntaxes/leapsql.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.yaml": "yaml",
+          "meta.embedded.block.python": "python",
+          "meta.embedded.block.sql": "sql"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "LeapSQL",
+      "properties": {
+        "leapsql.path": {
+          "type": "string",
+          "default": "leapsql",
+          "description": "Path to the leapsql executable"
+        },
+        "leapsql.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the LeapSQL language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test:grammar": "vscode-tmgrammar-test -g syntaxes/leapsql.tmLanguage.json 'test/colorization/**/*.sql'",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.0.0",
+    "vscode-tmgrammar-test": "^0.1.3"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}
