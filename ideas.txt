@@ -7,3 +7,5 @@ profiles.yml
 dialect specific config
 lsp
 cli prettify
+
+docs reference files & and last updated - update since last commit

@@ -1,10 +1,14 @@
-// Package main provides tests for the DBGo CLI.
+// Package main provides tests for the LeapSQL CLI.
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/leapstack-labs/leapsql/internal/cli"
 )
 
 func testdataDir(t *testing.T) string {
@@ -17,151 +21,307 @@ func testdataDir(t *testing.T) string {
 	return filepath.Join(wd, "..", "..", "testdata")
 }
 
-func TestVersionCmd(t *testing.T) {
-	err := versionCmd([]string{})
+func TestVersionCommand(t *testing.T) {
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"version"})
+
+	err := cmd.Execute()
 	if err != nil {
-		t.Errorf("versionCmd() error = %v", err)
+		t.Errorf("version command error = %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "LeapSQL") {
+		t.Errorf("version output should contain 'LeapSQL', got: %s", output)
 	}
 }
 
-func TestListCmd(t *testing.T) {
-	td := testdataDir(t)
-	tmpDir := t.TempDir()
+func TestHelpCommand(t *testing.T) {
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--help"})
 
-	args := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("help command error = %v", err)
 	}
 
-	err := listCmd(args)
-	if err != nil {
-		t.Errorf("listCmd() error = %v", err)
+	output := buf.String()
+	expectedCommands := []string{"run", "list", "dag", "seed", "lineage", "render", "docs"}
+	for _, expected := range expectedCommands {
+		if !strings.Contains(output, expected) {
+			t.Errorf("help output should contain '%s', got: %s", expected, output)
+		}
 	}
 }
 
-func TestDagCmd(t *testing.T) {
+func TestListCommand(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
 
-	args := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"list",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("list command error = %v", err)
 	}
 
-	err := dagCmd(args)
-	if err != nil {
-		t.Errorf("dagCmd() error = %v", err)
+	output := buf.String()
+	if !strings.Contains(output, "Models") {
+		t.Errorf("list output should contain 'Models', got: %s", output)
 	}
 }
 
-func TestSeedCmd(t *testing.T) {
+func TestListCommandJSON(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
 
-	args := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"list",
+		"--output", "json",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("list --json command error = %v", err)
 	}
 
-	err := seedCmd(args)
+	// JSON output goes to stdout, not the buffer
+	// So we just verify no error occurred
+}
+
+func TestDAGCommand(t *testing.T) {
+	td := testdataDir(t)
+	tmpDir := t.TempDir()
+
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"dag",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
 	if err != nil {
-		t.Errorf("seedCmd() error = %v", err)
+		t.Errorf("dag command error = %v", err)
 	}
 }
 
-func TestRunCmd(t *testing.T) {
+func TestSeedCommand(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
 
-	args := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
-		"-env", "test",
-	}
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"seed",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
 
-	err := runCmd(args)
+	err := cmd.Execute()
 	if err != nil {
-		t.Errorf("runCmd() error = %v", err)
+		t.Errorf("seed command error = %v", err)
 	}
 }
 
-func TestRunCmd_Select(t *testing.T) {
+func TestRunCommand(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
 
-	args := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
-		"-env", "test",
-		"-select", "staging.stg_customers",
-	}
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"run",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+		"--env", "test",
+	})
 
-	err := runCmd(args)
+	err := cmd.Execute()
 	if err != nil {
-		t.Errorf("runCmd() with -select error = %v", err)
+		t.Errorf("run command error = %v", err)
 	}
 }
 
-func TestRunCmd_SelectWithDownstream(t *testing.T) {
+func TestRunCommandSelect(t *testing.T) {
 	td := testdataDir(t)
 	tmpDir := t.TempDir()
 
-	// Use a persistent database to maintain state between runs
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"run",
+		"--select", "staging.stg_customers",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+		"--env", "test",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("run --select command error = %v", err)
+	}
+}
+
+func TestRunCommandSelectWithDownstream(t *testing.T) {
+	td := testdataDir(t)
+	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	baseArgs := []string{
-		"-models", filepath.Join(td, "models"),
-		"-seeds", filepath.Join(td, "seeds"),
-		"-macros", filepath.Join(td, "macros"),
-		"-state", filepath.Join(tmpDir, "state.db"),
-		"-database", dbPath,
-		"-env", "test",
+	// First run all models to create base tables
+	cmd := cli.NewRootCmd()
+	cmd.SetArgs([]string{
+		"run",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+		"--database", dbPath,
+		"--env", "test",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("initial run command error = %v", err)
 	}
 
-	// First run all models to create the base tables
-	// This is required because downstream models may depend on other models
-	// that weren't selected
-	err := runCmd(baseArgs)
-	if err != nil {
-		t.Fatalf("initial runCmd() error = %v", err)
-	}
+	// Now test select with downstream
+	cmd2 := cli.NewRootCmd()
+	cmd2.SetArgs([]string{
+		"run",
+		"--select", "staging.stg_customers",
+		"--downstream",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+		"--database", dbPath,
+		"--env", "test",
+	})
 
-	// Now test select with downstream - re-run stg_customers and its downstream
-	selectArgs := append(baseArgs, "-select", "staging.stg_customers", "-downstream")
-	err = runCmd(selectArgs)
+	err = cmd2.Execute()
 	if err != nil {
-		t.Errorf("runCmd() with -select and -downstream error = %v", err)
+		t.Errorf("run --select --downstream command error = %v", err)
 	}
 }
 
-func TestCreateEngine_BadStatePath(t *testing.T) {
+func TestLineageCommand(t *testing.T) {
 	td := testdataDir(t)
+	tmpDir := t.TempDir()
 
-	// We need to parse flags to set global variables for createEngine
-	// Use a helper to set up the environment
-	modelsDir = filepath.Join(td, "models")
-	seedsDir = filepath.Join(td, "seeds")
-	macrosDir = filepath.Join(td, "macros")
-	databasePath = ""
-	statePath = "/nonexistent/path/state.db"
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"lineage", "staging.stg_customers",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
 
-	_, err := createEngine()
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("lineage command error = %v", err)
+	}
+}
+
+func TestRenderCommand(t *testing.T) {
+	td := testdataDir(t)
+	tmpDir := t.TempDir()
+
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{
+		"render", "staging.stg_customers",
+		"--models-dir", filepath.Join(td, "models"),
+		"--seeds-dir", filepath.Join(td, "seeds"),
+		"--macros-dir", filepath.Join(td, "macros"),
+		"--state", filepath.Join(tmpDir, "state.db"),
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("render command error = %v", err)
+	}
+}
+
+func TestCompletionCommand(t *testing.T) {
+	shells := []string{"bash", "zsh", "fish", "powershell"}
+
+	for _, shell := range shells {
+		t.Run(shell, func(t *testing.T) {
+			cmd := cli.NewRootCmd()
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
+			cmd.SetArgs([]string{"completion", shell})
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Errorf("completion %s command error = %v", shell, err)
+			}
+		})
+	}
+}
+
+func TestUnknownCommand(t *testing.T) {
+	cmd := cli.NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"unknown-command"})
+
+	err := cmd.Execute()
 	if err == nil {
-		t.Error("createEngine() should fail with bad state path")
+		t.Error("unknown command should return an error")
 	}
 }
 
 func TestMain(m *testing.M) {
-	// Run tests
 	os.Exit(m.Run())
 }

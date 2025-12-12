@@ -669,6 +669,27 @@ func (e *Engine) GetModels() map[string]*parser.ModelConfig {
 	return e.models
 }
 
+// GetStateStore returns the state store.
+func (e *Engine) GetStateStore() state.StateStore {
+	return e.store
+}
+
+// RenderModel renders the SQL for a model with all templates expanded.
+func (e *Engine) RenderModel(modelPath string) (string, error) {
+	m, ok := e.models[modelPath]
+	if !ok {
+		return "", fmt.Errorf("model not found: %s", modelPath)
+	}
+
+	model, err := e.store.GetModelByPath(modelPath)
+	if err != nil {
+		// Model not in state store, create minimal version
+		model = &state.Model{Path: modelPath, Name: m.Name}
+	}
+
+	return e.buildSQL(m, model), nil
+}
+
 // pathToTableName converts a model path to a SQL table name.
 // e.g., "staging.customers" -> "staging.customers"
 func pathToTableName(path string) string {
