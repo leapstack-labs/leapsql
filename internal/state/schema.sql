@@ -124,3 +124,34 @@ CREATE TABLE IF NOT EXISTS column_lineage (
 
 CREATE INDEX IF NOT EXISTS idx_column_lineage_source ON column_lineage(source_table, source_column);
 CREATE INDEX IF NOT EXISTS idx_column_lineage_model ON column_lineage(model_path);
+
+-- macro_namespaces: one per .star file
+CREATE TABLE IF NOT EXISTS macro_namespaces (
+    name       TEXT PRIMARY KEY,              -- "utils", "datetime"
+    file_path  TEXT NOT NULL,                 -- Absolute path to .star file
+    package    TEXT DEFAULT '',               -- "" for local, package name for vendor
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_macro_namespaces_package ON macro_namespaces(package);
+
+-- macro_functions: many per namespace
+CREATE TABLE IF NOT EXISTS macro_functions (
+    namespace  TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    args       TEXT NOT NULL DEFAULT '[]',    -- JSON: ["column", "default=None"]
+    docstring  TEXT DEFAULT '',               -- Extracted from function
+    line       INTEGER DEFAULT 0,             -- Line number for go-to-definition
+    PRIMARY KEY (namespace, name),
+    FOREIGN KEY (namespace) REFERENCES macro_namespaces(name) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_macro_functions_namespace ON macro_functions(namespace);
+
+-- Trigger to update updated_at on macro_namespaces table
+CREATE TRIGGER IF NOT EXISTS macro_namespaces_updated_at
+    AFTER UPDATE ON macro_namespaces
+    FOR EACH ROW
+BEGIN
+    UPDATE macro_namespaces SET updated_at = CURRENT_TIMESTAMP WHERE name = NEW.name;
+END;

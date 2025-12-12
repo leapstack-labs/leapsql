@@ -12,6 +12,9 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/docs"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/lsp"
+	"github.com/leapstack-labs/leapsql/internal/macro"
+	"github.com/leapstack-labs/leapsql/internal/state"
 )
 
 const (
@@ -76,6 +79,16 @@ func main() {
 			Description: "Show version information",
 			Run:         versionCmd,
 		},
+		"lsp": {
+			Name:        "lsp",
+			Description: "Start the Language Server Protocol server",
+			Run:         lspCmd,
+		},
+		"discover": {
+			Name:        "discover",
+			Description: "Index macros and models for IDE features",
+			Run:         discoverCmd,
+		},
 	}
 
 	if len(os.Args) < 2 {
@@ -110,7 +123,7 @@ func printUsage(commands map[string]*Command) {
 	fmt.Println("Usage: leapsql <command> [options]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	for _, cmd := range []string{"run", "build", "list", "seed", "dag", "docs", "version"} {
+	for _, cmd := range []string{"run", "build", "list", "seed", "dag", "docs", "discover", "lsp", "version"} {
 		if c, ok := commands[cmd]; ok {
 			fmt.Printf("  %-12s %s\n", c.Name, c.Description)
 		}
@@ -351,6 +364,143 @@ func versionCmd(args []string) error {
 	fmt.Println("LeapSQL v0.1.0")
 	fmt.Println("Data Transformation Engine built with Go and DuckDB")
 	return nil
+}
+
+// lspCmd starts the Language Server Protocol server.
+func lspCmd(args []string) error {
+	fs := flag.NewFlagSet("lsp", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Println("Usage: leapsql lsp")
+		fmt.Println()
+		fmt.Println("Starts the LSP server for IDE integration.")
+		fmt.Println("The server communicates over stdin/stdout using JSON-RPC.")
+		fmt.Println()
+		fmt.Println("The project root and state database are determined by the")
+		fmt.Println("client's initialization request (rootUri parameter).")
+	}
+	fs.Parse(args)
+
+	server := lsp.NewServer(os.Stdin, os.Stdout)
+	return server.Run()
+}
+
+// discoverCmd indexes macros and models for IDE features.
+func discoverCmd(args []string) error {
+	fs := flag.NewFlagSet("discover", flag.ExitOnError)
+	setupFlags(fs)
+	fs.Usage = func() {
+		fmt.Println("Usage: leapsql discover [options]")
+		fmt.Println()
+		fmt.Println("Indexes macros and models into the SQLite state database")
+		fmt.Println("for use by the LSP server and other IDE features.")
+		fmt.Println()
+		fmt.Println("Options:")
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
+
+	// Ensure state directory exists
+	stateDir := filepath.Dir(statePath)
+	if stateDir != "." && stateDir != "" {
+		if err := os.MkdirAll(stateDir, 0755); err != nil {
+			return fmt.Errorf("failed to create state directory: %w", err)
+		}
+	}
+
+	// Open or create SQLite database
+	store := state.NewSQLiteStore()
+	if err := store.Open(statePath); err != nil {
+		return fmt.Errorf("failed to open state database: %w", err)
+	}
+	defer store.Close()
+
+	// Initialize schema (creates tables if they don't exist)
+	if err := store.InitSchema(); err != nil {
+		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+
+	// Discover macros
+	macroCount, funcCount, err := discoverMacros(store, macrosDir)
+	if err != nil {
+		return fmt.Errorf("failed to discover macros: %w", err)
+	}
+
+	fmt.Printf("Discovered %d macro namespaces with %d functions\n", macroCount, funcCount)
+	fmt.Printf("State saved to %s\n", statePath)
+
+	return nil
+}
+
+// discoverMacros scans the macros directory and indexes all .star files.
+func discoverMacros(store state.StateStore, dir string) (int, int, error) {
+	// Check if macros directory exists
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		fmt.Printf("Macros directory not found: %s (skipping)\n", dir)
+		return 0, 0, nil
+	}
+
+	var namespaceCount, functionCount int
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories and non-.star files
+		if info.IsDir() || !strings.HasSuffix(info.Name(), ".star") {
+			return nil
+		}
+
+		// Read file content
+		content, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Printf("Warning: failed to read %s: %v\n", path, err)
+			return nil
+		}
+
+		// Parse the .star file
+		absPath, _ := filepath.Abs(path)
+		parsed, err := macro.ParseStarlarkFile(absPath, content)
+		if err != nil {
+			fmt.Printf("Warning: failed to parse %s: %v\n", path, err)
+			return nil
+		}
+
+		// Convert to state types
+		ns := &state.MacroNamespace{
+			Name:     parsed.Name,
+			FilePath: parsed.FilePath,
+			Package:  parsed.Package,
+		}
+
+		var funcs []*state.MacroFunction
+		for _, f := range parsed.Functions {
+			funcs = append(funcs, &state.MacroFunction{
+				Namespace: parsed.Name,
+				Name:      f.Name,
+				Args:      f.Args,
+				Docstring: f.Docstring,
+				Line:      f.Line,
+			})
+		}
+
+		// Save to database
+		if err := store.SaveMacroNamespace(ns, funcs); err != nil {
+			fmt.Printf("Warning: failed to save %s: %v\n", parsed.Name, err)
+			return nil
+		}
+
+		if verbose {
+			fmt.Printf("  Indexed: %s (%d functions)\n", parsed.Name, len(funcs))
+		}
+
+		namespaceCount++
+		functionCount += len(funcs)
+
+		return nil
+	})
+
+	return namespaceCount, functionCount, err
 }
 
 // docsCmd handles the docs subcommands.

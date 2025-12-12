@@ -1075,3 +1075,283 @@ ORDER BY depth, model_path, column_name`
 
 	return results, rows.Err()
 }
+
+// --- Macro operations ---
+
+// SaveMacroNamespace stores a macro namespace and its functions.
+// This replaces any existing functions for the namespace.
+func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroFunction) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Upsert namespace
+	_, err = tx.Exec(`
+		INSERT INTO macro_namespaces (name, file_path, package, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(name) DO UPDATE SET
+			file_path = excluded.file_path,
+			package = excluded.package,
+			updated_at = CURRENT_TIMESTAMP
+	`, ns.Name, ns.FilePath, ns.Package)
+	if err != nil {
+		return fmt.Errorf("failed to upsert namespace: %w", err)
+	}
+
+	// Delete old functions for this namespace
+	_, err = tx.Exec("DELETE FROM macro_functions WHERE namespace = ?", ns.Name)
+	if err != nil {
+		return fmt.Errorf("failed to delete old functions: %w", err)
+	}
+
+	// Insert functions
+	stmt, err := tx.Prepare(`
+		INSERT INTO macro_functions (namespace, name, args, docstring, line)
+		VALUES (?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, fn := range functions {
+		argsJSON, _ := json.Marshal(fn.Args)
+		_, err := stmt.Exec(ns.Name, fn.Name, string(argsJSON), fn.Docstring, fn.Line)
+		if err != nil {
+			return fmt.Errorf("failed to insert function %s: %w", fn.Name, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetMacroNamespaces returns all macro namespaces.
+func (s *SQLiteStore) GetMacroNamespaces() ([]*MacroNamespace, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT name, file_path, package, updated_at 
+		FROM macro_namespaces 
+		ORDER BY name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespaces: %w", err)
+	}
+	defer rows.Close()
+
+	var namespaces []*MacroNamespace
+	for rows.Next() {
+		var ns MacroNamespace
+		var pkg sql.NullString
+		if err := rows.Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan namespace: %w", err)
+		}
+		if pkg.Valid {
+			ns.Package = pkg.String
+		}
+		namespaces = append(namespaces, &ns)
+	}
+
+	return namespaces, rows.Err()
+}
+
+// GetMacroNamespace returns a single macro namespace by name.
+func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	var ns MacroNamespace
+	var pkg sql.NullString
+
+	err := s.db.QueryRow(`
+		SELECT name, file_path, package, updated_at 
+		FROM macro_namespaces 
+		WHERE name = ?
+	`, name).Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace: %w", err)
+	}
+
+	if pkg.Valid {
+		ns.Package = pkg.String
+	}
+
+	return &ns, nil
+}
+
+// GetMacroFunctions returns all functions for a namespace.
+func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*MacroFunction, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT namespace, name, args, docstring, line 
+		FROM macro_functions 
+		WHERE namespace = ?
+		ORDER BY name
+	`, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get functions: %w", err)
+	}
+	defer rows.Close()
+
+	var functions []*MacroFunction
+	for rows.Next() {
+		var fn MacroFunction
+		var argsJSON string
+		var docstring sql.NullString
+		if err := rows.Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line); err != nil {
+			return nil, fmt.Errorf("failed to scan function: %w", err)
+		}
+		json.Unmarshal([]byte(argsJSON), &fn.Args)
+		if docstring.Valid {
+			fn.Docstring = docstring.String
+		}
+		functions = append(functions, &fn)
+	}
+
+	return functions, rows.Err()
+}
+
+// GetMacroFunction returns a single function by namespace and name.
+func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*MacroFunction, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	var fn MacroFunction
+	var argsJSON string
+	var docstring sql.NullString
+
+	err := s.db.QueryRow(`
+		SELECT namespace, name, args, docstring, line 
+		FROM macro_functions 
+		WHERE namespace = ? AND name = ?
+	`, namespace, name).Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get function: %w", err)
+	}
+
+	json.Unmarshal([]byte(argsJSON), &fn.Args)
+	if docstring.Valid {
+		fn.Docstring = docstring.String
+	}
+
+	return &fn, nil
+}
+
+// MacroFunctionExists checks if a macro function exists.
+func (s *SQLiteStore) MacroFunctionExists(namespace, name string) (bool, error) {
+	if s.db == nil {
+		return false, fmt.Errorf("database not opened")
+	}
+
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM macro_functions 
+		WHERE namespace = ? AND name = ?
+	`, namespace, name).Scan(&count)
+
+	return count > 0, err
+}
+
+// SearchMacroNamespaces searches namespaces by prefix.
+func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*MacroNamespace, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT name, file_path, package, updated_at 
+		FROM macro_namespaces 
+		WHERE name LIKE ? || '%'
+		ORDER BY name
+	`, prefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search namespaces: %w", err)
+	}
+	defer rows.Close()
+
+	var namespaces []*MacroNamespace
+	for rows.Next() {
+		var ns MacroNamespace
+		var pkg sql.NullString
+		if err := rows.Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan namespace: %w", err)
+		}
+		if pkg.Valid {
+			ns.Package = pkg.String
+		}
+		namespaces = append(namespaces, &ns)
+	}
+
+	return namespaces, rows.Err()
+}
+
+// SearchMacroFunctions searches functions within a namespace by prefix.
+func (s *SQLiteStore) SearchMacroFunctions(namespace, prefix string) ([]*MacroFunction, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT namespace, name, args, docstring, line 
+		FROM macro_functions 
+		WHERE namespace = ? AND name LIKE ? || '%'
+		ORDER BY name
+	`, namespace, prefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search functions: %w", err)
+	}
+	defer rows.Close()
+
+	var functions []*MacroFunction
+	for rows.Next() {
+		var fn MacroFunction
+		var argsJSON string
+		var docstring sql.NullString
+		if err := rows.Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line); err != nil {
+			return nil, fmt.Errorf("failed to scan function: %w", err)
+		}
+		json.Unmarshal([]byte(argsJSON), &fn.Args)
+		if docstring.Valid {
+			fn.Docstring = docstring.String
+		}
+		functions = append(functions, &fn)
+	}
+
+	return functions, rows.Err()
+}
+
+// DeleteMacroNamespace deletes a namespace and all its functions.
+func (s *SQLiteStore) DeleteMacroNamespace(name string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	// The CASCADE in the schema should handle deleting functions
+	_, err := s.db.Exec("DELETE FROM macro_namespaces WHERE name = ?", name)
+	if err != nil {
+		return fmt.Errorf("failed to delete namespace: %w", err)
+	}
+
+	return nil
+}

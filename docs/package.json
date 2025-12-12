@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "unocss": "^66.5.9",
+    "vite": "^7.2.7",
     "vitepress": "^1.6.4",
     "vitepress-plugin-llms": "^1.9.3"
   }

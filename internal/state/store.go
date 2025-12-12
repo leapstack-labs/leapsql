@@ -117,6 +117,23 @@ type TraceResult struct {
 	IsExternal bool   `json:"is_external"` // true if source_table is not a known model
 }
 
+// MacroNamespace represents a macro namespace from a .star file.
+type MacroNamespace struct {
+	Name      string `json:"name"`       // e.g., "utils", "datetime"
+	FilePath  string `json:"file_path"`  // Absolute path to .star file
+	Package   string `json:"package"`    // "" for local, package name for vendor
+	UpdatedAt string `json:"updated_at"` // ISO timestamp
+}
+
+// MacroFunction represents a function exported from a macro namespace.
+type MacroFunction struct {
+	Namespace string   `json:"namespace"` // Parent namespace name
+	Name      string   `json:"name"`      // Function name
+	Args      []string `json:"args"`      // Argument names with defaults
+	Docstring string   `json:"docstring"` // Function documentation
+	Line      int      `json:"line"`      // Line number for go-to-definition
+}
+
 // StateStore defines the interface for state management operations.
 type StateStore interface {
 	// Open opens a connection to the state store at the given path.
@@ -163,4 +180,15 @@ type StateStore interface {
 	DeleteModelColumns(modelPath string) error
 	TraceColumnBackward(modelPath, columnName string) ([]TraceResult, error)
 	TraceColumnForward(modelPath, columnName string) ([]TraceResult, error)
+
+	// Macro operations
+	SaveMacroNamespace(ns *MacroNamespace, functions []*MacroFunction) error
+	GetMacroNamespaces() ([]*MacroNamespace, error)
+	GetMacroNamespace(name string) (*MacroNamespace, error)
+	GetMacroFunctions(namespace string) ([]*MacroFunction, error)
+	GetMacroFunction(namespace, name string) (*MacroFunction, error)
+	MacroFunctionExists(namespace, name string) (bool, error)
+	SearchMacroNamespaces(prefix string) ([]*MacroNamespace, error)
+	SearchMacroFunctions(namespace, prefix string) ([]*MacroFunction, error)
+	DeleteMacroNamespace(name string) error
 }

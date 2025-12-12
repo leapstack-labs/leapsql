@@ -19,6 +19,7 @@ export default defineConfig({
   ],
 
   vite: {
+// @ts-ignore - Vite version mismatch between vitepress and explicit vite dep
     plugins: [UnoCSS(), llmstxt()],
   },
 
