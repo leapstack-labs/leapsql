@@ -45,6 +45,7 @@ type Model struct {
 	Materialized string         `json:"materialized"` // "table", "view", "incremental"
 	UniqueKey    string         `json:"unique_key,omitempty"`
 	ContentHash  string         `json:"content_hash"`
+	FilePath     string         `json:"file_path,omitempty"` // Absolute path to .sql file
 	Owner        string         `json:"owner,omitempty"`
 	Schema       string         `json:"schema,omitempty"`
 	Tags         []string       `json:"tags,omitempty"`
@@ -155,8 +156,10 @@ type StateStore interface {
 	RegisterModel(model *Model) error
 	GetModelByID(id string) (*Model, error)
 	GetModelByPath(path string) (*Model, error)
+	GetModelByFilePath(filePath string) (*Model, error) // NEW: lookup by file system path
 	UpdateModelHash(id string, contentHash string) error
 	ListModels() ([]*Model, error)
+	DeleteModelByFilePath(filePath string) error // NEW: cleanup deleted files
 
 	// Model run operations
 	RecordModelRun(modelRun *ModelRun) error
@@ -191,4 +194,14 @@ type StateStore interface {
 	SearchMacroNamespaces(prefix string) ([]*MacroNamespace, error)
 	SearchMacroFunctions(namespace, prefix string) ([]*MacroFunction, error)
 	DeleteMacroNamespace(name string) error
+	DeleteMacroNamespaceByFilePath(filePath string) error // NEW: cleanup by file path
+
+	// File hash tracking for incremental discovery
+	GetContentHash(filePath string) (string, error)
+	SetContentHash(filePath, hash, fileType string) error
+	DeleteContentHash(filePath string) error
+
+	// List tracked file paths (for detecting deletions)
+	ListModelFilePaths() ([]string, error)
+	ListMacroFilePaths() ([]string, error)
 }

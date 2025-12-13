@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS models (
     materialized TEXT NOT NULL DEFAULT 'table',
     unique_key TEXT,
     content_hash TEXT NOT NULL,
+    file_path TEXT,           -- Absolute path to .sql file (for incremental discovery)
     -- New fields from frontmatter
     owner TEXT,
     schema_name TEXT,
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS models (
 
 CREATE INDEX IF NOT EXISTS idx_models_path ON models(path);
 CREATE INDEX IF NOT EXISTS idx_models_name ON models(name);
+CREATE INDEX IF NOT EXISTS idx_models_file_path ON models(file_path);
 
 -- model_runs: execution history per model
 CREATE TABLE IF NOT EXISTS model_runs (
@@ -155,3 +157,13 @@ CREATE TRIGGER IF NOT EXISTS macro_namespaces_updated_at
 BEGIN
     UPDATE macro_namespaces SET updated_at = CURRENT_TIMESTAMP WHERE name = NEW.name;
 END;
+
+-- file_hashes: track content hashes for incremental discovery
+CREATE TABLE IF NOT EXISTS file_hashes (
+    file_path TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    file_type TEXT NOT NULL,  -- 'model' or 'macro'
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_hashes_type ON file_hashes(file_type);

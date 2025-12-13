@@ -12,21 +12,55 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/state"
 )
 
-// testdataDir returns the path to the testdata directory.
-func testdataDir() string {
-	// Go up two levels from internal/engine to repo root, then into testdata
-	return filepath.Join("..", "..", "testdata")
+// createTestProject creates a minimal test project in a temp directory.
+// Returns the temp dir path. Use t.TempDir() for automatic cleanup.
+func createTestProject(t *testing.T) (tmpDir, modelsDir, seedsDir, macrosDir string) {
+	t.Helper()
+	tmpDir = t.TempDir()
+	modelsDir = filepath.Join(tmpDir, "models")
+	seedsDir = filepath.Join(tmpDir, "seeds")
+	macrosDir = filepath.Join(tmpDir, "macros")
+
+	for _, dir := range []string{modelsDir, seedsDir, macrosDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("Failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Create a simple seed
+	seedContent := "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n"
+	if err := os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644); err != nil {
+		t.Fatalf("Failed to write seed: %v", err)
+	}
+
+	// Create a simple model
+	modelContent := `/*---
+name: active_users
+materialized: table
+---*/
+
+SELECT id, name, email FROM users
+`
+	if err := os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644); err != nil {
+		t.Fatalf("Failed to write model: %v", err)
+	}
+
+	return
+}
+
+// testContext returns a context for unit tests.
+func testContext() context.Context {
+	return context.Background()
 }
 
 func TestNew(t *testing.T) {
-	// Create temp directory for state
-	tmpDir := t.TempDir()
+	tmpDir, modelsDir, seedsDir, macrosDir := createTestProject(t)
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
+		ModelsDir:    modelsDir,
+		SeedsDir:     seedsDir,
+		MacrosDir:    macrosDir,
 		DatabasePath: "", // in-memory DuckDB
 		StatePath:    statePath,
 	}
@@ -37,8 +71,11 @@ func TestNew(t *testing.T) {
 	}
 	defer engine.Close()
 
-	if engine.db == nil {
-		t.Error("engine.db should not be nil")
+	if engine.db != nil {
+		t.Error("engine.db should be nil (lazy initialization)")
+	}
+	if engine.dbConnected {
+		t.Error("engine.dbConnected should be false initially")
 	}
 	if engine.store == nil {
 		t.Error("engine.store should not be nil")
@@ -52,10 +89,13 @@ func TestNew(t *testing.T) {
 }
 
 func TestNew_InvalidStatePath(t *testing.T) {
+	tmpDir, modelsDir, seedsDir, macrosDir := createTestProject(t)
+	_ = tmpDir
+
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
+		ModelsDir:    modelsDir,
+		SeedsDir:     seedsDir,
+		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    "/nonexistent/path/state.db",
 	}
@@ -66,68 +106,14 @@ func TestNew_InvalidStatePath(t *testing.T) {
 	}
 }
 
-func TestLoadSeeds(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Verify seeds were loaded by querying the tables
-	testCases := []struct {
-		table    string
-		minCount int
-	}{
-		{"raw_customers", 5},
-		{"raw_orders", 1},
-		{"raw_products", 1},
-	}
-
-	for _, tc := range testCases {
-		rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM "+tc.table)
-		if err != nil {
-			t.Errorf("Query %s failed: %v", tc.table, err)
-			continue
-		}
-
-		var count int
-		if rows.Next() {
-			if err := rows.Scan(&count); err != nil {
-				rows.Close()
-				t.Errorf("Scan failed for %s: %v", tc.table, err)
-				continue
-			}
-		}
-		rows.Close()
-
-		if count < tc.minCount {
-			t.Errorf("Table %s has %d rows, want at least %d", tc.table, count, tc.minCount)
-		}
-	}
-}
-
 func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
+	modelsDir := filepath.Join(tmpDir, "models")
+	os.MkdirAll(modelsDir, 0755)
 
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
+		ModelsDir:    modelsDir,
 		SeedsDir:     "", // No seeds dir
 		DatabasePath: "",
 		StatePath:    statePath,
@@ -139,7 +125,7 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 	}
 	defer engine.Close()
 
-	ctx := context.Background()
+	ctx := testContext()
 	if err := engine.LoadSeeds(ctx); err != nil {
 		t.Errorf("LoadSeeds() should succeed with empty seeds dir, got: %v", err)
 	}
@@ -148,9 +134,11 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
+	modelsDir := filepath.Join(tmpDir, "models")
+	os.MkdirAll(modelsDir, 0755)
 
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
+		ModelsDir:    modelsDir,
 		SeedsDir:     filepath.Join(tmpDir, "nonexistent"),
 		DatabasePath: "",
 		StatePath:    statePath,
@@ -162,231 +150,10 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 	}
 	defer engine.Close()
 
-	ctx := context.Background()
+	ctx := testContext()
 	// Should not error, just skip loading
 	if err := engine.LoadSeeds(ctx); err != nil {
 		t.Errorf("LoadSeeds() should succeed with nonexistent seeds dir, got: %v", err)
-	}
-}
-
-func TestDiscover(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	// Check that models were discovered
-	models := engine.GetModels()
-	if len(models) == 0 {
-		t.Fatal("No models discovered")
-	}
-
-	// Expected models from testdata
-	expectedModels := []string{
-		"staging.stg_customers",
-		"staging.stg_orders",
-		"staging.stg_products",
-		"marts.customer_summary",
-		"marts.product_summary",
-		"marts.executive_dashboard",
-		"marts.order_facts",
-	}
-
-	for _, expected := range expectedModels {
-		if _, ok := models[expected]; !ok {
-			t.Errorf("Expected model %q not found", expected)
-		}
-	}
-
-	// Check DAG was built
-	graph := engine.GetGraph()
-	if graph.NodeCount() != len(expectedModels) {
-		t.Errorf("Graph has %d nodes, want %d", graph.NodeCount(), len(expectedModels))
-	}
-}
-
-func TestDiscover_DAGDependencies(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	graph := engine.GetGraph()
-
-	// Staging models should be roots (no dependencies)
-	roots := graph.GetRoots()
-	t.Logf("DAG roots: %v", roots)
-
-	// customer_summary depends on stg_customers and stg_orders
-	parents := graph.GetParents("marts.customer_summary")
-	t.Logf("customer_summary parents: %v", parents)
-
-	if len(parents) < 2 {
-		t.Errorf("customer_summary should have at least 2 parents, got %d: %v", len(parents), parents)
-	}
-}
-
-func TestRun(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-
-	// Load seeds first
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Discover models
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	// Run all models
-	run, err := engine.Run(ctx, "test")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	if run == nil {
-		t.Fatal("Run() returned nil run")
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
-
-	// Verify tables were created by querying them
-	tables := []string{
-		"staging.stg_customers",
-		"staging.stg_orders",
-		"staging.stg_products",
-		"marts.customer_summary",
-		"marts.product_summary",
-	}
-
-	for _, table := range tables {
-		rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM "+table)
-		if err != nil {
-			t.Errorf("Query %s failed: %v", table, err)
-			continue
-		}
-		var count int
-		if rows.Next() {
-			rows.Scan(&count)
-		}
-		rows.Close()
-		t.Logf("Table %s has %d rows", table, count)
-	}
-}
-
-func TestRunSelected(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-
-	// Load seeds first
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Discover models
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	// Run only staging models
-	selectedModels := []string{
-		"staging.stg_customers",
-		"staging.stg_orders",
-		"staging.stg_products",
-	}
-
-	run, err := engine.RunSelected(ctx, "test", selectedModels, false)
-	if err != nil {
-		t.Fatalf("RunSelected() failed: %v", err)
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
-
-	// Verify staging tables were created
-	for _, model := range selectedModels {
-		rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM "+model)
-		if err != nil {
-			t.Errorf("Query %s failed: %v", model, err)
-			continue
-		}
-		var count int
-		if rows.Next() {
-			rows.Scan(&count)
-		}
-		rows.Close()
-		if count == 0 {
-			t.Errorf("Table %s has 0 rows", model)
-		}
 	}
 }
 
@@ -431,13 +198,13 @@ func TestHashContent(t *testing.T) {
 }
 
 func TestBuildSQL(t *testing.T) {
-	tmpDir := t.TempDir()
+	tmpDir, modelsDir, seedsDir, macrosDir := createTestProject(t)
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
+		ModelsDir:    modelsDir,
+		SeedsDir:     seedsDir,
+		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
 	}
@@ -485,13 +252,13 @@ func TestBuildSQL(t *testing.T) {
 }
 
 func TestEngine_Close(t *testing.T) {
-	tmpDir := t.TempDir()
+	tmpDir, modelsDir, seedsDir, macrosDir := createTestProject(t)
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
+		ModelsDir:    modelsDir,
+		SeedsDir:     seedsDir,
+		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
 	}
@@ -512,466 +279,14 @@ func TestEngine_Close(t *testing.T) {
 	}
 }
 
-// Integration test: Full pipeline
-func TestIntegration_FullPipeline(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-
-	cfg := Config{
-		ModelsDir:    filepath.Join(testdataDir(), "models"),
-		SeedsDir:     filepath.Join(testdataDir(), "seeds"),
-		MacrosDir:    filepath.Join(testdataDir(), "macros"),
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-
-	// Step 1: Load seeds
-	t.Log("Loading seeds...")
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Step 2: Discover models
-	t.Log("Discovering models...")
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	models := engine.GetModels()
-	t.Logf("Discovered %d models", len(models))
-
-	// Step 3: Get execution order
-	graph := engine.GetGraph()
-	sorted, err := graph.TopologicalSort()
-	if err != nil {
-		t.Fatalf("TopologicalSort() failed: %v", err)
-	}
-
-	t.Log("Execution order:")
-	for i, node := range sorted {
-		t.Logf("  %d. %s", i+1, node.ID)
-	}
-
-	// Step 4: Run all models
-	t.Log("Running all models...")
-	run, err := engine.Run(ctx, "test")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	t.Logf("Run ID: %s", run.ID)
-	t.Logf("Run Status: %s", run.Status)
-
-	if run.Status != "completed" {
-		t.Fatalf("Run failed with status %s: %s", run.Status, run.Error)
-	}
-
-	// Step 5: Verify data in tables
-	t.Log("Verifying table data...")
-
-	// Check customer summary
-	rows, err := engine.db.Query(ctx, "SELECT customer_id, customer_name, total_orders FROM marts.customer_summary ORDER BY customer_id")
-	if err != nil {
-		t.Fatalf("Query customer_summary failed: %v", err)
-	}
-
-	var customerCount int
-	for rows.Next() {
-		var id int
-		var name string
-		var orders int
-		if err := rows.Scan(&id, &name, &orders); err != nil {
-			rows.Close()
-			t.Fatalf("Scan failed: %v", err)
-		}
-		t.Logf("  Customer %d: %s (%d orders)", id, name, orders)
-		customerCount++
-	}
-	rows.Close()
-
-	if customerCount == 0 {
-		t.Error("No customers found in customer_summary")
-	}
-}
-
-// Test frontmatter integration - models with YAML frontmatter
-func TestEngine_FrontmatterIntegration(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-	modelsDir := filepath.Join(tmpDir, "models")
-	seedsDir := filepath.Join(tmpDir, "seeds")
-
-	// Create models directory structure
-	if err := os.MkdirAll(modelsDir, 0755); err != nil {
-		t.Fatalf("Failed to create models dir: %v", err)
-	}
-	if err := os.MkdirAll(seedsDir, 0755); err != nil {
-		t.Fatalf("Failed to create seeds dir: %v", err)
-	}
-
-	// Create a simple seed
-	seedContent := "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n3,Carol,carol@example.com\n"
-	if err := os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644); err != nil {
-		t.Fatalf("Failed to write seed: %v", err)
-	}
-
-	// Create a model with YAML frontmatter
-	modelContent := `/*---
-name: active_users
-materialized: table
-owner: data-team
-schema: analytics
-tags:
-  - users
-  - active
-meta:
-  priority: high
----*/
-
-SELECT id, name, email FROM users
-`
-	if err := os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644); err != nil {
-		t.Fatalf("Failed to write model: %v", err)
-	}
-
-	cfg := Config{
-		ModelsDir:    modelsDir,
-		SeedsDir:     seedsDir,
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-
-	// Load seeds
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Discover models
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	models := engine.GetModels()
-	if len(models) != 1 {
-		t.Errorf("Expected 1 model, got %d", len(models))
-	}
-
-	// Check that frontmatter was parsed correctly
-	model, ok := models["active_users"]
-	if !ok {
-		t.Fatal("Model 'active_users' not found")
-	}
-
-	if model.Name != "active_users" {
-		t.Errorf("Model name = %q, want %q", model.Name, "active_users")
-	}
-	if model.Materialized != "table" {
-		t.Errorf("Model materialized = %q, want %q", model.Materialized, "table")
-	}
-	if model.Owner != "data-team" {
-		t.Errorf("Model owner = %q, want %q", model.Owner, "data-team")
-	}
-	if model.Schema != "analytics" {
-		t.Errorf("Model schema = %q, want %q", model.Schema, "analytics")
-	}
-	if len(model.Tags) != 2 {
-		t.Errorf("Model tags count = %d, want 2", len(model.Tags))
-	}
-	if model.Meta["priority"] != "high" {
-		t.Errorf("Model meta.priority = %v, want %q", model.Meta["priority"], "high")
-	}
-	if !model.HasFrontmatter {
-		t.Error("Model should have HasFrontmatter = true")
-	}
-
-	// Run
-	run, err := engine.Run(ctx, "dev")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
-
-	// Verify table was created
-	rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM active_users")
-	if err != nil {
-		t.Fatalf("Query active_users failed: %v", err)
-	}
-
-	var count int
-	if rows.Next() {
-		rows.Scan(&count)
-	}
-	rows.Close()
-
-	if count != 3 {
-		t.Errorf("active_users has %d rows, want 3", count)
-	}
-}
-
-// Test template rendering with Starlark expressions
-func TestEngine_TemplateIntegration(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-	modelsDir := filepath.Join(tmpDir, "models")
-	seedsDir := filepath.Join(tmpDir, "seeds")
-
-	// Create directories
-	if err := os.MkdirAll(modelsDir, 0755); err != nil {
-		t.Fatalf("Failed to create models dir: %v", err)
-	}
-	if err := os.MkdirAll(seedsDir, 0755); err != nil {
-		t.Fatalf("Failed to create seeds dir: %v", err)
-	}
-
-	// Create seed
-	seedContent := "id,name,status\n1,Alice,active\n2,Bob,inactive\n3,Carol,active\n"
-	if err := os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644); err != nil {
-		t.Fatalf("Failed to write seed: %v", err)
-	}
-
-	// Create a model with template expressions using 'this'
-	modelContent := `/*---
-name: user_report
-materialized: view
----*/
-
--- This model uses template expressions
-SELECT 
-    id,
-    name,
-    status,
-    '{{ this.name }}' as source_model
-FROM users
-WHERE status = 'active'
-`
-	if err := os.WriteFile(filepath.Join(modelsDir, "user_report.sql"), []byte(modelContent), 0644); err != nil {
-		t.Fatalf("Failed to write model: %v", err)
-	}
-
-	cfg := Config{
-		ModelsDir:    modelsDir,
-		SeedsDir:     seedsDir,
-		DatabasePath: "",
-		StatePath:    statePath,
-		Environment:  "prod",
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	ctx := context.Background()
-
-	// Load seeds
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Discover models
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	// Run
-	run, err := engine.Run(ctx, "prod")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
-
-	// Verify view was created and template was rendered
-	rows, err := engine.db.Query(ctx, "SELECT id, source_model FROM user_report ORDER BY id")
-	if err != nil {
-		t.Fatalf("Query user_report failed: %v", err)
-	}
-
-	var count int
-	for rows.Next() {
-		var id int
-		var sourceModel string
-		if err := rows.Scan(&id, &sourceModel); err != nil {
-			rows.Close()
-			t.Fatalf("Scan failed: %v", err)
-		}
-		// Template expression {{ this.name }} should be rendered
-		if sourceModel != "user_report" {
-			t.Errorf("source_model = %q, want %q", sourceModel, "user_report")
-		}
-		count++
-	}
-	rows.Close()
-
-	// Should have 2 active users
-	if count != 2 {
-		t.Errorf("user_report has %d rows, want 2", count)
-	}
-}
-
-// Test macros integration
-func TestEngine_MacrosIntegration(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.db")
-	modelsDir := filepath.Join(tmpDir, "models")
-	seedsDir := filepath.Join(tmpDir, "seeds")
-	macrosDir := filepath.Join(tmpDir, "macros")
-
-	// Create directories
-	for _, dir := range []string{modelsDir, seedsDir, macrosDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			t.Fatalf("Failed to create dir %s: %v", dir, err)
-		}
-	}
-
-	// Create seed
-	seedContent := "id,name,amount\n1,Alice,100\n2,Bob,200\n3,Carol,150\n"
-	if err := os.WriteFile(filepath.Join(seedsDir, "sales.csv"), []byte(seedContent), 0644); err != nil {
-		t.Fatalf("Failed to write seed: %v", err)
-	}
-
-	// Create a macro file
-	macroContent := `# Macro for generating a filter condition
-def safe_divide(numerator, denominator, default="0"):
-    return "CASE WHEN {} = 0 THEN {} ELSE {} / {} END".format(denominator, default, numerator, denominator)
-`
-	if err := os.WriteFile(filepath.Join(macrosDir, "utils.star"), []byte(macroContent), 0644); err != nil {
-		t.Fatalf("Failed to write macro: %v", err)
-	}
-
-	// Create a model that uses the macro
-	modelContent := `/*---
-name: sales_report
-materialized: table
----*/
-
-SELECT 
-    id,
-    name,
-    amount,
-    {{ utils.safe_divide("amount", "100") }} as amount_scaled
-FROM sales
-`
-	if err := os.WriteFile(filepath.Join(modelsDir, "sales_report.sql"), []byte(modelContent), 0644); err != nil {
-		t.Fatalf("Failed to write model: %v", err)
-	}
-
-	cfg := Config{
-		ModelsDir:    modelsDir,
-		SeedsDir:     seedsDir,
-		MacrosDir:    macrosDir,
-		DatabasePath: "",
-		StatePath:    statePath,
-	}
-
-	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	defer engine.Close()
-
-	// Verify macro was loaded
-	if engine.macroRegistry == nil {
-		t.Fatal("macroRegistry should not be nil")
-	}
-
-	// Check if utils namespace exists
-	namespaces := engine.macroRegistry.Namespaces()
-	found := false
-	for _, ns := range namespaces {
-		if ns == "utils" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Logf("Available namespaces: %v", namespaces)
-		t.Error("Expected 'utils' namespace to be loaded")
-	}
-
-	ctx := context.Background()
-
-	// Load seeds
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
-
-	// Discover models
-	if err := engine.Discover(); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
-
-	// Run
-	run, err := engine.Run(ctx, "dev")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
-
-	// Verify table was created and macro was expanded
-	rows, err := engine.db.Query(ctx, "SELECT id, amount_scaled FROM sales_report ORDER BY id")
-	if err != nil {
-		t.Fatalf("Query sales_report failed: %v", err)
-	}
-
-	expectedScaled := []float64{1.0, 2.0, 1.5} // 100/100, 200/100, 150/100
-	i := 0
-	for rows.Next() {
-		var id int
-		var scaled float64
-		if err := rows.Scan(&id, &scaled); err != nil {
-			rows.Close()
-			t.Fatalf("Scan failed: %v", err)
-		}
-		if i < len(expectedScaled) && scaled != expectedScaled[i] {
-			t.Errorf("Row %d: amount_scaled = %v, want %v", i, scaled, expectedScaled[i])
-		}
-		i++
-	}
-	rows.Close()
-
-	if i != 3 {
-		t.Errorf("sales_report has %d rows, want 3", i)
-	}
-}
-
-// Test with custom models directory
+// TestEngine_CustomModels tests with a minimal custom models directory.
 func TestEngine_CustomModels(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
 	seedsDir := filepath.Join(tmpDir, "seeds")
 
-	// Create models directory structure
+	// Create directories
 	if err := os.MkdirAll(modelsDir, 0755); err != nil {
 		t.Fatalf("Failed to create models dir: %v", err)
 	}
@@ -1006,7 +321,7 @@ SELECT id, name FROM users
 	}
 	defer engine.Close()
 
-	ctx := context.Background()
+	ctx := testContext()
 
 	// Load seeds
 	if err := engine.LoadSeeds(ctx); err != nil {
@@ -1014,7 +329,7 @@ SELECT id, name FROM users
 	}
 
 	// Discover models
-	if err := engine.Discover(); err != nil {
+	if _, err := engine.Discover(DiscoveryOptions{}); err != nil {
 		t.Fatalf("Discover() failed: %v", err)
 	}
 

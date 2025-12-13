@@ -56,7 +56,7 @@ func runList(cmd *cobra.Command) error {
 	defer eng.Close()
 
 	// Discover models
-	if err := eng.Discover(); err != nil {
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 

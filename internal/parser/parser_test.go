@@ -185,52 +185,6 @@ func TestParser_filePathToModelPath(t *testing.T) {
 	}
 }
 
-func TestExtractReferences(t *testing.T) {
-	tests := []struct {
-		sql      string
-		expected []string
-	}{
-		{
-			sql:      `SELECT * FROM {{ ref('staging.orders') }}`,
-			expected: []string{"staging.orders"},
-		},
-		{
-			sql:      `SELECT * FROM {{ ref("staging.orders") }}`,
-			expected: []string{"staging.orders"},
-		},
-		{
-			sql: `SELECT o.id, c.name 
-FROM {{ ref('staging.orders') }} o
-JOIN {{ ref('staging.customers') }} c ON o.customer_id = c.id`,
-			expected: []string{"staging.orders", "staging.customers"},
-		},
-		{
-			sql:      `SELECT * FROM raw_data`,
-			expected: nil,
-		},
-		{
-			// Duplicate refs should be deduplicated
-			sql: `SELECT * FROM {{ ref('staging.orders') }}
-UNION ALL
-SELECT * FROM {{ ref('staging.orders') }}`,
-			expected: []string{"staging.orders"},
-		},
-	}
-
-	for i, tc := range tests {
-		refs := ExtractReferences(tc.sql)
-		if len(refs) != len(tc.expected) {
-			t.Errorf("test %d: expected %d refs, got %d", i, len(tc.expected), len(refs))
-			continue
-		}
-		for j, ref := range refs {
-			if ref != tc.expected[j] {
-				t.Errorf("test %d: ref[%d] = %q, expected %q", i, j, ref, tc.expected[j])
-			}
-		}
-	}
-}
-
 func TestScanner_ScanDir(t *testing.T) {
 	// Create temp directory with test models
 	tmpDir, err := os.MkdirTemp("", "parser-test")

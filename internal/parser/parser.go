@@ -310,24 +310,6 @@ func (p *Parser) filePathToModelPath(filePath string) string {
 	return strings.Join(parts, ".")
 }
 
-// ExtractReferences scans SQL for table references using ref() function.
-// e.g., SELECT * FROM {{ ref('staging.orders') }}
-func ExtractReferences(sql string) []string {
-	// Pattern for ref('model_path') or ref("model_path")
-	refPattern := regexp.MustCompile(`ref\s*\(\s*['"]([^'"]+)['"]\s*\)`)
-	matches := refPattern.FindAllStringSubmatch(sql, -1)
-
-	var refs []string
-	seen := make(map[string]bool)
-	for _, match := range matches {
-		if len(match) > 1 && !seen[match[1]] {
-			refs = append(refs, match[1])
-			seen[match[1]] = true
-		}
-	}
-	return refs
-}
-
 // Scanner scans a directory for SQL model files.
 type Scanner struct {
 	parser *Parser
@@ -373,6 +355,12 @@ func (s *Scanner) ScanDir(dir string) ([]*ModelConfig, error) {
 	}
 
 	return models, nil
+}
+
+// ParseContent parses SQL content from a file path and content bytes.
+// This is useful for incremental parsing when file content is already loaded.
+func (s *Scanner) ParseContent(filePath string, content []byte) (*ModelConfig, error) {
+	return s.parser.ParseContent(filePath, string(content))
 }
 
 // GetParser returns the underlying parser.

@@ -239,10 +239,10 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 		model.UpdatedAt = now
 
 		_, err := s.db.Exec(
-			`UPDATE models SET name = ?, materialized = ?, unique_key = ?, content_hash = ?, 
+			`UPDATE models SET name = ?, materialized = ?, unique_key = ?, content_hash = ?, file_path = ?,
 			 owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, updated_at = ? 
 			 WHERE id = ?`,
-			model.Name, model.Materialized, model.UniqueKey, model.ContentHash,
+			model.Name, model.Materialized, model.UniqueKey, model.ContentHash, nullString(model.FilePath),
 			nullString(model.Owner), nullString(model.Schema), tagsJSON, testsJSON, metaJSON,
 			model.UpdatedAt, model.ID,
 		)
@@ -258,10 +258,10 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 		model.UpdatedAt = now
 
 		_, err := s.db.Exec(
-			`INSERT INTO models (id, path, name, materialized, unique_key, content_hash, 
+			`INSERT INTO models (id, path, name, materialized, unique_key, content_hash, file_path,
 			 owner, schema_name, tags, tests, meta, created_at, updated_at) 
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			model.ID, model.Path, model.Name, model.Materialized, model.UniqueKey, model.ContentHash,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			model.ID, model.Path, model.Name, model.Materialized, model.UniqueKey, model.ContentHash, nullString(model.FilePath),
 			nullString(model.Owner), nullString(model.Schema), tagsJSON, testsJSON, metaJSON,
 			model.CreatedAt, model.UpdatedAt,
 		)
@@ -317,14 +317,14 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 	}
 
 	model := &Model{}
-	var uniqueKey, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
+	var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
 
 	err := s.db.QueryRow(
-		`SELECT id, path, name, materialized, unique_key, content_hash, 
+		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
 		 owner, schema_name, tags, tests, meta, created_at, updated_at 
 		 FROM models WHERE id = ?`,
 		id,
-	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash,
+	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
 		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -337,6 +337,9 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 	// Deserialize optional fields
 	if uniqueKey.Valid {
 		model.UniqueKey = uniqueKey.String
+	}
+	if filePath.Valid {
+		model.FilePath = filePath.String
 	}
 	if owner.Valid {
 		model.Owner = owner.String
@@ -374,14 +377,14 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 	}
 
 	model := &Model{}
-	var uniqueKey, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
+	var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
 
 	err := s.db.QueryRow(
-		`SELECT id, path, name, materialized, unique_key, content_hash, 
+		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
 		 owner, schema_name, tags, tests, meta, created_at, updated_at 
 		 FROM models WHERE path = ?`,
 		path,
-	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash,
+	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
 		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -394,6 +397,9 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 	// Deserialize optional fields
 	if uniqueKey.Valid {
 		model.UniqueKey = uniqueKey.String
+	}
+	if filePath.Valid {
+		model.FilePath = filePath.String
 	}
 	if owner.Valid {
 		model.Owner = owner.String
@@ -445,7 +451,7 @@ func (s *SQLiteStore) ListModels() ([]*Model, error) {
 	}
 
 	rows, err := s.db.Query(
-		`SELECT id, path, name, materialized, unique_key, content_hash, 
+		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
 		 owner, schema_name, tags, tests, meta, created_at, updated_at 
 		 FROM models ORDER BY path`,
 	)
@@ -457,9 +463,9 @@ func (s *SQLiteStore) ListModels() ([]*Model, error) {
 	var models []*Model
 	for rows.Next() {
 		model := &Model{}
-		var uniqueKey, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
+		var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
 
-		err := rows.Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash,
+		err := rows.Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
 			&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan model: %w", err)
@@ -468,6 +474,9 @@ func (s *SQLiteStore) ListModels() ([]*Model, error) {
 		// Deserialize optional fields
 		if uniqueKey.Valid {
 			model.UniqueKey = uniqueKey.String
+		}
+		if filePath.Valid {
+			model.FilePath = filePath.String
 		}
 		if owner.Valid {
 			model.Owner = owner.String
@@ -785,9 +794,6 @@ func (s *SQLiteStore) UpdateEnvironmentRef(name string, commitRef string) error 
 
 	return nil
 }
-
-// Ensure SQLiteStore implements StateStore interface
-var _ StateStore = (*SQLiteStore)(nil)
 
 // --- Column lineage operations ---
 
@@ -1355,3 +1361,225 @@ func (s *SQLiteStore) DeleteMacroNamespace(name string) error {
 
 	return nil
 }
+
+// DeleteMacroNamespaceByFilePath deletes a namespace by its file path.
+func (s *SQLiteStore) DeleteMacroNamespaceByFilePath(filePath string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	_, err := s.db.Exec("DELETE FROM macro_namespaces WHERE file_path = ?", filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete namespace by file path: %w", err)
+	}
+
+	return nil
+}
+
+// --- File hash operations for incremental discovery ---
+
+// GetContentHash retrieves the content hash for a file path.
+func (s *SQLiteStore) GetContentHash(filePath string) (string, error) {
+	if s.db == nil {
+		return "", fmt.Errorf("database not opened")
+	}
+
+	var hash string
+	err := s.db.QueryRow(
+		`SELECT content_hash FROM file_hashes WHERE file_path = ?`,
+		filePath,
+	).Scan(&hash)
+
+	if err == sql.ErrNoRows {
+		return "", nil // Not found, return empty string
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get content hash: %w", err)
+	}
+
+	return hash, nil
+}
+
+// SetContentHash stores the content hash for a file path.
+func (s *SQLiteStore) SetContentHash(filePath, hash, fileType string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	_, err := s.db.Exec(`
+		INSERT INTO file_hashes (file_path, content_hash, file_type, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(file_path) DO UPDATE SET
+			content_hash = excluded.content_hash,
+			file_type = excluded.file_type,
+			updated_at = CURRENT_TIMESTAMP
+	`, filePath, hash, fileType)
+
+	if err != nil {
+		return fmt.Errorf("failed to set content hash: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteContentHash removes the content hash for a file path.
+func (s *SQLiteStore) DeleteContentHash(filePath string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	_, err := s.db.Exec("DELETE FROM file_hashes WHERE file_path = ?", filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete content hash: %w", err)
+	}
+
+	return nil
+}
+
+// --- Model operations for incremental discovery ---
+
+// GetModelByFilePath retrieves a model by its file system path.
+func (s *SQLiteStore) GetModelByFilePath(filePath string) (*Model, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	model := &Model{}
+	var uniqueKey, filePathCol, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
+
+	err := s.db.QueryRow(
+		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
+		 owner, schema_name, tags, tests, meta, created_at, updated_at 
+		 FROM models WHERE file_path = ?`,
+		filePath,
+	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePathCol,
+		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // Not found, return nil without error
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model by file path: %w", err)
+	}
+
+	// Deserialize optional fields
+	if uniqueKey.Valid {
+		model.UniqueKey = uniqueKey.String
+	}
+	if filePathCol.Valid {
+		model.FilePath = filePathCol.String
+	}
+	if owner.Valid {
+		model.Owner = owner.String
+	}
+	if schema.Valid {
+		model.Schema = schema.String
+	}
+
+	// Deserialize JSON fields
+	if err := deserializeJSON(tagsJSON, &model.Tags); err != nil {
+		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
+	}
+	if err := deserializeJSON(testsJSON, &model.Tests); err != nil {
+		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
+	}
+	if err := deserializeJSON(metaJSON, &model.Meta); err != nil {
+		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
+	}
+
+	return model, nil
+}
+
+// DeleteModelByFilePath deletes a model by its file system path.
+func (s *SQLiteStore) DeleteModelByFilePath(filePath string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	// First delete associated column lineage
+	_, err := s.db.Exec(`
+		DELETE FROM column_lineage 
+		WHERE model_path IN (SELECT path FROM models WHERE file_path = ?)
+	`, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete column lineage: %w", err)
+	}
+
+	// Delete model columns
+	_, err = s.db.Exec(`
+		DELETE FROM model_columns 
+		WHERE model_path IN (SELECT path FROM models WHERE file_path = ?)
+	`, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete model columns: %w", err)
+	}
+
+	// Delete dependencies
+	_, err = s.db.Exec(`
+		DELETE FROM dependencies 
+		WHERE model_id IN (SELECT id FROM models WHERE file_path = ?)
+		   OR parent_id IN (SELECT id FROM models WHERE file_path = ?)
+	`, filePath, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete dependencies: %w", err)
+	}
+
+	// Delete the model
+	_, err = s.db.Exec("DELETE FROM models WHERE file_path = ?", filePath)
+	if err != nil {
+		return fmt.Errorf("failed to delete model: %w", err)
+	}
+
+	return nil
+}
+
+// ListModelFilePaths returns all file paths of tracked models.
+func (s *SQLiteStore) ListModelFilePaths() ([]string, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`SELECT file_path FROM models WHERE file_path IS NOT NULL AND file_path != ''`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list model file paths: %w", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("failed to scan file path: %w", err)
+		}
+		paths = append(paths, path)
+	}
+
+	return paths, rows.Err()
+}
+
+// ListMacroFilePaths returns all file paths of tracked macro namespaces.
+func (s *SQLiteStore) ListMacroFilePaths() ([]string, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.db.Query(`SELECT file_path FROM macro_namespaces WHERE file_path IS NOT NULL AND file_path != ''`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list macro file paths: %w", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("failed to scan file path: %w", err)
+		}
+		paths = append(paths, path)
+	}
+
+	return paths, rows.Err()
+}
+
+// Ensure SQLiteStore implements StateStore interface
+var _ StateStore = (*SQLiteStore)(nil)

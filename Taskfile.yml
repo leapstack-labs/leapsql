@@ -57,6 +57,16 @@ tasks:
     cmds:
       - go test ./...
 
+  test:integration:
+    desc: Run integration tests only (requires integration build tag)
+    cmds:
+      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
+
+  test:all:
+    desc: Run all tests including integration tests
+    cmds:
+      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
+
   run:
     desc: Run all models
     deps: [build]

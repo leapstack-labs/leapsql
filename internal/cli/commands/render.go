@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
+	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +51,7 @@ func runRender(cmd *cobra.Command, modelPath string) error {
 	}
 	defer eng.Close()
 
-	if err := eng.Discover(); err != nil {
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 

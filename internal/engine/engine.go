@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/adapter"
@@ -24,7 +25,12 @@ import (
 
 // Engine orchestrates the execution of SQL models.
 type Engine struct {
-	db            adapter.Adapter
+	// Database adapter (lazy initialized)
+	db          adapter.Adapter
+	dbConfig    adapter.Config
+	dbConnected bool
+	dbMu        sync.Mutex
+
 	store         state.StateStore
 	modelsDir     string
 	seedsDir      string
@@ -55,25 +61,16 @@ type Config struct {
 	Target *starctx.TargetInfo
 }
 
-// New creates a new engine with the given configuration.
+// New creates a new engine with lazy database connection.
+// The database adapter is only connected when Run() or LoadSeeds() is called.
 func New(cfg Config) (*Engine, error) {
-	ctx := context.Background()
-
-	// Create DuckDB adapter
-	db := adapter.NewDuckDBAdapter()
-	if err := db.Connect(ctx, adapter.Config{Path: cfg.DatabasePath}); err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Create state store
+	// Create state store (always needed)
 	store := state.NewSQLiteStore()
 	if err := store.Open(cfg.StatePath); err != nil {
-		db.Close()
 		return nil, fmt.Errorf("failed to open state store: %w", err)
 	}
 
 	if err := store.InitSchema(); err != nil {
-		db.Close()
 		store.Close()
 		return nil, fmt.Errorf("failed to initialize state schema: %w", err)
 	}
@@ -85,9 +82,7 @@ func New(cfg Config) (*Engine, error) {
 		macroRegistry, err = macro.LoadAndRegister(cfg.MacrosDir)
 		if err != nil {
 			// Log warning but don't fail - macros are optional
-			// In a real implementation, we might want to check if directory exists first
 			if !os.IsNotExist(err) {
-				db.Close()
 				store.Close()
 				return nil, fmt.Errorf("failed to load macros: %w", err)
 			}
@@ -114,7 +109,9 @@ func New(cfg Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		db:            db,
+		db:            nil, // Lazy
+		dbConfig:      adapter.Config{Path: cfg.DatabasePath},
+		dbConnected:   false,
 		store:         store,
 		modelsDir:     cfg.ModelsDir,
 		seedsDir:      cfg.SeedsDir,
@@ -126,6 +123,24 @@ func New(cfg Config) (*Engine, error) {
 		registry:      registry.NewModelRegistry(),
 		macroRegistry: macroRegistry,
 	}, nil
+}
+
+// ensureDBConnected lazily connects to the database.
+func (e *Engine) ensureDBConnected(ctx context.Context) error {
+	e.dbMu.Lock()
+	defer e.dbMu.Unlock()
+
+	if e.dbConnected {
+		return nil
+	}
+
+	e.db = adapter.NewDuckDBAdapter()
+	if err := e.db.Connect(ctx, e.dbConfig); err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	e.dbConnected = true
+	return nil
 }
 
 // Close releases all resources.
@@ -153,6 +168,11 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 		return nil
 	}
 
+	// Ensure database is connected before loading seeds
+	if err := e.ensureDBConnected(ctx); err != nil {
+		return err
+	}
+
 	entries, err := os.ReadDir(e.seedsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -177,111 +197,20 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 	return nil
 }
 
-// Discover scans the models directory and builds the dependency graph.
-// It uses the registry to resolve auto-detected table sources to model dependencies.
-func (e *Engine) Discover() error {
-	scanner := parser.NewScanner(e.modelsDir)
-	models, err := scanner.ScanDir(e.modelsDir)
-	if err != nil {
-		return fmt.Errorf("failed to scan models: %w", err)
-	}
-
-	// Clear existing state
-	e.graph = dag.NewGraph()
-	e.models = make(map[string]*parser.ModelConfig)
-	e.registry = registry.NewModelRegistry()
-
-	// Phase 1: Register all models in the registry
-	for _, m := range models {
-		e.registry.Register(m)
-		e.models[m.Path] = m
-	}
-
-	// Phase 2: Add all models as nodes in the graph
-	for _, m := range models {
-		e.graph.AddNode(m.Path, m)
-	}
-
-	// Phase 3: Resolve dependencies and add edges
-	for _, m := range models {
-		// Prefer auto-detected Sources over legacy @import Imports
-		var tableSources []string
-		if len(m.Sources) > 0 {
-			tableSources = m.Sources
-		} else {
-			tableSources = m.Imports
-		}
-
-		// Resolve table names to model dependencies
-		dependencies, _ := e.registry.ResolveDependencies(tableSources)
-
-		// Add edges for each dependency
-		for _, dep := range dependencies {
-			// Skip self-references
-			if dep == m.Path {
-				continue
-			}
-			if _, exists := e.graph.GetNode(dep); exists {
-				if err := e.graph.AddEdge(dep, m.Path); err != nil {
-					return fmt.Errorf("failed to add dependency %s -> %s: %w", dep, m.Path, err)
-				}
-			}
-		}
-	}
-
-	// Check for cycles
-	if hasCycle, cyclePath := e.graph.HasCycle(); hasCycle {
-		return fmt.Errorf("circular dependency detected: %v", cyclePath)
-	}
-
-	// Register models in state store
-	for _, m := range models {
-		model := &state.Model{
-			Path:         m.Path,
-			Name:         m.Name,
-			Materialized: m.Materialized,
-			UniqueKey:    m.UniqueKey,
-			ContentHash:  hashContent(m.RawContent),
-		}
-		if err := e.store.RegisterModel(model); err != nil {
-			return fmt.Errorf("failed to register model %s: %w", m.Path, err)
-		}
-
-		// Store column lineage if available
-		if len(m.Columns) > 0 {
-			// Convert parser.ColumnInfo to state.ColumnInfo
-			stateColumns := make([]state.ColumnInfo, 0, len(m.Columns))
-			for _, col := range m.Columns {
-				// Convert parser.SourceRef to state.SourceRef
-				sources := make([]state.SourceRef, 0, len(col.Sources))
-				for _, src := range col.Sources {
-					sources = append(sources, state.SourceRef{
-						Table:  src.Table,
-						Column: src.Column,
-					})
-				}
-				stateColumns = append(stateColumns, state.ColumnInfo{
-					Name:          col.Name,
-					Index:         col.Index,
-					TransformType: col.TransformType,
-					Function:      col.Function,
-					Sources:       sources,
-				})
-			}
-
-			// Delete existing column lineage before saving (for re-discovery)
-			e.store.DeleteModelColumns(m.Path)
-			if err := e.store.SaveModelColumns(m.Path, stateColumns); err != nil {
-				return fmt.Errorf("failed to save column lineage for %s: %w", m.Path, err)
-			}
-		}
-	}
-
-	return nil
+// DiscoverLegacy provides backward compatibility for code that uses the old Discover() signature.
+// Deprecated: Use Discover(opts DiscoveryOptions) instead.
+func (e *Engine) DiscoverLegacy() error {
+	_, err := e.Discover(DiscoveryOptions{})
+	return err
 }
 
 // Run executes all models in topological order.
 func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
+	// Ensure database is connected before execution
+	if err := e.ensureDBConnected(ctx); err != nil {
+		return nil, err
+	}
+
 	// Create a new run
 	run, err := e.store.CreateRun(env)
 	if err != nil {
@@ -353,6 +282,11 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 // RunSelected executes only the specified models and their downstream dependents.
 // Upstream dependencies must already exist in the database.
 func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []string, includeDownstream bool) (*state.Run, error) {
+	// Ensure database is connected before execution
+	if err := e.ensureDBConnected(ctx); err != nil {
+		return nil, err
+	}
+
 	var affected []string
 	if includeDownstream {
 		// Get affected nodes (selected + downstream)

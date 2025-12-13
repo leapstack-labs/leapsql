@@ -90,8 +90,8 @@ func TestNewInitCommand(t *testing.T) {
 func TestInitCommandMetadata(t *testing.T) {
 	cmd := NewInitCommand()
 
-	if cmd.Use != "init" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "init")
+	if cmd.Use != "init [directory]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "init [directory]")
 	}
 
 	if cmd.Short == "" {

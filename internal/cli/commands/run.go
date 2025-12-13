@@ -95,7 +95,7 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 	if verbose && !opts.JSONOutput {
 		r.Muted("Discovering models...")
 	}
-	if err := eng.Discover(); err != nil {
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 

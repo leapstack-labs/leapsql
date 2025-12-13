@@ -70,7 +70,7 @@ func runLineage(cmd *cobra.Command, modelPath string, opts *LineageOptions) erro
 	}
 	defer eng.Close()
 
-	if err := eng.Discover(); err != nil {
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
 

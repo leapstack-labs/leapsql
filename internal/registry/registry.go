@@ -169,9 +169,24 @@ func (r *ModelRegistry) ResolveDependencies(tableNames []string) (dependencies [
 			if _, ok := seenExternal[tableName]; !ok {
 				seenExternal[tableName] = struct{}{}
 				externalSources = append(externalSources, tableName)
+				// Mark as external source
+				r.externalSources[tableName] = struct{}{}
 			}
 		}
 	}
 
 	return dependencies, externalSources
+}
+
+// GetExternalSources returns all known external sources (tables not mapped to models).
+func (r *ModelRegistry) GetExternalSources() map[string]struct{} {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	result := make(map[string]struct{}, len(r.externalSources))
+	for k, v := range r.externalSources {
+		result[k] = v
+	}
+	return result
 }

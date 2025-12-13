@@ -31,6 +31,13 @@ func NewGraph() *Graph {
 	}
 }
 
+// Clear removes all nodes and edges from the graph.
+func (g *Graph) Clear() {
+	g.nodes = make(map[string]*Node)
+	g.edges = make(map[string][]string)
+	g.parents = make(map[string][]string)
+}
+
 // AddNode adds a node to the graph.
 func (g *Graph) AddNode(id string, data interface{}) {
 	if _, exists := g.nodes[id]; !exists {
