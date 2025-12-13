@@ -43,27 +43,24 @@ const (
 // LoadConfig loads configuration from file, environment variables, and flags.
 // Precedence (highest to lowest): flags > env vars > config file > defaults
 func LoadConfig(cfgFile string) (*Config, error) {
-	// Create a new viper instance to avoid global state issues
-	v := viper.New()
-
-	// Set defaults
-	v.SetDefault("models_dir", DefaultModelsDir)
-	v.SetDefault("seeds_dir", DefaultSeedsDir)
-	v.SetDefault("macros_dir", DefaultMacrosDir)
-	v.SetDefault("state_path", DefaultStateFile)
-	v.SetDefault("environment", DefaultEnv)
-	v.SetDefault("verbose", false)
-	v.SetDefault("output", DefaultOutput)
+	// Set defaults on global viper
+	viper.SetDefault("models_dir", DefaultModelsDir)
+	viper.SetDefault("seeds_dir", DefaultSeedsDir)
+	viper.SetDefault("macros_dir", DefaultMacrosDir)
+	viper.SetDefault("state_path", DefaultStateFile)
+	viper.SetDefault("environment", DefaultEnv)
+	viper.SetDefault("verbose", false)
+	viper.SetDefault("output", DefaultOutput)
 
 	// Environment variable support
-	v.SetEnvPrefix("LEAPSQL")
-	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+	viper.SetEnvPrefix("LEAPSQL")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 
 	// Config file handling - only read if explicitly specified or file exists
 	if cfgFile != "" {
-		v.SetConfigFile(cfgFile)
-		if err := v.ReadInConfig(); err != nil {
+		viper.SetConfigFile(cfgFile)
+		if err := viper.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("error reading config file %s: %w", cfgFile, err)
 		}
 	} else {
@@ -85,8 +82,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 		for _, configPath := range configPaths {
 			if _, err := os.Stat(configPath); err == nil {
-				v.SetConfigFile(configPath)
-				if err := v.ReadInConfig(); err != nil {
+				viper.SetConfigFile(configPath)
+				if err := viper.ReadInConfig(); err != nil {
 					return nil, fmt.Errorf("error reading config file %s: %w", configPath, err)
 				}
 				break
@@ -94,15 +91,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
-	// Merge with global viper for flag bindings
-	for _, key := range viper.AllKeys() {
-		if viper.IsSet(key) {
-			v.Set(key, viper.Get(key))
-		}
-	}
-
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %w", err)
 	}
 

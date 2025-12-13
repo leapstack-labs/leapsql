@@ -13,6 +13,7 @@ import (
 // Unknown fields cause parse errors (use Meta for extensions).
 type FrontmatterConfig struct {
 	Name         string         `yaml:"name"`
+	Description  string         `yaml:"description"`
 	Materialized string         `yaml:"materialized"` // table, view, incremental
 	UniqueKey    string         `yaml:"unique_key"`
 	Owner        string         `yaml:"owner"`
@@ -90,6 +91,7 @@ func parseFrontmatterYAML(yamlContent string) (*FrontmatterConfig, error) {
 	// Check for unknown fields
 	knownFields := map[string]bool{
 		"name":         true,
+		"description":  true,
 		"materialized": true,
 		"unique_key":   true,
 		"owner":        true,
