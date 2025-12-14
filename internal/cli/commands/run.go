@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -348,6 +350,20 @@ type Config struct {
 	Environment  string
 	Verbose      bool
 	OutputFormat string
+	// Target holds target configuration (populated from viper if available)
+	Target *TargetConfig
+}
+
+// TargetConfig holds database target configuration for commands.
+type TargetConfig struct {
+	Type     string
+	Database string
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Schema   string
+	Options  map[string]string
 }
 
 func createEngine(cfg *Config) (*engine.Engine, error) {
@@ -359,12 +375,38 @@ func createEngine(cfg *Config) (*engine.Engine, error) {
 		}
 	}
 
+	// Build target info for template rendering
+	var targetInfo *starctx.TargetInfo
+	var adapterConfig *adapter.Config
+
+	if cfg.Target != nil {
+		targetInfo = &starctx.TargetInfo{
+			Type:     cfg.Target.Type,
+			Schema:   cfg.Target.Schema,
+			Database: cfg.Target.Database,
+		}
+		adapterConfig = &adapter.Config{
+			Type:     cfg.Target.Type,
+			Path:     cfg.Target.Database,
+			Database: cfg.Target.Database,
+			Schema:   cfg.Target.Schema,
+			Host:     cfg.Target.Host,
+			Port:     cfg.Target.Port,
+			Username: cfg.Target.User,
+			Password: cfg.Target.Password,
+			Options:  cfg.Target.Options,
+		}
+	}
+
 	engineCfg := engine.Config{
-		ModelsDir:    cfg.ModelsDir,
-		SeedsDir:     cfg.SeedsDir,
-		MacrosDir:    cfg.MacrosDir,
-		DatabasePath: cfg.DatabasePath,
-		StatePath:    cfg.StatePath,
+		ModelsDir:     cfg.ModelsDir,
+		SeedsDir:      cfg.SeedsDir,
+		MacrosDir:     cfg.MacrosDir,
+		DatabasePath:  cfg.DatabasePath,
+		StatePath:     cfg.StatePath,
+		Environment:   cfg.Environment,
+		Target:        targetInfo,
+		AdapterConfig: adapterConfig,
 	}
 
 	return engine.New(engineCfg)

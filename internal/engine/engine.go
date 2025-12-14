@@ -52,6 +52,7 @@ type Config struct {
 	// MacrosDir is the path to the macros directory (optional)
 	MacrosDir string
 	// DatabasePath is the path to the DuckDB database (empty for in-memory)
+	// Deprecated: Use Target configuration instead
 	DatabasePath string
 	// StatePath is the path to the SQLite state database
 	StatePath string
@@ -59,6 +60,8 @@ type Config struct {
 	Environment string
 	// Target contains adapter/database configuration
 	Target *starctx.TargetInfo
+	// AdapterConfig contains the full adapter configuration
+	AdapterConfig *adapter.Config
 }
 
 // New creates a new engine with lazy database connection.
@@ -108,9 +111,32 @@ func New(cfg Config) (*Engine, error) {
 		}
 	}
 
+	// Build adapter config
+	var dbConfig adapter.Config
+	if cfg.AdapterConfig != nil {
+		dbConfig = *cfg.AdapterConfig
+	} else {
+		// Build from target info and legacy DatabasePath for backward compatibility
+		dbConfig = adapter.Config{
+			Type:     target.Type,
+			Path:     cfg.DatabasePath,
+			Database: target.Database,
+			Schema:   target.Schema,
+		}
+		// If Path is empty but Database is set (for file-based DBs), use Database as Path
+		if dbConfig.Path == "" && dbConfig.Database != "" && dbConfig.Type == "duckdb" {
+			dbConfig.Path = dbConfig.Database
+		}
+	}
+
+	// Ensure adapter type is set
+	if dbConfig.Type == "" {
+		dbConfig.Type = "duckdb"
+	}
+
 	return &Engine{
 		db:            nil, // Lazy
-		dbConfig:      adapter.Config{Path: cfg.DatabasePath},
+		dbConfig:      dbConfig,
 		dbConnected:   false,
 		store:         store,
 		modelsDir:     cfg.ModelsDir,
@@ -134,11 +160,17 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 		return nil
 	}
 
-	e.db = adapter.NewDuckDBAdapter()
-	if err := e.db.Connect(ctx, e.dbConfig); err != nil {
+	// Use adapter registry to create the appropriate adapter
+	db, err := adapter.NewAdapter(e.dbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create database adapter: %w", err)
+	}
+
+	if err := db.Connect(ctx, e.dbConfig); err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	e.db = db
 	e.dbConnected = true
 	return nil
 }

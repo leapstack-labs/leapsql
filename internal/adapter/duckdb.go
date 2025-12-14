@@ -10,6 +10,10 @@ import (
 	_ "github.com/marcboeker/go-duckdb"
 )
 
+func init() {
+	Register("duckdb", func() Adapter { return NewDuckDBAdapter() })
+}
+
 // DuckDBAdapter implements the Adapter interface for DuckDB.
 type DuckDBAdapter struct {
 	db     *sql.DB

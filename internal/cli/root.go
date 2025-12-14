@@ -6,16 +6,19 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/leapstack-labs/leapsql/internal/cli/commands"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	cfgFile string
-	cfg     *Config
+	cfgFile    string
+	targetFlag string
+	cfg        *Config
 )
 
 // Version information (set at build time).
@@ -47,9 +50,9 @@ then execute them in the correct order with state tracking and lineage.`,
 				return nil
 			}
 
-			// Load configuration
+			// Load configuration with optional target override
 			var err error
-			cfg, err = LoadConfig(cfgFile)
+			cfg, err = LoadConfigWithTarget(cfgFile, targetFlag)
 			if err != nil {
 				return err
 			}
@@ -68,6 +71,9 @@ then execute them in the correct order with state tracking and lineage.`,
 				if configFile := GetConfigFileUsed(); configFile != "" {
 					fmt.Fprintf(os.Stderr, "Using config file: %s\n", configFile)
 				}
+				if targetFlag != "" {
+					fmt.Fprintf(os.Stderr, "Using target: %s\n", targetFlag)
+				}
 			}
 
 			return nil
@@ -83,6 +89,7 @@ Built with Go and DuckDB
 
 	// Global persistent flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: ./leapsql.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&targetFlag, "target", "t", "", "Target environment to use (e.g., dev, staging, prod)")
 	rootCmd.PersistentFlags().String("models-dir", "", "Path to models directory")
 	rootCmd.PersistentFlags().String("seeds-dir", "", "Path to seeds directory")
 	rootCmd.PersistentFlags().String("macros-dir", "", "Path to macros directory")
@@ -95,6 +102,12 @@ Built with Go and DuckDB
 	// Register completion for output flag
 	rootCmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"auto", "text", "markdown", "json"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	// Register completion for target flag
+	rootCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Return common environment names
+		return []string{"dev", "staging", "prod"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	// Bind flags to viper
@@ -168,12 +181,41 @@ func CreateEngine(cfg *Config) (*engine.Engine, error) {
 		}
 	}
 
+	// Build target info for template rendering
+	var targetInfo *starctx.TargetInfo
+	if cfg.Target != nil {
+		targetInfo = &starctx.TargetInfo{
+			Type:     cfg.Target.Type,
+			Schema:   cfg.Target.Schema,
+			Database: cfg.Target.Database,
+		}
+	}
+
+	// Build adapter config from target
+	var adapterConfig *adapter.Config
+	if cfg.Target != nil {
+		adapterConfig = &adapter.Config{
+			Type:     cfg.Target.Type,
+			Path:     cfg.Target.Database,
+			Database: cfg.Target.Database,
+			Schema:   cfg.Target.Schema,
+			Host:     cfg.Target.Host,
+			Port:     cfg.Target.Port,
+			Username: cfg.Target.User,
+			Password: cfg.Target.Password,
+			Options:  cfg.Target.Options,
+		}
+	}
+
 	engineCfg := engine.Config{
-		ModelsDir:    cfg.ModelsDir,
-		SeedsDir:     cfg.SeedsDir,
-		MacrosDir:    cfg.MacrosDir,
-		DatabasePath: cfg.DatabasePath,
-		StatePath:    cfg.StatePath,
+		ModelsDir:     cfg.ModelsDir,
+		SeedsDir:      cfg.SeedsDir,
+		MacrosDir:     cfg.MacrosDir,
+		DatabasePath:  cfg.DatabasePath,
+		StatePath:     cfg.StatePath,
+		Environment:   cfg.Environment,
+		Target:        targetInfo,
+		AdapterConfig: adapterConfig,
 	}
 
 	return engine.New(engineCfg)

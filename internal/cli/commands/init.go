@@ -274,11 +274,14 @@ const minimalConfig = `# LeapSQL Configuration
 models_dir: models
 seeds_dir: seeds
 macros_dir: macros
-database: ""  # Empty for in-memory DuckDB
 state_path: .leapsql/state.db
 environment: dev
-verbose: false
-output: auto
+
+# Database target
+target:
+  type: duckdb
+  database: ""  # Empty for in-memory DuckDB
+  schema: main
 `
 
 const minimalModel = `/*---
@@ -315,16 +318,28 @@ models_dir: models
 seeds_dir: seeds
 macros_dir: macros
 
-# Database - uses file-based DuckDB for persistence
-database: warehouse.duckdb
-
 # State tracking for incremental runs
 state_path: .leapsql/state.db
 
 # Environment
 environment: dev
-verbose: false
-output: auto
+
+# Default target (DuckDB for local development)
+target:
+  type: duckdb
+  database: warehouse.duckdb
+  schema: main
+
+# Environment-specific targets
+environments:
+  dev:
+    target:
+      type: duckdb
+      database: dev.duckdb
+  prod:
+    target:
+      type: duckdb
+      database: prod.duckdb
 `
 
 const readmeContent = `# LeapSQL Example Project
