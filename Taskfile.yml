@@ -57,6 +57,11 @@ tasks:
     cmds:
       - go test ./...
 
+  generate:
+    desc: Run all go generate directives (sqlc)
+    cmds:
+      - go generate ./...
+
   test:integration:
     desc: Run integration tests only (requires integration build tag)
     cmds:
