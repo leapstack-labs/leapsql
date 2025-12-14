@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDuckDBAdapter_Connect(t *testing.T) {
@@ -26,9 +29,8 @@ func TestDuckDBAdapter_Connect(t *testing.T) {
 				return filepath.Join(tmpDir, "test.duckdb")
 			},
 			verify: func(t *testing.T, path string) {
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Error("database file was not created")
-				}
+				_, err := os.Stat(path)
+				assert.False(t, os.IsNotExist(err), "database file was not created")
 			},
 		},
 	}
@@ -39,10 +41,7 @@ func TestDuckDBAdapter_Connect(t *testing.T) {
 			adapter := NewDuckDBAdapter()
 
 			dbPath := tt.setupPath(t)
-			err := adapter.Connect(ctx, Config{Path: dbPath})
-			if err != nil {
-				t.Fatalf("failed to connect: %v", err)
-			}
+			require.NoError(t, adapter.Connect(ctx, Config{Path: dbPath}))
 			defer adapter.Close()
 
 			if tt.verify != nil {
@@ -78,9 +77,7 @@ func TestDuckDBAdapter_NotConnected(t *testing.T) {
 			adapter := NewDuckDBAdapter()
 
 			err := tt.operation(ctx, adapter)
-			if err == nil {
-				t.Error("expected error when operating without connection, got nil")
-			}
+			assert.Error(t, err, "expected error when operating without connection")
 		})
 	}
 }
@@ -89,9 +86,7 @@ func TestDuckDBAdapter_Exec(t *testing.T) {
 	ctx := context.Background()
 	adapter := NewDuckDBAdapter()
 
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 	defer adapter.Close()
 
 	// Create a table
@@ -102,9 +97,7 @@ func TestDuckDBAdapter_Exec(t *testing.T) {
 			value DOUBLE
 		)
 	`)
-	if err != nil {
-		t.Fatalf("failed to create table: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Insert data
 	err = adapter.Exec(ctx, `
@@ -113,34 +106,23 @@ func TestDuckDBAdapter_Exec(t *testing.T) {
 			(2, 'bob', 200.75),
 			(3, 'charlie', 300.25)
 	`)
-	if err != nil {
-		t.Fatalf("failed to insert data: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestDuckDBAdapter_Query(t *testing.T) {
 	ctx := context.Background()
 	adapter := NewDuckDBAdapter()
 
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 	defer adapter.Close()
 
 	// Create and populate a table
-	if err := adapter.Exec(ctx, `CREATE TABLE users (id INTEGER, name VARCHAR)`); err != nil {
-		t.Fatalf("failed to create table: %v", err)
-	}
-
-	if err := adapter.Exec(ctx, `INSERT INTO users VALUES (1, 'alice'), (2, 'bob')`); err != nil {
-		t.Fatalf("failed to insert data: %v", err)
-	}
+	require.NoError(t, adapter.Exec(ctx, `CREATE TABLE users (id INTEGER, name VARCHAR)`))
+	require.NoError(t, adapter.Exec(ctx, `INSERT INTO users VALUES (1, 'alice'), (2, 'bob')`))
 
 	// Query the data
 	rows, err := adapter.Query(ctx, `SELECT id, name FROM users ORDER BY id`)
-	if err != nil {
-		t.Fatalf("failed to query: %v", err)
-	}
+	require.NoError(t, err)
 	defer rows.Close()
 
 	expected := []struct {
@@ -155,24 +137,15 @@ func TestDuckDBAdapter_Query(t *testing.T) {
 	for rows.Next() {
 		var id int
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			t.Fatalf("failed to scan row: %v", err)
-		}
+		require.NoError(t, rows.Scan(&id, &name))
 
-		if i >= len(expected) {
-			t.Fatalf("unexpected extra row: id=%d, name=%s", id, name)
-		}
-
-		if id != expected[i].id || name != expected[i].name {
-			t.Errorf("row %d: got (%d, %s), want (%d, %s)",
-				i, id, name, expected[i].id, expected[i].name)
-		}
+		require.Less(t, i, len(expected), "unexpected extra row: id=%d, name=%s", id, name)
+		assert.Equal(t, expected[i].id, id)
+		assert.Equal(t, expected[i].name, name)
 		i++
 	}
 
-	if i != len(expected) {
-		t.Errorf("got %d rows, want %d", i, len(expected))
-	}
+	assert.Equal(t, len(expected), i)
 }
 
 func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
@@ -188,34 +161,26 @@ func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
 		{
 			name: "existing table with data",
 			setupTable: func(t *testing.T, adapter *DuckDBAdapter, ctx context.Context) {
-				if err := adapter.Exec(ctx, `
+				require.NoError(t, adapter.Exec(ctx, `
 					CREATE TABLE products (
 						product_id INTEGER NOT NULL,
 						name VARCHAR,
 						price DOUBLE,
 						in_stock BOOLEAN
 					)
-				`); err != nil {
-					t.Fatalf("failed to create table: %v", err)
-				}
-				if err := adapter.Exec(ctx, `
+				`))
+				require.NoError(t, adapter.Exec(ctx, `
 					INSERT INTO products VALUES 
 						(1, 'Widget', 9.99, true),
 						(2, 'Gadget', 19.99, false)
-				`); err != nil {
-					t.Fatalf("failed to insert data: %v", err)
-				}
+				`))
 			},
 			tableName:   "products",
 			wantColumns: 4,
 			wantRows:    2,
 			checkFunc: func(t *testing.T, meta *Metadata) {
-				if meta.Name != "products" {
-					t.Errorf("got table name %q, want %q", meta.Name, "products")
-				}
-				if meta.Schema != "main" {
-					t.Errorf("got schema %q, want %q", meta.Schema, "main")
-				}
+				assert.Equal(t, "products", meta.Name)
+				assert.Equal(t, "main", meta.Schema)
 
 				expectedColumns := map[string]string{
 					"product_id": "INTEGER",
@@ -230,9 +195,7 @@ func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
 						t.Errorf("unexpected column: %s", col.Name)
 						continue
 					}
-					if col.Type != expectedType {
-						t.Errorf("column %s: got type %q, want %q", col.Name, col.Type, expectedType)
-					}
+					assert.Equal(t, expectedType, col.Type, "column %s", col.Name)
 				}
 			},
 		},
@@ -248,9 +211,7 @@ func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
 			ctx := context.Background()
 			adapter := NewDuckDBAdapter()
 
-			if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-				t.Fatalf("failed to connect: %v", err)
-			}
+			require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 			defer adapter.Close()
 
 			if tt.setupTable != nil {
@@ -260,23 +221,13 @@ func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
 			metadata, err := adapter.GetTableMetadata(ctx, tt.tableName)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if len(metadata.Columns) != tt.wantColumns {
-				t.Errorf("got %d columns, want %d", len(metadata.Columns), tt.wantColumns)
-			}
-
-			if metadata.RowCount != tt.wantRows {
-				t.Errorf("got row count %d, want %d", metadata.RowCount, tt.wantRows)
-			}
+			require.NoError(t, err)
+			assert.Len(t, metadata.Columns, tt.wantColumns)
+			assert.Equal(t, tt.wantRows, metadata.RowCount)
 
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, metadata)
@@ -289,9 +240,7 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 	ctx := context.Background()
 	adapter := NewDuckDBAdapter()
 
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 	defer adapter.Close()
 
 	// Create a temporary CSV file
@@ -303,42 +252,27 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 2,bob,200.75
 3,charlie,300.25`
 
-	if err := os.WriteFile(csvPath, []byte(csvContent), 0644); err != nil {
-		t.Fatalf("failed to write CSV file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0644))
 
 	// Load the CSV
-	if err := adapter.LoadCSV(ctx, "test_data", csvPath); err != nil {
-		t.Fatalf("failed to load CSV: %v", err)
-	}
+	require.NoError(t, adapter.LoadCSV(ctx, "test_data", csvPath))
 
 	// Verify the data was loaded
 	rows, err := adapter.Query(ctx, "SELECT COUNT(*) FROM test_data")
-	if err != nil {
-		t.Fatalf("failed to query loaded data: %v", err)
-	}
+	require.NoError(t, err)
 	defer rows.Close()
 
 	var count int
 	if rows.Next() {
-		if err := rows.Scan(&count); err != nil {
-			t.Fatalf("failed to scan count: %v", err)
-		}
+		require.NoError(t, rows.Scan(&count))
 	}
 
-	if count != 3 {
-		t.Errorf("got %d rows, want 3", count)
-	}
+	assert.Equal(t, 3, count)
 
 	// Verify metadata
 	metadata, err := adapter.GetTableMetadata(ctx, "test_data")
-	if err != nil {
-		t.Fatalf("failed to get metadata: %v", err)
-	}
-
-	if len(metadata.Columns) != 3 {
-		t.Errorf("got %d columns, want 3", len(metadata.Columns))
-	}
+	require.NoError(t, err)
+	assert.Len(t, metadata.Columns, 3)
 }
 
 func TestDuckDBAdapter_Close(t *testing.T) {
@@ -356,14 +290,10 @@ func TestDuckDBAdapter_Close(t *testing.T) {
 			adapter := NewDuckDBAdapter()
 
 			if tt.connect {
-				if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-					t.Fatalf("failed to connect: %v", err)
-				}
+				require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 			}
 
-			if err := adapter.Close(); err != nil {
-				t.Errorf("close should not error: %v", err)
-			}
+			assert.NoError(t, adapter.Close())
 		})
 	}
 }
@@ -372,47 +302,37 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 	ctx := context.Background()
 	adapter := NewDuckDBAdapter()
 
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
 	defer adapter.Close()
 
 	// Create tables
-	if err := adapter.Exec(ctx, `
+	require.NoError(t, adapter.Exec(ctx, `
 		CREATE TABLE orders (
 			order_id INTEGER,
 			customer_id INTEGER,
 			amount DOUBLE,
 			order_date DATE
 		)
-	`); err != nil {
-		t.Fatalf("failed to create orders table: %v", err)
-	}
+	`))
 
-	if err := adapter.Exec(ctx, `
+	require.NoError(t, adapter.Exec(ctx, `
 		CREATE TABLE customers (
 			customer_id INTEGER,
 			name VARCHAR
 		)
-	`); err != nil {
-		t.Fatalf("failed to create customers table: %v", err)
-	}
+	`))
 
 	// Insert data
-	if err := adapter.Exec(ctx, `
+	require.NoError(t, adapter.Exec(ctx, `
 		INSERT INTO customers VALUES (1, 'Alice'), (2, 'Bob')
-	`); err != nil {
-		t.Fatalf("failed to insert customers: %v", err)
-	}
+	`))
 
-	if err := adapter.Exec(ctx, `
+	require.NoError(t, adapter.Exec(ctx, `
 		INSERT INTO orders VALUES 
 			(1, 1, 100.0, '2024-01-01'),
 			(2, 1, 150.0, '2024-01-15'),
 			(3, 2, 200.0, '2024-01-10')
-	`); err != nil {
-		t.Fatalf("failed to insert orders: %v", err)
-	}
+	`))
 
 	// Run a complex query with JOIN and aggregation
 	rows, err := adapter.Query(ctx, `
@@ -425,9 +345,7 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 		GROUP BY c.name
 		ORDER BY total_amount DESC
 	`)
-	if err != nil {
-		t.Fatalf("failed to run complex query: %v", err)
-	}
+	require.NoError(t, err)
 	defer rows.Close()
 
 	results := make(map[string]float64)
@@ -435,17 +353,10 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 		var name string
 		var total float64
 		var count int
-		if err := rows.Scan(&name, &total, &count); err != nil {
-			t.Fatalf("failed to scan row: %v", err)
-		}
+		require.NoError(t, rows.Scan(&name, &total, &count))
 		results[name] = total
 	}
 
-	if results["Alice"] != 250.0 {
-		t.Errorf("Alice total: got %.2f, want 250.00", results["Alice"])
-	}
-
-	if results["Bob"] != 200.0 {
-		t.Errorf("Bob total: got %.2f, want 200.00", results["Bob"])
-	}
+	assert.Equal(t, 250.0, results["Alice"])
+	assert.Equal(t, 200.0, results["Bob"])
 }

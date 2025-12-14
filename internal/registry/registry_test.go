@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestModelRegistry_Register(t *testing.T) {
@@ -16,18 +17,12 @@ func TestModelRegistry_Register(t *testing.T) {
 
 	r.Register(model)
 
-	if r.Count() != 1 {
-		t.Errorf("expected count 1, got %d", r.Count())
-	}
+	assert.Equal(t, 1, r.Count(), "expected count 1")
 
 	// Should be retrievable by path
 	got, ok := r.GetModel("staging.stg_customers")
-	if !ok {
-		t.Error("expected to find model by path")
-	}
-	if got != model {
-		t.Error("expected same model instance")
-	}
+	assert.True(t, ok, "expected to find model by path")
+	assert.Equal(t, model, got, "expected same model instance")
 }
 
 func TestModelRegistry_Resolve(t *testing.T) {
@@ -84,12 +79,8 @@ func TestModelRegistry_Resolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotPath, gotFound := r.Resolve(tt.tableName)
-			if gotFound != tt.wantFound {
-				t.Errorf("Resolve(%q) found = %v, want %v", tt.tableName, gotFound, tt.wantFound)
-			}
-			if gotPath != tt.wantPath {
-				t.Errorf("Resolve(%q) path = %q, want %q", tt.tableName, gotPath, tt.wantPath)
-			}
+			assert.Equal(t, tt.wantFound, gotFound, "Resolve(%q) found", tt.tableName)
+			assert.Equal(t, tt.wantPath, gotPath, "Resolve(%q) path", tt.tableName)
 		})
 	}
 }
@@ -112,37 +103,17 @@ func TestModelRegistry_ResolveDependencies(t *testing.T) {
 	deps, external := r.ResolveDependencies(tableNames)
 
 	// Verify dependencies
-	if len(deps) != 2 {
-		t.Errorf("expected 2 dependencies, got %d", len(deps))
-	}
+	assert.Len(t, deps, 2, "expected 2 dependencies")
 
 	// Verify external sources
-	if len(external) != 2 {
-		t.Errorf("expected 2 external sources, got %d", len(external))
-	}
+	assert.Len(t, external, 2, "expected 2 external sources")
 
 	// Check specific values
-	depsMap := make(map[string]bool)
-	for _, d := range deps {
-		depsMap[d] = true
-	}
-	if !depsMap["staging.stg_customers"] {
-		t.Error("expected staging.stg_customers in dependencies")
-	}
-	if !depsMap["staging.stg_orders"] {
-		t.Error("expected staging.stg_orders in dependencies")
-	}
+	assert.Contains(t, deps, "staging.stg_customers", "expected staging.stg_customers in dependencies")
+	assert.Contains(t, deps, "staging.stg_orders", "expected staging.stg_orders in dependencies")
 
-	externalMap := make(map[string]bool)
-	for _, e := range external {
-		externalMap[e] = true
-	}
-	if !externalMap["raw_customers"] {
-		t.Error("expected raw_customers in external sources")
-	}
-	if !externalMap["raw_orders"] {
-		t.Error("expected raw_orders in external sources")
-	}
+	assert.Contains(t, external, "raw_customers", "expected raw_customers in external sources")
+	assert.Contains(t, external, "raw_orders", "expected raw_orders in external sources")
 }
 
 func TestModelRegistry_ExternalSources(t *testing.T) {
@@ -151,15 +122,9 @@ func TestModelRegistry_ExternalSources(t *testing.T) {
 	r.RegisterExternalSource("raw_customers")
 	r.RegisterExternalSource("raw_orders")
 
-	if !r.IsExternalSource("raw_customers") {
-		t.Error("expected raw_customers to be external")
-	}
-	if !r.IsExternalSource("raw_orders") {
-		t.Error("expected raw_orders to be external")
-	}
-	if r.IsExternalSource("stg_customers") {
-		t.Error("expected stg_customers to not be external")
-	}
+	assert.True(t, r.IsExternalSource("raw_customers"), "expected raw_customers to be external")
+	assert.True(t, r.IsExternalSource("raw_orders"), "expected raw_orders to be external")
+	assert.False(t, r.IsExternalSource("stg_customers"), "expected stg_customers to not be external")
 }
 
 func TestModelRegistry_AllModels(t *testing.T) {
@@ -169,9 +134,7 @@ func TestModelRegistry_AllModels(t *testing.T) {
 	r.Register(&parser.ModelConfig{Path: "staging.stg_orders", Name: "stg_orders"})
 
 	models := r.AllModels()
-	if len(models) != 2 {
-		t.Errorf("expected 2 models, got %d", len(models))
-	}
+	assert.Len(t, models, 2, "expected 2 models")
 }
 
 func TestModelRegistry_Deduplication(t *testing.T) {
@@ -191,10 +154,6 @@ func TestModelRegistry_Deduplication(t *testing.T) {
 	deps, external := r.ResolveDependencies(tableNames)
 
 	// Should deduplicate
-	if len(deps) != 1 {
-		t.Errorf("expected 1 dependency (deduplicated), got %d: %v", len(deps), deps)
-	}
-	if len(external) != 1 {
-		t.Errorf("expected 1 external source (deduplicated), got %d: %v", len(external), external)
-	}
+	assert.Len(t, deps, 1, "expected 1 dependency (deduplicated)")
+	assert.Len(t, external, 1, "expected 1 external source (deduplicated)")
 }

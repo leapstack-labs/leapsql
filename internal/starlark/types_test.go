@@ -3,6 +3,8 @@ package starlark
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -73,13 +75,12 @@ func TestGoToStarlark(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GoToStarlark(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GoToStarlark() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err, "expected error")
 				return
 			}
-			if !tt.wantErr && got.String() != tt.wantStr {
-				t.Errorf("GoToStarlark() = %v, want %v", got.String(), tt.wantStr)
-			}
+			require.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.wantStr, got.String(), "GoToStarlark()")
 		})
 	}
 }
@@ -126,13 +127,12 @@ func TestStarlarkToGo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := StarlarkToGo(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("StarlarkToGo() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err, "expected error")
 				return
 			}
-			if !tt.wantErr && got != tt.want {
-				t.Errorf("StarlarkToGo() = %v (%T), want %v (%T)", got, got, tt.want, tt.want)
-			}
+			require.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.want, got, "StarlarkToGo()")
 		})
 	}
 }
@@ -145,15 +145,11 @@ func TestTargetInfo_ToStarlark(t *testing.T) {
 	}
 
 	val := target.ToStarlark()
-	if val == nil {
-		t.Fatal("ToStarlark returned nil")
-	}
+	require.NotNil(t, val, "ToStarlark returned nil")
 
 	// Access fields via AttrNames
 	str := val.String()
-	if str == "" {
-		t.Error("expected non-empty string representation")
-	}
+	assert.NotEmpty(t, str, "expected non-empty string representation")
 }
 
 func TestThisInfo_ToStarlark(t *testing.T) {
@@ -163,12 +159,8 @@ func TestThisInfo_ToStarlark(t *testing.T) {
 	}
 
 	val := this.ToStarlark()
-	if val == nil {
-		t.Fatal("ToStarlark returned nil")
-	}
+	require.NotNil(t, val, "ToStarlark returned nil")
 
 	str := val.String()
-	if str == "" {
-		t.Error("expected non-empty string representation")
-	}
+	assert.NotEmpty(t, str, "expected non-empty string representation")
 }

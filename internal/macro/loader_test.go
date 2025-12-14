@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -23,9 +25,7 @@ func TestLoader_Load(t *testing.T) {
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				if err := os.Mkdir(macrosDir, 0755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(macrosDir, 0755))
 				return macrosDir
 			},
 			wantModules: 0,
@@ -42,9 +42,7 @@ func TestLoader_Load(t *testing.T) {
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				filePath := filepath.Join(dir, "macros")
-				if err := os.WriteFile(filePath, []byte("not a dir"), 0644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filePath, []byte("not a dir"), 0644))
 				return filePath
 			},
 			wantErr: true,
@@ -54,9 +52,7 @@ func TestLoader_Load(t *testing.T) {
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				if err := os.Mkdir(macrosDir, 0755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(macrosDir, 0755))
 				macroContent := `
 def greet(name):
     return "Hello, " + name + "!"
@@ -67,9 +63,7 @@ def add(a, b):
 _private = "should not be exported"
 `
 				macroPath := filepath.Join(macrosDir, "utils.star")
-				if err := os.WriteFile(macroPath, []byte(macroContent), 0644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0644))
 				return macrosDir
 			},
 			wantModules:    1,
@@ -83,9 +77,7 @@ _private = "should not be exported"
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				if err := os.Mkdir(macrosDir, 0755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(macrosDir, 0755))
 				files := map[string]string{
 					"datetime.star": `
 def now():
@@ -98,9 +90,7 @@ def square(x):
 				}
 				for name, content := range files {
 					path := filepath.Join(macrosDir, name)
-					if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 				}
 				return macrosDir
 			},
@@ -112,17 +102,13 @@ def square(x):
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				if err := os.Mkdir(macrosDir, 0755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(macrosDir, 0755))
 				badContent := `
 def broken(:
     return 1
 `
 				macroPath := filepath.Join(macrosDir, "broken.star")
-				if err := os.WriteFile(macroPath, []byte(badContent), 0644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0644))
 				return macrosDir
 			},
 			wantErr: true,
@@ -132,13 +118,9 @@ def broken(:
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				if err := os.Mkdir(macrosDir, 0755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(macrosDir, 0755))
 				macroPath := filepath.Join(macrosDir, "123invalid.star")
-				if err := os.WriteFile(macroPath, []byte("x = 1"), 0644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(macroPath, []byte("x = 1"), 0644))
 				return macrosDir
 			},
 			wantErr: true,
@@ -152,26 +134,18 @@ def broken(:
 			modules, err := loader.Load()
 
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
+				require.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			if tt.wantNil {
-				if modules != nil {
-					t.Errorf("expected nil modules, got %v", modules)
-				}
+				assert.Nil(t, modules)
 				return
 			}
 
-			if len(modules) != tt.wantModules {
-				t.Fatalf("expected %d modules, got %d", tt.wantModules, len(modules))
-			}
+			require.Len(t, modules, tt.wantModules)
 
 			// Check namespaces
 			if len(tt.wantNamespaces) > 0 {
@@ -180,9 +154,7 @@ def broken(:
 					namespaces[m.Namespace] = true
 				}
 				for _, ns := range tt.wantNamespaces {
-					if !namespaces[ns] {
-						t.Errorf("expected namespace %q not found", ns)
-					}
+					assert.True(t, namespaces[ns], "expected namespace %q not found", ns)
 				}
 			}
 
@@ -194,19 +166,14 @@ def broken(:
 				}
 				for ns, expectedExports := range tt.checkExports {
 					module, ok := moduleMap[ns]
-					if !ok {
-						t.Errorf("namespace %q not found", ns)
-						continue
-					}
+					require.True(t, ok, "namespace %q not found", ns)
 					for _, export := range expectedExports {
-						if _, ok := module.Exports[export]; !ok {
-							t.Errorf("expected export %q in namespace %q", export, ns)
-						}
+						_, ok := module.Exports[export]
+						assert.True(t, ok, "expected export %q in namespace %q", export, ns)
 					}
 					// Check that private symbols are not exported
-					if _, ok := module.Exports["_private"]; ok {
-						t.Error("'_private' should not be exported")
-					}
+					_, ok = module.Exports["_private"]
+					assert.False(t, ok, "'_private' should not be exported")
 				}
 			}
 		})
@@ -217,32 +184,22 @@ func TestLoader_Load_SyntaxError_Details(t *testing.T) {
 	// This test verifies the LoadError structure specifically
 	dir := t.TempDir()
 	macrosDir := filepath.Join(dir, "macros")
-	if err := os.Mkdir(macrosDir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(macrosDir, 0755))
 
 	badContent := `
 def broken(:
     return 1
 `
 	macroPath := filepath.Join(macrosDir, "broken.star")
-	if err := os.WriteFile(macroPath, []byte(badContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0644))
 
 	loader := NewLoader(macrosDir)
 	_, err := loader.Load()
-	if err == nil {
-		t.Fatal("expected error for syntax error in macro")
-	}
+	require.Error(t, err)
 
 	loadErr, ok := err.(*LoadError)
-	if !ok {
-		t.Fatalf("expected *LoadError, got %T", err)
-	}
-	if loadErr.File != macroPath {
-		t.Errorf("expected file %q, got %q", macroPath, loadErr.File)
-	}
+	require.True(t, ok, "expected *LoadError, got %T", err)
+	assert.Equal(t, macroPath, loadErr.File)
 }
 
 func TestValidateNamespace(t *testing.T) {
@@ -265,8 +222,10 @@ func TestValidateNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateNamespace(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateNamespace(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -275,9 +234,7 @@ func TestValidateNamespace(t *testing.T) {
 func TestLoader_ExecuteFunction(t *testing.T) {
 	dir := t.TempDir()
 	macrosDir := filepath.Join(dir, "macros")
-	if err := os.Mkdir(macrosDir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(macrosDir, 0755))
 
 	// Create a macro with a function we can call
 	macroContent := `
@@ -285,36 +242,24 @@ def double(x):
     return x * 2
 `
 	macroPath := filepath.Join(macrosDir, "math.star")
-	if err := os.WriteFile(macroPath, []byte(macroContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0644))
 
 	loader := NewLoader(macrosDir)
 	modules, err := loader.Load()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	module := modules[0]
 	doubleFn := module.Exports["double"]
-	if doubleFn == nil {
-		t.Fatal("expected 'double' function")
-	}
+	require.NotNil(t, doubleFn, "expected 'double' function")
 
 	// Call the function
 	thread := &starlark.Thread{Name: "test"}
 	result, err := starlark.Call(thread, doubleFn, starlark.Tuple{starlark.MakeInt(5)}, nil)
-	if err != nil {
-		t.Fatalf("failed to call function: %v", err)
-	}
+	require.NoError(t, err)
 
 	intResult, ok := result.(starlark.Int)
-	if !ok {
-		t.Fatalf("expected Int result, got %T", result)
-	}
+	require.True(t, ok, "expected Int result, got %T", result)
 
 	val, _ := intResult.Int64()
-	if val != 10 {
-		t.Errorf("expected 10, got %d", val)
-	}
+	assert.Equal(t, int64(10), val)
 }

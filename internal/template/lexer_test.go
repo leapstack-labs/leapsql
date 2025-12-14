@@ -2,6 +2,9 @@ package template
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLexer_PlainText(t *testing.T) {
@@ -9,23 +12,13 @@ func TestLexer_PlainText(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if len(tokens) != 2 { // TEXT + EOF
-		t.Fatalf("expected 2 tokens, got %d", len(tokens))
-	}
+	require.Len(t, tokens, 2, "expected 2 tokens") // TEXT + EOF
 
-	if tokens[0].Type != TokenText {
-		t.Errorf("expected TEXT, got %s", tokens[0].Type)
-	}
-	if tokens[0].Value != input {
-		t.Errorf("expected %q, got %q", input, tokens[0].Value)
-	}
-	if tokens[1].Type != TokenEOF {
-		t.Errorf("expected EOF, got %s", tokens[1].Type)
-	}
+	assert.Equal(t, TokenText, tokens[0].Type, "expected TEXT")
+	assert.Equal(t, input, tokens[0].Value, "expected input value")
+	assert.Equal(t, TokenEOF, tokens[1].Type, "expected EOF")
 }
 
 func TestLexer_SimpleExpression(t *testing.T) {
@@ -33,9 +26,7 @@ func TestLexer_SimpleExpression(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	expected := []struct {
 		typ TokenType
@@ -47,16 +38,12 @@ func TestLexer_SimpleExpression(t *testing.T) {
 		{TokenEOF, ""},
 	}
 
-	if len(tokens) != len(expected) {
-		t.Fatalf("expected %d tokens, got %d", len(expected), len(tokens))
-	}
+	require.Len(t, tokens, len(expected), "wrong number of tokens")
 
 	for i, exp := range expected {
-		if tokens[i].Type != exp.typ {
-			t.Errorf("token[%d]: expected type %s, got %s", i, exp.typ, tokens[i].Type)
-		}
-		if exp.typ != TokenEOF && tokens[i].Value != exp.val {
-			t.Errorf("token[%d]: expected value %q, got %q", i, exp.val, tokens[i].Value)
+		assert.Equal(t, exp.typ, tokens[i].Type, "token[%d] type", i)
+		if exp.typ != TokenEOF {
+			assert.Equal(t, exp.val, tokens[i].Value, "token[%d] value", i)
 		}
 	}
 }
@@ -66,9 +53,7 @@ func TestLexer_MultipleExpressions(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	expected := []struct {
 		typ TokenType
@@ -80,14 +65,10 @@ func TestLexer_MultipleExpressions(t *testing.T) {
 		{TokenEOF, ""},
 	}
 
-	if len(tokens) != len(expected) {
-		t.Fatalf("expected %d tokens, got %d", len(expected), len(tokens))
-	}
+	require.Len(t, tokens, len(expected), "wrong number of tokens")
 
 	for i, exp := range expected {
-		if tokens[i].Type != exp.typ {
-			t.Errorf("token[%d]: expected type %s, got %s", i, exp.typ, tokens[i].Type)
-		}
+		assert.Equal(t, exp.typ, tokens[i].Type, "token[%d] type", i)
 	}
 }
 
@@ -96,20 +77,12 @@ func TestLexer_Statement(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if len(tokens) != 2 { // STMT + EOF
-		t.Fatalf("expected 2 tokens, got %d", len(tokens))
-	}
+	require.Len(t, tokens, 2, "expected 2 tokens") // STMT + EOF
 
-	if tokens[0].Type != TokenStmt {
-		t.Errorf("expected STMT, got %s", tokens[0].Type)
-	}
-	if tokens[0].Value != "for x in items:" {
-		t.Errorf("expected %q, got %q", "for x in items:", tokens[0].Value)
-	}
+	assert.Equal(t, TokenStmt, tokens[0].Type, "expected STMT")
+	assert.Equal(t, "for x in items:", tokens[0].Value, "expected statement value")
 }
 
 func TestLexer_ForLoop(t *testing.T) {
@@ -121,9 +94,7 @@ FROM users`
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	expectedTypes := []TokenType{
 		TokenText, // "SELECT\n"
@@ -136,14 +107,10 @@ FROM users`
 		TokenEOF,
 	}
 
-	if len(tokens) != len(expectedTypes) {
-		t.Fatalf("expected %d tokens, got %d", len(expectedTypes), len(tokens))
-	}
+	require.Len(t, tokens, len(expectedTypes), "wrong number of tokens")
 
 	for i, exp := range expectedTypes {
-		if tokens[i].Type != exp {
-			t.Errorf("token[%d]: expected type %s, got %s", i, exp, tokens[i].Type)
-		}
+		assert.Equal(t, exp, tokens[i].Type, "token[%d] type", i)
 	}
 }
 
@@ -156,9 +123,7 @@ no
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	expectedTypes := []TokenType{
 		TokenStmt, // "if condition:"
@@ -169,14 +134,10 @@ no
 		TokenEOF,
 	}
 
-	if len(tokens) != len(expectedTypes) {
-		t.Fatalf("expected %d tokens, got %d", len(expectedTypes), len(tokens))
-	}
+	require.Len(t, tokens, len(expectedTypes), "wrong number of tokens")
 
 	for i, exp := range expectedTypes {
-		if tokens[i].Type != exp {
-			t.Errorf("token[%d]: expected type %s, got %s", i, exp, tokens[i].Type)
-		}
+		assert.Equal(t, exp, tokens[i].Type, "token[%d] type", i)
 	}
 }
 
@@ -185,18 +146,12 @@ func TestLexer_UnclosedExpression(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	_, err := lexer.Tokenize()
-	if err == nil {
-		t.Fatal("expected error for unclosed expression")
-	}
+	require.Error(t, err, "expected error for unclosed expression")
 
 	lexErr, ok := err.(*LexError)
-	if !ok {
-		t.Fatalf("expected LexError, got %T", err)
-	}
+	require.True(t, ok, "expected LexError, got %T", err)
 
-	if lexErr.Position().Line != 1 {
-		t.Errorf("expected line 1, got %d", lexErr.Position().Line)
-	}
+	assert.Equal(t, 1, lexErr.Position().Line, "expected line 1")
 }
 
 func TestLexer_UnclosedStatement(t *testing.T) {
@@ -204,9 +159,7 @@ func TestLexer_UnclosedStatement(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	_, err := lexer.Tokenize()
-	if err == nil {
-		t.Fatal("expected error for unclosed statement")
-	}
+	assert.Error(t, err, "expected error for unclosed statement")
 }
 
 func TestLexer_NestedBraces(t *testing.T) {
@@ -215,20 +168,12 @@ func TestLexer_NestedBraces(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if len(tokens) != 2 { // EXPR + EOF
-		t.Fatalf("expected 2 tokens, got %d", len(tokens))
-	}
+	require.Len(t, tokens, 2, "expected 2 tokens") // EXPR + EOF
 
-	if tokens[0].Type != TokenExpr {
-		t.Errorf("expected EXPR, got %s", tokens[0].Type)
-	}
-	if tokens[0].Value != `{"key": "value"}` {
-		t.Errorf("expected %q, got %q", `{"key": "value"}`, tokens[0].Value)
-	}
+	assert.Equal(t, TokenExpr, tokens[0].Type, "expected EXPR")
+	assert.Equal(t, `{"key": "value"}`, tokens[0].Value, "expected dict literal")
 }
 
 func TestLexer_PositionTracking(t *testing.T) {
@@ -236,18 +181,12 @@ func TestLexer_PositionTracking(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	// The expression should be on line 3
 	exprToken := tokens[1] // Skip first text token
-	if exprToken.Type != TokenExpr {
-		t.Fatalf("expected EXPR, got %s", exprToken.Type)
-	}
-	if exprToken.Pos.Line != 3 {
-		t.Errorf("expected line 3, got %d", exprToken.Pos.Line)
-	}
+	require.Equal(t, TokenExpr, exprToken.Type, "expected EXPR")
+	assert.Equal(t, 3, exprToken.Pos.Line, "expected line 3")
 }
 
 func TestLexer_WhitespaceHandling(t *testing.T) {
@@ -265,14 +204,9 @@ func TestLexer_WhitespaceHandling(t *testing.T) {
 	for _, tt := range tests {
 		lexer := NewLexer(tt.input, "test.sql")
 		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Errorf("input %q: unexpected error: %v", tt.input, err)
-			continue
-		}
+		require.NoError(t, err, "input %q: unexpected error", tt.input)
 
-		if tokens[0].Value != tt.expected {
-			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, tokens[0].Value)
-		}
+		assert.Equal(t, tt.expected, tokens[0].Value, "input %q", tt.input)
 	}
 }
 
@@ -281,13 +215,9 @@ func TestLexer_EmptyExpression(t *testing.T) {
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if tokens[0].Value != "" {
-		t.Errorf("expected empty string, got %q", tokens[0].Value)
-	}
+	assert.Empty(t, tokens[0].Value, "expected empty string")
 }
 
 func TestLexer_ComplexTemplate(t *testing.T) {
@@ -309,9 +239,7 @@ FROM {{ target.schema }}.users`
 	lexer := NewLexer(input, "test.sql")
 
 	tokens, err := lexer.Tokenize()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	// Count tokens by type
 	counts := make(map[TokenType]int)
@@ -320,12 +248,8 @@ FROM {{ target.schema }}.users`
 	}
 
 	// Expressions: {{ col }}, {{ target.schema }} = 2
-	if counts[TokenExpr] != 2 {
-		t.Errorf("expected 2 expressions, got %d", counts[TokenExpr])
-	}
+	assert.Equal(t, 2, counts[TokenExpr], "expected 2 expressions")
 
 	// Statements: for, endfor, if, else, endif = 5
-	if counts[TokenStmt] != 5 {
-		t.Errorf("expected 5 statements, got %d", counts[TokenStmt])
-	}
+	assert.Equal(t, 5, counts[TokenStmt], "expected 5 statements")
 }

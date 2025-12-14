@@ -4,6 +4,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -12,27 +14,17 @@ func TestThreadPool_GetPut(t *testing.T) {
 
 	// Get a thread
 	thread := pool.Get("test1")
-	if thread == nil {
-		t.Fatal("Get returned nil")
-	}
-	if thread.Name != "test1" {
-		t.Errorf("thread.Name = %q, want \"test1\"", thread.Name)
-	}
+	require.NotNil(t, thread, "Get returned nil")
+	assert.Equal(t, "test1", thread.Name, "thread.Name")
 
 	// Return it
 	pool.Put(thread)
-	if pool.Size() != 1 {
-		t.Errorf("pool size = %d, want 1", pool.Size())
-	}
+	assert.Equal(t, 1, pool.Size(), "pool size after put")
 
 	// Get it again - should be reused
 	thread2 := pool.Get("test2")
-	if pool.Size() != 0 {
-		t.Errorf("pool size = %d, want 0 after get", pool.Size())
-	}
-	if thread2.Name != "test2" {
-		t.Errorf("thread.Name = %q, want \"test2\"", thread2.Name)
-	}
+	assert.Equal(t, 0, pool.Size(), "pool size after get")
+	assert.Equal(t, "test2", thread2.Name, "thread.Name after reuse")
 }
 
 func TestThreadPool_MaxSize(t *testing.T) {
@@ -49,9 +41,7 @@ func TestThreadPool_MaxSize(t *testing.T) {
 	}
 
 	// Pool should only have 2 threads (max size)
-	if pool.Size() != 2 {
-		t.Errorf("pool size = %d, want 2 (max size)", pool.Size())
-	}
+	assert.Equal(t, 2, pool.Size(), "pool size should be max (2)")
 }
 
 func TestThreadPool_DefaultSize(t *testing.T) {
@@ -62,9 +52,7 @@ func TestThreadPool_DefaultSize(t *testing.T) {
 		pool.Put(pool.Get("test"))
 	}
 
-	if pool.Size() == 0 {
-		t.Error("pool size should not be 0 after puts")
-	}
+	assert.NotEqual(t, 0, pool.Size(), "pool size should not be 0 after puts")
 }
 
 func TestThreadPool_Concurrent(t *testing.T) {
@@ -85,9 +73,7 @@ func TestThreadPool_Concurrent(t *testing.T) {
 	wg.Wait()
 
 	// Pool should have some threads returned
-	if pool.Size() > 10 {
-		t.Errorf("pool size = %d, should not exceed max of 10", pool.Size())
-	}
+	assert.LessOrEqual(t, pool.Size(), 10, "pool size should not exceed max of 10")
 }
 
 func TestParallelExecutor_Execute(t *testing.T) {
@@ -106,21 +92,14 @@ func TestParallelExecutor_Execute(t *testing.T) {
 
 	results := executor.Execute(tasks)
 
-	if len(results) != 3 {
-		t.Fatalf("expected 3 results, got %d", len(results))
-	}
+	require.Len(t, results, 3, "expected 3 results")
 
 	// Check results (order is preserved)
 	expected := []int64{11, 22, 30}
 	for i, result := range results {
-		if result.Error != nil {
-			t.Errorf("task %d error: %v", i, result.Error)
-			continue
-		}
+		require.NoError(t, result.Error, "task %d error", i)
 		val, _ := result.Value.(starlark.Int).Int64()
-		if val != expected[i] {
-			t.Errorf("task %d result = %d, want %d", i, val, expected[i])
-		}
+		assert.Equal(t, expected[i], val, "task %d result", i)
 	}
 }
 
@@ -135,17 +114,11 @@ func TestParallelExecutor_ExecuteWithErrors(t *testing.T) {
 
 	results := executor.Execute(tasks)
 
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
-	}
+	require.Len(t, results, 2, "expected 2 results")
 
 	// First should succeed
-	if results[0].Error != nil {
-		t.Errorf("task 0 should succeed, got error: %v", results[0].Error)
-	}
+	assert.NoError(t, results[0].Error, "task 0 should succeed")
 
 	// Second should fail
-	if results[1].Error == nil {
-		t.Error("task 1 should fail with undefined variable")
-	}
+	assert.Error(t, results[1].Error, "task 1 should fail with undefined variable")
 }

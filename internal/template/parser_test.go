@@ -2,6 +2,9 @@ package template
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParser_ValidInput(t *testing.T) {
@@ -17,12 +20,8 @@ func TestParser_ValidInput(t *testing.T) {
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				text, ok := tmpl.Nodes[0].(*TextNode)
-				if !ok {
-					t.Fatalf("expected TextNode, got %T", tmpl.Nodes[0])
-				}
-				if text.Text != "SELECT * FROM users" {
-					t.Errorf("expected %q, got %q", "SELECT * FROM users", text.Text)
-				}
+				require.True(t, ok, "expected TextNode, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "SELECT * FROM users", text.Text)
 			},
 		},
 		{
@@ -31,28 +30,16 @@ func TestParser_ValidInput(t *testing.T) {
 			wantNodes: 3,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				text1, ok := tmpl.Nodes[0].(*TextNode)
-				if !ok {
-					t.Fatalf("node[0]: expected TextNode, got %T", tmpl.Nodes[0])
-				}
-				if text1.Text != "SELECT " {
-					t.Errorf("node[0]: expected %q, got %q", "SELECT ", text1.Text)
-				}
+				require.True(t, ok, "node[0]: expected TextNode, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "SELECT ", text1.Text)
 
 				expr, ok := tmpl.Nodes[1].(*ExprNode)
-				if !ok {
-					t.Fatalf("node[1]: expected ExprNode, got %T", tmpl.Nodes[1])
-				}
-				if expr.Expr != "column" {
-					t.Errorf("node[1]: expected %q, got %q", "column", expr.Expr)
-				}
+				require.True(t, ok, "node[1]: expected ExprNode, got %T", tmpl.Nodes[1])
+				assert.Equal(t, "column", expr.Expr)
 
 				text2, ok := tmpl.Nodes[2].(*TextNode)
-				if !ok {
-					t.Fatalf("node[2]: expected TextNode, got %T", tmpl.Nodes[2])
-				}
-				if text2.Text != " FROM users" {
-					t.Errorf("node[2]: expected %q, got %q", " FROM users", text2.Text)
-				}
+				require.True(t, ok, "node[2]: expected TextNode, got %T", tmpl.Nodes[2])
+				assert.Equal(t, " FROM users", text2.Text)
 			},
 		},
 		{
@@ -63,25 +50,13 @@ func TestParser_ValidInput(t *testing.T) {
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-				if !ok {
-					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-				}
-				if forBlock.VarName != "col" {
-					t.Errorf("expected var name 'col', got %q", forBlock.VarName)
-				}
-				if forBlock.IterExpr != "columns" {
-					t.Errorf("expected iter expr 'columns', got %q", forBlock.IterExpr)
-				}
-				if len(forBlock.Body) != 3 {
-					t.Fatalf("expected 3 body nodes, got %d", len(forBlock.Body))
-				}
+				require.True(t, ok, "expected ForBlock, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "col", forBlock.VarName)
+				assert.Equal(t, "columns", forBlock.IterExpr)
+				require.Len(t, forBlock.Body, 3)
 				expr, ok := forBlock.Body[1].(*ExprNode)
-				if !ok {
-					t.Fatalf("body[1]: expected ExprNode, got %T", forBlock.Body[1])
-				}
-				if expr.Expr != "col" {
-					t.Errorf("body[1]: expected %q, got %q", "col", expr.Expr)
-				}
+				require.True(t, ok, "body[1]: expected ExprNode, got %T", forBlock.Body[1])
+				assert.Equal(t, "col", expr.Expr)
 			},
 		},
 		{
@@ -90,15 +65,9 @@ func TestParser_ValidInput(t *testing.T) {
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-				if !ok {
-					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-				}
-				if forBlock.VarName != "x" {
-					t.Errorf("expected var name 'x', got %q", forBlock.VarName)
-				}
-				if forBlock.IterExpr != `["a", "b", "c"]` {
-					t.Errorf("expected iter expr '[\"a\", \"b\", \"c\"]', got %q", forBlock.IterExpr)
-				}
+				require.True(t, ok, "expected ForBlock, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "x", forBlock.VarName)
+				assert.Equal(t, `["a", "b", "c"]`, forBlock.IterExpr)
 			},
 		},
 		{
@@ -111,21 +80,11 @@ no
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-				if !ok {
-					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-				}
-				if ifBlock.Condition != "condition" {
-					t.Errorf("expected condition 'condition', got %q", ifBlock.Condition)
-				}
-				if len(ifBlock.Body) != 1 {
-					t.Fatalf("expected 1 if body node, got %d", len(ifBlock.Body))
-				}
-				if ifBlock.Else == nil {
-					t.Fatal("expected else body")
-				}
-				if len(ifBlock.Else) != 1 {
-					t.Fatalf("expected 1 else body node, got %d", len(ifBlock.Else))
-				}
+				require.True(t, ok, "expected IfBlock, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "condition", ifBlock.Condition)
+				assert.Len(t, ifBlock.Body, 1)
+				require.NotNil(t, ifBlock.Else)
+				assert.Len(t, ifBlock.Else, 1)
 			},
 		},
 		{
@@ -140,21 +99,11 @@ C
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-				if !ok {
-					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-				}
-				if ifBlock.Condition != "a" {
-					t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
-				}
-				if len(ifBlock.ElseIfs) != 2 {
-					t.Fatalf("expected 2 elif branches, got %d", len(ifBlock.ElseIfs))
-				}
-				if ifBlock.ElseIfs[0].Condition != "b" {
-					t.Errorf("elif[0]: expected condition 'b', got %q", ifBlock.ElseIfs[0].Condition)
-				}
-				if ifBlock.ElseIfs[1].Condition != "c" {
-					t.Errorf("elif[1]: expected condition 'c', got %q", ifBlock.ElseIfs[1].Condition)
-				}
+				require.True(t, ok, "expected IfBlock, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "a", ifBlock.Condition)
+				require.Len(t, ifBlock.ElseIfs, 2)
+				assert.Equal(t, "b", ifBlock.ElseIfs[0].Condition)
+				assert.Equal(t, "c", ifBlock.ElseIfs[1].Condition)
 			},
 		},
 		{
@@ -169,18 +118,10 @@ C
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-				if !ok {
-					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-				}
-				if ifBlock.Condition != "a" {
-					t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
-				}
-				if len(ifBlock.ElseIfs) != 1 {
-					t.Fatalf("expected 1 elif branch, got %d", len(ifBlock.ElseIfs))
-				}
-				if ifBlock.Else == nil {
-					t.Fatal("expected else body")
-				}
+				require.True(t, ok, "expected IfBlock, got %T", tmpl.Nodes[0])
+				assert.Equal(t, "a", ifBlock.Condition)
+				assert.Len(t, ifBlock.ElseIfs, 1)
+				assert.NotNil(t, ifBlock.Else)
 			},
 		},
 		{
@@ -193,9 +134,7 @@ C
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-				if !ok {
-					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-				}
+				require.True(t, ok, "expected ForBlock, got %T", tmpl.Nodes[0])
 
 				var foundIf bool
 				for _, node := range forBlock.Body {
@@ -204,9 +143,7 @@ C
 						break
 					}
 				}
-				if !foundIf {
-					t.Error("expected nested IfBlock in ForBlock body")
-				}
+				assert.True(t, foundIf, "expected nested IfBlock in ForBlock body")
 			},
 		},
 		{
@@ -215,13 +152,8 @@ C
 			wantNodes: 1,
 			checkFunc: func(t *testing.T, tmpl *Template) {
 				expr, ok := tmpl.Nodes[0].(*ExprNode)
-				if !ok {
-					t.Fatalf("expected ExprNode, got %T", tmpl.Nodes[0])
-				}
-				expected := `target.schema + "." + this.name`
-				if expr.Expr != expected {
-					t.Errorf("expected %q, got %q", expected, expr.Expr)
-				}
+				require.True(t, ok, "expected ExprNode, got %T", tmpl.Nodes[0])
+				assert.Equal(t, `target.schema + "." + this.name`, expr.Expr)
 			},
 		},
 	}
@@ -229,12 +161,8 @@ C
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := ParseString(tt.input, "test.sql")
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if len(tmpl.Nodes) != tt.wantNodes {
-				t.Fatalf("expected %d node(s), got %d", tt.wantNodes, len(tmpl.Nodes))
-			}
+			require.NoError(t, err)
+			require.Len(t, tmpl.Nodes, tt.wantNodes)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, tmpl)
 			}
@@ -252,18 +180,11 @@ func TestParser_ForWithoutColon(t *testing.T) {
 	for _, input := range inputs {
 		t.Run(input[:20]+"...", func(t *testing.T) {
 			tmpl, err := ParseString(input, "test.sql")
-			if err != nil {
-				t.Fatalf("input %q: unexpected error: %v", input, err)
-			}
+			require.NoError(t, err, "input %q", input)
 
 			forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-			if !ok {
-				t.Fatalf("input %q: expected ForBlock, got %T", input, tmpl.Nodes[0])
-			}
-
-			if forBlock.VarName != "x" {
-				t.Errorf("input %q: expected var 'x', got %q", input, forBlock.VarName)
-			}
+			require.True(t, ok, "input %q: expected ForBlock, got %T", input, tmpl.Nodes[0])
+			assert.Equal(t, "x", forBlock.VarName)
 		})
 	}
 }
@@ -305,14 +226,11 @@ no`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParseString(tt.input, "test.sql")
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
+			require.Error(t, err)
 
 			if tt.errType == "UnmatchedBlockError" {
-				if _, ok := err.(*UnmatchedBlockError); !ok {
-					t.Errorf("expected UnmatchedBlockError, got %T: %v", err, err)
-				}
+				_, ok := err.(*UnmatchedBlockError)
+				assert.True(t, ok, "expected UnmatchedBlockError, got %T: %v", err, err)
 			}
 		})
 	}

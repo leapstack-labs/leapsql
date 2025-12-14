@@ -2,24 +2,15 @@ package commands
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewDAGCommand(t *testing.T) {
 	cmd := NewDAGCommand()
 
-	if cmd.Use != "dag" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "dag")
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short should not be empty")
-	}
-
-	if cmd.Long == "" {
-		t.Error("Long should not be empty")
-	}
-
-	if cmd.Example == "" {
-		t.Error("Example should not be empty")
-	}
+	assert.Equal(t, "dag", cmd.Use)
+	assert.NotEmpty(t, cmd.Short, "Short should not be empty")
+	assert.NotEmpty(t, cmd.Long, "Long should not be empty")
+	assert.NotEmpty(t, cmd.Example, "Example should not be empty")
 }

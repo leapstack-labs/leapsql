@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewVersionCommand(t *testing.T) {
@@ -38,16 +40,15 @@ func TestNewVersionCommand(t *testing.T) {
 			cmd.SetErr(buf)
 
 			err := cmd.Execute()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
+			assert.NoError(t, err)
 
 			output := buf.String()
 			for _, want := range tt.wantOut {
-				if !strings.Contains(output, want) {
-					t.Errorf("output should contain %q, got: %s", want, output)
-				}
+				assert.True(t, strings.Contains(output, want), "output should contain %q, got: %s", want, output)
 			}
 		})
 	}
@@ -56,15 +57,7 @@ func TestNewVersionCommand(t *testing.T) {
 func TestVersionCommandMetadata(t *testing.T) {
 	cmd := NewVersionCommand("test")
 
-	if cmd.Use != "version" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "version")
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short should not be empty")
-	}
-
-	if cmd.Long == "" {
-		t.Error("Long should not be empty")
-	}
+	assert.Equal(t, "version", cmd.Use)
+	assert.NotEmpty(t, cmd.Short, "Short should not be empty")
+	assert.NotEmpty(t, cmd.Long, "Long should not be empty")
 }

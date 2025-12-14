@@ -2,6 +2,9 @@ package lsp
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDocumentStore_OpenGetClose(t *testing.T) {
@@ -15,25 +18,15 @@ func TestDocumentStore_OpenGetClose(t *testing.T) {
 
 	// Get document
 	doc := store.Get(uri)
-	if doc == nil {
-		t.Fatal("expected document to exist")
-	}
-	if doc.URI != uri {
-		t.Errorf("expected URI %s, got %s", uri, doc.URI)
-	}
-	if doc.Content != content {
-		t.Errorf("expected content %q, got %q", content, doc.Content)
-	}
-	if doc.Version != 1 {
-		t.Errorf("expected version 1, got %d", doc.Version)
-	}
+	require.NotNil(t, doc, "expected document to exist")
+	assert.Equal(t, uri, doc.URI, "expected URI to match")
+	assert.Equal(t, content, doc.Content, "expected content to match")
+	assert.Equal(t, 1, doc.Version, "expected version to match")
 
 	// Close document
 	store.Close(uri)
 	doc = store.Get(uri)
-	if doc != nil {
-		t.Error("expected document to be nil after close")
-	}
+	assert.Nil(t, doc, "expected document to be nil after close")
 }
 
 func TestDocumentStore_Update(t *testing.T) {
@@ -46,12 +39,8 @@ func TestDocumentStore_Update(t *testing.T) {
 	store.Update(uri, "SELECT 2", 2)
 
 	doc := store.Get(uri)
-	if doc.Content != "SELECT 2" {
-		t.Errorf("expected content 'SELECT 2', got %q", doc.Content)
-	}
-	if doc.Version != 2 {
-		t.Errorf("expected version 2, got %d", doc.Version)
-	}
+	assert.Equal(t, "SELECT 2", doc.Content, "expected content to be updated")
+	assert.Equal(t, 2, doc.Version, "expected version to be updated")
 }
 
 func TestDocumentStore_List(t *testing.T) {
@@ -62,9 +51,7 @@ func TestDocumentStore_List(t *testing.T) {
 	store.Open("file:///c.sql", "SELECT c", 1)
 
 	uris := store.List()
-	if len(uris) != 3 {
-		t.Errorf("expected 3 URIs, got %d", len(uris))
-	}
+	assert.Len(t, uris, 3, "expected 3 URIs")
 }
 
 func TestComputeLineOffsets(t *testing.T) {
@@ -82,14 +69,9 @@ func TestComputeLineOffsets(t *testing.T) {
 
 	for _, tt := range tests {
 		offsets := computeLineOffsets(tt.content)
-		if len(offsets) != len(tt.expected) {
-			t.Errorf("content %q: expected %d offsets, got %d", tt.content, len(tt.expected), len(offsets))
-			continue
-		}
+		require.Len(t, offsets, len(tt.expected), "content %q: wrong number of offsets", tt.content)
 		for i, exp := range tt.expected {
-			if offsets[i] != exp {
-				t.Errorf("content %q: offset[%d] expected %d, got %d", tt.content, i, exp, offsets[i])
-			}
+			assert.Equal(t, exp, offsets[i], "content %q: offset[%d]", tt.content, i)
 		}
 	}
 }
@@ -119,9 +101,7 @@ func TestDocument_PositionToOffset(t *testing.T) {
 
 	for _, tt := range tests {
 		offset := doc.PositionToOffset(tt.pos)
-		if offset != tt.expected {
-			t.Errorf("PositionToOffset(%v): expected %d, got %d", tt.pos, tt.expected, offset)
-		}
+		assert.Equal(t, tt.expected, offset, "PositionToOffset(%v)", tt.pos)
 	}
 }
 
@@ -150,9 +130,8 @@ func TestDocument_OffsetToPosition(t *testing.T) {
 
 	for _, tt := range tests {
 		pos := doc.OffsetToPosition(tt.offset)
-		if pos.Line != tt.expected.Line || pos.Character != tt.expected.Character {
-			t.Errorf("OffsetToPosition(%d): expected %v, got %v", tt.offset, tt.expected, pos)
-		}
+		assert.Equal(t, tt.expected.Line, pos.Line, "OffsetToPosition(%d) line", tt.offset)
+		assert.Equal(t, tt.expected.Character, pos.Character, "OffsetToPosition(%d) character", tt.offset)
 	}
 }
 
@@ -176,9 +155,7 @@ func TestDocument_GetLine(t *testing.T) {
 
 	for _, tt := range tests {
 		line := doc.GetLine(tt.line)
-		if line != tt.expected {
-			t.Errorf("GetLine(%d): expected %q, got %q", tt.line, tt.expected, line)
-		}
+		assert.Equal(t, tt.expected, line, "GetLine(%d)", tt.line)
 	}
 }
 
@@ -203,9 +180,7 @@ func TestDocument_GetWordAtPosition(t *testing.T) {
 
 	for _, tt := range tests {
 		word, _ := doc.GetWordAtPosition(tt.pos)
-		if word != tt.expectedWord {
-			t.Errorf("GetWordAtPosition(%v): expected %q, got %q", tt.pos, tt.expectedWord, word)
-		}
+		assert.Equal(t, tt.expectedWord, word, "GetWordAtPosition(%v)", tt.pos)
 	}
 }
 
@@ -227,9 +202,7 @@ func TestDocument_GetTextBefore(t *testing.T) {
 
 	for _, tt := range tests {
 		text := doc.GetTextBefore(tt.pos)
-		if text != tt.expected {
-			t.Errorf("GetTextBefore(%v): expected %q, got %q", tt.pos, tt.expected, text)
-		}
+		assert.Equal(t, tt.expected, text, "GetTextBefore(%v)", tt.pos)
 	}
 }
 
@@ -251,9 +224,7 @@ func TestDocument_GetTextAfter(t *testing.T) {
 
 	for _, tt := range tests {
 		text := doc.GetTextAfter(tt.pos)
-		if text != tt.expected {
-			t.Errorf("GetTextAfter(%v): expected %q, got %q", tt.pos, tt.expected, text)
-		}
+		assert.Equal(t, tt.expected, text, "GetTextAfter(%v)", tt.pos)
 	}
 }
 
@@ -284,9 +255,7 @@ func TestDocument_GetTextInRange(t *testing.T) {
 
 	for _, tt := range tests {
 		text := doc.GetTextInRange(tt.r)
-		if text != tt.expected {
-			t.Errorf("GetTextInRange(%v): expected %q, got %q", tt.r, tt.expected, text)
-		}
+		assert.Equal(t, tt.expected, text, "GetTextInRange(%v)", tt.r)
 	}
 }
 
@@ -302,9 +271,7 @@ func TestURIToPath(t *testing.T) {
 
 	for _, tt := range tests {
 		path := URIToPath(tt.uri)
-		if path != tt.expected {
-			t.Errorf("URIToPath(%q): expected %q, got %q", tt.uri, tt.expected, path)
-		}
+		assert.Equal(t, tt.expected, path, "URIToPath(%q)", tt.uri)
 	}
 }
 
@@ -320,9 +287,7 @@ func TestPathToURI(t *testing.T) {
 
 	for _, tt := range tests {
 		uri := PathToURI(tt.path)
-		if uri != tt.expected {
-			t.Errorf("PathToURI(%q): expected %q, got %q", tt.path, tt.expected, uri)
-		}
+		assert.Equal(t, tt.expected, uri, "PathToURI(%q)", tt.path)
 	}
 }
 
@@ -331,14 +296,10 @@ func TestIsWordChar(t *testing.T) {
 	nonWordChars := " \t\n!@#$%^&*()-+=[]{}|;':\",./<>?"
 
 	for _, c := range wordChars {
-		if !isWordChar(byte(c)) {
-			t.Errorf("isWordChar(%q): expected true", c)
-		}
+		assert.True(t, isWordChar(byte(c)), "isWordChar(%q): expected true", c)
 	}
 
 	for _, c := range nonWordChars {
-		if isWordChar(byte(c)) {
-			t.Errorf("isWordChar(%q): expected false", c)
-		}
+		assert.False(t, isWordChar(byte(c)), "isWordChar(%q): expected false", c)
 	}
 }

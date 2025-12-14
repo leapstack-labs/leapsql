@@ -1,10 +1,11 @@
 package template
 
 import (
-	"strings"
 	"testing"
 
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -46,12 +47,8 @@ func TestRenderer_Expressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
 			result, err := RenderString(tt.input, "test.sql", ctx)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -97,18 +94,14 @@ FROM users`,
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
 			result, err := RenderString(tt.input, "test.sql", ctx)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if tt.expected != "" && result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
+			if tt.expected != "" {
+				assert.Equal(t, tt.expected, result)
 			}
 
 			for _, s := range tt.containsAll {
-				if !strings.Contains(result, s) {
-					t.Errorf("expected result to contain %q, got %q", s, result)
-				}
+				assert.Contains(t, result, s)
 			}
 		})
 	}
@@ -132,12 +125,8 @@ func TestRenderer_IfStatement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
 			result, err := RenderString(tt.input, "test.sql", ctx)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -164,12 +153,8 @@ func TestRenderer_TruthyFalsy(t *testing.T) {
 			ctx := newTestContext()
 
 			result, err := RenderString(input, "test.sql", ctx)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -189,9 +174,7 @@ func TestRenderer_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
 			_, err := RenderString(tt.input, "test.sql", ctx)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
+			assert.Error(t, err)
 		})
 	}
 }
@@ -211,29 +194,19 @@ FROM {{ target.schema }}.users`
 	ctx := newTestContext()
 
 	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should contain all column names
 	for _, col := range []string{"id", "name", "created_at"} {
-		if !strings.Contains(result, col) {
-			t.Errorf("expected result to contain %q", col)
-		}
+		assert.Contains(t, result, col)
 	}
 
 	// Should contain * since env is "dev"
-	if !strings.Contains(result, "*") {
-		t.Error("expected result to contain '*' for dev env")
-	}
+	assert.Contains(t, result, "*")
 
 	// Should not contain "updated_at" since env is "dev"
-	if strings.Contains(result, "updated_at") {
-		t.Error("expected result NOT to contain 'updated_at' for dev env")
-	}
+	assert.NotContains(t, result, "updated_at")
 
 	// Should have correct table reference
-	if !strings.Contains(result, "analytics.users") {
-		t.Error("expected result to contain 'analytics.users'")
-	}
+	assert.Contains(t, result, "analytics.users")
 }

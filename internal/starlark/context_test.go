@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/macro"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -24,18 +26,15 @@ func TestNewExecutionContext(t *testing.T) {
 
 	ctx := NewExecutionContext(config, "dev", target, this)
 
-	if ctx == nil {
-		t.Fatal("NewExecutionContext returned nil")
-	}
+	require.NotNil(t, ctx, "NewExecutionContext returned nil")
 
 	globals := ctx.Globals()
 
 	// Check all expected globals are present
 	expectedKeys := []string{"config", "env", "target", "this"}
 	for _, key := range expectedKeys {
-		if _, ok := globals[key]; !ok {
-			t.Errorf("global %q not found", key)
-		}
+		_, ok := globals[key]
+		assert.True(t, ok, "global %q not found", key)
 	}
 }
 
@@ -98,14 +97,13 @@ func TestExecutionContext_EvalExpr(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ctx.EvalExprString(tt.expr, "test.sql", 1)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("EvalExprString() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err, "expected error")
 				return
 			}
 
-			if !tt.wantErr && result != tt.want {
-				t.Errorf("EvalExprString() = %q, want %q", result, tt.want)
-			}
+			require.NoError(t, err, "unexpected error")
+			assert.Equal(t, tt.want, result, "EvalExprString()")
 		})
 	}
 }
@@ -122,21 +120,13 @@ func TestExecutionContext_EvalExpr_WithTarget(t *testing.T) {
 
 	// Test target.schema access
 	result, err := ctx.EvalExprString(`target.schema`, "test.sql", 1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "analytics" {
-		t.Errorf("target.schema = %q, want \"analytics\"", result)
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, "analytics", result, "target.schema")
 
 	// Test target.type access
 	result, err = ctx.EvalExprString(`target.type`, "test.sql", 1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "duckdb" {
-		t.Errorf("target.type = %q, want \"duckdb\"", result)
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, "duckdb", result, "target.type")
 }
 
 func TestExecutionContext_EvalExpr_WithThis(t *testing.T) {
@@ -150,21 +140,13 @@ func TestExecutionContext_EvalExpr_WithThis(t *testing.T) {
 
 	// Test this.name access
 	result, err := ctx.EvalExprString(`this.name`, "test.sql", 1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "orders" {
-		t.Errorf("this.name = %q, want \"orders\"", result)
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, "orders", result, "this.name")
 
 	// Test this.schema access
 	result, err = ctx.EvalExprString(`this.schema`, "test.sql", 1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "staging" {
-		t.Errorf("this.schema = %q, want \"staging\"", result)
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, "staging", result, "this.schema")
 }
 
 func TestExecutionContext_AddMacros(t *testing.T) {
@@ -177,14 +159,11 @@ func TestExecutionContext_AddMacros(t *testing.T) {
 	}
 
 	err := ctx.AddMacros(macros)
-	if err != nil {
-		t.Fatalf("AddMacros() error = %v", err)
-	}
+	require.NoError(t, err, "AddMacros() error")
 
 	globals := ctx.Globals()
-	if _, ok := globals["utils"]; !ok {
-		t.Error("utils macro not found in globals")
-	}
+	_, ok := globals["utils"]
+	assert.True(t, ok, "utils macro not found in globals")
 }
 
 func TestExecutionContext_AddMacros_ConflictWithBuiltin(t *testing.T) {
@@ -208,9 +187,7 @@ func TestExecutionContext_AddMacros_ConflictWithBuiltin(t *testing.T) {
 			}
 
 			err := ctx.AddMacros(macros)
-			if err == nil {
-				t.Errorf("expected error for conflicting macro name %q", tt.macroName)
-			}
+			assert.Error(t, err, "expected error for conflicting macro name %q", tt.macroName)
 		})
 	}
 }
@@ -244,9 +221,7 @@ func TestEvalError_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.want {
-				t.Errorf("Error() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.err.Error(), "Error()")
 		})
 	}
 }
@@ -260,9 +235,8 @@ func TestNewContext_WithOptions(t *testing.T) {
 	ctx := NewContext(config, "prod", nil, nil, WithMacros(macros))
 
 	globals := ctx.Globals()
-	if _, ok := globals["datetime"]; !ok {
-		t.Error("datetime macro not found in globals")
-	}
+	_, ok := globals["datetime"]
+	assert.True(t, ok, "datetime macro not found in globals")
 }
 
 func TestNewContext_WithMacroRegistry(t *testing.T) {
@@ -277,31 +251,22 @@ func TestNewContext_WithMacroRegistry(t *testing.T) {
 			"greet": starlark.String("greet_func"),
 		},
 	}
-	if err := registry.Register(module); err != nil {
-		t.Fatalf("failed to register module: %v", err)
-	}
+	err := registry.Register(module)
+	require.NoError(t, err, "failed to register module")
 
 	ctx := NewContext(config, "prod", nil, nil, WithMacroRegistry(registry))
 
 	globals := ctx.Globals()
 	utilsVal, ok := globals["utils"]
-	if !ok {
-		t.Fatal("utils macro not found in globals")
-	}
+	require.True(t, ok, "utils macro not found in globals")
 
 	// Check it's a module with attribute access
 	mod, ok := utilsVal.(starlark.HasAttrs)
-	if !ok {
-		t.Fatalf("expected HasAttrs, got %T", utilsVal)
-	}
+	require.True(t, ok, "expected HasAttrs, got %T", utilsVal)
 
 	greet, err := mod.Attr("greet")
-	if err != nil {
-		t.Fatalf("failed to get greet attr: %v", err)
-	}
-	if greet.String() != `"greet_func"` {
-		t.Errorf("expected greet_func, got %s", greet.String())
-	}
+	require.NoError(t, err, "failed to get greet attr")
+	assert.Equal(t, `"greet_func"`, greet.String(), "greet value")
 }
 
 func TestNewContext_WithMacroRegistry_Nil(t *testing.T) {
@@ -312,10 +277,8 @@ func TestNewContext_WithMacroRegistry_Nil(t *testing.T) {
 
 	globals := ctx.Globals()
 	// Should have standard globals
-	if _, ok := globals["config"]; !ok {
-		t.Error("config not found")
-	}
-	if _, ok := globals["env"]; !ok {
-		t.Error("env not found")
-	}
+	_, ok := globals["config"]
+	assert.True(t, ok, "config not found")
+	_, ok = globals["env"]
+	assert.True(t, ok, "env not found")
 }

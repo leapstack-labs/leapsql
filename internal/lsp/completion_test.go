@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/pkg/lineage"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInTemplateExpr(t *testing.T) {
@@ -27,9 +28,7 @@ func TestInTemplateExpr(t *testing.T) {
 
 	for _, tt := range tests {
 		result := inTemplateExpr(tt.before)
-		if result != tt.expected {
-			t.Errorf("inTemplateExpr(%q): expected %v, got %v", tt.before, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "inTemplateExpr(%q)", tt.before)
 	}
 }
 
@@ -47,9 +46,7 @@ func TestExtractTemplateExprContent(t *testing.T) {
 
 	for _, tt := range tests {
 		result := extractTemplateExprContent(tt.before)
-		if result != tt.expected {
-			t.Errorf("extractTemplateExprContent(%q): expected %q, got %q", tt.before, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "extractTemplateExprContent(%q)", tt.before)
 	}
 }
 
@@ -69,9 +66,7 @@ func TestExtractIdentifierBefore(t *testing.T) {
 
 	for _, tt := range tests {
 		result := extractIdentifierBefore(tt.s, tt.pos)
-		if result != tt.expected {
-			t.Errorf("extractIdentifierBefore(%q, %d): expected %q, got %q", tt.s, tt.pos, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "extractIdentifierBefore(%q, %d)", tt.s, tt.pos)
 	}
 }
 
@@ -93,9 +88,7 @@ func TestFindLastSQLKeyword(t *testing.T) {
 
 	for _, tt := range tests {
 		result := findLastSQLKeyword(tt.before)
-		if result != tt.expected {
-			t.Errorf("findLastSQLKeyword(%q): expected %q, got %q", tt.before, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "findLastSQLKeyword(%q)", tt.before)
 	}
 }
 
@@ -104,15 +97,11 @@ func TestIsIdentChar(t *testing.T) {
 	invalidChars := " \t\n.,-!@#$%^&*()"
 
 	for _, c := range validChars {
-		if !isIdentChar(byte(c)) {
-			t.Errorf("isIdentChar(%q): expected true", c)
-		}
+		assert.True(t, isIdentChar(byte(c)), "isIdentChar(%q) should be true", c)
 	}
 
 	for _, c := range invalidChars {
-		if isIdentChar(byte(c)) {
-			t.Errorf("isIdentChar(%q): expected false", c)
-		}
+		assert.False(t, isIdentChar(byte(c)), "isIdentChar(%q) should be false", c)
 	}
 }
 
@@ -130,9 +119,7 @@ func TestFormatSignature(t *testing.T) {
 
 	for _, tt := range tests {
 		result := formatSignature(tt.name, tt.args)
-		if result != tt.expected {
-			t.Errorf("formatSignature(%q, %v): expected %q, got %q", tt.name, tt.args, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "formatSignature(%q, %v)", tt.name, tt.args)
 	}
 }
 
@@ -201,11 +188,9 @@ func TestServer_DetectContext(t *testing.T) {
 			}
 
 			ctx, arg := server.detectContext(doc, tt.pos)
-			if ctx != tt.expectedCtx {
-				t.Errorf("detectContext: expected ctx %v, got %v", tt.expectedCtx, ctx)
-			}
-			if tt.expectedArg != "" && arg != tt.expectedArg {
-				t.Errorf("detectContext: expected arg %q, got %q", tt.expectedArg, arg)
+			assert.Equal(t, tt.expectedCtx, ctx, "detectContext context")
+			if tt.expectedArg != "" {
+				assert.Equal(t, tt.expectedArg, arg, "detectContext arg")
 			}
 		})
 	}
@@ -236,9 +221,7 @@ func TestServer_ExtractPrefix(t *testing.T) {
 		}
 
 		result := server.extractPrefix(doc, tt.pos)
-		if result != tt.expected {
-			t.Errorf("extractPrefix(%q, %v): expected %q, got %q", tt.content, tt.pos, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "extractPrefix(%q, %v)", tt.content, tt.pos)
 	}
 }
 
@@ -270,9 +253,7 @@ func TestServer_GetCompletions_Builtins(t *testing.T) {
 		}
 	}
 
-	if !found {
-		t.Error("expected 'config' in completions for 'c' prefix in template")
-	}
+	assert.True(t, found, "expected 'config' in completions for 'c' prefix in template")
 }
 
 func TestServer_GetCompletions_SQLKeywords(t *testing.T) {
@@ -303,9 +284,7 @@ func TestServer_GetCompletions_SQLKeywords(t *testing.T) {
 		}
 	}
 
-	if !found {
-		t.Error("expected 'SELECT' in completions for 'SEL' prefix")
-	}
+	assert.True(t, found, "expected 'SELECT' in completions for 'SEL' prefix")
 }
 
 func TestServer_GetCompletions_SQLFunctions(t *testing.T) {
@@ -332,16 +311,12 @@ func TestServer_GetCompletions_SQLFunctions(t *testing.T) {
 	for _, item := range items {
 		if item.Label == "COUNT" {
 			found = true
-			if item.Kind != CompletionItemKindFunction {
-				t.Errorf("expected COUNT to be a function, got kind %d", item.Kind)
-			}
+			assert.Equal(t, CompletionItemKindFunction, item.Kind, "expected COUNT to be a function")
 			break
 		}
 	}
 
-	if !found {
-		t.Error("expected 'COUNT' in completions for 'COU' prefix in SELECT")
-	}
+	assert.True(t, found, "expected 'COUNT' in completions for 'COU' prefix in SELECT")
 }
 
 func TestCompletionItemKinds(t *testing.T) {
@@ -349,25 +324,19 @@ func TestCompletionItemKinds(t *testing.T) {
 	for _, builtin := range builtinGlobals {
 		switch builtin.Label {
 		case "config", "env", "target", "this":
-			if builtin.Kind != CompletionItemKindVariable {
-				t.Errorf("%s should be Variable, got %d", builtin.Label, builtin.Kind)
-			}
+			assert.Equal(t, CompletionItemKindVariable, builtin.Kind, "%s should be Variable", builtin.Label)
 		}
 	}
 
 	// Verify SQL keywords have correct kind
 	for _, kw := range sqlKeywords {
-		if kw.Kind != CompletionItemKindKeyword {
-			t.Errorf("SQL keyword %s should be Keyword, got %d", kw.Label, kw.Kind)
-		}
+		assert.Equal(t, CompletionItemKindKeyword, kw.Kind, "SQL keyword %s should be Keyword", kw.Label)
 	}
 
 	// Verify SQL functions from catalog return correct kind when converted
 	items := getSQLFunctionCompletions("")
 	for _, item := range items {
-		if item.Kind != CompletionItemKindFunction {
-			t.Errorf("SQL function %s should be Function, got %d", item.Label, item.Kind)
-		}
+		assert.Equal(t, CompletionItemKindFunction, item.Kind, "SQL function %s should be Function", item.Label)
 	}
 }
 
@@ -383,33 +352,23 @@ func TestConfigKeys(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("expected config key %q not found", key)
-		}
+		assert.True(t, found, "expected config key %q not found", key)
 	}
 }
 
 func TestGetSQLFunctionCompletions(t *testing.T) {
 	// Test that catalog integration works
 	items := getSQLFunctionCompletions("")
-	if len(items) == 0 {
-		t.Error("expected non-empty completions from catalog")
-	}
+	assert.NotEmpty(t, items, "expected non-empty completions from catalog")
 
 	// Should have more than the previous hardcoded 25 functions
-	if len(items) < 100 {
-		t.Errorf("expected at least 100 functions from catalog, got %d", len(items))
-	}
+	assert.GreaterOrEqual(t, len(items), 100, "expected at least 100 functions from catalog")
 
 	// Test prefix filtering
 	countItems := getSQLFunctionCompletions("COUNT")
-	if len(countItems) == 0 {
-		t.Error("expected COUNT function in completions")
-	}
+	assert.NotEmpty(t, countItems, "expected COUNT function in completions")
 	for _, item := range countItems {
-		if !strings.HasPrefix(item.Label, "COUNT") {
-			t.Errorf("expected all items to start with COUNT, got %s", item.Label)
-		}
+		assert.True(t, strings.HasPrefix(item.Label, "COUNT"), "expected all items to start with COUNT, got %s", item.Label)
 	}
 }
 
@@ -424,26 +383,16 @@ func TestGetSQLFunctionCompletions_Details(t *testing.T) {
 		}
 	}
 
-	if countItem == nil {
-		t.Fatal("COUNT not found in completions")
+	if !assert.NotNil(t, countItem, "COUNT not found in completions") {
+		return
 	}
 
 	// Check that fields are populated from catalog
-	if countItem.Kind != CompletionItemKindFunction {
-		t.Errorf("expected Function kind, got %d", countItem.Kind)
-	}
-	if countItem.Detail == "" {
-		t.Error("expected Detail (signature) to be populated")
-	}
-	if countItem.Documentation == "" {
-		t.Error("expected Documentation to be populated")
-	}
-	if countItem.InsertText == "" {
-		t.Error("expected InsertText (snippet) to be populated")
-	}
-	if countItem.InsertTextFormat != InsertTextFormatSnippet {
-		t.Error("expected snippet format")
-	}
+	assert.Equal(t, CompletionItemKindFunction, countItem.Kind, "expected Function kind")
+	assert.NotEmpty(t, countItem.Detail, "expected Detail (signature) to be populated")
+	assert.NotEmpty(t, countItem.Documentation, "expected Documentation to be populated")
+	assert.NotEmpty(t, countItem.InsertText, "expected InsertText (snippet) to be populated")
+	assert.Equal(t, InsertTextFormatSnippet, countItem.InsertTextFormat, "expected snippet format")
 }
 
 func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
@@ -476,24 +425,18 @@ func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
 	}
 
 	for cat, found := range categories {
-		if !found {
-			t.Errorf("no functions found for category %s", cat)
-		}
+		assert.True(t, found, "no functions found for category %s", cat)
 	}
 }
 
 func TestCatalogSearchFunctions(t *testing.T) {
 	// Test the underlying catalog search
 	results := lineage.SearchFunctions("DATE")
-	if len(results) == 0 {
-		t.Error("expected DATE functions")
-	}
+	assert.NotEmpty(t, results, "expected DATE functions")
 
 	// All results should start with DATE
 	for _, fn := range results {
-		if !strings.HasPrefix(fn.Name, "DATE") {
-			t.Errorf("expected function to start with DATE, got %s", fn.Name)
-		}
+		assert.True(t, strings.HasPrefix(fn.Name, "DATE"), "expected function to start with DATE, got %s", fn.Name)
 	}
 }
 
@@ -515,16 +458,12 @@ func TestServer_GetHover_Builtins(t *testing.T) {
 
 	hover := server.getHover(params)
 
-	if hover == nil {
-		t.Fatal("expected hover info for 'config'")
+	if !assert.NotNil(t, hover, "expected hover info for 'config'") {
+		return
 	}
 
-	if !strings.Contains(hover.Contents.Value, "config") {
-		t.Error("hover should contain 'config'")
-	}
-	if !strings.Contains(hover.Contents.Value, "dict") {
-		t.Error("hover should describe config as dict")
-	}
+	assert.Contains(t, hover.Contents.Value, "config", "hover should contain 'config'")
+	assert.Contains(t, hover.Contents.Value, "dict", "hover should describe config as dict")
 }
 
 func TestServer_GetHover_NoResult(t *testing.T) {
@@ -571,19 +510,13 @@ func TestServer_GetHover_SQLFunction(t *testing.T) {
 
 	hover := server.getHover(params)
 
-	if hover == nil {
-		t.Fatal("expected hover info for COUNT function")
+	if !assert.NotNil(t, hover, "expected hover info for COUNT function") {
+		return
 	}
 
-	if !strings.Contains(hover.Contents.Value, "COUNT") {
-		t.Error("hover should contain function name")
-	}
-	if !strings.Contains(hover.Contents.Value, "bigint") {
-		t.Error("hover should contain return type from signature")
-	}
-	if !strings.Contains(hover.Contents.Value, "Aggregate") {
-		t.Error("hover should indicate it's an aggregate function")
-	}
+	assert.Contains(t, hover.Contents.Value, "COUNT", "hover should contain function name")
+	assert.Contains(t, hover.Contents.Value, "bigint", "hover should contain return type from signature")
+	assert.Contains(t, hover.Contents.Value, "Aggregate", "hover should indicate it's an aggregate function")
 }
 
 func TestServer_GetHover_WindowFunction(t *testing.T) {
@@ -604,14 +537,10 @@ func TestServer_GetHover_WindowFunction(t *testing.T) {
 
 	hover := server.getHover(params)
 
-	if hover == nil {
-		t.Fatal("expected hover info for ROW_NUMBER function")
+	if !assert.NotNil(t, hover, "expected hover info for ROW_NUMBER function") {
+		return
 	}
 
-	if !strings.Contains(hover.Contents.Value, "ROW_NUMBER") {
-		t.Error("hover should contain function name")
-	}
-	if !strings.Contains(hover.Contents.Value, "Window") {
-		t.Error("hover should indicate it's a window function")
-	}
+	assert.Contains(t, hover.Contents.Value, "ROW_NUMBER", "hover should contain function name")
+	assert.Contains(t, hover.Contents.Value, "Window", "hover should indicate it's a window function")
 }

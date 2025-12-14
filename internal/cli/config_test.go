@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	// Import adapter package to ensure duckdb is registered via init()
 	_ "github.com/leapstack-labs/leapsql/internal/adapter"
 )
@@ -78,16 +81,12 @@ func TestTargetConfig_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.target.Validate()
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error but got nil")
-				}
-				if tt.errSubstr != "" && !strings.Contains(err.Error(), tt.errSubstr) {
-					t.Errorf("error %q should contain %q", err.Error(), tt.errSubstr)
+				require.Error(t, err, "expected error but got nil")
+				if tt.errSubstr != "" {
+					assert.Contains(t, err.Error(), tt.errSubstr)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -98,19 +97,13 @@ func TestTargetConfig_Validate(t *testing.T) {
 func TestTargetConfig_Validate_ErrorContainsAvailable(t *testing.T) {
 	target := TargetConfig{Type: "invalid_db"}
 	err := target.Validate()
-	if err == nil {
-		t.Fatal("expected error for invalid type")
-	}
+	require.Error(t, err, "expected error for invalid type")
 
 	errStr := err.Error()
 	// Should mention available adapters
-	if !strings.Contains(errStr, "duckdb") {
-		t.Errorf("error should list available adapters, got: %s", errStr)
-	}
+	assert.Contains(t, errStr, "duckdb", "error should list available adapters")
 	// Should mention the config file
-	if !strings.Contains(errStr, "leapsql.yaml") {
-		t.Errorf("error should mention config file, got: %s", errStr)
-	}
+	assert.Contains(t, errStr, "leapsql.yaml", "error should mention config file")
 }
 
 // TestDefaultSchemaForType tests the DefaultSchemaForType function.
@@ -133,9 +126,7 @@ func TestDefaultSchemaForType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.dbType, func(t *testing.T) {
 			got := DefaultSchemaForType(tt.dbType)
-			if got != tt.expected {
-				t.Errorf("DefaultSchemaForType(%q) = %q, want %q", tt.dbType, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -195,9 +186,7 @@ func TestExpandEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := expandEnvVars(tt.input)
-			if got != tt.expected {
-				t.Errorf("expandEnvVars(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -207,24 +196,18 @@ func TestMergeTargetConfig(t *testing.T) {
 	t.Run("nil base returns override", func(t *testing.T) {
 		override := &TargetConfig{Type: "duckdb", Database: "test.db"}
 		result := mergeTargetConfig(nil, override)
-		if result != override {
-			t.Error("nil base should return override")
-		}
+		assert.Equal(t, override, result, "nil base should return override")
 	})
 
 	t.Run("nil override returns base", func(t *testing.T) {
 		base := &TargetConfig{Type: "duckdb", Database: "test.db"}
 		result := mergeTargetConfig(base, nil)
-		if result != base {
-			t.Error("nil override should return base")
-		}
+		assert.Equal(t, base, result, "nil override should return base")
 	})
 
 	t.Run("both nil returns nil", func(t *testing.T) {
 		result := mergeTargetConfig(nil, nil)
-		if result != nil {
-			t.Error("both nil should return nil")
-		}
+		assert.Nil(t, result, "both nil should return nil")
 	})
 
 	t.Run("override replaces base fields", func(t *testing.T) {
@@ -241,18 +224,10 @@ func TestMergeTargetConfig(t *testing.T) {
 
 		result := mergeTargetConfig(base, override)
 
-		if result.Type != "duckdb" {
-			t.Errorf("Type should be inherited from base, got %q", result.Type)
-		}
-		if result.Database != "override.db" {
-			t.Errorf("Database should be from override, got %q", result.Database)
-		}
-		if result.Schema != "custom" {
-			t.Errorf("Schema should be from override, got %q", result.Schema)
-		}
-		if result.Host != "localhost" {
-			t.Errorf("Host should be inherited from base, got %q", result.Host)
-		}
+		assert.Equal(t, "duckdb", result.Type, "Type should be inherited from base")
+		assert.Equal(t, "override.db", result.Database, "Database should be from override")
+		assert.Equal(t, "custom", result.Schema, "Schema should be from override")
+		assert.Equal(t, "localhost", result.Host, "Host should be inherited from base")
 	})
 
 	t.Run("options are merged", func(t *testing.T) {
@@ -272,15 +247,9 @@ func TestMergeTargetConfig(t *testing.T) {
 
 		result := mergeTargetConfig(base, override)
 
-		if result.Options["key1"] != "base_value1" {
-			t.Errorf("key1 should be from base, got %q", result.Options["key1"])
-		}
-		if result.Options["key2"] != "override_value2" {
-			t.Errorf("key2 should be from override, got %q", result.Options["key2"])
-		}
-		if result.Options["key3"] != "override_value3" {
-			t.Errorf("key3 should be from override, got %q", result.Options["key3"])
-		}
+		assert.Equal(t, "base_value1", result.Options["key1"], "key1 should be from base")
+		assert.Equal(t, "override_value2", result.Options["key2"], "key2 should be from override")
+		assert.Equal(t, "override_value3", result.Options["key3"], "key3 should be from override")
 	})
 }
 
@@ -289,17 +258,13 @@ func TestTargetConfig_ApplyDefaults(t *testing.T) {
 	t.Run("sets default schema for duckdb", func(t *testing.T) {
 		target := &TargetConfig{Type: "duckdb"}
 		target.ApplyDefaults()
-		if target.Schema != "main" {
-			t.Errorf("expected schema 'main', got %q", target.Schema)
-		}
+		assert.Equal(t, "main", target.Schema)
 	})
 
 	t.Run("preserves existing schema", func(t *testing.T) {
 		target := &TargetConfig{Type: "duckdb", Schema: "custom"}
 		target.ApplyDefaults()
-		if target.Schema != "custom" {
-			t.Errorf("expected schema 'custom' to be preserved, got %q", target.Schema)
-		}
+		assert.Equal(t, "custom", target.Schema)
 	})
 }
 
@@ -310,19 +275,11 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 	t.Run("valid duckdb config", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "valid_duckdb.yaml")
 		cfg, err := LoadConfigWithTarget(cfgPath, "")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
-		if cfg.Target.Type != "duckdb" {
-			t.Errorf("expected target type 'duckdb', got %q", cfg.Target.Type)
-		}
-		if cfg.Target.Database != ":memory:" {
-			t.Errorf("expected database ':memory:', got %q", cfg.Target.Database)
-		}
-		if cfg.Target.Schema != "main" {
-			t.Errorf("expected schema 'main', got %q", cfg.Target.Schema)
-		}
+		assert.Equal(t, "duckdb", cfg.Target.Type)
+		assert.Equal(t, ":memory:", cfg.Target.Database)
+		assert.Equal(t, "main", cfg.Target.Schema)
 	})
 
 	t.Run("valid config with environments", func(t *testing.T) {
@@ -330,72 +287,46 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 
 		// Load with default environment (dev)
 		cfg, err := LoadConfigWithTarget(cfgPath, "")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
-		if cfg.Target.Database != "dev.duckdb" {
-			t.Errorf("expected database 'dev.duckdb', got %q", cfg.Target.Database)
-		}
+		assert.Equal(t, "dev.duckdb", cfg.Target.Database)
 	})
 
 	t.Run("config with target override to staging", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
 		cfg, err := LoadConfigWithTarget(cfgPath, "staging")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
-		if cfg.Target.Database != "staging.duckdb" {
-			t.Errorf("expected database 'staging.duckdb', got %q", cfg.Target.Database)
-		}
-		if cfg.Target.Schema != "staging" {
-			t.Errorf("expected schema 'staging', got %q", cfg.Target.Schema)
-		}
+		assert.Equal(t, "staging.duckdb", cfg.Target.Database)
+		assert.Equal(t, "staging", cfg.Target.Schema)
 	})
 
 	t.Run("config with target override to prod", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
 		cfg, err := LoadConfigWithTarget(cfgPath, "prod")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
-		if cfg.Target.Database != "prod.duckdb" {
-			t.Errorf("expected database 'prod.duckdb', got %q", cfg.Target.Database)
-		}
-		if cfg.Target.Schema != "prod" {
-			t.Errorf("expected schema 'prod', got %q", cfg.Target.Schema)
-		}
+		assert.Equal(t, "prod.duckdb", cfg.Target.Database)
+		assert.Equal(t, "prod", cfg.Target.Schema)
 	})
 
 	t.Run("invalid unknown type", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "invalid_unknown_type.yaml")
 		_, err := LoadConfigWithTarget(cfgPath, "")
-		if err == nil {
-			t.Fatal("expected error for unknown type, got nil")
-		}
+		require.Error(t, err, "expected error for unknown type")
 
-		if !strings.Contains(err.Error(), "invalid target configuration") {
-			t.Errorf("error should mention invalid target configuration, got: %s", err.Error())
-		}
-		if !strings.Contains(err.Error(), "mysql") {
-			t.Errorf("error should mention the invalid type 'mysql', got: %s", err.Error())
-		}
+		assert.Contains(t, err.Error(), "invalid target configuration")
+		assert.Contains(t, err.Error(), "mysql")
 	})
 
 	t.Run("invalid empty type", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "invalid_empty_type.yaml")
 		_, err := LoadConfigWithTarget(cfgPath, "")
-		if err == nil {
-			t.Fatal("expected error for empty type, got nil")
-		}
+		require.Error(t, err, "expected error for empty type")
 
-		if !strings.Contains(err.Error(), "target type is required") {
-			t.Errorf("error should mention type is required, got: %s", err.Error())
-		}
+		assert.Contains(t, err.Error(), "target type is required")
 	})
 
 	t.Run("config with env vars", func(t *testing.T) {
@@ -411,19 +342,11 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 
 		cfgPath := filepath.Join(testdataDir, "valid_env_vars.yaml")
 		cfg, err := LoadConfigWithTarget(cfgPath, "")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
-		if cfg.Target.Database != "/path/to/test.db" {
-			t.Errorf("expected database '/path/to/test.db', got %q", cfg.Target.Database)
-		}
-		if cfg.Target.User != "testuser" {
-			t.Errorf("expected user 'testuser', got %q", cfg.Target.User)
-		}
-		if cfg.Target.Password != "secret123" {
-			t.Errorf("expected password 'secret123', got %q", cfg.Target.Password)
-		}
+		assert.Equal(t, "/path/to/test.db", cfg.Target.Database)
+		assert.Equal(t, "testuser", cfg.Target.User)
+		assert.Equal(t, "secret123", cfg.Target.Password)
 	})
 }
 
@@ -434,33 +357,23 @@ func TestLoadConfigWithTarget_NonexistentEnvironment(t *testing.T) {
 
 	// Load with non-existent environment - should still work, using base target
 	cfg, err := LoadConfigWithTarget(cfgPath, "nonexistent")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should fall back to the base target config
-	if cfg.Target.Type != "duckdb" {
-		t.Errorf("expected type 'duckdb', got %q", cfg.Target.Type)
-	}
+	assert.Equal(t, "duckdb", cfg.Target.Type)
 }
 
 // TestConfig_Validate tests the Config.Validate method.
 func TestConfig_Validate(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		cfg := &Config{ModelsDir: "models"}
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		assert.NoError(t, cfg.Validate())
 	})
 
 	t.Run("empty models_dir", func(t *testing.T) {
 		cfg := &Config{ModelsDir: ""}
 		err := cfg.Validate()
-		if err == nil {
-			t.Fatal("expected error for empty models_dir")
-		}
-		if !strings.Contains(err.Error(), "models_dir is required") {
-			t.Errorf("error should mention models_dir, got: %s", err.Error())
-		}
+		require.Error(t, err, "expected error for empty models_dir")
+		assert.True(t, strings.Contains(err.Error(), "models_dir is required"), "error should mention models_dir")
 	})
 }

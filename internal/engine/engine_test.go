@@ -5,11 +5,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createTestProject creates a minimal test project in a temp directory.
@@ -22,16 +23,12 @@ func createTestProject(t *testing.T) (tmpDir, modelsDir, seedsDir, macrosDir str
 	macrosDir = filepath.Join(tmpDir, "macros")
 
 	for _, dir := range []string{modelsDir, seedsDir, macrosDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			t.Fatalf("Failed to create dir %s: %v", dir, err)
-		}
+		require.NoError(t, os.MkdirAll(dir, 0755), "Failed to create dir %s", dir)
 	}
 
 	// Create a simple seed
 	seedContent := "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n"
-	if err := os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644); err != nil {
-		t.Fatalf("Failed to write seed: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644), "Failed to write seed")
 
 	// Create a simple model
 	modelContent := `/*---
@@ -41,9 +38,7 @@ materialized: table
 
 SELECT id, name, email FROM users
 `
-	if err := os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644); err != nil {
-		t.Fatalf("Failed to write model: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644), "Failed to write model")
 
 	return
 }
@@ -66,26 +61,14 @@ func TestNew(t *testing.T) {
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer engine.Close()
 
-	if engine.db != nil {
-		t.Error("engine.db should be nil (lazy initialization)")
-	}
-	if engine.dbConnected {
-		t.Error("engine.dbConnected should be false initially")
-	}
-	if engine.store == nil {
-		t.Error("engine.store should not be nil")
-	}
-	if engine.modelsDir != cfg.ModelsDir {
-		t.Errorf("engine.modelsDir = %q, want %q", engine.modelsDir, cfg.ModelsDir)
-	}
-	if engine.seedsDir != cfg.SeedsDir {
-		t.Errorf("engine.seedsDir = %q, want %q", engine.seedsDir, cfg.SeedsDir)
-	}
+	assert.Nil(t, engine.db, "engine.db should be nil (lazy initialization)")
+	assert.False(t, engine.dbConnected, "engine.dbConnected should be false initially")
+	assert.NotNil(t, engine.store, "engine.store should not be nil")
+	assert.Equal(t, cfg.ModelsDir, engine.modelsDir)
+	assert.Equal(t, cfg.SeedsDir, engine.seedsDir)
 }
 
 func TestNew_InvalidStatePath(t *testing.T) {
@@ -101,9 +84,7 @@ func TestNew_InvalidStatePath(t *testing.T) {
 	}
 
 	_, err := New(cfg)
-	if err == nil {
-		t.Fatal("New() should fail with invalid state path")
-	}
+	require.Error(t, err, "New() should fail with invalid state path")
 }
 
 func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
@@ -120,15 +101,11 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer engine.Close()
 
 	ctx := testContext()
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Errorf("LoadSeeds() should succeed with empty seeds dir, got: %v", err)
-	}
+	assert.NoError(t, engine.LoadSeeds(ctx), "LoadSeeds() should succeed with empty seeds dir")
 }
 
 func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
@@ -145,16 +122,12 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer engine.Close()
 
 	ctx := testContext()
 	// Should not error, just skip loading
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Errorf("LoadSeeds() should succeed with nonexistent seeds dir, got: %v", err)
-	}
+	assert.NoError(t, engine.LoadSeeds(ctx), "LoadSeeds() should succeed with nonexistent seeds dir")
 }
 
 func TestPathToTableName(t *testing.T) {
@@ -169,9 +142,7 @@ func TestPathToTableName(t *testing.T) {
 
 	for _, tc := range tests {
 		result := pathToTableName(tc.path)
-		if result != tc.expected {
-			t.Errorf("pathToTableName(%q) = %q, want %q", tc.path, result, tc.expected)
-		}
+		assert.Equal(t, tc.expected, result, "pathToTableName(%q)", tc.path)
 	}
 }
 
@@ -183,18 +154,10 @@ func TestHashContent(t *testing.T) {
 	hash2 := hashContent(content2)
 	hash1Again := hashContent(content1)
 
-	if hash1 == hash2 {
-		t.Error("Different content should produce different hashes")
-	}
-
-	if hash1 != hash1Again {
-		t.Error("Same content should produce same hash")
-	}
-
+	assert.NotEqual(t, hash1, hash2, "Different content should produce different hashes")
+	assert.Equal(t, hash1, hash1Again, "Same content should produce same hash")
 	// Check hash is a reasonable length (16 hex chars for 8 bytes)
-	if len(hash1) != 16 {
-		t.Errorf("Hash length = %d, want 16", len(hash1))
-	}
+	assert.Len(t, hash1, 16, "Hash length should be 16")
 }
 
 func TestBuildSQL(t *testing.T) {
@@ -210,9 +173,7 @@ func TestBuildSQL(t *testing.T) {
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer engine.Close()
 
 	// Create a mock model config - LeapSQL uses pure SQL, dependencies are auto-detected
@@ -233,19 +194,14 @@ func TestBuildSQL(t *testing.T) {
 	sql := engine.buildSQL(modelCfg, model)
 
 	// Check that {{ this.schema }}.{{ this.name }} was replaced
-	if strings.Contains(sql, "{{ this.schema }}") || strings.Contains(sql, "{{ this.name }}") {
-		t.Error("{{ this.schema }}.{{ this.name }} should be replaced")
-	}
+	assert.NotContains(t, sql, "{{ this.schema }}", "{{ this.schema }} should be replaced")
+	assert.NotContains(t, sql, "{{ this.name }}", "{{ this.name }} should be replaced")
 
 	// Check the actual replacements - should produce marts.summary
-	if !strings.Contains(sql, "marts.summary") {
-		t.Errorf("{{ this.schema }}.{{ this.name }} should be replaced with 'marts.summary', got: %s", sql)
-	}
+	assert.Contains(t, sql, "marts.summary", "{{ this.schema }}.{{ this.name }} should be replaced with 'marts.summary'")
 
 	// Dependencies are auto-detected from SQL, not via ref()
-	if !strings.Contains(sql, "staging.customers") {
-		t.Error("SQL should contain the source table reference")
-	}
+	assert.Contains(t, sql, "staging.customers", "SQL should contain the source table reference")
 }
 
 func TestEngine_Close(t *testing.T) {
@@ -261,19 +217,13 @@ func TestEngine_Close(t *testing.T) {
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 
 	// Close should not error
-	if err := engine.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
-	}
+	assert.NoError(t, engine.Close(), "Close() failed")
 
 	// Second close should also not panic/error
-	if err := engine.Close(); err != nil {
-		t.Errorf("Second Close() failed: %v", err)
-	}
+	assert.NoError(t, engine.Close(), "Second Close() failed")
 }
 
 // TestEngine_CustomModels tests with a minimal custom models directory.
@@ -284,26 +234,18 @@ func TestEngine_CustomModels(t *testing.T) {
 	seedsDir := filepath.Join(tmpDir, "seeds")
 
 	// Create directories
-	if err := os.MkdirAll(modelsDir, 0755); err != nil {
-		t.Fatalf("Failed to create models dir: %v", err)
-	}
-	if err := os.MkdirAll(seedsDir, 0755); err != nil {
-		t.Fatalf("Failed to create seeds dir: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(modelsDir, 0755), "Failed to create models dir")
+	require.NoError(t, os.MkdirAll(seedsDir, 0755), "Failed to create seeds dir")
 
 	// Create a simple seed
 	seedContent := "id,name\n1,Alice\n2,Bob\n"
-	if err := os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644); err != nil {
-		t.Fatalf("Failed to write seed: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644), "Failed to write seed")
 
 	// Create a simple model
 	modelContent := `-- @config(materialized='table')
 SELECT id, name FROM users
 `
-	if err := os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644); err != nil {
-		t.Fatalf("Failed to write model: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644), "Failed to write model")
 
 	cfg := Config{
 		ModelsDir:    modelsDir,
@@ -313,43 +255,29 @@ SELECT id, name FROM users
 	}
 
 	engine, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer engine.Close()
 
 	ctx := testContext()
 
 	// Load seeds
-	if err := engine.LoadSeeds(ctx); err != nil {
-		t.Fatalf("LoadSeeds() failed: %v", err)
-	}
+	require.NoError(t, engine.LoadSeeds(ctx), "LoadSeeds() failed")
 
 	// Discover models
-	if _, err := engine.Discover(DiscoveryOptions{}); err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
+	_, err = engine.Discover(DiscoveryOptions{})
+	require.NoError(t, err, "Discover() failed")
 
 	models := engine.GetModels()
-	if len(models) != 1 {
-		t.Errorf("Expected 1 model, got %d", len(models))
-	}
+	assert.Len(t, models, 1, "Expected 1 model")
 
 	// Run
 	run, err := engine.Run(ctx, "dev")
-	if err != nil {
-		t.Fatalf("Run() failed: %v", err)
-	}
-
-	if run.Status != "completed" {
-		t.Errorf("Run status = %q, want %q. Error: %s", run.Status, "completed", run.Error)
-	}
+	require.NoError(t, err, "Run() failed")
+	assert.Equal(t, state.RunStatus("completed"), run.Status, "Run status should be completed. Error: %s", run.Error)
 
 	// Verify table was created
 	rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM active_users")
-	if err != nil {
-		t.Fatalf("Query active_users failed: %v", err)
-	}
+	require.NoError(t, err, "Query active_users failed")
 
 	var count int
 	if rows.Next() {
@@ -357,7 +285,5 @@ SELECT id, name FROM users
 	}
 	rows.Close()
 
-	if count != 2 {
-		t.Errorf("active_users has %d rows, want 2", count)
-	}
+	assert.Equal(t, 2, count, "active_users should have 2 rows")
 }

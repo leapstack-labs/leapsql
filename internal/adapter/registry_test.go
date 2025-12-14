@@ -2,30 +2,21 @@ package adapter
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDuckDBSelfRegistration(t *testing.T) {
 	// DuckDB should be auto-registered via init()
-	if !IsRegistered("duckdb") {
-		t.Error("duckdb adapter should be auto-registered")
-	}
+	assert.True(t, IsRegistered("duckdb"), "duckdb adapter should be auto-registered")
 }
 
 func TestListAdapters(t *testing.T) {
 	adapters := ListAdapters()
 
 	// Should contain at least duckdb
-	found := false
-	for _, name := range adapters {
-		if name == "duckdb" {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Errorf("duckdb should be in adapter list, got: %v", adapters)
-	}
+	assert.Contains(t, adapters, "duckdb", "duckdb should be in adapter list")
 }
 
 func TestIsRegistered(t *testing.T) {
@@ -42,9 +33,7 @@ func TestIsRegistered(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsRegistered(tt.adapter)
-			if got != tt.expected {
-				t.Errorf("IsRegistered(%q) = %v, want %v", tt.adapter, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsRegistered(%q)", tt.adapter)
 		})
 	}
 }
@@ -52,18 +41,12 @@ func TestIsRegistered(t *testing.T) {
 func TestGet(t *testing.T) {
 	// Get existing adapter
 	factory, ok := Get("duckdb")
-	if !ok {
-		t.Fatal("Get(duckdb) should return true")
-	}
-	if factory == nil {
-		t.Fatal("Get(duckdb) should return non-nil factory")
-	}
+	require.True(t, ok, "Get(duckdb) should return true")
+	require.NotNil(t, factory, "Get(duckdb) should return non-nil factory")
 
 	// Get non-existing adapter
 	_, ok = Get("nonexistent")
-	if ok {
-		t.Error("Get(nonexistent) should return false")
-	}
+	assert.False(t, ok, "Get(nonexistent) should return false")
 }
 
 func TestNewAdapter_Success(t *testing.T) {
@@ -73,12 +56,8 @@ func TestNewAdapter_Success(t *testing.T) {
 	}
 
 	adapter, err := NewAdapter(cfg)
-	if err != nil {
-		t.Fatalf("NewAdapter(duckdb) failed: %v", err)
-	}
-	if adapter == nil {
-		t.Fatal("NewAdapter(duckdb) returned nil adapter")
-	}
+	require.NoError(t, err, "NewAdapter(duckdb) failed")
+	require.NotNil(t, adapter, "NewAdapter(duckdb) returned nil adapter")
 }
 
 func TestNewAdapter_UnknownType(t *testing.T) {
@@ -87,31 +66,16 @@ func TestNewAdapter_UnknownType(t *testing.T) {
 	}
 
 	_, err := NewAdapter(cfg)
-	if err == nil {
-		t.Fatal("NewAdapter(unknown_adapter) should fail")
-	}
+	require.Error(t, err, "NewAdapter(unknown_adapter) should fail")
 
 	// Check error type
 	unknownErr, ok := err.(*UnknownAdapterError)
-	if !ok {
-		t.Fatalf("expected *UnknownAdapterError, got %T", err)
-	}
+	require.True(t, ok, "expected *UnknownAdapterError, got %T", err)
 
-	if unknownErr.Type != "unknown_adapter" {
-		t.Errorf("error type should be 'unknown_adapter', got %q", unknownErr.Type)
-	}
+	assert.Equal(t, "unknown_adapter", unknownErr.Type, "error type")
 
 	// Available should include duckdb
-	found := false
-	for _, name := range unknownErr.Available {
-		if name == "duckdb" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("Available adapters should include duckdb, got: %v", unknownErr.Available)
-	}
+	assert.Contains(t, unknownErr.Available, "duckdb", "Available adapters should include duckdb")
 }
 
 func TestNewAdapter_EmptyType(t *testing.T) {
@@ -120,14 +84,9 @@ func TestNewAdapter_EmptyType(t *testing.T) {
 	}
 
 	_, err := NewAdapter(cfg)
-	if err == nil {
-		t.Fatal("NewAdapter with empty type should fail")
-	}
+	require.Error(t, err, "NewAdapter with empty type should fail")
 
-	expected := "adapter type not specified"
-	if err.Error() != expected {
-		t.Errorf("error message should be %q, got %q", expected, err.Error())
-	}
+	assert.Equal(t, "adapter type not specified", err.Error(), "error message")
 }
 
 func TestUnknownAdapterError_Error(t *testing.T) {
@@ -139,19 +98,13 @@ func TestUnknownAdapterError_Error(t *testing.T) {
 	msg := err.Error()
 
 	// Check that error message contains important info
-	if msg == "" {
-		t.Fatal("error message should not be empty")
-	}
+	assert.NotEmpty(t, msg, "error message should not be empty")
 
 	// Should mention the type
-	if !contains(msg, "fake_db") {
-		t.Errorf("error should mention the unknown type 'fake_db'")
-	}
+	assert.Contains(t, msg, "fake_db", "error should mention the unknown type 'fake_db'")
 
 	// Should hint about config
-	if !contains(msg, "leapsql.yaml") {
-		t.Errorf("error should mention config file")
-	}
+	assert.Contains(t, msg, "leapsql.yaml", "error should mention config file")
 }
 
 func TestRegister(t *testing.T) {
@@ -162,29 +115,9 @@ func TestRegister(t *testing.T) {
 		// Note: We can't unregister, but that's OK for tests
 	}()
 
-	if !IsRegistered("test_adapter") {
-		t.Error("test_adapter should be registered after Register()")
-	}
+	assert.True(t, IsRegistered("test_adapter"), "test_adapter should be registered after Register()")
 
 	factory, ok := Get("test_adapter")
-	if !ok {
-		t.Error("Get(test_adapter) should return true after Register()")
-	}
-	if factory == nil {
-		t.Error("Get(test_adapter) should return non-nil factory")
-	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	assert.True(t, ok, "Get(test_adapter) should return true after Register()")
+	assert.NotNil(t, factory, "Get(test_adapter) should return non-nil factory")
 }

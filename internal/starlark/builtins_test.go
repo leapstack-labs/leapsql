@@ -3,6 +3,8 @@ package starlark
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -17,72 +19,46 @@ func TestBuildConfigDict(t *testing.T) {
 		map[string]any{"priority": "high"},
 	)
 
-	if dict == nil {
-		t.Fatal("BuildConfigDict returned nil")
-	}
+	require.NotNil(t, dict, "BuildConfigDict returned nil")
 
 	d, ok := dict.(*starlark.Dict)
-	if !ok {
-		t.Fatalf("expected *starlark.Dict, got %T", dict)
-	}
+	require.True(t, ok, "expected *starlark.Dict, got %T", dict)
 
 	// Check name
 	nameVal, found, _ := d.Get(starlark.String("name"))
-	if !found {
-		t.Error("name not found in dict")
-	} else if nameVal.String() != `"my_model"` {
-		t.Errorf("name = %v, want \"my_model\"", nameVal)
-	}
+	assert.True(t, found, "name not found in dict")
+	assert.Equal(t, `"my_model"`, nameVal.String(), "name value")
 
 	// Check materialized
 	matlVal, found, _ := d.Get(starlark.String("materialized"))
-	if !found {
-		t.Error("materialized not found in dict")
-	} else if matlVal.String() != `"incremental"` {
-		t.Errorf("materialized = %v, want \"incremental\"", matlVal)
-	}
+	assert.True(t, found, "materialized not found in dict")
+	assert.Equal(t, `"incremental"`, matlVal.String(), "materialized value")
 
 	// Check tags
 	tagsVal, found, _ := d.Get(starlark.String("tags"))
-	if !found {
-		t.Error("tags not found in dict")
-	}
+	assert.True(t, found, "tags not found in dict")
 	tagsList, ok := tagsVal.(*starlark.List)
-	if !ok {
-		t.Errorf("tags is not a list: %T", tagsVal)
-	} else if tagsList.Len() != 2 {
-		t.Errorf("tags length = %d, want 2", tagsList.Len())
-	}
+	require.True(t, ok, "tags is not a list: %T", tagsVal)
+	assert.Equal(t, 2, tagsList.Len(), "tags length")
 
 	// Check meta
 	metaVal, found, _ := d.Get(starlark.String("meta"))
-	if !found {
-		t.Error("meta not found in dict")
-	}
+	assert.True(t, found, "meta not found in dict")
 	metaDict, ok := metaVal.(*starlark.Dict)
-	if !ok {
-		t.Errorf("meta is not a dict: %T", metaVal)
-	}
+	require.True(t, ok, "meta is not a dict: %T", metaVal)
 	priorityVal, found, _ := metaDict.Get(starlark.String("priority"))
-	if !found {
-		t.Error("meta.priority not found")
-	} else if priorityVal.String() != `"high"` {
-		t.Errorf("meta.priority = %v, want \"high\"", priorityVal)
-	}
+	assert.True(t, found, "meta.priority not found")
+	assert.Equal(t, `"high"`, priorityVal.String(), "meta.priority value")
 }
 
 func TestBuildConfigDict_Empty(t *testing.T) {
 	dict := BuildConfigDict("", "", "", "", "", nil, nil)
 
 	d, ok := dict.(*starlark.Dict)
-	if !ok {
-		t.Fatalf("expected *starlark.Dict, got %T", dict)
-	}
+	require.True(t, ok, "expected *starlark.Dict, got %T", dict)
 
 	// Empty config should have no keys
-	if d.Len() != 0 {
-		t.Errorf("expected empty dict, got %d keys", d.Len())
-	}
+	assert.Equal(t, 0, d.Len(), "expected empty dict")
 }
 
 func TestPredeclared(t *testing.T) {
@@ -103,28 +79,21 @@ func TestPredeclared(t *testing.T) {
 	globals := Predeclared(config, "dev", target, this)
 
 	// Check config
-	if _, ok := globals["config"]; !ok {
-		t.Error("config not found in globals")
-	}
+	_, ok := globals["config"]
+	assert.True(t, ok, "config not found in globals")
 
 	// Check env
 	envVal, ok := globals["env"]
-	if !ok {
-		t.Error("env not found in globals")
-	}
-	if envVal.String() != `"dev"` {
-		t.Errorf("env = %v, want \"dev\"", envVal)
-	}
+	assert.True(t, ok, "env not found in globals")
+	assert.Equal(t, `"dev"`, envVal.String(), "env value")
 
 	// Check target
-	if _, ok := globals["target"]; !ok {
-		t.Error("target not found in globals")
-	}
+	_, ok = globals["target"]
+	assert.True(t, ok, "target not found in globals")
 
 	// Check this
-	if _, ok := globals["this"]; !ok {
-		t.Error("this not found in globals")
-	}
+	_, ok = globals["this"]
+	assert.True(t, ok, "this not found in globals")
 }
 
 func TestPredeclared_NilTarget(t *testing.T) {
@@ -132,18 +101,14 @@ func TestPredeclared_NilTarget(t *testing.T) {
 	globals := Predeclared(config, "prod", nil, nil)
 
 	// Should have config and env
-	if _, ok := globals["config"]; !ok {
-		t.Error("config not found in globals")
-	}
-	if _, ok := globals["env"]; !ok {
-		t.Error("env not found in globals")
-	}
+	_, ok := globals["config"]
+	assert.True(t, ok, "config not found in globals")
+	_, ok = globals["env"]
+	assert.True(t, ok, "env not found in globals")
 
 	// Should not have target or this
-	if _, ok := globals["target"]; ok {
-		t.Error("target should not be in globals when nil")
-	}
-	if _, ok := globals["this"]; ok {
-		t.Error("this should not be in globals when nil")
-	}
+	_, ok = globals["target"]
+	assert.False(t, ok, "target should not be in globals when nil")
+	_, ok = globals["this"]
+	assert.False(t, ok, "this should not be in globals when nil")
 }

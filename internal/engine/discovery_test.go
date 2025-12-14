@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestShouldParseFile_NewFile tests that new files are parsed.
@@ -23,22 +26,14 @@ func TestShouldParseFile_NewFile(t *testing.T) {
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// File not in SQLite -> should parse
 	needsParse, hash, content := eng.shouldParseFile(modelPath, false)
-	if !needsParse {
-		t.Error("Expected needsParse=true for new file")
-	}
-	if hash == "" {
-		t.Error("Expected non-empty hash")
-	}
-	if len(content) == 0 {
-		t.Error("Expected non-empty content")
-	}
+	assert.True(t, needsParse, "Expected needsParse=true for new file")
+	assert.NotEmpty(t, hash, "Expected non-empty hash")
+	assert.NotEmpty(t, content, "Expected non-empty content")
 }
 
 // TestShouldParseFile_UnchangedFile tests that unchanged files are skipped.
@@ -59,27 +54,19 @@ func TestShouldParseFile_UnchangedFile(t *testing.T) {
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// First check - should parse
 	needsParse, hash, _ := eng.shouldParseFile(modelPath, false)
-	if !needsParse {
-		t.Error("Expected needsParse=true for new file")
-	}
+	assert.True(t, needsParse, "Expected needsParse=true for new file")
 
 	// Store the hash
-	if err := eng.store.SetContentHash(modelPath, hash, "model"); err != nil {
-		t.Fatalf("SetContentHash failed: %v", err)
-	}
+	require.NoError(t, eng.store.SetContentHash(modelPath, hash, "model"), "SetContentHash failed")
 
 	// Second check with same content - should skip
 	needsParse, _, _ = eng.shouldParseFile(modelPath, false)
-	if needsParse {
-		t.Error("Expected needsParse=false for unchanged file")
-	}
+	assert.False(t, needsParse, "Expected needsParse=false for unchanged file")
 }
 
 // TestShouldParseFile_ChangedFile tests that changed files are re-parsed.
@@ -99,9 +86,7 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// Store initial hash
@@ -113,12 +98,8 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 
 	// Should parse because content changed
 	needsParse, newHash, _ := eng.shouldParseFile(modelPath, false)
-	if !needsParse {
-		t.Error("Expected needsParse=true for changed file")
-	}
-	if newHash == hash {
-		t.Error("Expected different hash for changed content")
-	}
+	assert.True(t, needsParse, "Expected needsParse=true for changed file")
+	assert.NotEqual(t, hash, newHash, "Expected different hash for changed content")
 }
 
 // TestShouldParseFile_ForceRefresh tests that force flag always triggers parse.
@@ -138,9 +119,7 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// Store hash
@@ -149,9 +128,7 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 
 	// Force flag should always parse
 	needsParse, _, _ := eng.shouldParseFile(modelPath, true)
-	if !needsParse {
-		t.Error("Expected needsParse=true when force=true")
-	}
+	assert.True(t, needsParse, "Expected needsParse=true when force=true")
 }
 
 // TestDiscoverModels_IncrementalSkip tests that unchanged models are skipped.
@@ -179,42 +156,24 @@ SELECT 2`), 0644)
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// First discovery - should parse all
 	result1, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("First Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "First Discover() failed")
 
-	if result1.ModelsTotal != 2 {
-		t.Errorf("Expected 2 total models, got %d", result1.ModelsTotal)
-	}
-	if result1.ModelsChanged != 2 {
-		t.Errorf("Expected 2 changed models on first run, got %d", result1.ModelsChanged)
-	}
-	if result1.ModelsSkipped != 0 {
-		t.Errorf("Expected 0 skipped models on first run, got %d", result1.ModelsSkipped)
-	}
+	assert.Equal(t, 2, result1.ModelsTotal, "Expected 2 total models")
+	assert.Equal(t, 2, result1.ModelsChanged, "Expected 2 changed models on first run")
+	assert.Equal(t, 0, result1.ModelsSkipped, "Expected 0 skipped models on first run")
 
 	// Second discovery with no changes - should skip all
 	result2, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("Second Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "Second Discover() failed")
 
-	if result2.ModelsTotal != 2 {
-		t.Errorf("Expected 2 total models, got %d", result2.ModelsTotal)
-	}
-	if result2.ModelsChanged != 0 {
-		t.Errorf("Expected 0 changed models on second run, got %d", result2.ModelsChanged)
-	}
-	if result2.ModelsSkipped != 2 {
-		t.Errorf("Expected 2 skipped models on second run, got %d", result2.ModelsSkipped)
-	}
+	assert.Equal(t, 2, result2.ModelsTotal, "Expected 2 total models")
+	assert.Equal(t, 0, result2.ModelsChanged, "Expected 0 changed models on second run")
+	assert.Equal(t, 2, result2.ModelsSkipped, "Expected 2 skipped models on second run")
 }
 
 // TestDiscoverModels_DeletedFileCleanup tests that deleted files are removed from state.
@@ -238,42 +197,27 @@ SELECT 1`), 0644)
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// First discovery
 	result1, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("First Discover() failed: %v", err)
-	}
-
-	if result1.ModelsTotal != 1 {
-		t.Errorf("Expected 1 model, got %d", result1.ModelsTotal)
-	}
+	require.NoError(t, err, "First Discover() failed")
+	assert.Equal(t, 1, result1.ModelsTotal, "Expected 1 model")
 
 	// Delete the file
 	os.Remove(modelPath)
 
 	// Second discovery - should detect deletion
 	result2, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("Second Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "Second Discover() failed")
 
-	if result2.ModelsTotal != 0 {
-		t.Errorf("Expected 0 total models after deletion, got %d", result2.ModelsTotal)
-	}
-	if result2.ModelsDeleted != 1 {
-		t.Errorf("Expected 1 deleted model, got %d", result2.ModelsDeleted)
-	}
+	assert.Equal(t, 0, result2.ModelsTotal, "Expected 0 total models after deletion")
+	assert.Equal(t, 1, result2.ModelsDeleted, "Expected 1 deleted model")
 
 	// Verify model is removed from in-memory state
 	models := eng.GetModels()
-	if len(models) != 0 {
-		t.Errorf("Expected 0 models in memory, got %d", len(models))
-	}
+	assert.Empty(t, models, "Expected 0 models in memory")
 }
 
 // TestDiscoverModels_GracefulDegradation tests that parse errors don't stop discovery.
@@ -302,27 +246,19 @@ SELECT 1`), 0644)
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// Discovery should succeed - the directory named .sql will be skipped
 	result, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "Discover() failed")
 
 	// Should have 1 valid model
-	if result.ModelsTotal < 1 {
-		t.Errorf("Expected at least 1 model, got %d", result.ModelsTotal)
-	}
+	assert.GreaterOrEqual(t, result.ModelsTotal, 1, "Expected at least 1 model")
 
 	// Valid model should still be registered
 	models := eng.GetModels()
-	if len(models) < 1 {
-		t.Errorf("Expected at least 1 valid model in memory, got %d", len(models))
-	}
+	assert.GreaterOrEqual(t, len(models), 1, "Expected at least 1 valid model in memory")
 }
 
 // TestDiscoverMacros_IncrementalSkip tests incremental macro discovery.
@@ -345,36 +281,22 @@ def hello(name):
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// First discovery
 	result1, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("First Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "First Discover() failed")
 
-	if result1.MacrosTotal != 1 {
-		t.Errorf("Expected 1 macro, got %d", result1.MacrosTotal)
-	}
-	if result1.MacrosChanged != 1 {
-		t.Errorf("Expected 1 changed macro on first run, got %d", result1.MacrosChanged)
-	}
+	assert.Equal(t, 1, result1.MacrosTotal, "Expected 1 macro")
+	assert.Equal(t, 1, result1.MacrosChanged, "Expected 1 changed macro on first run")
 
 	// Second discovery - should skip
 	result2, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("Second Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "Second Discover() failed")
 
-	if result2.MacrosSkipped != 1 {
-		t.Errorf("Expected 1 skipped macro on second run, got %d", result2.MacrosSkipped)
-	}
-	if result2.MacrosChanged != 0 {
-		t.Errorf("Expected 0 changed macros on second run, got %d", result2.MacrosChanged)
-	}
+	assert.Equal(t, 1, result2.MacrosSkipped, "Expected 1 skipped macro on second run")
+	assert.Equal(t, 0, result2.MacrosChanged, "Expected 0 changed macros on second run")
 }
 
 // TestDiscover_ForceFullRefresh tests that --force re-parses everything.
@@ -396,29 +318,19 @@ SELECT 1`), 0644)
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	// First discovery
 	_, err = eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("First Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "First Discover() failed")
 
 	// Second discovery with force - should re-parse
 	result, err := eng.Discover(DiscoveryOptions{ForceFullRefresh: true})
-	if err != nil {
-		t.Fatalf("Second Discover() with force failed: %v", err)
-	}
+	require.NoError(t, err, "Second Discover() with force failed")
 
-	if result.ModelsChanged != 1 {
-		t.Errorf("Expected 1 changed model with force=true, got %d", result.ModelsChanged)
-	}
-	if result.ModelsSkipped != 0 {
-		t.Errorf("Expected 0 skipped models with force=true, got %d", result.ModelsSkipped)
-	}
+	assert.Equal(t, 1, result.ModelsChanged, "Expected 1 changed model with force=true")
+	assert.Equal(t, 0, result.ModelsSkipped, "Expected 0 skipped models with force=true")
 }
 
 // TestDiscover_SeedValidation tests that missing seeds are detected.
@@ -447,20 +359,14 @@ SELECT * FROM raw_data`), 0644)
 	}
 
 	eng, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
+	require.NoError(t, err, "New() failed")
 	defer eng.Close()
 
 	result, err := eng.Discover(DiscoveryOptions{})
-	if err != nil {
-		t.Fatalf("Discover() failed: %v", err)
-	}
+	require.NoError(t, err, "Discover() failed")
 
 	// Model should be discovered
-	if result.ModelsTotal != 1 {
-		t.Errorf("Expected 1 model, got %d", result.ModelsTotal)
-	}
+	assert.Equal(t, 1, result.ModelsTotal, "Expected 1 model")
 }
 
 // TestDiscoveryResult_Summary tests the Summary() method.
@@ -477,31 +383,24 @@ func TestDiscoveryResult_Summary(t *testing.T) {
 	}
 
 	summary := result.Summary()
-	if summary == "" {
-		t.Error("Expected non-empty summary")
-	}
+	assert.NotEmpty(t, summary, "Expected non-empty summary")
 
 	// Check that summary contains key info
-	if !containsAll(summary, "10 total", "3 changed", "6 skipped", "1 deleted") {
-		t.Errorf("Summary missing expected content: %s", summary)
-	}
+	assert.True(t, containsAll(summary, "10 total", "3 changed", "6 skipped", "1 deleted"),
+		"Summary missing expected content: %s", summary)
 }
 
 // TestDiscoveryResult_HasErrors tests the HasErrors() method.
 func TestDiscoveryResult_HasErrors(t *testing.T) {
 	result := &DiscoveryResult{}
-	if result.HasErrors() {
-		t.Error("Expected HasErrors()=false for empty errors")
-	}
+	assert.False(t, result.HasErrors(), "Expected HasErrors()=false for empty errors")
 
 	result.Errors = append(result.Errors, DiscoveryError{
 		Path:    "/test",
 		Type:    "parse",
 		Message: "test error",
 	})
-	if !result.HasErrors() {
-		t.Error("Expected HasErrors()=true when errors exist")
-	}
+	assert.True(t, result.HasErrors(), "Expected HasErrors()=true when errors exist")
 }
 
 // containsAll checks if s contains all substrings.

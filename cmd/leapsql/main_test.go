@@ -6,19 +6,18 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/cli"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testdataDir(t *testing.T) string {
 	t.Helper()
 	// Get the absolute path to testdata directory
 	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get working directory: %v", err)
-	}
+	require.NoError(t, err, "failed to get working directory")
 	return filepath.Join(wd, "..", "..", "testdata")
 }
 
@@ -30,14 +29,10 @@ func TestVersionCommand(t *testing.T) {
 	cmd.SetArgs([]string{"version"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("version command error = %v", err)
-	}
+	assert.NoError(t, err, "version command error")
 
 	output := buf.String()
-	if !strings.Contains(output, "LeapSQL") {
-		t.Errorf("version output should contain 'LeapSQL', got: %s", output)
-	}
+	assert.Contains(t, output, "LeapSQL", "version output should contain 'LeapSQL'")
 }
 
 func TestHelpCommand(t *testing.T) {
@@ -48,16 +43,12 @@ func TestHelpCommand(t *testing.T) {
 	cmd.SetArgs([]string{"--help"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("help command error = %v", err)
-	}
+	assert.NoError(t, err, "help command error")
 
 	output := buf.String()
 	expectedCommands := []string{"run", "list", "dag", "seed", "lineage", "render", "docs"}
 	for _, expected := range expectedCommands {
-		if !strings.Contains(output, expected) {
-			t.Errorf("help output should contain '%s', got: %s", expected, output)
-		}
+		assert.Contains(t, output, expected, "help output should contain '%s'", expected)
 	}
 }
 
@@ -78,14 +69,10 @@ func TestListCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("list command error = %v", err)
-	}
+	assert.NoError(t, err, "list command error")
 
 	output := buf.String()
-	if !strings.Contains(output, "Models") {
-		t.Errorf("list output should contain 'Models', got: %s", output)
-	}
+	assert.Contains(t, output, "Models", "list output should contain 'Models'")
 }
 
 func TestListCommandJSON(t *testing.T) {
@@ -106,22 +93,16 @@ func TestListCommandJSON(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("list --json command error = %v", err)
-	}
+	assert.NoError(t, err, "list --json command error")
 
 	// Validate JSON structure
 	var result map[string]interface{}
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &result), "output is not valid JSON")
 
 	// Verify expected top-level keys exist
 	expectedKeys := []string{"models", "macros", "summary"}
 	for _, key := range expectedKeys {
-		if _, ok := result[key]; !ok {
-			t.Errorf("JSON output should contain key %q", key)
-		}
+		assert.Contains(t, result, key, "JSON output should contain key %q", key)
 	}
 }
 
@@ -142,9 +123,7 @@ func TestDAGCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("dag command error = %v", err)
-	}
+	assert.NoError(t, err, "dag command error")
 }
 
 func TestSeedCommand(t *testing.T) {
@@ -164,9 +143,7 @@ func TestSeedCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("seed command error = %v", err)
-	}
+	assert.NoError(t, err, "seed command error")
 }
 
 func TestRunCommand(t *testing.T) {
@@ -187,9 +164,7 @@ func TestRunCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("run command error = %v", err)
-	}
+	assert.NoError(t, err, "run command error")
 }
 
 func TestRunCommandSelect(t *testing.T) {
@@ -211,9 +186,7 @@ func TestRunCommandSelect(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("run --select command error = %v", err)
-	}
+	assert.NoError(t, err, "run --select command error")
 }
 
 func TestRunCommandSelectWithDownstream(t *testing.T) {
@@ -234,9 +207,7 @@ func TestRunCommandSelectWithDownstream(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("initial run command error = %v", err)
-	}
+	require.NoError(t, err, "initial run command error")
 
 	// Now test select with downstream
 	cmd2 := cli.NewRootCmd()
@@ -253,9 +224,7 @@ func TestRunCommandSelectWithDownstream(t *testing.T) {
 	})
 
 	err = cmd2.Execute()
-	if err != nil {
-		t.Errorf("run --select --downstream command error = %v", err)
-	}
+	assert.NoError(t, err, "run --select --downstream command error")
 }
 
 func TestLineageCommand(t *testing.T) {
@@ -275,9 +244,7 @@ func TestLineageCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("lineage command error = %v", err)
-	}
+	assert.NoError(t, err, "lineage command error")
 }
 
 func TestLineageCommandInvalidModel(t *testing.T) {
@@ -297,12 +264,8 @@ func TestLineageCommandInvalidModel(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("lineage with invalid model should return an error")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error should mention 'not found', got: %v", err)
-	}
+	assert.Error(t, err, "lineage with invalid model should return an error")
+	assert.Contains(t, err.Error(), "not found", "error should mention 'not found'")
 }
 
 func TestRenderCommand(t *testing.T) {
@@ -322,9 +285,7 @@ func TestRenderCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("render command error = %v", err)
-	}
+	assert.NoError(t, err, "render command error")
 }
 
 func TestRenderCommandInvalidModel(t *testing.T) {
@@ -344,9 +305,7 @@ func TestRenderCommandInvalidModel(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("render with invalid model should return an error")
-	}
+	assert.Error(t, err, "render with invalid model should return an error")
 }
 
 func TestCompletionCommand(t *testing.T) {
@@ -361,9 +320,7 @@ func TestCompletionCommand(t *testing.T) {
 			cmd.SetArgs([]string{"completion", shell})
 
 			err := cmd.Execute()
-			if err != nil {
-				t.Errorf("completion %s command error = %v", shell, err)
-			}
+			assert.NoError(t, err, "completion %s command error", shell)
 		})
 	}
 }
@@ -376,9 +333,7 @@ func TestUnknownCommand(t *testing.T) {
 	cmd.SetArgs([]string{"unknown-command"})
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("unknown command should return an error")
-	}
+	assert.Error(t, err, "unknown command should return an error")
 }
 
 func TestMain(m *testing.M) {

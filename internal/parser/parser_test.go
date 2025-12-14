@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParser_ParseContent(t *testing.T) {
@@ -79,15 +82,9 @@ WHERE created_at > '2024-01-01'
 			wantName: "users",
 			wantPath: "marts.users",
 			checkFunc: func(t *testing.T, config *ModelConfig) {
-				if len(config.Conditionals) != 1 {
-					t.Fatalf("expected 1 conditional, got %d", len(config.Conditionals))
-				}
-				if config.Conditionals[0].Condition != "env == 'prod'" {
-					t.Errorf("expected condition \"env == 'prod'\", got %q", config.Conditionals[0].Condition)
-				}
-				if config.Conditionals[0].Content != "WHERE created_at > '2024-01-01'\n" {
-					t.Errorf("unexpected conditional content: %q", config.Conditionals[0].Content)
-				}
+				require.Len(t, config.Conditionals, 1)
+				assert.Equal(t, "env == 'prod'", config.Conditionals[0].Condition)
+				assert.Equal(t, "WHERE created_at > '2024-01-01'\n", config.Conditionals[0].Content)
 			},
 		},
 		{
@@ -103,9 +100,7 @@ WHERE active = true`,
 				expectedSQL := `SELECT id, name
 FROM staging.users
 WHERE active = true`
-				if config.SQL != expectedSQL {
-					t.Errorf("expected SQL:\n%s\ngot:\n%s", expectedSQL, config.SQL)
-				}
+				assert.Equal(t, expectedSQL, config.SQL)
 			},
 		},
 	}
@@ -126,30 +121,24 @@ WHERE active = true`
 			p := NewParser("/models")
 			filePath := filePaths[tt.name]
 			config, err := p.ParseContent(filePath, tt.sql)
-			if err != nil {
-				t.Fatalf("failed to parse content: %v", err)
-			}
+			require.NoError(t, err)
 
-			if tt.wantName != "" && config.Name != tt.wantName {
-				t.Errorf("expected name %q, got %q", tt.wantName, config.Name)
+			if tt.wantName != "" {
+				assert.Equal(t, tt.wantName, config.Name)
 			}
-			if tt.wantPath != "" && config.Path != tt.wantPath {
-				t.Errorf("expected path %q, got %q", tt.wantPath, config.Path)
+			if tt.wantPath != "" {
+				assert.Equal(t, tt.wantPath, config.Path)
 			}
-			if tt.wantMatl != "" && config.Materialized != tt.wantMatl {
-				t.Errorf("expected materialized %q, got %q", tt.wantMatl, config.Materialized)
+			if tt.wantMatl != "" {
+				assert.Equal(t, tt.wantMatl, config.Materialized)
 			}
-			if tt.wantUniqueKey != "" && config.UniqueKey != tt.wantUniqueKey {
-				t.Errorf("expected unique_key %q, got %q", tt.wantUniqueKey, config.UniqueKey)
+			if tt.wantUniqueKey != "" {
+				assert.Equal(t, tt.wantUniqueKey, config.UniqueKey)
 			}
 			if tt.wantImports != nil {
-				if len(config.Imports) != len(tt.wantImports) {
-					t.Fatalf("expected %d imports, got %d", len(tt.wantImports), len(config.Imports))
-				}
+				require.Len(t, config.Imports, len(tt.wantImports))
 				for i, imp := range tt.wantImports {
-					if config.Imports[i] != imp {
-						t.Errorf("import[%d]: expected %q, got %q", i, imp, config.Imports[i])
-					}
+					assert.Equal(t, imp, config.Imports[i])
 				}
 			}
 			if tt.checkFunc != nil {
@@ -220,9 +209,7 @@ FROM staging.stg_customers`,
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser("/models")
 			config, err := p.ParseContent("/models/test.sql", tt.sql)
-			if err != nil {
-				t.Fatalf("failed to parse content: %v", err)
-			}
+			require.NoError(t, err)
 
 			sourcesMap := make(map[string]bool)
 			for _, s := range config.Sources {
@@ -230,16 +217,12 @@ FROM staging.stg_customers`,
 			}
 
 			for _, want := range tt.wantSources {
-				if !sourcesMap[want] {
-					t.Errorf("expected source %q in sources %v", want, config.Sources)
-				}
+				assert.True(t, sourcesMap[want], "expected source %q in sources %v", want, config.Sources)
 			}
 
 			// Special check for CTE test: CTE names should NOT be in sources
 			if tt.name == "CTE" {
-				if sourcesMap["customer_orders"] {
-					t.Error("CTE 'customer_orders' should NOT be in sources")
-				}
+				assert.False(t, sourcesMap["customer_orders"], "CTE 'customer_orders' should NOT be in sources")
 			}
 		})
 	}
@@ -262,10 +245,7 @@ func TestParser_filePathToModelPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser(tt.baseDir)
 			result := p.filePathToModelPath(tt.filePath)
-			if result != tt.expected {
-				t.Errorf("filePathToModelPath(%q, %q) = %q, expected %q",
-					tt.baseDir, tt.filePath, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -273,16 +253,12 @@ func TestParser_filePathToModelPath(t *testing.T) {
 func TestScanner_ScanDir(t *testing.T) {
 	// Create temp directory with test models
 	tmpDir, err := os.MkdirTemp("", "parser-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
 	// Create subdirectory
 	stagingDir := filepath.Join(tmpDir, "staging")
-	if err := os.MkdirAll(stagingDir, 0755); err != nil {
-		t.Fatalf("failed to create staging dir: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(stagingDir, 0755))
 
 	// Create test files
 	files := map[string]string{
@@ -295,21 +271,14 @@ SELECT COUNT(*) FROM staging.users`,
 	}
 
 	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to write file %s: %v", path, err)
-		}
+		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 	}
 
 	// Scan directory
 	scanner := NewScanner(tmpDir)
 	models, err := scanner.ScanDir(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to scan dir: %v", err)
-	}
-
-	if len(models) != 3 {
-		t.Fatalf("expected 3 models, got %d", len(models))
-	}
+	require.NoError(t, err)
+	require.Len(t, models, 3)
 
 	// Verify models were parsed correctly
 	modelsByPath := make(map[string]*ModelConfig)
@@ -317,30 +286,22 @@ SELECT COUNT(*) FROM staging.users`,
 		modelsByPath[m.Path] = m
 	}
 
-	if m, ok := modelsByPath["staging.users"]; !ok {
-		t.Error("missing staging.users model")
-	} else if m.Materialized != "table" {
-		t.Errorf("staging.users materialized = %q, expected 'table'", m.Materialized)
-	}
+	m, ok := modelsByPath["staging.users"]
+	require.True(t, ok, "missing staging.users model")
+	assert.Equal(t, "table", m.Materialized)
 
-	if m, ok := modelsByPath["staging.orders"]; !ok {
-		t.Error("missing staging.orders model")
-	} else if len(m.Imports) != 1 || m.Imports[0] != "staging.users" {
-		t.Errorf("staging.orders imports = %v, expected [staging.users]", m.Imports)
-	}
+	m, ok = modelsByPath["staging.orders"]
+	require.True(t, ok, "missing staging.orders model")
+	assert.Equal(t, []string{"staging.users"}, m.Imports)
 
-	if m, ok := modelsByPath["summary"]; !ok {
-		t.Error("missing summary model")
-	} else if len(m.Imports) != 2 {
-		t.Errorf("summary imports = %v, expected 2 imports", m.Imports)
-	}
+	m, ok = modelsByPath["summary"]
+	require.True(t, ok, "missing summary model")
+	assert.Len(t, m.Imports, 2)
 }
 
 func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "parser-test-hidden")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
 	// Create regular file and hidden file
@@ -349,13 +310,8 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 
 	scanner := NewScanner(tmpDir)
 	models, err := scanner.ScanDir(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to scan dir: %v", err)
-	}
-
-	if len(models) != 1 {
-		t.Errorf("expected 1 model (skipping hidden), got %d", len(models))
-	}
+	require.NoError(t, err)
+	assert.Len(t, models, 1, "expected 1 model (skipping hidden)")
 }
 
 func TestParser_ParseContent_ColumnLineage(t *testing.T) {
@@ -370,14 +326,10 @@ func TestParser_ParseContent_ColumnLineage(t *testing.T) {
 	GROUP BY c.customer_id, c.customer_name`
 
 	config, err := p.ParseContent("/models/summary.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should have column lineage extracted
-	if len(config.Columns) != 3 {
-		t.Fatalf("expected 3 columns, got %d", len(config.Columns))
-	}
+	require.Len(t, config.Columns, 3)
 
 	// Find columns by name
 	columnsByName := make(map[string]ColumnInfo)
@@ -386,26 +338,14 @@ func TestParser_ParseContent_ColumnLineage(t *testing.T) {
 	}
 
 	// customer_id should be direct from customers
-	if col, ok := columnsByName["customer_id"]; !ok {
-		t.Error("missing customer_id column")
-	} else {
-		if col.TransformType != "" {
-			t.Errorf("customer_id should be direct (no transform), got %q", col.TransformType)
-		}
-		if len(col.Sources) < 1 {
-			t.Error("customer_id should have at least one source")
-		}
-	}
+	col, ok := columnsByName["customer_id"]
+	require.True(t, ok, "missing customer_id column")
+	assert.Empty(t, col.TransformType, "customer_id should be direct (no transform)")
+	assert.NotEmpty(t, col.Sources, "customer_id should have at least one source")
 
 	// total_amount should be an expression (SUM)
-	if col, ok := columnsByName["total_amount"]; !ok {
-		t.Error("missing total_amount column")
-	} else {
-		if col.TransformType != "EXPR" {
-			t.Errorf("total_amount should be EXPR transform, got %q", col.TransformType)
-		}
-		if col.Function != "sum" {
-			t.Errorf("total_amount should have function 'sum', got %q", col.Function)
-		}
-	}
+	col, ok = columnsByName["total_amount"]
+	require.True(t, ok, "missing total_amount column")
+	assert.Equal(t, "EXPR", col.TransformType)
+	assert.Equal(t, "sum", col.Function)
 }

@@ -2,6 +2,8 @@ package lsp
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractSQL(t *testing.T) {
@@ -60,9 +62,7 @@ WHERE active = true
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractSQL(tt.content)
-			if result != tt.expected {
-				t.Errorf("extractSQL():\nexpected: %q\ngot:      %q", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result, "extractSQL()")
 		})
 	}
 }
@@ -72,15 +72,11 @@ func TestIsBuiltinGlobal(t *testing.T) {
 	nonBuiltins := []string{"utils", "my_macro", "ref", "custom"}
 
 	for _, name := range builtins {
-		if !isBuiltinGlobal(name) {
-			t.Errorf("isBuiltinGlobal(%q): expected true", name)
-		}
+		assert.True(t, isBuiltinGlobal(name), "isBuiltinGlobal(%q): expected true", name)
 	}
 
 	for _, name := range nonBuiltins {
-		if isBuiltinGlobal(name) {
-			t.Errorf("isBuiltinGlobal(%q): expected false", name)
-		}
+		assert.False(t, isBuiltinGlobal(name), "isBuiltinGlobal(%q): expected false", name)
 	}
 }
 
@@ -105,9 +101,7 @@ func TestLevenshtein(t *testing.T) {
 
 	for _, tt := range tests {
 		result := levenshtein(tt.s1, tt.s2)
-		if result != tt.expected {
-			t.Errorf("levenshtein(%q, %q): expected %d, got %d", tt.s1, tt.s2, tt.expected, result)
-		}
+		assert.Equal(t, tt.expected, result, "levenshtein(%q, %q)", tt.s1, tt.s2)
 	}
 }
 
@@ -129,10 +123,7 @@ func TestSuggestSimilar(t *testing.T) {
 
 	for _, tt := range tests {
 		suggestions := suggestSimilar(tt.input, candidates, tt.maxDistance)
-		if len(suggestions) != tt.expected {
-			t.Errorf("suggestSimilar(%q, maxDist=%d): expected %d suggestions, got %d: %v",
-				tt.input, tt.maxDistance, tt.expected, len(suggestions), suggestions)
-		}
+		assert.Len(t, suggestions, tt.expected, "suggestSimilar(%q, maxDist=%d)", tt.input, tt.maxDistance)
 	}
 }
 
@@ -182,14 +173,13 @@ SELECT * FROM users`,
 
 			diags := server.validateFrontmatter(doc)
 
-			if tt.expectErrors && len(diags) == 0 {
-				t.Error("expected diagnostics but got none")
+			if tt.expectErrors {
+				assert.NotEmpty(t, diags, "expected diagnostics but got none")
+			} else {
+				assert.Empty(t, diags, "expected no diagnostics")
 			}
-			if !tt.expectErrors && len(diags) > 0 {
-				t.Errorf("expected no diagnostics but got %d: %v", len(diags), diags)
-			}
-			if tt.expectedCount > 0 && len(diags) != tt.expectedCount {
-				t.Errorf("expected %d diagnostics, got %d", tt.expectedCount, len(diags))
+			if tt.expectedCount > 0 {
+				assert.Len(t, diags, tt.expectedCount, "unexpected diagnostic count")
 			}
 		})
 	}
@@ -236,11 +226,10 @@ func TestServer_ValidateTemplate(t *testing.T) {
 
 			diags := server.validateTemplate(doc)
 
-			if tt.expectErrors && len(diags) == 0 {
-				t.Error("expected diagnostics but got none")
-			}
-			if !tt.expectErrors && len(diags) > 0 {
-				t.Errorf("expected no diagnostics but got %d: %v", len(diags), diags)
+			if tt.expectErrors {
+				assert.NotEmpty(t, diags, "expected diagnostics but got none")
+			} else {
+				assert.Empty(t, diags, "expected no diagnostics")
 			}
 		})
 	}
@@ -294,11 +283,10 @@ func TestServer_ValidateSQL(t *testing.T) {
 
 			diags := server.validateSQL(doc)
 
-			if tt.expectErrors && len(diags) == 0 {
-				t.Error("expected diagnostics but got none")
-			}
-			if !tt.expectErrors && len(diags) > 0 {
-				t.Errorf("expected no diagnostics but got %d: %v", len(diags), diags)
+			if tt.expectErrors {
+				assert.NotEmpty(t, diags, "expected diagnostics but got none")
+			} else {
+				assert.Empty(t, diags, "expected no diagnostics")
 			}
 		})
 	}
@@ -320,8 +308,6 @@ func TestDiagnosticCodes(t *testing.T) {
 	// Just ensure the codes are documented - actual code usage
 	// is tested in the validation tests
 	for _, tt := range tests {
-		if tt.code == "" {
-			t.Errorf("diagnostic code should not be empty for %s", tt.description)
-		}
+		assert.NotEmpty(t, tt.code, "diagnostic code should not be empty for %s", tt.description)
 	}
 }

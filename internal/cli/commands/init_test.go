@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewInitCommand(t *testing.T) {
@@ -71,17 +74,17 @@ func TestNewInitCommand(t *testing.T) {
 			cmd.SetArgs(tt.args)
 
 			err := cmd.Execute()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
+			assert.NoError(t, err)
 
 			// Check expected files exist
 			for _, f := range tt.wantFiles {
 				path := filepath.Join(tmpDir, f)
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Errorf("expected file/dir %q to exist", f)
-				}
+				_, err := os.Stat(path)
+				assert.False(t, os.IsNotExist(err), "expected file/dir %q to exist", f)
 			}
 		})
 	}
@@ -90,18 +93,9 @@ func TestNewInitCommand(t *testing.T) {
 func TestInitCommandMetadata(t *testing.T) {
 	cmd := NewInitCommand()
 
-	if cmd.Use != "init [directory]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "init [directory]")
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short should not be empty")
-	}
-
-	// Verify --force flag exists
-	if cmd.Flags().Lookup("force") == nil {
-		t.Error("--force flag should exist")
-	}
+	assert.Equal(t, "init [directory]", cmd.Use)
+	assert.NotEmpty(t, cmd.Short, "Short should not be empty")
+	assert.NotNil(t, cmd.Flags().Lookup("force"), "--force flag should exist")
 }
 
 func TestInitCreatesValidConfig(t *testing.T) {
@@ -114,15 +108,12 @@ func TestInitCreatesValidConfig(t *testing.T) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
+	err := cmd.Execute()
+	require.NoError(t, err)
 
 	// Read and verify config content
 	content, err := os.ReadFile("leapsql.yaml")
-	if err != nil {
-		t.Fatalf("failed to read leapsql.yaml: %v", err)
-	}
+	require.NoError(t, err, "failed to read leapsql.yaml")
 
 	expectedContents := []string{
 		"models_dir: models",
@@ -132,8 +123,6 @@ func TestInitCreatesValidConfig(t *testing.T) {
 	}
 
 	for _, expected := range expectedContents {
-		if !strings.Contains(string(content), expected) {
-			t.Errorf("config should contain %q", expected)
-		}
+		assert.True(t, strings.Contains(string(content), expected), "config should contain %q", expected)
 	}
 }

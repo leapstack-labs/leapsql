@@ -3,6 +3,8 @@ package macro
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
@@ -18,17 +20,10 @@ func TestRegistry_Register(t *testing.T) {
 	}
 
 	err := registry.Register(module)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if !registry.Has("datetime") {
-		t.Error("expected registry to have 'datetime'")
-	}
-
-	if registry.Len() != 1 {
-		t.Errorf("expected len 1, got %d", registry.Len())
-	}
+	assert.True(t, registry.Has("datetime"), "expected registry to have 'datetime'")
+	assert.Equal(t, 1, registry.Len(), "expected len 1")
 }
 
 func TestRegistry_ReservedNamespace(t *testing.T) {
@@ -42,17 +37,11 @@ func TestRegistry_ReservedNamespace(t *testing.T) {
 			}
 
 			err := registry.Register(module)
-			if err == nil {
-				t.Errorf("expected error for reserved namespace %q", reserved)
-			}
+			require.Error(t, err, "expected error for reserved namespace %q", reserved)
 
 			regErr, ok := err.(*RegistryError)
-			if !ok {
-				t.Errorf("expected *RegistryError, got %T", err)
-			}
-			if regErr.Namespace != reserved {
-				t.Errorf("expected namespace %q, got %q", reserved, regErr.Namespace)
-			}
+			require.True(t, ok, "expected *RegistryError, got %T", err)
+			assert.Equal(t, reserved, regErr.Namespace, "expected namespace %q", reserved)
 		})
 	}
 }
@@ -71,22 +60,15 @@ func TestRegistry_DuplicateNamespace(t *testing.T) {
 		Exports:   starlark.StringDict{},
 	}
 
-	if err := registry.Register(module1); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := registry.Register(module1)
+	require.NoError(t, err, "unexpected error")
 
-	err := registry.Register(module2)
-	if err == nil {
-		t.Fatal("expected error for duplicate namespace")
-	}
+	err = registry.Register(module2)
+	require.Error(t, err, "expected error for duplicate namespace")
 
 	regErr, ok := err.(*RegistryError)
-	if !ok {
-		t.Fatalf("expected *RegistryError, got %T", err)
-	}
-	if regErr.Namespace != "utils" {
-		t.Errorf("expected namespace 'utils', got %q", regErr.Namespace)
-	}
+	require.True(t, ok, "expected *RegistryError, got %T", err)
+	assert.Equal(t, "utils", regErr.Namespace, "expected namespace 'utils'")
 }
 
 func TestRegistry_RegisterAll(t *testing.T) {
@@ -99,18 +81,12 @@ func TestRegistry_RegisterAll(t *testing.T) {
 	}
 
 	err := registry.RegisterAll(modules)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
-	if registry.Len() != 3 {
-		t.Errorf("expected 3 modules, got %d", registry.Len())
-	}
+	assert.Equal(t, 3, registry.Len(), "expected 3 modules")
 
 	for _, m := range modules {
-		if !registry.Has(m.Namespace) {
-			t.Errorf("expected registry to have %q", m.Namespace)
-		}
+		assert.True(t, registry.Has(m.Namespace), "expected registry to have %q", m.Namespace)
 	}
 }
 
@@ -124,14 +100,10 @@ func TestRegistry_RegisterAll_StopsOnError(t *testing.T) {
 	}
 
 	err := registry.RegisterAll(modules)
-	if err == nil {
-		t.Fatal("expected error")
-	}
+	require.Error(t, err, "expected error")
 
 	// Only the first one should be registered
-	if registry.Len() != 1 {
-		t.Errorf("expected 1 module (before error), got %d", registry.Len())
-	}
+	assert.Equal(t, 1, registry.Len(), "expected 1 module (before error)")
 }
 
 func TestRegistry_Get(t *testing.T) {
@@ -147,14 +119,10 @@ func TestRegistry_Get(t *testing.T) {
 	registry.Register(module)
 
 	got := registry.Get("datetime")
-	if got != module {
-		t.Errorf("Get returned wrong module")
-	}
+	assert.Equal(t, module, got, "Get returned wrong module")
 
 	got = registry.Get("nonexistent")
-	if got != nil {
-		t.Errorf("expected nil for nonexistent namespace")
-	}
+	assert.Nil(t, got, "expected nil for nonexistent namespace")
 }
 
 func TestRegistry_Namespaces(t *testing.T) {
@@ -168,16 +136,12 @@ func TestRegistry_Namespaces(t *testing.T) {
 	registry.RegisterAll(modules)
 
 	namespaces := registry.Namespaces()
-	if len(namespaces) != 3 {
-		t.Fatalf("expected 3 namespaces, got %d", len(namespaces))
-	}
+	require.Len(t, namespaces, 3, "expected 3 namespaces")
 
 	// Should be sorted
 	expected := []string{"alpha", "beta", "zeta"}
 	for i, ns := range expected {
-		if namespaces[i] != ns {
-			t.Errorf("expected %q at index %d, got %q", ns, i, namespaces[i])
-		}
+		assert.Equal(t, ns, namespaces[i], "expected %q at index %d", ns, i)
 	}
 }
 
@@ -195,35 +159,23 @@ func TestRegistry_ToStarlarkDict(t *testing.T) {
 	registry.Register(module)
 
 	dict := registry.ToStarlarkDict()
-	if len(dict) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(dict))
-	}
+	require.Len(t, dict, 1, "expected 1 entry")
 
 	utilsVal, ok := dict["utils"]
-	if !ok {
-		t.Fatal("expected 'utils' in dict")
-	}
+	require.True(t, ok, "expected 'utils' in dict")
 
 	// Check it's a module with HasAttrs
 	mod, ok := utilsVal.(starlark.HasAttrs)
-	if !ok {
-		t.Fatalf("expected HasAttrs, got %T", utilsVal)
-	}
+	require.True(t, ok, "expected HasAttrs, got %T", utilsVal)
 
 	// Check attribute access
 	greetVal, err := mod.Attr("greet")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if greetVal.String() != `"hello_func"` {
-		t.Errorf("expected 'hello_func', got %s", greetVal.String())
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, `"hello_func"`, greetVal.String(), "expected 'hello_func'")
 
 	// Check AttrNames
 	attrNames := mod.AttrNames()
-	if len(attrNames) != 2 {
-		t.Errorf("expected 2 attr names, got %d", len(attrNames))
-	}
+	assert.Len(t, attrNames, 2, "expected 2 attr names")
 }
 
 func TestStarlarkModule_NoSuchAttr(t *testing.T) {
@@ -233,9 +185,7 @@ func TestStarlarkModule_NoSuchAttr(t *testing.T) {
 	}
 
 	_, err := mod.Attr("nonexistent")
-	if err == nil {
-		t.Fatal("expected error for nonexistent attr")
-	}
+	assert.Error(t, err, "expected error for nonexistent attr")
 }
 
 func TestStarlarkModule_Interface(t *testing.T) {
@@ -247,34 +197,22 @@ func TestStarlarkModule_Interface(t *testing.T) {
 	}
 
 	// Test String()
-	if mod.String() != "<module test>" {
-		t.Errorf("unexpected String(): %s", mod.String())
-	}
+	assert.Equal(t, "<module test>", mod.String(), "unexpected String()")
 
 	// Test Type()
-	if mod.Type() != "module" {
-		t.Errorf("unexpected Type(): %s", mod.Type())
-	}
+	assert.Equal(t, "module", mod.Type(), "unexpected Type()")
 
 	// Test Truth()
-	if mod.Truth() != starlark.True {
-		t.Error("expected Truth() to return True")
-	}
+	assert.Equal(t, starlark.True, mod.Truth(), "expected Truth() to return True")
 
 	// Test Hash()
 	_, err := mod.Hash()
-	if err == nil {
-		t.Error("expected error from Hash()")
-	}
+	assert.Error(t, err, "expected error from Hash()")
 }
 
 func TestLoadAndRegister(t *testing.T) {
 	// Test with nonexistent directory - should return empty registry
 	registry, err := LoadAndRegister("/nonexistent/path")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if registry.Len() != 0 {
-		t.Errorf("expected empty registry, got %d modules", registry.Len())
-	}
+	require.NoError(t, err, "unexpected error")
+	assert.Equal(t, 0, registry.Len(), "expected empty registry")
 }
