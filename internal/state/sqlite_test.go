@@ -3,50 +3,39 @@ package state
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestStore(t *testing.T) *SQLiteStore {
 	t.Helper()
 	store := NewSQLiteStore()
-	if err := store.Open(":memory:"); err != nil {
-		t.Fatalf("failed to open store: %v", err)
-	}
-	if err := store.InitSchema(); err != nil {
-		t.Fatalf("failed to init schema: %v", err)
-	}
+	require.NoError(t, store.Open(":memory:"))
+	require.NoError(t, store.InitSchema())
 	return store
 }
 
 func TestSQLiteStore_OpenClose(t *testing.T) {
 	store := NewSQLiteStore()
 
-	if err := store.Open(":memory:"); err != nil {
-		t.Fatalf("failed to open in-memory store: %v", err)
-	}
-
-	if err := store.Close(); err != nil {
-		t.Fatalf("failed to close store: %v", err)
-	}
+	require.NoError(t, store.Open(":memory:"))
+	require.NoError(t, store.Close())
 }
 
 func TestSQLiteStore_InitSchema(t *testing.T) {
 	store := NewSQLiteStore()
-	if err := store.Open(":memory:"); err != nil {
-		t.Fatalf("failed to open store: %v", err)
-	}
+	require.NoError(t, store.Open(":memory:"))
 	defer store.Close()
 
-	if err := store.InitSchema(); err != nil {
-		t.Fatalf("failed to init schema: %v", err)
-	}
+	require.NoError(t, store.InitSchema())
 
 	// Verify tables exist by querying them
 	tables := []string{"runs", "models", "model_runs", "dependencies", "environments", "model_columns", "column_lineage"}
 	for _, table := range tables {
 		rows, err := store.db.Query("SELECT 1 FROM " + table + " LIMIT 1")
-		if err != nil {
-			t.Errorf("table %s does not exist: %v", table, err)
-		} else {
+		assert.NoError(t, err, "table %s should exist", table)
+		if rows != nil {
 			rows.Close()
 		}
 	}
@@ -65,43 +54,27 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 			name: "create run",
 			setup: func(t *testing.T, store *SQLiteStore) *Run {
 				run, err := store.CreateRun("production")
-				if err != nil {
-					t.Fatalf("failed to create run: %v", err)
-				}
+				require.NoError(t, err)
 				return run
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
-				if run.ID == "" {
-					t.Error("run ID should not be empty")
-				}
-				if run.Environment != "production" {
-					t.Errorf("expected environment 'production', got %q", run.Environment)
-				}
-				if run.Status != RunStatusRunning {
-					t.Errorf("expected status 'running', got %q", run.Status)
-				}
+				assert.NotEmpty(t, run.ID)
+				assert.Equal(t, "production", run.Environment)
+				assert.Equal(t, RunStatusRunning, run.Status)
 			},
 		},
 		{
 			name: "get run",
 			setup: func(t *testing.T, store *SQLiteStore) *Run {
 				run, err := store.CreateRun("staging")
-				if err != nil {
-					t.Fatalf("failed to create run: %v", err)
-				}
+				require.NoError(t, err)
 				return run
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
 				retrieved, err := store.GetRun(run.ID)
-				if err != nil {
-					t.Fatalf("failed to get run: %v", err)
-				}
-				if retrieved.ID != run.ID {
-					t.Errorf("expected ID %q, got %q", run.ID, retrieved.ID)
-				}
-				if retrieved.Environment != "staging" {
-					t.Errorf("expected environment 'staging', got %q", retrieved.Environment)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, run.ID, retrieved.ID)
+				assert.Equal(t, "staging", retrieved.Environment)
 			},
 		},
 		{
@@ -111,9 +84,7 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
 				_, err := store.GetRun("nonexistent-id")
-				if err == nil {
-					t.Error("expected error for nonexistent run")
-				}
+				assert.Error(t, err)
 			},
 		},
 		{
@@ -123,19 +94,12 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 				return run
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
-				err := store.CompleteRun(run.ID, RunStatusCompleted, "")
-				if err != nil {
-					t.Fatalf("failed to complete run: %v", err)
-				}
+				require.NoError(t, store.CompleteRun(run.ID, RunStatusCompleted, ""))
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
 				retrieved, _ := store.GetRun(run.ID)
-				if retrieved.Status != RunStatusCompleted {
-					t.Errorf("expected status 'completed', got %q", retrieved.Status)
-				}
-				if retrieved.CompletedAt == nil {
-					t.Error("completed_at should not be nil")
-				}
+				assert.Equal(t, RunStatusCompleted, retrieved.Status)
+				assert.NotNil(t, retrieved.CompletedAt)
 			},
 		},
 		{
@@ -145,19 +109,12 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 				return run
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
-				err := store.CompleteRun(run.ID, RunStatusFailed, "something went wrong")
-				if err != nil {
-					t.Fatalf("failed to complete run: %v", err)
-				}
+				require.NoError(t, store.CompleteRun(run.ID, RunStatusFailed, "something went wrong"))
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
 				retrieved, _ := store.GetRun(run.ID)
-				if retrieved.Status != RunStatusFailed {
-					t.Errorf("expected status 'failed', got %q", retrieved.Status)
-				}
-				if retrieved.Error != "something went wrong" {
-					t.Errorf("expected error message, got %q", retrieved.Error)
-				}
+				assert.Equal(t, RunStatusFailed, retrieved.Status)
+				assert.Equal(t, "something went wrong", retrieved.Error)
 			},
 		},
 		{
@@ -170,12 +127,8 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
 				latest, err := store.GetLatestRun("prod")
-				if err != nil {
-					t.Fatalf("failed to get latest run: %v", err)
-				}
-				if latest.ID != run.ID {
-					t.Errorf("expected latest run ID %q, got %q", run.ID, latest.ID)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, run.ID, latest.ID)
 			},
 		},
 		{
@@ -185,12 +138,8 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
 				latest, err := store.GetLatestRun("nonexistent")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if latest != nil {
-					t.Error("expected nil for nonexistent environment")
-				}
+				require.NoError(t, err)
+				assert.Nil(t, latest)
 			},
 		},
 	}
@@ -232,16 +181,11 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 					Materialized: "table",
 					ContentHash:  "abc123",
 				}
-				err := store.RegisterModel(model)
-				if err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
-				if model.ID == "" {
-					t.Error("model ID should be generated")
-				}
+				assert.NotEmpty(t, model.ID)
 			},
 		},
 		{
@@ -258,16 +202,11 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			},
 			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
 				model.ContentHash = "def456"
-				err := store.RegisterModel(model)
-				if err != nil {
-					t.Fatalf("failed to upsert model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				retrieved, _ := store.GetModelByPath("models.staging.stg_users")
-				if retrieved.ContentHash != "def456" {
-					t.Errorf("expected hash 'def456', got %q", retrieved.ContentHash)
-				}
+				assert.Equal(t, "def456", retrieved.ContentHash)
 			},
 		},
 		{
@@ -284,12 +223,8 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				retrieved, err := store.GetModelByID(model.ID)
-				if err != nil {
-					t.Fatalf("failed to get model: %v", err)
-				}
-				if retrieved.Name != "stg_orders" {
-					t.Errorf("expected name 'stg_orders', got %q", retrieved.Name)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, "stg_orders", retrieved.Name)
 			},
 		},
 		{
@@ -307,15 +242,9 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				retrieved, err := store.GetModelByPath("models.marts.revenue")
-				if err != nil {
-					t.Fatalf("failed to get model: %v", err)
-				}
-				if retrieved.Materialized != "incremental" {
-					t.Errorf("expected materialized 'incremental', got %q", retrieved.Materialized)
-				}
-				if retrieved.UniqueKey != "transaction_id" {
-					t.Errorf("expected unique_key 'transaction_id', got %q", retrieved.UniqueKey)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, "incremental", retrieved.Materialized)
+				assert.Equal(t, "transaction_id", retrieved.UniqueKey)
 			},
 		},
 		{
@@ -325,12 +254,8 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				retrieved, err := store.GetModelByPath("nonexistent.model")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if retrieved != nil {
-					t.Error("expected nil for nonexistent model")
-				}
+				require.NoError(t, err)
+				assert.Nil(t, retrieved)
 			},
 		},
 		{
@@ -342,22 +267,15 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 					Materialized: "table",
 					ContentHash:  "original",
 				}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
 			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
-				err := store.UpdateModelHash(model.ID, "updated")
-				if err != nil {
-					t.Fatalf("failed to update hash: %v", err)
-				}
+				require.NoError(t, store.UpdateModelHash(model.ID, "updated"))
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				retrieved, _ := store.GetModelByID(model.ID)
-				if retrieved.ContentHash != "updated" {
-					t.Errorf("expected hash 'updated', got %q", retrieved.ContentHash)
-				}
+				assert.Equal(t, "updated", retrieved.ContentHash)
 			},
 		},
 		{
@@ -369,20 +287,14 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 					{Path: "models.c", Name: "c", Materialized: "table", ContentHash: "3"},
 				}
 				for _, m := range models {
-					if err := store.RegisterModel(m); err != nil {
-						t.Fatalf("failed to register model: %v", err)
-					}
+					require.NoError(t, store.RegisterModel(m))
 				}
 				return nil
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
 				list, err := store.ListModels()
-				if err != nil {
-					t.Fatalf("failed to list models: %v", err)
-				}
-				if len(list) != 3 {
-					t.Errorf("expected 3 models, got %d", len(list))
-				}
+				require.NoError(t, err)
+				assert.Len(t, list, 3)
 			},
 		},
 	}
@@ -435,27 +347,13 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				},
 			},
 			verify: func(t *testing.T, retrieved *Model) {
-				if retrieved.Owner != "data-team" {
-					t.Errorf("expected owner 'data-team', got %q", retrieved.Owner)
-				}
-				if retrieved.Schema != "analytics" {
-					t.Errorf("expected schema 'analytics', got %q", retrieved.Schema)
-				}
-				if len(retrieved.Tags) != 2 || retrieved.Tags[0] != "pii" || retrieved.Tags[1] != "daily" {
-					t.Errorf("expected tags [pii, daily], got %v", retrieved.Tags)
-				}
-				if len(retrieved.Tests) != 2 {
-					t.Errorf("expected 2 tests, got %d", len(retrieved.Tests))
-				}
-				if retrieved.Tests[0].Unique[0] != "user_id" {
-					t.Errorf("expected first test unique ['user_id'], got %v", retrieved.Tests[0].Unique)
-				}
-				if retrieved.Meta["priority"] != "high" {
-					t.Errorf("expected meta.priority 'high', got %v", retrieved.Meta["priority"])
-				}
-				if sla, ok := retrieved.Meta["sla"].(float64); !ok || sla != 24 {
-					t.Errorf("expected meta.sla 24, got %v", retrieved.Meta["sla"])
-				}
+				assert.Equal(t, "data-team", retrieved.Owner)
+				assert.Equal(t, "analytics", retrieved.Schema)
+				assert.Equal(t, []string{"pii", "daily"}, retrieved.Tags)
+				require.Len(t, retrieved.Tests, 2)
+				assert.Equal(t, []string{"user_id"}, retrieved.Tests[0].Unique)
+				assert.Equal(t, "high", retrieved.Meta["priority"])
+				assert.Equal(t, float64(24), retrieved.Meta["sla"])
 			},
 		},
 		{
@@ -467,21 +365,11 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				ContentHash:  "hash123",
 			},
 			verify: func(t *testing.T, retrieved *Model) {
-				if retrieved.Owner != "" {
-					t.Errorf("expected empty owner, got %q", retrieved.Owner)
-				}
-				if retrieved.Schema != "" {
-					t.Errorf("expected empty schema, got %q", retrieved.Schema)
-				}
-				if len(retrieved.Tags) != 0 {
-					t.Errorf("expected empty tags, got %v", retrieved.Tags)
-				}
-				if len(retrieved.Tests) != 0 {
-					t.Errorf("expected empty tests, got %v", retrieved.Tests)
-				}
-				if len(retrieved.Meta) != 0 {
-					t.Errorf("expected empty meta, got %v", retrieved.Meta)
-				}
+				assert.Empty(t, retrieved.Owner)
+				assert.Empty(t, retrieved.Schema)
+				assert.Empty(t, retrieved.Tags)
+				assert.Empty(t, retrieved.Tests)
+				assert.Empty(t, retrieved.Meta)
 			},
 		},
 		{
@@ -501,18 +389,10 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				},
 			},
 			verify: func(t *testing.T, retrieved *Model) {
-				if len(retrieved.Tests) != 1 {
-					t.Fatalf("expected 1 test, got %d", len(retrieved.Tests))
-				}
-				if retrieved.Tests[0].AcceptedValues == nil {
-					t.Fatal("expected AcceptedValues to not be nil")
-				}
-				if retrieved.Tests[0].AcceptedValues.Column != "status" {
-					t.Errorf("expected column 'status', got %q", retrieved.Tests[0].AcceptedValues.Column)
-				}
-				if len(retrieved.Tests[0].AcceptedValues.Values) != 3 {
-					t.Errorf("expected 3 values, got %d", len(retrieved.Tests[0].AcceptedValues.Values))
-				}
+				require.Len(t, retrieved.Tests, 1)
+				require.NotNil(t, retrieved.Tests[0].AcceptedValues)
+				assert.Equal(t, "status", retrieved.Tests[0].AcceptedValues.Column)
+				assert.Len(t, retrieved.Tests[0].AcceptedValues.Values, 3)
 			},
 		},
 	}
@@ -522,14 +402,10 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 			store := setupTestStore(t)
 			defer store.Close()
 
-			if err := store.RegisterModel(tt.model); err != nil {
-				t.Fatalf("failed to register model: %v", err)
-			}
+			require.NoError(t, store.RegisterModel(tt.model))
 
 			retrieved, err := store.GetModelByPath(tt.model.Path)
-			if err != nil {
-				t.Fatalf("failed to get model: %v", err)
-			}
+			require.NoError(t, err)
 
 			tt.verify(t, retrieved)
 		})
@@ -549,9 +425,7 @@ func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 		Owner:        "team-a",
 		Tags:         []string{"initial"},
 	}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
+	require.NoError(t, store.RegisterModel(model))
 
 	// Update the model with new frontmatter fields
 	model.ContentHash = "hash2"
@@ -561,30 +435,16 @@ func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	model.Tests = []TestConfig{{NotNull: []string{"id"}}}
 	model.Meta = map[string]any{"version": 2}
 
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to update model: %v", err)
-	}
+	require.NoError(t, store.RegisterModel(model))
 
 	retrieved, err := store.GetModelByPath("models.update_test")
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
+	require.NoError(t, err)
 
-	if retrieved.Owner != "team-b" {
-		t.Errorf("expected owner 'team-b', got %q", retrieved.Owner)
-	}
-	if retrieved.Schema != "new_schema" {
-		t.Errorf("expected schema 'new_schema', got %q", retrieved.Schema)
-	}
-	if len(retrieved.Tags) != 2 || retrieved.Tags[0] != "updated" {
-		t.Errorf("expected tags [updated, v2], got %v", retrieved.Tags)
-	}
-	if len(retrieved.Tests) != 1 {
-		t.Errorf("expected 1 test, got %d", len(retrieved.Tests))
-	}
-	if version, ok := retrieved.Meta["version"].(float64); !ok || version != 2 {
-		t.Errorf("expected meta.version 2, got %v", retrieved.Meta["version"])
-	}
+	assert.Equal(t, "team-b", retrieved.Owner)
+	assert.Equal(t, "new_schema", retrieved.Schema)
+	assert.Equal(t, []string{"updated", "v2"}, retrieved.Tags)
+	assert.Len(t, retrieved.Tests, 1)
+	assert.Equal(t, float64(2), retrieved.Meta["version"])
 }
 
 func TestSQLiteStore_GetModelByID_WithFrontmatterFields(t *testing.T) {
@@ -602,24 +462,14 @@ func TestSQLiteStore_GetModelByID_WithFrontmatterFields(t *testing.T) {
 		Meta:         map[string]any{"department": "finance"},
 	}
 
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
+	require.NoError(t, store.RegisterModel(model))
 
 	retrieved, err := store.GetModelByID(model.ID)
-	if err != nil {
-		t.Fatalf("failed to get model by ID: %v", err)
-	}
+	require.NoError(t, err)
 
-	if retrieved.Owner != "analytics" {
-		t.Errorf("expected owner 'analytics', got %q", retrieved.Owner)
-	}
-	if retrieved.Schema != "reporting" {
-		t.Errorf("expected schema 'reporting', got %q", retrieved.Schema)
-	}
-	if len(retrieved.Tags) != 1 || retrieved.Tags[0] != "finance" {
-		t.Errorf("expected tags [finance], got %v", retrieved.Tags)
-	}
+	assert.Equal(t, "analytics", retrieved.Owner)
+	assert.Equal(t, "reporting", retrieved.Schema)
+	assert.Equal(t, []string{"finance"}, retrieved.Tags)
 }
 
 func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
@@ -638,30 +488,16 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 	}
 
 	for _, m := range models {
-		if err := store.RegisterModel(m); err != nil {
-			t.Fatalf("failed to register model: %v", err)
-		}
+		require.NoError(t, store.RegisterModel(m))
 	}
 
 	list, err := store.ListModels()
-	if err != nil {
-		t.Fatalf("failed to list models: %v", err)
-	}
+	require.NoError(t, err)
+	require.Len(t, list, 2)
 
-	if len(list) != 2 {
-		t.Fatalf("expected 2 models, got %d", len(list))
-	}
-
-	if list[0].Owner != "team-a" {
-		t.Errorf("expected owner 'team-a', got %q", list[0].Owner)
-	}
-	if len(list[0].Tags) != 1 || list[0].Tags[0] != "tag-a" {
-		t.Errorf("expected tags [tag-a], got %v", list[0].Tags)
-	}
-
-	if list[1].Owner != "team-b" {
-		t.Errorf("expected owner 'team-b', got %q", list[1].Owner)
-	}
+	assert.Equal(t, "team-a", list[0].Owner)
+	assert.Equal(t, []string{"tag-a"}, list[0].Tags)
+	assert.Equal(t, "team-b", list[1].Owner)
 }
 
 // --- Model run tests ---
@@ -678,9 +514,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
 				run, _ := store.CreateRun("test")
 				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
@@ -689,16 +523,11 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 					ModelID: model.ID,
 					Status:  ModelRunStatusRunning,
 				}
-				err := store.RecordModelRun(modelRun)
-				if err != nil {
-					t.Fatalf("failed to record model run: %v", err)
-				}
+				require.NoError(t, store.RecordModelRun(modelRun))
 				return modelRun
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
-				if modelRun.ID == "" {
-					t.Error("model run ID should be generated")
-				}
+				assert.NotEmpty(t, modelRun.ID)
 			},
 		},
 		{
@@ -706,9 +535,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
 				run, _ := store.CreateRun("test")
 				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
@@ -717,54 +544,33 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 					ModelID: model.ID,
 					Status:  ModelRunStatusRunning,
 				}
-				if err := store.RecordModelRun(modelRun); err != nil {
-					t.Fatalf("failed to record model run: %v", err)
-				}
+				require.NoError(t, store.RecordModelRun(modelRun))
 
 				time.Sleep(10 * time.Millisecond)
 
-				err := store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, "")
-				if err != nil {
-					t.Fatalf("failed to update model run: %v", err)
-				}
+				require.NoError(t, store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, ""))
 				return modelRun
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
 				runs, _ := store.GetModelRunsForRun(run.ID)
-				if len(runs) != 1 {
-					t.Fatalf("expected 1 model run, got %d", len(runs))
-				}
-				if runs[0].Status != ModelRunStatusSuccess {
-					t.Errorf("expected status 'success', got %q", runs[0].Status)
-				}
-				if runs[0].RowsAffected != 100 {
-					t.Errorf("expected 100 rows affected, got %d", runs[0].RowsAffected)
-				}
-				if runs[0].ExecutionMS == 0 {
-					t.Error("execution_ms should be > 0")
-				}
+				require.Len(t, runs, 1)
+				assert.Equal(t, ModelRunStatusSuccess, runs[0].Status)
+				assert.Equal(t, int64(100), runs[0].RowsAffected)
+				assert.Greater(t, runs[0].ExecutionMS, int64(0))
 			},
 		},
 		{
 			name: "get latest model run",
 			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
 				run1, err := store.CreateRun("test")
-				if err != nil {
-					t.Fatalf("failed to create run1: %v", err)
-				}
+				require.NoError(t, err)
 				run2, err := store.CreateRun("test")
-				if err != nil {
-					t.Fatalf("failed to create run2: %v", err)
-				}
+				require.NoError(t, err)
 				model := &Model{Path: "models.test", Name: "test", ContentHash: "hash"}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 
 				mr1 := &ModelRun{RunID: run1.ID, ModelID: model.ID, Status: ModelRunStatusSuccess}
-				if err := store.RecordModelRun(mr1); err != nil {
-					t.Fatalf("failed to record model run 1: %v", err)
-				}
+				require.NoError(t, store.RecordModelRun(mr1))
 
 				time.Sleep(10 * time.Millisecond)
 
@@ -772,23 +578,15 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			},
 			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
 				mr2 := &ModelRun{RunID: run.ID, ModelID: model.ID, Status: ModelRunStatusRunning}
-				if err := store.RecordModelRun(mr2); err != nil {
-					t.Fatalf("failed to record model run 2: %v", err)
-				}
+				require.NoError(t, store.RecordModelRun(mr2))
 				return mr2
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
 				model, _ := store.GetModelByPath("models.test")
 				latest, err := store.GetLatestModelRun(model.ID)
-				if err != nil {
-					t.Fatalf("failed to get latest model run: %v", err)
-				}
-				if latest == nil {
-					t.Fatal("expected latest model run, got nil")
-				}
-				if latest.ID != modelRun.ID {
-					t.Errorf("expected latest model run ID %q, got %q", modelRun.ID, latest.ID)
-				}
+				require.NoError(t, err)
+				require.NotNil(t, latest)
+				assert.Equal(t, modelRun.ID, latest.ID)
 			},
 		},
 	}
@@ -833,18 +631,13 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				store.RegisterModel(parent2)
 				store.RegisterModel(child)
 
-				err := store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID})
-				if err != nil {
-					t.Fatalf("failed to set dependencies: %v", err)
-				}
+				require.NoError(t, store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID}))
 				return []*Model{parent1, parent2, child}
 			},
 			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
 				child := models[2]
 				deps, _ := store.GetDependencies(child.ID)
-				if len(deps) != 2 {
-					t.Errorf("expected 2 dependencies, got %d", len(deps))
-				}
+				assert.Len(t, deps, 2)
 			},
 		},
 		{
@@ -859,22 +652,15 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				store.RegisterModel(child)
 
 				store.SetDependencies(child.ID, []string{parent1.ID})
-				err := store.SetDependencies(child.ID, []string{parent2.ID})
-				if err != nil {
-					t.Fatalf("failed to replace dependencies: %v", err)
-				}
+				require.NoError(t, store.SetDependencies(child.ID, []string{parent2.ID}))
 				return []*Model{parent1, parent2, child}
 			},
 			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
 				parent2 := models[1]
 				child := models[2]
 				deps, _ := store.GetDependencies(child.ID)
-				if len(deps) != 1 {
-					t.Errorf("expected 1 dependency, got %d", len(deps))
-				}
-				if deps[0] != parent2.ID {
-					t.Errorf("expected parent2 ID, got %q", deps[0])
-				}
+				assert.Len(t, deps, 1)
+				assert.Equal(t, parent2.ID, deps[0])
 			},
 		},
 		{
@@ -896,12 +682,8 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
 				parent := models[0]
 				dependents, err := store.GetDependents(parent.ID)
-				if err != nil {
-					t.Fatalf("failed to get dependents: %v", err)
-				}
-				if len(dependents) != 2 {
-					t.Errorf("expected 2 dependents, got %d", len(dependents))
-				}
+				require.NoError(t, err)
+				assert.Len(t, dependents, 2)
 			},
 		},
 	}
@@ -933,12 +715,8 @@ func TestSQLiteStore_Environment(t *testing.T) {
 			name: "create environment",
 			operation: func(t *testing.T, store *SQLiteStore) {
 				env, err := store.CreateEnvironment("staging")
-				if err != nil {
-					t.Fatalf("failed to create environment: %v", err)
-				}
-				if env.Name != "staging" {
-					t.Errorf("expected name 'staging', got %q", env.Name)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, "staging", env.Name)
 			},
 		},
 		{
@@ -946,38 +724,25 @@ func TestSQLiteStore_Environment(t *testing.T) {
 			operation: func(t *testing.T, store *SQLiteStore) {
 				store.CreateEnvironment("production")
 				env, err := store.GetEnvironment("production")
-				if err != nil {
-					t.Fatalf("failed to get environment: %v", err)
-				}
-				if env.Name != "production" {
-					t.Errorf("expected name 'production', got %q", env.Name)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, "production", env.Name)
 			},
 		},
 		{
 			name: "get environment not found",
 			operation: func(t *testing.T, store *SQLiteStore) {
 				env, err := store.GetEnvironment("nonexistent")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if env != nil {
-					t.Error("expected nil for nonexistent environment")
-				}
+				require.NoError(t, err)
+				assert.Nil(t, env)
 			},
 		},
 		{
 			name: "update environment ref",
 			operation: func(t *testing.T, store *SQLiteStore) {
 				store.CreateEnvironment("dev")
-				err := store.UpdateEnvironmentRef("dev", "abc123")
-				if err != nil {
-					t.Fatalf("failed to update environment ref: %v", err)
-				}
+				require.NoError(t, store.UpdateEnvironmentRef("dev", "abc123"))
 				env, _ := store.GetEnvironment("dev")
-				if env.CommitRef != "abc123" {
-					t.Errorf("expected commit_ref 'abc123', got %q", env.CommitRef)
-				}
+				assert.Equal(t, "abc123", env.CommitRef)
 			},
 		},
 	}
@@ -1007,9 +772,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 					Name:        "stg_customers",
 					ContentHash: "abc123",
 				}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 
 				columns := []ColumnInfo{
 					{
@@ -1033,40 +796,20 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 					},
 				}
 
-				err := store.SaveModelColumns("staging.stg_customers", columns)
-				if err != nil {
-					t.Fatalf("failed to save model columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_customers", columns))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				retrieved, err := store.GetModelColumns("staging.stg_customers")
-				if err != nil {
-					t.Fatalf("failed to get model columns: %v", err)
-				}
+				require.NoError(t, err)
+				require.Len(t, retrieved, 2)
 
-				if len(retrieved) != 2 {
-					t.Fatalf("expected 2 columns, got %d", len(retrieved))
-				}
+				assert.Equal(t, "customer_id", retrieved[0].Name)
+				assert.Len(t, retrieved[0].Sources, 1)
 
-				if retrieved[0].Name != "customer_id" {
-					t.Errorf("expected column name 'customer_id', got %q", retrieved[0].Name)
-				}
-				if len(retrieved[0].Sources) != 1 {
-					t.Errorf("expected 1 source for customer_id, got %d", len(retrieved[0].Sources))
-				}
-
-				if retrieved[1].Name != "full_name" {
-					t.Errorf("expected column name 'full_name', got %q", retrieved[1].Name)
-				}
-				if retrieved[1].TransformType != "EXPR" {
-					t.Errorf("expected transform_type 'EXPR', got %q", retrieved[1].TransformType)
-				}
-				if retrieved[1].Function != "concat" {
-					t.Errorf("expected function 'concat', got %q", retrieved[1].Function)
-				}
-				if len(retrieved[1].Sources) != 2 {
-					t.Errorf("expected 2 sources for full_name, got %d", len(retrieved[1].Sources))
-				}
+				assert.Equal(t, "full_name", retrieved[1].Name)
+				assert.Equal(t, "EXPR", retrieved[1].TransformType)
+				assert.Equal(t, "concat", retrieved[1].Function)
+				assert.Len(t, retrieved[1].Sources, 2)
 			},
 		},
 		{
@@ -1077,38 +820,25 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 					Name:        "stg_orders",
 					ContentHash: "abc123",
 				}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 
 				initialColumns := []ColumnInfo{
 					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
 				}
-				if err := store.SaveModelColumns("staging.stg_orders", initialColumns); err != nil {
-					t.Fatalf("failed to save initial columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_orders", initialColumns))
 
 				updatedColumns := []ColumnInfo{
 					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "order_id"}}},
 					{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
 				}
-				if err := store.SaveModelColumns("staging.stg_orders", updatedColumns); err != nil {
-					t.Fatalf("failed to save updated columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_orders", updatedColumns))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				retrieved, err := store.GetModelColumns("staging.stg_orders")
-				if err != nil {
-					t.Fatalf("failed to get model columns: %v", err)
-				}
-
-				if len(retrieved) != 2 {
-					t.Fatalf("expected 2 columns after update, got %d", len(retrieved))
-				}
-
-				if len(retrieved[0].Sources) != 1 || retrieved[0].Sources[0].Column != "order_id" {
-					t.Errorf("expected source column 'order_id', got %v", retrieved[0].Sources)
-				}
+				require.NoError(t, err)
+				require.Len(t, retrieved, 2)
+				assert.Len(t, retrieved[0].Sources, 1)
+				assert.Equal(t, "order_id", retrieved[0].Sources[0].Column)
 			},
 		},
 		{
@@ -1116,12 +846,8 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 			setup: func(t *testing.T, store *SQLiteStore) {},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				columns, err := store.GetModelColumns("nonexistent.model")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if len(columns) != 0 {
-					t.Errorf("expected empty slice for nonexistent model, got %d columns", len(columns))
-				}
+				require.NoError(t, err)
+				assert.Empty(t, columns)
 			},
 		},
 		{
@@ -1132,31 +858,19 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 					Name:        "stg_products",
 					ContentHash: "abc123",
 				}
-				if err := store.RegisterModel(model); err != nil {
-					t.Fatalf("failed to register model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(model))
 
 				columns := []ColumnInfo{
 					{Name: "product_id", Index: 0, Sources: []SourceRef{{Table: "raw_products", Column: "id"}}},
 					{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_products", Column: "name"}}},
 				}
-				if err := store.SaveModelColumns("staging.stg_products", columns); err != nil {
-					t.Fatalf("failed to save columns: %v", err)
-				}
-
-				err := store.DeleteModelColumns("staging.stg_products")
-				if err != nil {
-					t.Fatalf("failed to delete columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_products", columns))
+				require.NoError(t, store.DeleteModelColumns("staging.stg_products"))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				retrieved, err := store.GetModelColumns("staging.stg_products")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if len(retrieved) != 0 {
-					t.Errorf("expected 0 columns after deletion, got %d", len(retrieved))
-				}
+				require.NoError(t, err)
+				assert.Empty(t, retrieved)
 			},
 		},
 	}
@@ -1197,60 +911,39 @@ func TestSQLiteStore_Trace(t *testing.T) {
 					Name:        "customer_summary",
 					ContentHash: "def",
 				}
-				if err := store.RegisterModel(stgModel); err != nil {
-					t.Fatalf("failed to register stg model: %v", err)
-				}
-				if err := store.RegisterModel(martModel); err != nil {
-					t.Fatalf("failed to register mart model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(stgModel))
+				require.NoError(t, store.RegisterModel(martModel))
 
 				stgColumns := []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
 				}
-				if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
-					t.Fatalf("failed to save stg columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_customers", stgColumns))
 
 				martColumns := []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
 				}
-				if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
-					t.Fatalf("failed to save mart columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("marts.customer_summary", martColumns))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				results, err := store.TraceColumnBackward("marts.customer_summary", "customer_id")
-				if err != nil {
-					t.Fatalf("failed to trace column backward: %v", err)
-				}
-
-				if len(results) == 0 {
-					t.Fatal("expected at least 1 trace result, got 0")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, results)
 
 				foundStgCustomers := false
 				foundRawCustomers := false
 				for _, r := range results {
 					if r.ModelPath == "stg_customers" && r.ColumnName == "customer_id" && r.Depth == 1 {
 						foundStgCustomers = true
-						if r.IsExternal {
-							t.Error("stg_customers should not be marked as external")
-						}
+						assert.False(t, r.IsExternal, "stg_customers should not be external")
 					}
 					if r.ModelPath == "raw_customers" && r.ColumnName == "id" && r.Depth == 2 {
 						foundRawCustomers = true
-						if !r.IsExternal {
-							t.Error("raw_customers should be marked as external (not a registered model)")
-						}
+						assert.True(t, r.IsExternal, "raw_customers should be external")
 					}
 				}
 
-				if !foundStgCustomers {
-					t.Error("did not find stg_customers.customer_id at depth 1")
-				}
-				if !foundRawCustomers {
-					t.Error("did not find raw_customers.id at depth 2")
-				}
+				assert.True(t, foundStgCustomers, "should find stg_customers.customer_id at depth 1")
+				assert.True(t, foundRawCustomers, "should find raw_customers.id at depth 2")
 			},
 		},
 		{
@@ -1266,38 +959,25 @@ func TestSQLiteStore_Trace(t *testing.T) {
 					Name:        "customer_summary",
 					ContentHash: "def",
 				}
-				if err := store.RegisterModel(stgModel); err != nil {
-					t.Fatalf("failed to register stg model: %v", err)
-				}
-				if err := store.RegisterModel(martModel); err != nil {
-					t.Fatalf("failed to register mart model: %v", err)
-				}
+				require.NoError(t, store.RegisterModel(stgModel))
+				require.NoError(t, store.RegisterModel(martModel))
 
 				stgColumns := []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
 					{Name: "email", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "email"}}},
 				}
-				if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
-					t.Fatalf("failed to save stg columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("staging.stg_customers", stgColumns))
 
 				martColumns := []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
 					{Name: "contact", Index: 1, Sources: []SourceRef{{Table: "stg_customers", Column: "email"}}},
 				}
-				if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
-					t.Fatalf("failed to save mart columns: %v", err)
-				}
+				require.NoError(t, store.SaveModelColumns("marts.customer_summary", martColumns))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
-				if err != nil {
-					t.Fatalf("failed to trace column forward: %v", err)
-				}
-
-				if len(results) == 0 {
-					t.Fatal("expected at least 1 trace result, got 0")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, results)
 
 				found := false
 				for _, r := range results {
@@ -1306,9 +986,7 @@ func TestSQLiteStore_Trace(t *testing.T) {
 						break
 					}
 				}
-				if !found {
-					t.Error("did not find marts.customer_summary.customer_id at depth 1")
-				}
+				assert.True(t, found, "should find marts.customer_summary.customer_id at depth 1")
 			},
 		},
 		{
@@ -1319,37 +997,24 @@ func TestSQLiteStore_Trace(t *testing.T) {
 				metricsModel := &Model{Path: "marts.customer_metrics", Name: "customer_metrics", ContentHash: "ghi"}
 
 				for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
-					if err := store.RegisterModel(m); err != nil {
-						t.Fatalf("failed to register model %s: %v", m.Path, err)
-					}
+					require.NoError(t, store.RegisterModel(m))
 				}
 
-				if err := store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
+				require.NoError(t, store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw", Column: "id"}}},
-				}); err != nil {
-					t.Fatalf("failed to save stg columns: %v", err)
-				}
+				}))
 
-				if err := store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
+				require.NoError(t, store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
 					{Name: "cust_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-				}); err != nil {
-					t.Fatalf("failed to save summary columns: %v", err)
-				}
-				if err := store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
+				}))
+				require.NoError(t, store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
 					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-				}); err != nil {
-					t.Fatalf("failed to save metrics columns: %v", err)
-				}
+				}))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
-				if err != nil {
-					t.Fatalf("failed to trace column forward: %v", err)
-				}
-
-				if len(results) < 2 {
-					t.Fatalf("expected at least 2 trace results, got %d", len(results))
-				}
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, len(results), 2)
 
 				foundSummary := false
 				foundMetrics := false
@@ -1362,12 +1027,8 @@ func TestSQLiteStore_Trace(t *testing.T) {
 					}
 				}
 
-				if !foundSummary {
-					t.Error("did not find marts.customer_summary in forward trace")
-				}
-				if !foundMetrics {
-					t.Error("did not find marts.customer_metrics in forward trace")
-				}
+				assert.True(t, foundSummary, "should find marts.customer_summary in forward trace")
+				assert.True(t, foundMetrics, "should find marts.customer_metrics in forward trace")
 			},
 		},
 		{
@@ -1375,20 +1036,12 @@ func TestSQLiteStore_Trace(t *testing.T) {
 			setup: func(t *testing.T, store *SQLiteStore) {},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				backward, err := store.TraceColumnBackward("nonexistent.model", "col")
-				if err != nil {
-					t.Fatalf("unexpected error on backward trace: %v", err)
-				}
-				if len(backward) != 0 {
-					t.Errorf("expected empty backward trace, got %d results", len(backward))
-				}
+				require.NoError(t, err)
+				assert.Empty(t, backward)
 
 				forward, err := store.TraceColumnForward("nonexistent.model", "col")
-				if err != nil {
-					t.Fatalf("unexpected error on forward trace: %v", err)
-				}
-				if len(forward) != 0 {
-					t.Errorf("expected empty forward trace, got %d results", len(forward))
-				}
+				require.NoError(t, err)
+				assert.Empty(t, forward)
 			},
 		},
 	}

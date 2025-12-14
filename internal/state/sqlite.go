@@ -1,6 +1,9 @@
 package state
 
+//go:generate sqlc generate
+
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
@@ -8,16 +11,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:embed schema.sql
 var schemaSQL string
 
-// SQLiteStore implements StateStore using SQLite.
+// SQLiteStore implements StateStore using SQLite with sqlc-generated queries.
 type SQLiteStore struct {
-	db   *sql.DB
-	path string
+	db      *sql.DB
+	queries *sqlcgen.Queries
+	path    string
 }
 
 // NewSQLiteStore creates a new SQLite state store instance.
@@ -49,6 +54,7 @@ func (s *SQLiteStore) Open(path string) error {
 
 	s.db = db
 	s.path = path
+	s.queries = sqlcgen.New(db)
 	return nil
 }
 
@@ -78,6 +84,11 @@ func generateID() string {
 	return uuid.New().String()
 }
 
+// ctx returns a background context for operations.
+func ctx() context.Context {
+	return context.Background()
+}
+
 // --- Run operations ---
 
 // CreateRun creates a new pipeline run.
@@ -86,22 +97,20 @@ func (s *SQLiteStore) CreateRun(env string) (*Run, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	run := &Run{
-		ID:          generateID(),
-		Environment: env,
-		Status:      RunStatusRunning,
-		StartedAt:   time.Now().UTC(),
-	}
+	id := generateID()
+	now := time.Now().UTC()
 
-	_, err := s.db.Exec(
-		`INSERT INTO runs (id, environment, status, started_at) VALUES (?, ?, ?, ?)`,
-		run.ID, run.Environment, run.Status, run.StartedAt,
-	)
+	row, err := s.queries.CreateRun(ctx(), sqlcgen.CreateRunParams{
+		ID:          id,
+		Environment: env,
+		Status:      string(RunStatusRunning),
+		StartedAt:   now,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create run: %w", err)
 	}
 
-	return run, nil
+	return convertRun(row), nil
 }
 
 // GetRun retrieves a run by ID.
@@ -110,15 +119,7 @@ func (s *SQLiteStore) GetRun(id string) (*Run, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	run := &Run{}
-	var completedAt sql.NullTime
-	var errMsg sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, environment, status, started_at, completed_at, error FROM runs WHERE id = ?`,
-		id,
-	).Scan(&run.ID, &run.Environment, &run.Status, &run.StartedAt, &completedAt, &errMsg)
-
+	row, err := s.queries.GetRun(ctx(), id)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("run not found: %s", id)
 	}
@@ -126,14 +127,7 @@ func (s *SQLiteStore) GetRun(id string) (*Run, error) {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	if completedAt.Valid {
-		run.CompletedAt = &completedAt.Time
-	}
-	if errMsg.Valid {
-		run.Error = errMsg.String
-	}
-
-	return run, nil
+	return convertRun(row), nil
 }
 
 // CompleteRun marks a run as completed with the given status.
@@ -148,20 +142,12 @@ func (s *SQLiteStore) CompleteRun(id string, status RunStatus, errMsg string) er
 		errorPtr = &errMsg
 	}
 
-	result, err := s.db.Exec(
-		`UPDATE runs SET status = ?, completed_at = ?, error = ? WHERE id = ?`,
-		status, now, errorPtr, id,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to complete run: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("run not found: %s", id)
-	}
-
-	return nil
+	return s.queries.CompleteRun(ctx(), sqlcgen.CompleteRunParams{
+		Status:      string(status),
+		CompletedAt: &now,
+		Error:       errorPtr,
+		ID:          id,
+	})
 }
 
 // GetLatestRun retrieves the most recent run for an environment.
@@ -170,16 +156,7 @@ func (s *SQLiteStore) GetLatestRun(env string) (*Run, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	run := &Run{}
-	var completedAt sql.NullTime
-	var errMsg sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, environment, status, started_at, completed_at, error 
-		 FROM runs WHERE environment = ? ORDER BY started_at DESC LIMIT 1`,
-		env,
-	).Scan(&run.ID, &run.Environment, &run.Status, &run.StartedAt, &completedAt, &errMsg)
-
+	row, err := s.queries.GetLatestRun(ctx(), env)
 	if err == sql.ErrNoRows {
 		return nil, nil // No runs found, return nil without error
 	}
@@ -187,14 +164,7 @@ func (s *SQLiteStore) GetLatestRun(env string) (*Run, error) {
 		return nil, fmt.Errorf("failed to get latest run: %w", err)
 	}
 
-	if completedAt.Valid {
-		run.CompletedAt = &completedAt.Time
-	}
-	if errMsg.Valid {
-		run.Error = errMsg.String
-	}
-
-	return run, nil
+	return convertRun(row), nil
 }
 
 // --- Model operations ---
@@ -211,18 +181,9 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 	}
 
 	// Serialize complex fields to JSON
-	tagsJSON, err := serializeJSON(model.Tags)
-	if err != nil {
-		return fmt.Errorf("failed to serialize tags: %w", err)
-	}
-	testsJSON, err := serializeJSON(model.Tests)
-	if err != nil {
-		return fmt.Errorf("failed to serialize tests: %w", err)
-	}
-	metaJSON, err := serializeJSON(model.Meta)
-	if err != nil {
-		return fmt.Errorf("failed to serialize meta: %w", err)
-	}
+	tagsJSON := serializeJSONPtr(model.Tags)
+	testsJSON := serializeJSONPtr(model.Tests)
+	metaJSON := serializeJSONPtr(model.Meta)
 
 	now := time.Now().UTC()
 
@@ -238,76 +199,45 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 		model.CreatedAt = existing.CreatedAt
 		model.UpdatedAt = now
 
-		_, err := s.db.Exec(
-			`UPDATE models SET name = ?, materialized = ?, unique_key = ?, content_hash = ?, file_path = ?,
-			 owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, updated_at = ? 
-			 WHERE id = ?`,
-			model.Name, model.Materialized, model.UniqueKey, model.ContentHash, nullString(model.FilePath),
-			nullString(model.Owner), nullString(model.Schema), tagsJSON, testsJSON, metaJSON,
-			model.UpdatedAt, model.ID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update model: %w", err)
-		}
-	} else {
-		// Insert new model
-		if model.ID == "" {
-			model.ID = generateID()
-		}
-		model.CreatedAt = now
-		model.UpdatedAt = now
-
-		_, err := s.db.Exec(
-			`INSERT INTO models (id, path, name, materialized, unique_key, content_hash, file_path,
-			 owner, schema_name, tags, tests, meta, created_at, updated_at) 
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			model.ID, model.Path, model.Name, model.Materialized, model.UniqueKey, model.ContentHash, nullString(model.FilePath),
-			nullString(model.Owner), nullString(model.Schema), tagsJSON, testsJSON, metaJSON,
-			model.CreatedAt, model.UpdatedAt,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert model: %w", err)
-		}
+		return s.queries.UpdateModel(ctx(), sqlcgen.UpdateModelParams{
+			Name:         model.Name,
+			Materialized: model.Materialized,
+			UniqueKey:    nullableString(model.UniqueKey),
+			ContentHash:  model.ContentHash,
+			FilePath:     nullableString(model.FilePath),
+			Owner:        nullableString(model.Owner),
+			SchemaName:   nullableString(model.Schema),
+			Tags:         tagsJSON,
+			Tests:        testsJSON,
+			Meta:         metaJSON,
+			UpdatedAt:    model.UpdatedAt,
+			ID:           model.ID,
+		})
 	}
 
-	return nil
-}
-
-// nullString returns a sql.NullString for optional string fields.
-func nullString(s string) sql.NullString {
-	if s == "" {
-		return sql.NullString{Valid: false}
+	// Insert new model
+	if model.ID == "" {
+		model.ID = generateID()
 	}
-	return sql.NullString{String: s, Valid: true}
-}
+	model.CreatedAt = now
+	model.UpdatedAt = now
 
-// serializeJSON serializes a value to JSON, returning nil for empty values.
-func serializeJSON(v any) (sql.NullString, error) {
-	if v == nil {
-		return sql.NullString{Valid: false}, nil
-	}
-
-	// Check for empty slices and maps
-	switch val := v.(type) {
-	case []string:
-		if len(val) == 0 {
-			return sql.NullString{Valid: false}, nil
-		}
-	case []TestConfig:
-		if len(val) == 0 {
-			return sql.NullString{Valid: false}, nil
-		}
-	case map[string]any:
-		if len(val) == 0 {
-			return sql.NullString{Valid: false}, nil
-		}
-	}
-
-	data, err := json.Marshal(v)
-	if err != nil {
-		return sql.NullString{}, err
-	}
-	return sql.NullString{String: string(data), Valid: true}, nil
+	return s.queries.InsertModel(ctx(), sqlcgen.InsertModelParams{
+		ID:           model.ID,
+		Path:         model.Path,
+		Name:         model.Name,
+		Materialized: model.Materialized,
+		UniqueKey:    nullableString(model.UniqueKey),
+		ContentHash:  model.ContentHash,
+		FilePath:     nullableString(model.FilePath),
+		Owner:        nullableString(model.Owner),
+		SchemaName:   nullableString(model.Schema),
+		Tags:         tagsJSON,
+		Tests:        testsJSON,
+		Meta:         metaJSON,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	})
 }
 
 // GetModelByID retrieves a model by ID.
@@ -316,17 +246,7 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	model := &Model{}
-	var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-		 owner, schema_name, tags, tests, meta, created_at, updated_at 
-		 FROM models WHERE id = ?`,
-		id,
-	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
-		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
-
+	row, err := s.queries.GetModelByID(ctx(), id)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("model not found: %s", id)
 	}
@@ -334,40 +254,7 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 		return nil, fmt.Errorf("failed to get model: %w", err)
 	}
 
-	// Deserialize optional fields
-	if uniqueKey.Valid {
-		model.UniqueKey = uniqueKey.String
-	}
-	if filePath.Valid {
-		model.FilePath = filePath.String
-	}
-	if owner.Valid {
-		model.Owner = owner.String
-	}
-	if schema.Valid {
-		model.Schema = schema.String
-	}
-
-	// Deserialize JSON fields
-	if err := deserializeJSON(tagsJSON, &model.Tags); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
-	}
-	if err := deserializeJSON(testsJSON, &model.Tests); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
-	}
-	if err := deserializeJSON(metaJSON, &model.Meta); err != nil {
-		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
-	}
-
-	return model, nil
-}
-
-// deserializeJSON deserializes a JSON string into a target value.
-func deserializeJSON(data sql.NullString, target any) error {
-	if !data.Valid || data.String == "" {
-		return nil
-	}
-	return json.Unmarshal([]byte(data.String), target)
+	return convertModel(row)
 }
 
 // GetModelByPath retrieves a model by its path.
@@ -376,17 +263,7 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	model := &Model{}
-	var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-		 owner, schema_name, tags, tests, meta, created_at, updated_at 
-		 FROM models WHERE path = ?`,
-		path,
-	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
-		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
-
+	row, err := s.queries.GetModelByPath(ctx(), path)
 	if err == sql.ErrNoRows {
 		return nil, nil // Not found, return nil without error
 	}
@@ -394,32 +271,24 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 		return nil, fmt.Errorf("failed to get model: %w", err)
 	}
 
-	// Deserialize optional fields
-	if uniqueKey.Valid {
-		model.UniqueKey = uniqueKey.String
-	}
-	if filePath.Valid {
-		model.FilePath = filePath.String
-	}
-	if owner.Valid {
-		model.Owner = owner.String
-	}
-	if schema.Valid {
-		model.Schema = schema.String
+	return convertModel(row)
+}
+
+// GetModelByFilePath retrieves a model by its file system path.
+func (s *SQLiteStore) GetModelByFilePath(filePath string) (*Model, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
 	}
 
-	// Deserialize JSON fields
-	if err := deserializeJSON(tagsJSON, &model.Tags); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
+	row, err := s.queries.GetModelByFilePath(ctx(), &filePath)
+	if err == sql.ErrNoRows {
+		return nil, nil // Not found, return nil without error
 	}
-	if err := deserializeJSON(testsJSON, &model.Tests); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
-	}
-	if err := deserializeJSON(metaJSON, &model.Meta); err != nil {
-		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model by file path: %w", err)
 	}
 
-	return model, nil
+	return convertModel(row)
 }
 
 // UpdateModelHash updates the content hash of a model.
@@ -428,20 +297,11 @@ func (s *SQLiteStore) UpdateModelHash(id string, contentHash string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	result, err := s.db.Exec(
-		`UPDATE models SET content_hash = ?, updated_at = ? WHERE id = ?`,
-		contentHash, time.Now().UTC(), id,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update model hash: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("model not found: %s", id)
-	}
-
-	return nil
+	return s.queries.UpdateModelHash(ctx(), sqlcgen.UpdateModelHashParams{
+		ContentHash: contentHash,
+		UpdatedAt:   time.Now().UTC(),
+		ID:          id,
+	})
 }
 
 // ListModels retrieves all registered models.
@@ -450,56 +310,58 @@ func (s *SQLiteStore) ListModels() ([]*Model, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(
-		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-		 owner, schema_name, tags, tests, meta, created_at, updated_at 
-		 FROM models ORDER BY path`,
-	)
+	rows, err := s.queries.ListModels(ctx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
-	defer rows.Close()
 
-	var models []*Model
-	for rows.Next() {
-		model := &Model{}
-		var uniqueKey, filePath, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
-
-		err := rows.Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePath,
-			&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
+	models := make([]*Model, 0, len(rows))
+	for _, row := range rows {
+		model, err := convertModel(row)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan model: %w", err)
+			return nil, err
 		}
-
-		// Deserialize optional fields
-		if uniqueKey.Valid {
-			model.UniqueKey = uniqueKey.String
-		}
-		if filePath.Valid {
-			model.FilePath = filePath.String
-		}
-		if owner.Valid {
-			model.Owner = owner.String
-		}
-		if schema.Valid {
-			model.Schema = schema.String
-		}
-
-		// Deserialize JSON fields
-		if err := deserializeJSON(tagsJSON, &model.Tags); err != nil {
-			return nil, fmt.Errorf("failed to deserialize tags: %w", err)
-		}
-		if err := deserializeJSON(testsJSON, &model.Tests); err != nil {
-			return nil, fmt.Errorf("failed to deserialize tests: %w", err)
-		}
-		if err := deserializeJSON(metaJSON, &model.Meta); err != nil {
-			return nil, fmt.Errorf("failed to deserialize meta: %w", err)
-		}
-
 		models = append(models, model)
 	}
 
-	return models, rows.Err()
+	return models, nil
+}
+
+// DeleteModelByFilePath deletes a model by its file system path.
+func (s *SQLiteStore) DeleteModelByFilePath(filePath string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not opened")
+	}
+
+	// First delete associated column lineage and dependencies
+	model, err := s.GetModelByFilePath(filePath)
+	if err != nil {
+		return err
+	}
+	if model == nil {
+		return nil // Model not found, nothing to delete
+	}
+
+	// Delete column lineage
+	if err := s.queries.DeleteColumnLineageByModelPath(ctx(), model.Path); err != nil {
+		return fmt.Errorf("failed to delete column lineage: %w", err)
+	}
+
+	// Delete model columns
+	if err := s.queries.DeleteModelColumnsByModelPath(ctx(), model.Path); err != nil {
+		return fmt.Errorf("failed to delete model columns: %w", err)
+	}
+
+	// Delete dependencies
+	if err := s.queries.DeleteDependenciesByModelOrParent(ctx(), sqlcgen.DeleteDependenciesByModelOrParentParams{
+		FilePath:   &filePath,
+		FilePath_2: &filePath,
+	}); err != nil {
+		return fmt.Errorf("failed to delete dependencies: %w", err)
+	}
+
+	// Delete the model
+	return s.queries.DeleteModelByFilePath(ctx(), &filePath)
 }
 
 // --- Model run operations ---
@@ -515,16 +377,21 @@ func (s *SQLiteStore) RecordModelRun(modelRun *ModelRun) error {
 	}
 	modelRun.StartedAt = time.Now().UTC()
 
-	_, err := s.db.Exec(
-		`INSERT INTO model_runs (id, run_id, model_id, status, rows_affected, started_at, error, execution_ms) 
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		modelRun.ID, modelRun.RunID, modelRun.ModelID, modelRun.Status, modelRun.RowsAffected, modelRun.StartedAt, modelRun.Error, modelRun.ExecutionMS,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to record model run: %w", err)
+	var errorPtr *string
+	if modelRun.Error != "" {
+		errorPtr = &modelRun.Error
 	}
 
-	return nil
+	return s.queries.RecordModelRun(ctx(), sqlcgen.RecordModelRunParams{
+		ID:           modelRun.ID,
+		RunID:        modelRun.RunID,
+		ModelID:      modelRun.ModelID,
+		Status:       string(modelRun.Status),
+		RowsAffected: &modelRun.RowsAffected,
+		StartedAt:    modelRun.StartedAt,
+		Error:        errorPtr,
+		ExecutionMs:  &modelRun.ExecutionMS,
+	})
 }
 
 // UpdateModelRun updates the status of a model run.
@@ -539,29 +406,22 @@ func (s *SQLiteStore) UpdateModelRun(id string, status ModelRunStatus, rowsAffec
 		errorPtr = &errMsg
 	}
 
-	// Calculate execution time
-	var startedAt time.Time
-	err := s.db.QueryRow(`SELECT started_at FROM model_runs WHERE id = ?`, id).Scan(&startedAt)
+	// Get started_at to calculate execution time
+	startedAt, err := s.queries.GetModelRunStartedAt(ctx(), id)
 	if err != nil {
 		return fmt.Errorf("failed to get model run start time: %w", err)
 	}
 
 	executionMS := now.Sub(startedAt).Milliseconds()
 
-	result, err := s.db.Exec(
-		`UPDATE model_runs SET status = ?, rows_affected = ?, completed_at = ?, error = ?, execution_ms = ? WHERE id = ?`,
-		status, rowsAffected, now, errorPtr, executionMS, id,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update model run: %w", err)
-	}
-
-	rowsUpdated, _ := result.RowsAffected()
-	if rowsUpdated == 0 {
-		return fmt.Errorf("model run not found: %s", id)
-	}
-
-	return nil
+	return s.queries.UpdateModelRun(ctx(), sqlcgen.UpdateModelRunParams{
+		Status:       string(status),
+		RowsAffected: &rowsAffected,
+		CompletedAt:  &now,
+		Error:        errorPtr,
+		ExecutionMs:  &executionMS,
+		ID:           id,
+	})
 }
 
 // GetModelRunsForRun retrieves all model runs for a given pipeline run.
@@ -570,37 +430,17 @@ func (s *SQLiteStore) GetModelRunsForRun(runID string) ([]*ModelRun, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(
-		`SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, execution_ms 
-		 FROM model_runs WHERE run_id = ? ORDER BY started_at`,
-		runID,
-	)
+	rows, err := s.queries.GetModelRunsForRun(ctx(), runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model runs: %w", err)
 	}
-	defer rows.Close()
 
-	var modelRuns []*ModelRun
-	for rows.Next() {
-		mr := &ModelRun{}
-		var completedAt sql.NullTime
-		var errMsg sql.NullString
-
-		err := rows.Scan(&mr.ID, &mr.RunID, &mr.ModelID, &mr.Status, &mr.RowsAffected, &mr.StartedAt, &completedAt, &errMsg, &mr.ExecutionMS)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan model run: %w", err)
-		}
-
-		if completedAt.Valid {
-			mr.CompletedAt = &completedAt.Time
-		}
-		if errMsg.Valid {
-			mr.Error = errMsg.String
-		}
-		modelRuns = append(modelRuns, mr)
+	modelRuns := make([]*ModelRun, 0, len(rows))
+	for _, row := range rows {
+		modelRuns = append(modelRuns, convertModelRun(row))
 	}
 
-	return modelRuns, rows.Err()
+	return modelRuns, nil
 }
 
 // GetLatestModelRun retrieves the most recent run for a model.
@@ -609,16 +449,7 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	mr := &ModelRun{}
-	var completedAt sql.NullTime
-	var errMsg sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, execution_ms 
-		 FROM model_runs WHERE model_id = ? ORDER BY started_at DESC LIMIT 1`,
-		modelID,
-	).Scan(&mr.ID, &mr.RunID, &mr.ModelID, &mr.Status, &mr.RowsAffected, &mr.StartedAt, &completedAt, &errMsg, &mr.ExecutionMS)
-
+	row, err := s.queries.GetLatestModelRun(ctx(), modelID)
 	if err == sql.ErrNoRows {
 		return nil, nil // No runs found
 	}
@@ -626,14 +457,7 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
 		return nil, fmt.Errorf("failed to get latest model run: %w", err)
 	}
 
-	if completedAt.Valid {
-		mr.CompletedAt = &completedAt.Time
-	}
-	if errMsg.Valid {
-		mr.Error = errMsg.String
-	}
-
-	return mr, nil
+	return convertModelRun(row), nil
 }
 
 // --- Dependency operations ---
@@ -651,25 +475,24 @@ func (s *SQLiteStore) SetDependencies(modelID string, parentIDs []string) error 
 	}
 	defer tx.Rollback()
 
+	qtx := s.queries.WithTx(tx)
+
 	// Delete existing dependencies
-	_, err = tx.Exec(`DELETE FROM dependencies WHERE model_id = ?`, modelID)
-	if err != nil {
+	if err := qtx.DeleteDependenciesByModelID(ctx(), modelID); err != nil {
 		return fmt.Errorf("failed to delete existing dependencies: %w", err)
 	}
 
 	// Insert new dependencies
 	for _, parentID := range parentIDs {
-		_, err = tx.Exec(`INSERT INTO dependencies (model_id, parent_id) VALUES (?, ?)`, modelID, parentID)
-		if err != nil {
+		if err := qtx.InsertDependency(ctx(), sqlcgen.InsertDependencyParams{
+			ModelID:  modelID,
+			ParentID: parentID,
+		}); err != nil {
 			return fmt.Errorf("failed to insert dependency: %w", err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 // GetDependencies retrieves the parent IDs for a model.
@@ -678,22 +501,7 @@ func (s *SQLiteStore) GetDependencies(modelID string) ([]string, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`SELECT parent_id FROM dependencies WHERE model_id = ?`, modelID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dependencies: %w", err)
-	}
-	defer rows.Close()
-
-	var parentIDs []string
-	for rows.Next() {
-		var parentID string
-		if err := rows.Scan(&parentID); err != nil {
-			return nil, fmt.Errorf("failed to scan dependency: %w", err)
-		}
-		parentIDs = append(parentIDs, parentID)
-	}
-
-	return parentIDs, rows.Err()
+	return s.queries.GetDependencies(ctx(), modelID)
 }
 
 // GetDependents retrieves the IDs of models that depend on the given model.
@@ -702,22 +510,7 @@ func (s *SQLiteStore) GetDependents(modelID string) ([]string, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`SELECT model_id FROM dependencies WHERE parent_id = ?`, modelID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dependents: %w", err)
-	}
-	defer rows.Close()
-
-	var dependentIDs []string
-	for rows.Next() {
-		var dependentID string
-		if err := rows.Scan(&dependentID); err != nil {
-			return nil, fmt.Errorf("failed to scan dependent: %w", err)
-		}
-		dependentIDs = append(dependentIDs, dependentID)
-	}
-
-	return dependentIDs, rows.Err()
+	return s.queries.GetDependents(ctx(), modelID)
 }
 
 // --- Environment operations ---
@@ -728,21 +521,18 @@ func (s *SQLiteStore) CreateEnvironment(name string) (*Environment, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	env := &Environment{
-		Name:      name,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-	}
+	now := time.Now().UTC()
 
-	_, err := s.db.Exec(
-		`INSERT INTO environments (name, created_at, updated_at) VALUES (?, ?, ?)`,
-		env.Name, env.CreatedAt, env.UpdatedAt,
-	)
+	row, err := s.queries.CreateEnvironment(ctx(), sqlcgen.CreateEnvironmentParams{
+		Name:      name,
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create environment: %w", err)
 	}
 
-	return env, nil
+	return convertEnvironment(row), nil
 }
 
 // GetEnvironment retrieves an environment by name.
@@ -751,14 +541,7 @@ func (s *SQLiteStore) GetEnvironment(name string) (*Environment, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	env := &Environment{}
-	var commitRef sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT name, commit_ref, created_at, updated_at FROM environments WHERE name = ?`,
-		name,
-	).Scan(&env.Name, &commitRef, &env.CreatedAt, &env.UpdatedAt)
-
+	row, err := s.queries.GetEnvironment(ctx(), name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -766,11 +549,7 @@ func (s *SQLiteStore) GetEnvironment(name string) (*Environment, error) {
 		return nil, fmt.Errorf("failed to get environment: %w", err)
 	}
 
-	if commitRef.Valid {
-		env.CommitRef = commitRef.String
-	}
-
-	return env, nil
+	return convertEnvironment(row), nil
 }
 
 // UpdateEnvironmentRef updates the commit reference for an environment.
@@ -779,20 +558,11 @@ func (s *SQLiteStore) UpdateEnvironmentRef(name string, commitRef string) error 
 		return fmt.Errorf("database not opened")
 	}
 
-	result, err := s.db.Exec(
-		`UPDATE environments SET commit_ref = ?, updated_at = ? WHERE name = ?`,
-		commitRef, time.Now().UTC(), name,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update environment ref: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("environment not found: %s", name)
-	}
-
-	return nil
+	return s.queries.UpdateEnvironmentRef(ctx(), sqlcgen.UpdateEnvironmentRefParams{
+		CommitRef: &commitRef,
+		UpdatedAt: time.Now().UTC(),
+		Name:      name,
+	})
 }
 
 // --- Column lineage operations ---
@@ -810,35 +580,27 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) e
 	}
 	defer tx.Rollback()
 
+	qtx := s.queries.WithTx(tx)
+
 	// Delete existing column lineage first (due to foreign key)
-	_, err = tx.Exec(`DELETE FROM column_lineage WHERE model_path = ?`, modelPath)
-	if err != nil {
+	if err := qtx.DeleteColumnLineageByModelPath(ctx(), modelPath); err != nil {
 		return fmt.Errorf("failed to delete existing column lineage: %w", err)
 	}
 
 	// Delete existing columns
-	_, err = tx.Exec(`DELETE FROM model_columns WHERE model_path = ?`, modelPath)
-	if err != nil {
+	if err := qtx.DeleteModelColumnsByModelPath(ctx(), modelPath); err != nil {
 		return fmt.Errorf("failed to delete existing columns: %w", err)
 	}
 
 	// Insert new columns
-	colStmt, err := tx.Prepare(`INSERT INTO model_columns (model_path, column_name, column_index, transform_type, function_name) VALUES (?, ?, ?, ?, ?)`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare column insert: %w", err)
-	}
-	defer colStmt.Close()
-
-	lineageStmt, err := tx.Prepare(`INSERT INTO column_lineage (model_path, column_name, source_table, source_column) VALUES (?, ?, ?, ?)`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare lineage insert: %w", err)
-	}
-	defer lineageStmt.Close()
-
 	for _, col := range columns {
-		// Insert column
-		_, err = colStmt.Exec(modelPath, col.Name, col.Index, col.TransformType, col.Function)
-		if err != nil {
+		if err := qtx.InsertModelColumn(ctx(), sqlcgen.InsertModelColumnParams{
+			ModelPath:     modelPath,
+			ColumnName:    col.Name,
+			ColumnIndex:   int64(col.Index),
+			TransformType: nullableString(col.TransformType),
+			FunctionName:  nullableString(col.Function),
+		}); err != nil {
 			return fmt.Errorf("failed to insert column %s: %w", col.Name, err)
 		}
 
@@ -847,18 +609,18 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) e
 			if src.Table == "" && src.Column == "" {
 				continue // Skip empty sources
 			}
-			_, err = lineageStmt.Exec(modelPath, col.Name, src.Table, src.Column)
-			if err != nil {
+			if err := qtx.InsertColumnLineage(ctx(), sqlcgen.InsertColumnLineageParams{
+				ModelPath:    modelPath,
+				ColumnName:   col.Name,
+				SourceTable:  src.Table,
+				SourceColumn: src.Column,
+			}); err != nil {
 				return fmt.Errorf("failed to insert lineage for column %s: %w", col.Name, err)
 			}
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 // GetModelColumns retrieves column lineage information for a model.
@@ -868,72 +630,42 @@ func (s *SQLiteStore) GetModelColumns(modelPath string) ([]ColumnInfo, error) {
 	}
 
 	// Get all columns for the model
-	colRows, err := s.db.Query(
-		`SELECT column_name, column_index, transform_type, function_name 
-		 FROM model_columns 
-		 WHERE model_path = ? 
-		 ORDER BY column_index`,
-		modelPath,
-	)
+	colRows, err := s.queries.GetModelColumns(ctx(), modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
-	defer colRows.Close()
 
-	// Use index map instead of pointer map to avoid slice reallocation issues
+	// Build columns with index map for lineage lookup
 	columnsIdxMap := make(map[string]int)
-	var columns []ColumnInfo
+	columns := make([]ColumnInfo, 0, len(colRows))
 
-	for colRows.Next() {
-		var col ColumnInfo
-		var transformType, functionName sql.NullString
-
-		if err := colRows.Scan(&col.Name, &col.Index, &transformType, &functionName); err != nil {
-			return nil, fmt.Errorf("failed to scan column: %w", err)
+	for _, row := range colRows {
+		col := ColumnInfo{
+			Name:          row.ColumnName,
+			Index:         int(row.ColumnIndex),
+			TransformType: derefString(row.TransformType),
+			Function:      derefString(row.FunctionName),
 		}
-
-		if transformType.Valid {
-			col.TransformType = transformType.String
-		}
-		if functionName.Valid {
-			col.Function = functionName.String
-		}
-
 		columnsIdxMap[col.Name] = len(columns)
 		columns = append(columns, col)
 	}
 
-	if err := colRows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating columns: %w", err)
-	}
-
 	// Get lineage for all columns
-	lineageRows, err := s.db.Query(
-		`SELECT column_name, source_table, source_column 
-		 FROM column_lineage 
-		 WHERE model_path = ?`,
-		modelPath,
-	)
+	lineageRows, err := s.queries.GetColumnLineage(ctx(), modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get column lineage: %w", err)
 	}
-	defer lineageRows.Close()
 
-	for lineageRows.Next() {
-		var colName, sourceTable, sourceColumn string
-		if err := lineageRows.Scan(&colName, &sourceTable, &sourceColumn); err != nil {
-			return nil, fmt.Errorf("failed to scan lineage: %w", err)
-		}
-
-		if idx, ok := columnsIdxMap[colName]; ok {
+	for _, row := range lineageRows {
+		if idx, ok := columnsIdxMap[row.ColumnName]; ok {
 			columns[idx].Sources = append(columns[idx].Sources, SourceRef{
-				Table:  sourceTable,
-				Column: sourceColumn,
+				Table:  row.SourceTable,
+				Column: row.SourceColumn,
 			})
 		}
 	}
 
-	return columns, lineageRows.Err()
+	return columns, nil
 }
 
 // DeleteModelColumns deletes all column information for a model.
@@ -948,15 +680,15 @@ func (s *SQLiteStore) DeleteModelColumns(modelPath string) error {
 	}
 	defer tx.Rollback()
 
+	qtx := s.queries.WithTx(tx)
+
 	// Delete lineage first (foreign key constraint)
-	_, err = tx.Exec(`DELETE FROM column_lineage WHERE model_path = ?`, modelPath)
-	if err != nil {
+	if err := qtx.DeleteColumnLineageByModelPath(ctx(), modelPath); err != nil {
 		return fmt.Errorf("failed to delete column lineage: %w", err)
 	}
 
 	// Delete columns
-	_, err = tx.Exec(`DELETE FROM model_columns WHERE model_path = ?`, modelPath)
-	if err != nil {
+	if err := qtx.DeleteModelColumnsByModelPath(ctx(), modelPath); err != nil {
 		return fmt.Errorf("failed to delete columns: %w", err)
 	}
 
@@ -970,59 +702,25 @@ func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]Trace
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	query := `
-WITH RECURSIVE trace AS (
-    -- Start: get direct sources of the target column
-    SELECT 
-        cl.model_path,
-        cl.column_name,
-        cl.source_table,
-        cl.source_column,
-        1 as depth
-    FROM column_lineage cl
-    WHERE cl.model_path = ? AND cl.column_name = ?
-    
-    UNION ALL
-    
-    -- Recurse: follow source_table -> model -> its sources
-    SELECT 
-        cl.model_path,
-        cl.column_name,
-        cl.source_table,
-        cl.source_column,
-        t.depth + 1
-    FROM trace t
-    JOIN models m ON (m.name = t.source_table OR m.path = t.source_table)
-    JOIN column_lineage cl ON cl.model_path = m.path AND cl.column_name = t.source_column
-    WHERE t.depth < 20
-)
-SELECT DISTINCT 
-    source_table,
-    source_column,
-    depth,
-    CASE WHEN m.path IS NULL THEN 1 ELSE 0 END as is_external
-FROM trace t
-LEFT JOIN models m ON (m.name = t.source_table OR m.path = t.source_table)
-ORDER BY depth, source_table, source_column`
-
-	rows, err := s.db.Query(query, modelPath, columnName)
+	rows, err := s.queries.TraceColumnBackward(ctx(), sqlcgen.TraceColumnBackwardParams{
+		ModelPath:  modelPath,
+		ColumnName: columnName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to trace column backward: %w", err)
 	}
-	defer rows.Close()
 
-	var results []TraceResult
-	for rows.Next() {
-		var r TraceResult
-		var isExternal int
-		if err := rows.Scan(&r.ModelPath, &r.ColumnName, &r.Depth, &isExternal); err != nil {
-			return nil, fmt.Errorf("failed to scan trace result: %w", err)
-		}
-		r.IsExternal = isExternal == 1
-		results = append(results, r)
+	results := make([]TraceResult, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, TraceResult{
+			ModelPath:  row.ModelPath,
+			ColumnName: row.ColumnName,
+			Depth:      int(row.Depth),
+			IsExternal: row.IsExternal == 1,
+		})
 	}
 
-	return results, rows.Err()
+	return results, nil
 }
 
 // TraceColumnForward traces where a column flows to downstream.
@@ -1032,54 +730,24 @@ func (s *SQLiteStore) TraceColumnForward(modelPath, columnName string) ([]TraceR
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	query := `
-WITH RECURSIVE trace AS (
-    -- Start: find columns that reference this model/column as a source
-    SELECT 
-        cl.model_path,
-        cl.column_name,
-        cl.source_table,
-        cl.source_column,
-        1 as depth
-    FROM column_lineage cl
-    JOIN models m ON (m.name = cl.source_table OR m.path = cl.source_table)
-    WHERE m.path = ? AND cl.source_column = ?
-    
-    UNION ALL
-    
-    -- Recurse: find what references the columns we found
-    SELECT 
-        cl.model_path,
-        cl.column_name,
-        cl.source_table,
-        cl.source_column,
-        t.depth + 1
-    FROM trace t
-    JOIN models m ON m.path = t.model_path
-    JOIN column_lineage cl ON (cl.source_table = m.name OR cl.source_table = m.path)
-                          AND cl.source_column = t.column_name
-    WHERE t.depth < 20
-)
-SELECT DISTINCT model_path, column_name, depth
-FROM trace
-ORDER BY depth, model_path, column_name`
-
-	rows, err := s.db.Query(query, modelPath, columnName)
+	rows, err := s.queries.TraceColumnForward(ctx(), sqlcgen.TraceColumnForwardParams{
+		Path:         modelPath,
+		SourceColumn: columnName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to trace column forward: %w", err)
 	}
-	defer rows.Close()
 
-	var results []TraceResult
-	for rows.Next() {
-		var r TraceResult
-		if err := rows.Scan(&r.ModelPath, &r.ColumnName, &r.Depth); err != nil {
-			return nil, fmt.Errorf("failed to scan trace result: %w", err)
-		}
-		results = append(results, r)
+	results := make([]TraceResult, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, TraceResult{
+			ModelPath:  row.ModelPath,
+			ColumnName: row.ColumnName,
+			Depth:      int(row.Depth),
+		})
 	}
 
-	return results, rows.Err()
+	return results, nil
 }
 
 // --- Macro operations ---
@@ -1097,39 +765,33 @@ func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroF
 	}
 	defer tx.Rollback()
 
+	qtx := s.queries.WithTx(tx)
+
 	// Upsert namespace
-	_, err = tx.Exec(`
-		INSERT INTO macro_namespaces (name, file_path, package, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(name) DO UPDATE SET
-			file_path = excluded.file_path,
-			package = excluded.package,
-			updated_at = CURRENT_TIMESTAMP
-	`, ns.Name, ns.FilePath, ns.Package)
-	if err != nil {
+	if err := qtx.UpsertMacroNamespace(ctx(), sqlcgen.UpsertMacroNamespaceParams{
+		Name:     ns.Name,
+		FilePath: ns.FilePath,
+		Package:  nullableString(ns.Package),
+	}); err != nil {
 		return fmt.Errorf("failed to upsert namespace: %w", err)
 	}
 
 	// Delete old functions for this namespace
-	_, err = tx.Exec("DELETE FROM macro_functions WHERE namespace = ?", ns.Name)
-	if err != nil {
+	if err := qtx.DeleteMacroFunctionsByNamespace(ctx(), ns.Name); err != nil {
 		return fmt.Errorf("failed to delete old functions: %w", err)
 	}
 
 	// Insert functions
-	stmt, err := tx.Prepare(`
-		INSERT INTO macro_functions (namespace, name, args, docstring, line)
-		VALUES (?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
 	for _, fn := range functions {
 		argsJSON, _ := json.Marshal(fn.Args)
-		_, err := stmt.Exec(ns.Name, fn.Name, string(argsJSON), fn.Docstring, fn.Line)
-		if err != nil {
+		line := int64(fn.Line)
+		if err := qtx.InsertMacroFunction(ctx(), sqlcgen.InsertMacroFunctionParams{
+			Namespace: ns.Name,
+			Name:      fn.Name,
+			Args:      string(argsJSON),
+			Docstring: nullableString(fn.Docstring),
+			Line:      &line,
+		}); err != nil {
 			return fmt.Errorf("failed to insert function %s: %w", fn.Name, err)
 		}
 	}
@@ -1143,30 +805,17 @@ func (s *SQLiteStore) GetMacroNamespaces() ([]*MacroNamespace, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`
-		SELECT name, file_path, package, updated_at 
-		FROM macro_namespaces 
-		ORDER BY name
-	`)
+	rows, err := s.queries.GetMacroNamespaces(ctx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespaces: %w", err)
 	}
-	defer rows.Close()
 
-	var namespaces []*MacroNamespace
-	for rows.Next() {
-		var ns MacroNamespace
-		var pkg sql.NullString
-		if err := rows.Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan namespace: %w", err)
-		}
-		if pkg.Valid {
-			ns.Package = pkg.String
-		}
-		namespaces = append(namespaces, &ns)
+	namespaces := make([]*MacroNamespace, 0, len(rows))
+	for _, row := range rows {
+		namespaces = append(namespaces, convertMacroNamespace(row))
 	}
 
-	return namespaces, rows.Err()
+	return namespaces, nil
 }
 
 // GetMacroNamespace returns a single macro namespace by name.
@@ -1175,15 +824,7 @@ func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	var ns MacroNamespace
-	var pkg sql.NullString
-
-	err := s.db.QueryRow(`
-		SELECT name, file_path, package, updated_at 
-		FROM macro_namespaces 
-		WHERE name = ?
-	`, name).Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt)
-
+	row, err := s.queries.GetMacroNamespace(ctx(), name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1191,11 +832,7 @@ func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
 		return nil, fmt.Errorf("failed to get namespace: %w", err)
 	}
 
-	if pkg.Valid {
-		ns.Package = pkg.String
-	}
-
-	return &ns, nil
+	return convertMacroNamespace(row), nil
 }
 
 // GetMacroFunctions returns all functions for a namespace.
@@ -1204,33 +841,17 @@ func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*MacroFunction, err
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`
-		SELECT namespace, name, args, docstring, line 
-		FROM macro_functions 
-		WHERE namespace = ?
-		ORDER BY name
-	`, namespace)
+	rows, err := s.queries.GetMacroFunctions(ctx(), namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get functions: %w", err)
 	}
-	defer rows.Close()
 
-	var functions []*MacroFunction
-	for rows.Next() {
-		var fn MacroFunction
-		var argsJSON string
-		var docstring sql.NullString
-		if err := rows.Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line); err != nil {
-			return nil, fmt.Errorf("failed to scan function: %w", err)
-		}
-		json.Unmarshal([]byte(argsJSON), &fn.Args)
-		if docstring.Valid {
-			fn.Docstring = docstring.String
-		}
-		functions = append(functions, &fn)
+	functions := make([]*MacroFunction, 0, len(rows))
+	for _, row := range rows {
+		functions = append(functions, convertMacroFunction(row))
 	}
 
-	return functions, rows.Err()
+	return functions, nil
 }
 
 // GetMacroFunction returns a single function by namespace and name.
@@ -1239,16 +860,10 @@ func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*MacroFunction, 
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	var fn MacroFunction
-	var argsJSON string
-	var docstring sql.NullString
-
-	err := s.db.QueryRow(`
-		SELECT namespace, name, args, docstring, line 
-		FROM macro_functions 
-		WHERE namespace = ? AND name = ?
-	`, namespace, name).Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line)
-
+	row, err := s.queries.GetMacroFunction(ctx(), sqlcgen.GetMacroFunctionParams{
+		Namespace: namespace,
+		Name:      name,
+	})
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1256,12 +871,7 @@ func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*MacroFunction, 
 		return nil, fmt.Errorf("failed to get function: %w", err)
 	}
 
-	json.Unmarshal([]byte(argsJSON), &fn.Args)
-	if docstring.Valid {
-		fn.Docstring = docstring.String
-	}
-
-	return &fn, nil
+	return convertMacroFunction(row), nil
 }
 
 // MacroFunctionExists checks if a macro function exists.
@@ -1270,13 +880,15 @@ func (s *SQLiteStore) MacroFunctionExists(namespace, name string) (bool, error) 
 		return false, fmt.Errorf("database not opened")
 	}
 
-	var count int
-	err := s.db.QueryRow(`
-		SELECT COUNT(*) FROM macro_functions 
-		WHERE namespace = ? AND name = ?
-	`, namespace, name).Scan(&count)
+	count, err := s.queries.MacroFunctionExists(ctx(), sqlcgen.MacroFunctionExistsParams{
+		Namespace: namespace,
+		Name:      name,
+	})
+	if err != nil {
+		return false, err
+	}
 
-	return count > 0, err
+	return count > 0, nil
 }
 
 // SearchMacroNamespaces searches namespaces by prefix.
@@ -1285,31 +897,17 @@ func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*MacroNamespace, e
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`
-		SELECT name, file_path, package, updated_at 
-		FROM macro_namespaces 
-		WHERE name LIKE ? || '%'
-		ORDER BY name
-	`, prefix)
+	rows, err := s.queries.SearchMacroNamespaces(ctx(), &prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search namespaces: %w", err)
 	}
-	defer rows.Close()
 
-	var namespaces []*MacroNamespace
-	for rows.Next() {
-		var ns MacroNamespace
-		var pkg sql.NullString
-		if err := rows.Scan(&ns.Name, &ns.FilePath, &pkg, &ns.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan namespace: %w", err)
-		}
-		if pkg.Valid {
-			ns.Package = pkg.String
-		}
-		namespaces = append(namespaces, &ns)
+	namespaces := make([]*MacroNamespace, 0, len(rows))
+	for _, row := range rows {
+		namespaces = append(namespaces, convertMacroNamespace(row))
 	}
 
-	return namespaces, rows.Err()
+	return namespaces, nil
 }
 
 // SearchMacroFunctions searches functions within a namespace by prefix.
@@ -1318,33 +916,20 @@ func (s *SQLiteStore) SearchMacroFunctions(namespace, prefix string) ([]*MacroFu
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`
-		SELECT namespace, name, args, docstring, line 
-		FROM macro_functions 
-		WHERE namespace = ? AND name LIKE ? || '%'
-		ORDER BY name
-	`, namespace, prefix)
+	rows, err := s.queries.SearchMacroFunctions(ctx(), sqlcgen.SearchMacroFunctionsParams{
+		Namespace: namespace,
+		Column2:   &prefix,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to search functions: %w", err)
 	}
-	defer rows.Close()
 
-	var functions []*MacroFunction
-	for rows.Next() {
-		var fn MacroFunction
-		var argsJSON string
-		var docstring sql.NullString
-		if err := rows.Scan(&fn.Namespace, &fn.Name, &argsJSON, &docstring, &fn.Line); err != nil {
-			return nil, fmt.Errorf("failed to scan function: %w", err)
-		}
-		json.Unmarshal([]byte(argsJSON), &fn.Args)
-		if docstring.Valid {
-			fn.Docstring = docstring.String
-		}
-		functions = append(functions, &fn)
+	functions := make([]*MacroFunction, 0, len(rows))
+	for _, row := range rows {
+		functions = append(functions, convertMacroFunction(row))
 	}
 
-	return functions, rows.Err()
+	return functions, nil
 }
 
 // DeleteMacroNamespace deletes a namespace and all its functions.
@@ -1353,13 +938,7 @@ func (s *SQLiteStore) DeleteMacroNamespace(name string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	// The CASCADE in the schema should handle deleting functions
-	_, err := s.db.Exec("DELETE FROM macro_namespaces WHERE name = ?", name)
-	if err != nil {
-		return fmt.Errorf("failed to delete namespace: %w", err)
-	}
-
-	return nil
+	return s.queries.DeleteMacroNamespace(ctx(), name)
 }
 
 // DeleteMacroNamespaceByFilePath deletes a namespace by its file path.
@@ -1368,12 +947,7 @@ func (s *SQLiteStore) DeleteMacroNamespaceByFilePath(filePath string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	_, err := s.db.Exec("DELETE FROM macro_namespaces WHERE file_path = ?", filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete namespace by file path: %w", err)
-	}
-
-	return nil
+	return s.queries.DeleteMacroNamespaceByFilePath(ctx(), filePath)
 }
 
 // --- File hash operations for incremental discovery ---
@@ -1384,12 +958,7 @@ func (s *SQLiteStore) GetContentHash(filePath string) (string, error) {
 		return "", fmt.Errorf("database not opened")
 	}
 
-	var hash string
-	err := s.db.QueryRow(
-		`SELECT content_hash FROM file_hashes WHERE file_path = ?`,
-		filePath,
-	).Scan(&hash)
-
+	hash, err := s.queries.GetContentHash(ctx(), filePath)
 	if err == sql.ErrNoRows {
 		return "", nil // Not found, return empty string
 	}
@@ -1406,20 +975,11 @@ func (s *SQLiteStore) SetContentHash(filePath, hash, fileType string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	_, err := s.db.Exec(`
-		INSERT INTO file_hashes (file_path, content_hash, file_type, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(file_path) DO UPDATE SET
-			content_hash = excluded.content_hash,
-			file_type = excluded.file_type,
-			updated_at = CURRENT_TIMESTAMP
-	`, filePath, hash, fileType)
-
-	if err != nil {
-		return fmt.Errorf("failed to set content hash: %w", err)
-	}
-
-	return nil
+	return s.queries.SetContentHash(ctx(), sqlcgen.SetContentHashParams{
+		FilePath:    filePath,
+		ContentHash: hash,
+		FileType:    fileType,
+	})
 }
 
 // DeleteContentHash removes the content hash for a file path.
@@ -1428,110 +988,10 @@ func (s *SQLiteStore) DeleteContentHash(filePath string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	_, err := s.db.Exec("DELETE FROM file_hashes WHERE file_path = ?", filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete content hash: %w", err)
-	}
-
-	return nil
+	return s.queries.DeleteContentHash(ctx(), filePath)
 }
 
-// --- Model operations for incremental discovery ---
-
-// GetModelByFilePath retrieves a model by its file system path.
-func (s *SQLiteStore) GetModelByFilePath(filePath string) (*Model, error) {
-	if s.db == nil {
-		return nil, fmt.Errorf("database not opened")
-	}
-
-	model := &Model{}
-	var uniqueKey, filePathCol, owner, schema, tagsJSON, testsJSON, metaJSON sql.NullString
-
-	err := s.db.QueryRow(
-		`SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-		 owner, schema_name, tags, tests, meta, created_at, updated_at 
-		 FROM models WHERE file_path = ?`,
-		filePath,
-	).Scan(&model.ID, &model.Path, &model.Name, &model.Materialized, &uniqueKey, &model.ContentHash, &filePathCol,
-		&owner, &schema, &tagsJSON, &testsJSON, &metaJSON, &model.CreatedAt, &model.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		return nil, nil // Not found, return nil without error
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get model by file path: %w", err)
-	}
-
-	// Deserialize optional fields
-	if uniqueKey.Valid {
-		model.UniqueKey = uniqueKey.String
-	}
-	if filePathCol.Valid {
-		model.FilePath = filePathCol.String
-	}
-	if owner.Valid {
-		model.Owner = owner.String
-	}
-	if schema.Valid {
-		model.Schema = schema.String
-	}
-
-	// Deserialize JSON fields
-	if err := deserializeJSON(tagsJSON, &model.Tags); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
-	}
-	if err := deserializeJSON(testsJSON, &model.Tests); err != nil {
-		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
-	}
-	if err := deserializeJSON(metaJSON, &model.Meta); err != nil {
-		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
-	}
-
-	return model, nil
-}
-
-// DeleteModelByFilePath deletes a model by its file system path.
-func (s *SQLiteStore) DeleteModelByFilePath(filePath string) error {
-	if s.db == nil {
-		return fmt.Errorf("database not opened")
-	}
-
-	// First delete associated column lineage
-	_, err := s.db.Exec(`
-		DELETE FROM column_lineage 
-		WHERE model_path IN (SELECT path FROM models WHERE file_path = ?)
-	`, filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete column lineage: %w", err)
-	}
-
-	// Delete model columns
-	_, err = s.db.Exec(`
-		DELETE FROM model_columns 
-		WHERE model_path IN (SELECT path FROM models WHERE file_path = ?)
-	`, filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete model columns: %w", err)
-	}
-
-	// Delete dependencies
-	_, err = s.db.Exec(`
-		DELETE FROM dependencies 
-		WHERE model_id IN (SELECT id FROM models WHERE file_path = ?)
-		   OR parent_id IN (SELECT id FROM models WHERE file_path = ?)
-	`, filePath, filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete dependencies: %w", err)
-	}
-
-	// Delete the model
-	_, err = s.db.Exec("DELETE FROM models WHERE file_path = ?", filePath)
-	if err != nil {
-		return fmt.Errorf("failed to delete model: %w", err)
-	}
-
-	return nil
-}
+// --- File path listing operations ---
 
 // ListModelFilePaths returns all file paths of tracked models.
 func (s *SQLiteStore) ListModelFilePaths() ([]string, error) {
@@ -1539,22 +999,19 @@ func (s *SQLiteStore) ListModelFilePaths() ([]string, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`SELECT file_path FROM models WHERE file_path IS NOT NULL AND file_path != ''`)
+	rows, err := s.queries.ListModelFilePaths(ctx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list model file paths: %w", err)
 	}
-	defer rows.Close()
 
-	var paths []string
-	for rows.Next() {
-		var path string
-		if err := rows.Scan(&path); err != nil {
-			return nil, fmt.Errorf("failed to scan file path: %w", err)
+	paths := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row != nil {
+			paths = append(paths, *row)
 		}
-		paths = append(paths, path)
 	}
 
-	return paths, rows.Err()
+	return paths, nil
 }
 
 // ListMacroFilePaths returns all file paths of tracked macro namespaces.
@@ -1563,23 +1020,186 @@ func (s *SQLiteStore) ListMacroFilePaths() ([]string, error) {
 		return nil, fmt.Errorf("database not opened")
 	}
 
-	rows, err := s.db.Query(`SELECT file_path FROM macro_namespaces WHERE file_path IS NOT NULL AND file_path != ''`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list macro file paths: %w", err)
-	}
-	defer rows.Close()
-
-	var paths []string
-	for rows.Next() {
-		var path string
-		if err := rows.Scan(&path); err != nil {
-			return nil, fmt.Errorf("failed to scan file path: %w", err)
-		}
-		paths = append(paths, path)
-	}
-
-	return paths, rows.Err()
+	return s.queries.ListMacroFilePaths(ctx())
 }
 
 // Ensure SQLiteStore implements StateStore interface
 var _ StateStore = (*SQLiteStore)(nil)
+
+// --- Helper functions for type conversion ---
+
+func nullableString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func serializeJSONPtr(v any) *string {
+	if v == nil {
+		return nil
+	}
+
+	// Check for empty slices and maps
+	switch val := v.(type) {
+	case []string:
+		if len(val) == 0 {
+			return nil
+		}
+	case []TestConfig:
+		if len(val) == 0 {
+			return nil
+		}
+	case map[string]any:
+		if len(val) == 0 {
+			return nil
+		}
+	}
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	s := string(data)
+	return &s
+}
+
+func deserializeJSON(data *string, target any) error {
+	if data == nil || *data == "" {
+		return nil
+	}
+	return json.Unmarshal([]byte(*data), target)
+}
+
+func convertRun(row sqlcgen.Run) *Run {
+	run := &Run{
+		ID:          row.ID,
+		Environment: row.Environment,
+		Status:      RunStatus(row.Status),
+		StartedAt:   row.StartedAt,
+		CompletedAt: row.CompletedAt,
+	}
+	if row.Error != nil {
+		run.Error = *row.Error
+	}
+	return run
+}
+
+func convertModel(row sqlcgen.Model) (*Model, error) {
+	model := &Model{
+		ID:           row.ID,
+		Path:         row.Path,
+		Name:         row.Name,
+		Materialized: row.Materialized,
+		ContentHash:  row.ContentHash,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
+	}
+
+	if row.UniqueKey != nil {
+		model.UniqueKey = *row.UniqueKey
+	}
+	if row.FilePath != nil {
+		model.FilePath = *row.FilePath
+	}
+	if row.Owner != nil {
+		model.Owner = *row.Owner
+	}
+	if row.SchemaName != nil {
+		model.Schema = *row.SchemaName
+	}
+
+	// Deserialize JSON fields
+	if err := deserializeJSON(row.Tags, &model.Tags); err != nil {
+		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
+	}
+	if err := deserializeJSON(row.Tests, &model.Tests); err != nil {
+		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
+	}
+	if err := deserializeJSON(row.Meta, &model.Meta); err != nil {
+		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
+	}
+
+	return model, nil
+}
+
+func convertModelRun(row sqlcgen.ModelRun) *ModelRun {
+	mr := &ModelRun{
+		ID:          row.ID,
+		RunID:       row.RunID,
+		ModelID:     row.ModelID,
+		Status:      ModelRunStatus(row.Status),
+		StartedAt:   row.StartedAt,
+		CompletedAt: row.CompletedAt,
+	}
+
+	if row.RowsAffected != nil {
+		mr.RowsAffected = *row.RowsAffected
+	}
+	if row.Error != nil {
+		mr.Error = *row.Error
+	}
+	if row.ExecutionMs != nil {
+		mr.ExecutionMS = *row.ExecutionMs
+	}
+
+	return mr
+}
+
+func convertEnvironment(row sqlcgen.Environment) *Environment {
+	env := &Environment{
+		Name:      row.Name,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+
+	if row.CommitRef != nil {
+		env.CommitRef = *row.CommitRef
+	}
+
+	return env
+}
+
+func convertMacroNamespace(row sqlcgen.MacroNamespace) *MacroNamespace {
+	ns := &MacroNamespace{
+		Name:     row.Name,
+		FilePath: row.FilePath,
+	}
+
+	if row.Package != nil {
+		ns.Package = *row.Package
+	}
+	if row.UpdatedAt != nil {
+		ns.UpdatedAt = row.UpdatedAt.Format(time.RFC3339)
+	}
+
+	return ns
+}
+
+func convertMacroFunction(row sqlcgen.MacroFunction) *MacroFunction {
+	fn := &MacroFunction{
+		Namespace: row.Namespace,
+		Name:      row.Name,
+	}
+
+	// Parse args JSON
+	if row.Args != "" {
+		json.Unmarshal([]byte(row.Args), &fn.Args)
+	}
+
+	if row.Docstring != nil {
+		fn.Docstring = *row.Docstring
+	}
+	if row.Line != nil {
+		fn.Line = int(*row.Line)
+	}
+
+	return fn
+}
