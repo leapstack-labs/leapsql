@@ -1,0 +1,27 @@
+# Valid configuration with environment-specific targets
+models_dir: models
+seeds_dir: seeds
+macros_dir: macros
+state_path: .leapsql/state.db
+environment: dev
+
+target:
+  type: duckdb
+  database: dev.duckdb
+  schema: main
+
+environments:
+  dev:
+    target:
+      type: duckdb
+      database: dev.duckdb
+  staging:
+    target:
+      type: duckdb
+      database: staging.duckdb
+      schema: staging
+  prod:
+    target:
+      type: duckdb
+      database: prod.duckdb
+      schema: prod

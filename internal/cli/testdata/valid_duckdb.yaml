@@ -1,0 +1,11 @@
+# Valid configuration with DuckDB target
+models_dir: models
+seeds_dir: seeds
+macros_dir: macros
+state_path: .leapsql/state.db
+environment: dev
+
+target:
+  type: duckdb
+  database: ":memory:"
+  schema: main

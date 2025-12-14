@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/spf13/viper"
 )
 
@@ -111,21 +112,18 @@ func expandTargetEnvVars(t *TargetConfig) {
 }
 
 // Validate checks if the target configuration is valid.
+// It uses the adapter registry to determine which adapter types are available.
 func (t *TargetConfig) Validate() error {
 	if t.Type == "" {
 		return fmt.Errorf("target type is required")
 	}
 
-	// Known adapter types (can be extended when adapters are registered)
-	knownTypes := map[string]bool{
-		"duckdb":    true,
-		"postgres":  true,
-		"snowflake": true,
-		"bigquery":  true,
-	}
-
-	if !knownTypes[strings.ToLower(t.Type)] {
-		return fmt.Errorf("unknown target type %q (available: duckdb, postgres, snowflake, bigquery)", t.Type)
+	// Use adapter registry as single source of truth
+	if !adapter.IsRegistered(strings.ToLower(t.Type)) {
+		return &adapter.UnknownAdapterError{
+			Type:      t.Type,
+			Available: adapter.ListAdapters(),
+		}
 	}
 
 	return nil
@@ -251,6 +249,11 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string) (*Config, error
 		cfg.Target.Database = cfg.DatabasePath
 	} else if cfg.Target.Database != "" && cfg.DatabasePath == "" {
 		cfg.DatabasePath = cfg.Target.Database
+	}
+
+	// Validate target configuration
+	if err := cfg.Target.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid target configuration: %w", err)
 	}
 
 	return &cfg, nil

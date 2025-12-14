@@ -1,0 +1,8 @@
+# Invalid configuration - empty target type
+models_dir: models
+seeds_dir: seeds
+state_path: .leapsql/state.db
+
+target:
+  type: ""
+  database: test.db

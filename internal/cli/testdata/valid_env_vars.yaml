@@ -1,0 +1,10 @@
+# Valid configuration with environment variable expansion
+models_dir: models
+seeds_dir: seeds
+state_path: .leapsql/state.db
+
+target:
+  type: duckdb
+  database: ${TEST_DB_PATH}
+  user: ${TEST_DB_USER}
+  password: ${TEST_DB_PASSWORD}
