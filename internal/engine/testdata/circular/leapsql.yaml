@@ -1,0 +1,4 @@
+models_dir: models
+
+target:
+  type: duckdb

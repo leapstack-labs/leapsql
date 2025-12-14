@@ -13,7 +13,7 @@ import (
 
 // TestIntegration_FullPipeline tests the complete pipeline from seeds to run.
 func TestIntegration_FullPipeline(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -461,7 +461,7 @@ FROM sales
 
 // TestIntegration_RunSelected tests running only selected models.
 func TestIntegration_RunSelected(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{

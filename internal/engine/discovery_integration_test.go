@@ -15,18 +15,18 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/state"
 )
 
-// testdataDir returns path to local testdata directory.
-func testdataDir() string {
-	return "testdata"
+// testdataDir returns path to local testdata directory for a scenario.
+func testdataDir(scenario string) string {
+	return filepath.Join("testdata", scenario)
 }
 
 // copyTestdata copies testdata to a temp dir for modification.
-func copyTestdata(t *testing.T) string {
+func copyTestdata(t *testing.T, scenario string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 
 	// Walk source and copy
-	srcDir := testdataDir()
+	srcDir := testdataDir(scenario)
 	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -89,7 +89,7 @@ func assertHashInSQLite(t *testing.T, store state.StateStore, filePath string) {
 // TestIntegration_FullDiscoveryCycle tests the complete incremental discovery workflow.
 func TestIntegration_FullDiscoveryCycle(t *testing.T) {
 	// Copy testdata to temp dir for modification
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -272,7 +272,7 @@ SELECT 1 as id, 'new' as name
 // TestIntegration_DiscoveryThenRun tests the workflow from discovery through execution.
 func TestIntegration_DiscoveryThenRun(t *testing.T) {
 	// Copy testdata to temp dir
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -383,7 +383,7 @@ func TestIntegration_DiscoveryThenRun(t *testing.T) {
 
 // TestIntegration_DiscoveryStateConsistency tests that in-memory state matches SQLite.
 func TestIntegration_DiscoveryStateConsistency(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -470,7 +470,7 @@ func TestIntegration_DiscoveryStateConsistency(t *testing.T) {
 
 // TestIntegration_DiscoveryWithMacroChanges tests macro change detection.
 func TestIntegration_DiscoveryWithMacroChanges(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -590,7 +590,7 @@ SELECT
 
 // TestIntegration_DAGDependencies tests that DAG dependencies are correctly resolved.
 func TestIntegration_DAGDependencies(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{
@@ -658,7 +658,7 @@ func TestIntegration_DAGDependencies(t *testing.T) {
 // TestIntegration_LineageExtraction verifies that lineage extraction integrates correctly with discovery.
 // Detailed lineage parsing is tested in the parser package; this test verifies the integration.
 func TestIntegration_LineageExtraction(t *testing.T) {
-	tmpDir := copyTestdata(t)
+	tmpDir := copyTestdata(t, "basic")
 	statePath := filepath.Join(tmpDir, "state.db")
 
 	cfg := Config{

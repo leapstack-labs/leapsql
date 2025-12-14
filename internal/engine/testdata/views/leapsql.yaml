@@ -1,0 +1,5 @@
+models_dir: models
+seeds_dir: seeds
+
+target:
+  type: duckdb
