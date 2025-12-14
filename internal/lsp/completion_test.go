@@ -41,7 +41,7 @@ func TestExtractTemplateExprContent(t *testing.T) {
 		{"SELECT {{ ", ""},
 		{"SELECT {{ config.", "config."},
 		{"SELECT {{ utils.upper(", "utils.upper("},
-		{"{{ ref('staging.", "ref('staging."},
+		{"{{ utils.format(", "utils.format("},
 		{"no templates", ""},
 	}
 
@@ -166,12 +166,6 @@ func TestServer_DetectContext(t *testing.T) {
 			content:     "SELECT {{ config.",
 			pos:         Position{Line: 0, Character: 17},
 			expectedCtx: ContextConfigAccess,
-		},
-		{
-			name:        "ref call",
-			content:     "SELECT {{ ref('",
-			pos:         Position{Line: 0, Character: 15},
-			expectedCtx: ContextRefCall,
 		},
 		{
 			name:        "SELECT clause",
@@ -354,10 +348,6 @@ func TestCompletionItemKinds(t *testing.T) {
 	// Verify builtin globals have correct kinds
 	for _, builtin := range builtinGlobals {
 		switch builtin.Label {
-		case "ref":
-			if builtin.Kind != CompletionItemKindFunction {
-				t.Errorf("ref should be Function, got %d", builtin.Kind)
-			}
 		case "config", "env", "target", "this":
 			if builtin.Kind != CompletionItemKindVariable {
 				t.Errorf("%s should be Variable, got %d", builtin.Label, builtin.Kind)

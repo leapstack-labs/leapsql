@@ -1,10 +1,9 @@
 -- SYNTAX TEST "source.leapsql" "Template expressions and statements"
 
-SELECT * FROM {{ ref("users") }}
---            ^^ punctuation.section.interpolation.begin.leapsql
---               ^^^ support.function.builtin.leapsql
+SELECT * FROM users
+-- Pure SQL - LeapSQL auto-detects dependencies
 
-SELECT * FROM {{ source("raw", "customers") }}
+SELECT * FROM {{ config.schema }}.customers
 --            ^^ punctuation.section.interpolation.begin.leapsql
 --               ^^^^^^ support.function.builtin.leapsql
 

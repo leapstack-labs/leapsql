@@ -20,11 +20,11 @@ const (
 	ContextFunctionArgs // Inside "func("
 	ContextStarlarkRoot // Inside {{ }} at root level
 	ContextMacroAccess  // Inside {{ namespace. }}
-	ContextRefCall      // Inside ref('
 	ContextConfigAccess // Inside config. or config["
 )
 
 // builtinGlobals are the reserved Starlark globals with documentation.
+// Note: LeapSQL auto-detects dependencies from SQL - no ref() function needed.
 var builtinGlobals = []CompletionItem{
 	{
 		Label:         "config",
@@ -49,14 +49,6 @@ var builtinGlobals = []CompletionItem{
 		Kind:          CompletionItemKindVariable,
 		Detail:        "struct",
 		Documentation: "Current model information. Fields: this.name, this.schema, this.database",
-	},
-	{
-		Label:            "ref",
-		Kind:             CompletionItemKindFunction,
-		Detail:           "func(model_path) -> string",
-		Documentation:    "Reference another model. Example: ref('staging.customers')",
-		InsertText:       "ref('$1')",
-		InsertTextFormat: InsertTextFormatSnippet,
 	},
 }
 
@@ -191,22 +183,6 @@ func (s *Server) getCompletions(params CompletionParams) []CompletionItem {
 			}
 		}
 
-	case ContextRefCall:
-		// Suggest model paths
-		if s.store != nil {
-			models, _ := s.store.ListModels()
-			for _, model := range models {
-				if strings.HasPrefix(model.Path, prefix) {
-					items = append(items, CompletionItem{
-						Label:      model.Path,
-						Kind:       CompletionItemKindModule,
-						Detail:     model.Materialized,
-						InsertText: model.Path + "')",
-					})
-				}
-			}
-		}
-
 	case ContextSelectClause, ContextWhereClause:
 		// Suggest SQL functions from catalog
 		items = append(items, getSQLFunctionCompletions(prefix)...)
@@ -247,11 +223,6 @@ func (s *Server) detectContext(doc *Document, pos Position) (CompletionContextTy
 	// 1. Check if inside template expression {{ }}
 	if inTemplateExpr(before) {
 		exprContent := extractTemplateExprContent(before)
-
-		// Check for ref(' pattern
-		if strings.HasSuffix(exprContent, "ref('") || strings.HasSuffix(exprContent, `ref("`) {
-			return ContextRefCall, ""
-		}
 
 		// Check for namespace.function pattern (e.g., "utils.")
 		if dotIdx := strings.LastIndex(exprContent, "."); dotIdx != -1 {

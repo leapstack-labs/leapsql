@@ -215,13 +215,14 @@ func TestBuildSQL(t *testing.T) {
 	}
 	defer engine.Close()
 
-	// Create a mock model config
+	// Create a mock model config - LeapSQL uses pure SQL, dependencies are auto-detected
 	modelCfg := &parser.ModelConfig{
 		Path:         "marts.summary",
 		Name:         "summary",
 		Materialized: "table",
-		SQL:          "SELECT * FROM {{ ref('staging.customers') }} JOIN {{ this }}",
-		Imports:      []string{"staging.customers"},
+		SQL:          "SELECT * FROM staging.customers JOIN {{ this.schema }}.{{ this.name }}",
+		Sources:      []string{"staging.customers"},
+		FilePath:     filepath.Join(modelsDir, "marts", "summary.sql"),
 	}
 
 	model := &state.Model{
@@ -231,23 +232,19 @@ func TestBuildSQL(t *testing.T) {
 
 	sql := engine.buildSQL(modelCfg, model)
 
-	// Check that {{ this }} was replaced
-	if strings.Contains(sql, "{{ this }}") {
-		t.Error("{{ this }} should be replaced")
+	// Check that {{ this.schema }}.{{ this.name }} was replaced
+	if strings.Contains(sql, "{{ this.schema }}") || strings.Contains(sql, "{{ this.name }}") {
+		t.Error("{{ this.schema }}.{{ this.name }} should be replaced")
 	}
 
-	// Check that {{ ref('staging.customers') }} was replaced
-	if strings.Contains(sql, "{{ ref('staging.customers') }}") {
-		t.Error("{{ ref('staging.customers') }} should be replaced")
-	}
-
-	// Check the actual replacements
+	// Check the actual replacements - should produce marts.summary
 	if !strings.Contains(sql, "marts.summary") {
-		t.Error("{{ this }} should be replaced with 'marts.summary'")
+		t.Errorf("{{ this.schema }}.{{ this.name }} should be replaced with 'marts.summary', got: %s", sql)
 	}
 
+	// Dependencies are auto-detected from SQL, not via ref()
 	if !strings.Contains(sql, "staging.customers") {
-		t.Error("ref should be replaced with table name")
+		t.Error("SQL should contain the source table reference")
 	}
 }
 

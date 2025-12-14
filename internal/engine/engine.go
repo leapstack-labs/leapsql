@@ -401,12 +401,6 @@ func (e *Engine) buildSQLLegacy(m *parser.ModelConfig, model *state.Model) strin
 	tableName := pathToTableName(m.Path)
 	sql = strings.ReplaceAll(sql, "{{ this }}", tableName)
 
-	// Replace ref('path') with actual table names
-	for _, imp := range m.Imports {
-		refPattern := fmt.Sprintf("{{ ref('%s') }}", imp)
-		sql = strings.ReplaceAll(sql, refPattern, pathToTableName(imp))
-	}
-
 	return sql
 }
 
@@ -535,10 +529,6 @@ func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, 
 				// Process template replacements in conditional content
 				condContent := cond.Content
 				condContent = strings.ReplaceAll(condContent, "{{ this }}", tableName)
-				for _, imp := range m.Imports {
-					refPattern := fmt.Sprintf("{{ ref('%s') }}", imp)
-					condContent = strings.ReplaceAll(condContent, refPattern, pathToTableName(imp))
-				}
 				incrementalSQL = sql + "\n" + condContent
 				break
 			}

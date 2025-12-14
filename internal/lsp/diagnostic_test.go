@@ -42,7 +42,7 @@ name: test
 SELECT 
     {{ config.name }},
     {{ utils.upper('name') }}
-FROM {{ ref('staging.users') }}
+FROM staging.users
 {* if env == "prod" *}
 WHERE active = true
 {* end *}`,
@@ -50,7 +50,7 @@ WHERE active = true
 SELECT 
     __EXPR__,
     __EXPR__
-FROM __EXPR__
+FROM staging.users
 
 WHERE active = true
 `,
