@@ -6,182 +6,267 @@ import (
 	"testing"
 )
 
-func TestParser_ParseContent_BasicModel(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- Basic model with no pragmas
+func TestParser_ParseContent(t *testing.T) {
+	tests := []struct {
+		name          string
+		sql           string
+		wantName      string
+		wantPath      string
+		wantMatl      string
+		wantUniqueKey string
+		wantImports   []string
+		checkFunc     func(t *testing.T, config *ModelConfig)
+	}{
+		{
+			name: "basic model",
+			sql: `-- Basic model with no pragmas
 SELECT id, name, email
 FROM raw.users
-WHERE active = true`
-
-	config, err := p.ParseContent("/models/staging/users.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if config.Name != "users" {
-		t.Errorf("expected name 'users', got %q", config.Name)
-	}
-	if config.Path != "staging.users" {
-		t.Errorf("expected path 'staging.users', got %q", config.Path)
-	}
-	if config.Materialized != "table" {
-		t.Errorf("expected materialized 'table', got %q", config.Materialized)
-	}
-	if len(config.Imports) != 0 {
-		t.Errorf("expected 0 imports, got %d", len(config.Imports))
-	}
-}
-
-func TestParser_ParseContent_WithConfig(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @config(materialized='view')
+WHERE active = true`,
+			wantName: "users",
+			wantPath: "staging.users",
+			wantMatl: "table",
+		},
+		{
+			name: "with config",
+			sql: `-- @config(materialized='view')
 SELECT id, name
-FROM staging.users`
-
-	config, err := p.ParseContent("/models/marts/user_summary.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if config.Materialized != "view" {
-		t.Errorf("expected materialized 'view', got %q", config.Materialized)
-	}
-}
-
-func TestParser_ParseContent_WithUniqueKey(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @config(materialized='incremental', unique_key='id')
+FROM staging.users`,
+			wantName: "user_summary",
+			wantPath: "marts.user_summary",
+			wantMatl: "view",
+		},
+		{
+			name: "with unique_key",
+			sql: `-- @config(materialized='incremental', unique_key='id')
 SELECT id, name, updated_at
 FROM staging.users
-WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})`
-
-	config, err := p.ParseContent("/models/marts/users.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if config.Materialized != "incremental" {
-		t.Errorf("expected materialized 'incremental', got %q", config.Materialized)
-	}
-	if config.UniqueKey != "id" {
-		t.Errorf("expected unique_key 'id', got %q", config.UniqueKey)
-	}
-}
-
-func TestParser_ParseContent_WithImports(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @import(staging.orders)
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})`,
+			wantName:      "users",
+			wantPath:      "marts.users",
+			wantMatl:      "incremental",
+			wantUniqueKey: "id",
+		},
+		{
+			name: "with single import",
+			sql: `-- @import(staging.orders)
 -- @import(staging.customers)
 SELECT 
     o.id,
     c.name
 FROM staging.orders o
-JOIN staging.customers c ON o.customer_id = c.id`
-
-	config, err := p.ParseContent("/models/marts/order_summary.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Imports) != 2 {
-		t.Fatalf("expected 2 imports, got %d", len(config.Imports))
-	}
-	if config.Imports[0] != "staging.orders" {
-		t.Errorf("expected first import 'staging.orders', got %q", config.Imports[0])
-	}
-	if config.Imports[1] != "staging.customers" {
-		t.Errorf("expected second import 'staging.customers', got %q", config.Imports[1])
-	}
-}
-
-func TestParser_ParseContent_WithMultipleImports(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @import(staging.orders, staging.customers, staging.products)
-SELECT * FROM staging.orders`
-
-	config, err := p.ParseContent("/models/marts/summary.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Imports) != 3 {
-		t.Fatalf("expected 3 imports, got %d", len(config.Imports))
-	}
-}
-
-func TestParser_ParseContent_WithConditional(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @config(materialized='table')
+JOIN staging.customers c ON o.customer_id = c.id`,
+			wantName:    "order_summary",
+			wantPath:    "marts.order_summary",
+			wantImports: []string{"staging.orders", "staging.customers"},
+		},
+		{
+			name: "with multiple imports",
+			sql: `-- @import(staging.orders, staging.customers, staging.products)
+SELECT * FROM staging.orders`,
+			wantName:    "summary",
+			wantPath:    "marts.summary",
+			wantImports: []string{"staging.orders", "staging.customers", "staging.products"},
+		},
+		{
+			name: "with conditional",
+			sql: `-- @config(materialized='table')
 SELECT id, name
 FROM staging.users
 -- #if env == 'prod'
 WHERE created_at > '2024-01-01'
--- #endif`
-
-	config, err := p.ParseContent("/models/marts/users.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Conditionals) != 1 {
-		t.Fatalf("expected 1 conditional, got %d", len(config.Conditionals))
-	}
-	if config.Conditionals[0].Condition != "env == 'prod'" {
-		t.Errorf("expected condition \"env == 'prod'\", got %q", config.Conditionals[0].Condition)
-	}
-	if config.Conditionals[0].Content != "WHERE created_at > '2024-01-01'\n" {
-		t.Errorf("unexpected conditional content: %q", config.Conditionals[0].Content)
-	}
-}
-
-func TestParser_ParseContent_SQLWithoutPragmas(t *testing.T) {
-	p := NewParser("/models")
-
-	content := `-- @config(materialized='view')
+-- #endif`,
+			wantName: "users",
+			wantPath: "marts.users",
+			checkFunc: func(t *testing.T, config *ModelConfig) {
+				if len(config.Conditionals) != 1 {
+					t.Fatalf("expected 1 conditional, got %d", len(config.Conditionals))
+				}
+				if config.Conditionals[0].Condition != "env == 'prod'" {
+					t.Errorf("expected condition \"env == 'prod'\", got %q", config.Conditionals[0].Condition)
+				}
+				if config.Conditionals[0].Content != "WHERE created_at > '2024-01-01'\n" {
+					t.Errorf("unexpected conditional content: %q", config.Conditionals[0].Content)
+				}
+			},
+		},
+		{
+			name: "SQL without pragmas",
+			sql: `-- @config(materialized='view')
 -- @import(staging.users)
 SELECT id, name
 FROM staging.users
-WHERE active = true`
-
-	config, err := p.ParseContent("/models/active_users.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	expectedSQL := `SELECT id, name
+WHERE active = true`,
+			wantName: "active_users",
+			wantPath: "active_users",
+			checkFunc: func(t *testing.T, config *ModelConfig) {
+				expectedSQL := `SELECT id, name
 FROM staging.users
 WHERE active = true`
+				if config.SQL != expectedSQL {
+					t.Errorf("expected SQL:\n%s\ngot:\n%s", expectedSQL, config.SQL)
+				}
+			},
+		},
+	}
 
-	if config.SQL != expectedSQL {
-		t.Errorf("expected SQL:\n%s\ngot:\n%s", expectedSQL, config.SQL)
+	// Map test name to file path
+	filePaths := map[string]string{
+		"basic model":           "/models/staging/users.sql",
+		"with config":           "/models/marts/user_summary.sql",
+		"with unique_key":       "/models/marts/users.sql",
+		"with single import":    "/models/marts/order_summary.sql",
+		"with multiple imports": "/models/marts/summary.sql",
+		"with conditional":      "/models/marts/users.sql",
+		"SQL without pragmas":   "/models/active_users.sql",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser("/models")
+			filePath := filePaths[tt.name]
+			config, err := p.ParseContent(filePath, tt.sql)
+			if err != nil {
+				t.Fatalf("failed to parse content: %v", err)
+			}
+
+			if tt.wantName != "" && config.Name != tt.wantName {
+				t.Errorf("expected name %q, got %q", tt.wantName, config.Name)
+			}
+			if tt.wantPath != "" && config.Path != tt.wantPath {
+				t.Errorf("expected path %q, got %q", tt.wantPath, config.Path)
+			}
+			if tt.wantMatl != "" && config.Materialized != tt.wantMatl {
+				t.Errorf("expected materialized %q, got %q", tt.wantMatl, config.Materialized)
+			}
+			if tt.wantUniqueKey != "" && config.UniqueKey != tt.wantUniqueKey {
+				t.Errorf("expected unique_key %q, got %q", tt.wantUniqueKey, config.UniqueKey)
+			}
+			if tt.wantImports != nil {
+				if len(config.Imports) != len(tt.wantImports) {
+					t.Fatalf("expected %d imports, got %d", len(tt.wantImports), len(config.Imports))
+				}
+				for i, imp := range tt.wantImports {
+					if config.Imports[i] != imp {
+						t.Errorf("import[%d]: expected %q, got %q", i, imp, config.Imports[i])
+					}
+				}
+			}
+			if tt.checkFunc != nil {
+				tt.checkFunc(t, config)
+			}
+		})
+	}
+}
+
+func TestParser_ParseContent_AutoDetect(t *testing.T) {
+	tests := []struct {
+		name        string
+		sql         string
+		wantSources []string
+	}{
+		{
+			name:        "simple FROM clause",
+			sql:         `SELECT id, name FROM customers`,
+			wantSources: []string{"customers"},
+		},
+		{
+			name:        "qualified table names",
+			sql:         `SELECT id, name FROM staging.stg_customers`,
+			wantSources: []string{"staging.stg_customers"},
+		},
+		{
+			name: "JOIN with multiple sources",
+			sql: `SELECT 
+		c.customer_id,
+		o.order_id
+	FROM staging.stg_customers c
+	LEFT JOIN staging.stg_orders o ON c.customer_id = o.customer_id`,
+			wantSources: []string{"staging.stg_customers", "staging.stg_orders"},
+		},
+		{
+			name: "SQL with pragmas",
+			sql: `-- @config(materialized='table')
+-- @import(staging.stg_customers)
+-- Comment line
+SELECT 
+	customer_id,
+	customer_name
+FROM staging.stg_customers`,
+			wantSources: []string{"staging.stg_customers"},
+		},
+		{
+			name: "subquery with inner table reference",
+			sql: `SELECT * FROM (
+		SELECT id, name FROM raw_customers
+	) subq`,
+			wantSources: []string{"raw_customers"},
+		},
+		{
+			name: "CTE",
+			sql: `WITH customer_orders AS (
+		SELECT customer_id, COUNT(*) as order_count
+		FROM raw_orders
+		GROUP BY customer_id
+	)
+	SELECT c.*, co.order_count
+	FROM raw_customers c
+	JOIN customer_orders co ON c.id = co.customer_id`,
+			wantSources: []string{"raw_orders", "raw_customers"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser("/models")
+			config, err := p.ParseContent("/models/test.sql", tt.sql)
+			if err != nil {
+				t.Fatalf("failed to parse content: %v", err)
+			}
+
+			sourcesMap := make(map[string]bool)
+			for _, s := range config.Sources {
+				sourcesMap[s] = true
+			}
+
+			for _, want := range tt.wantSources {
+				if !sourcesMap[want] {
+					t.Errorf("expected source %q in sources %v", want, config.Sources)
+				}
+			}
+
+			// Special check for CTE test: CTE names should NOT be in sources
+			if tt.name == "CTE" {
+				if sourcesMap["customer_orders"] {
+					t.Error("CTE 'customer_orders' should NOT be in sources")
+				}
+			}
+		})
 	}
 }
 
 func TestParser_filePathToModelPath(t *testing.T) {
 	tests := []struct {
+		name     string
 		baseDir  string
 		filePath string
 		expected string
 	}{
-		{"/models", "/models/staging/users.sql", "staging.users"},
-		{"/models", "/models/marts/core/orders.sql", "marts.core.orders"},
-		{"/models", "/models/users.sql", "users"},
-		{"/app/models", "/app/models/staging/customers.sql", "staging.customers"},
+		{"staging model", "/models", "/models/staging/users.sql", "staging.users"},
+		{"nested marts model", "/models", "/models/marts/core/orders.sql", "marts.core.orders"},
+		{"root model", "/models", "/models/users.sql", "users"},
+		{"different base", "/app/models", "/app/models/staging/customers.sql", "staging.customers"},
 	}
 
-	for _, tc := range tests {
-		p := NewParser(tc.baseDir)
-		result := p.filePathToModelPath(tc.filePath)
-		if result != tc.expected {
-			t.Errorf("filePathToModelPath(%q, %q) = %q, expected %q",
-				tc.baseDir, tc.filePath, result, tc.expected)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.baseDir)
+			result := p.filePathToModelPath(tt.filePath)
+			if result != tt.expected {
+				t.Errorf("filePathToModelPath(%q, %q) = %q, expected %q",
+					tt.baseDir, tt.filePath, result, tt.expected)
+			}
+		})
 	}
 }
 
@@ -270,160 +355,6 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 
 	if len(models) != 1 {
 		t.Errorf("expected 1 model (skipping hidden), got %d", len(models))
-	}
-}
-
-func TestParser_ParseContent_AutoDetectSources(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: simple FROM clause
-	content := `SELECT id, name FROM customers`
-	config, err := p.ParseContent("/models/simple.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Sources) != 1 {
-		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
-	}
-	if config.Sources[0] != "customers" {
-		t.Errorf("expected source 'customers', got %q", config.Sources[0])
-	}
-}
-
-func TestParser_ParseContent_AutoDetectQualifiedSources(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: qualified table names
-	content := `SELECT id, name FROM staging.stg_customers`
-	config, err := p.ParseContent("/models/qualified.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Sources) != 1 {
-		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
-	}
-	if config.Sources[0] != "staging.stg_customers" {
-		t.Errorf("expected source 'staging.stg_customers', got %q", config.Sources[0])
-	}
-}
-
-func TestParser_ParseContent_AutoDetectJoinSources(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: JOIN with multiple sources
-	content := `SELECT 
-		c.customer_id,
-		o.order_id
-	FROM staging.stg_customers c
-	LEFT JOIN staging.stg_orders o ON c.customer_id = o.customer_id`
-	config, err := p.ParseContent("/models/join.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Sources) != 2 {
-		t.Fatalf("expected 2 sources, got %d: %v", len(config.Sources), config.Sources)
-	}
-
-	// Check both sources are present (order may vary)
-	sourcesMap := make(map[string]bool)
-	for _, s := range config.Sources {
-		sourcesMap[s] = true
-	}
-	if !sourcesMap["staging.stg_customers"] {
-		t.Error("expected 'staging.stg_customers' in sources")
-	}
-	if !sourcesMap["staging.stg_orders"] {
-		t.Error("expected 'staging.stg_orders' in sources")
-	}
-}
-
-func TestParser_ParseContent_AutoDetectWithPragmas(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: SQL with pragmas - should still detect sources from SQL
-	content := `-- @config(materialized='table')
--- @import(staging.stg_customers)
--- Comment line
-SELECT 
-	customer_id,
-	customer_name
-FROM staging.stg_customers`
-
-	config, err := p.ParseContent("/models/with_pragmas.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	// Should have explicit import from pragma
-	if len(config.Imports) != 1 {
-		t.Errorf("expected 1 import, got %d", len(config.Imports))
-	}
-
-	// Should also have auto-detected source
-	if len(config.Sources) != 1 {
-		t.Fatalf("expected 1 auto-detected source, got %d: %v", len(config.Sources), config.Sources)
-	}
-	if config.Sources[0] != "staging.stg_customers" {
-		t.Errorf("expected source 'staging.stg_customers', got %q", config.Sources[0])
-	}
-}
-
-func TestParser_ParseContent_AutoDetectSubquery(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: subquery with inner table reference
-	content := `SELECT * FROM (
-		SELECT id, name FROM raw_customers
-	) subq`
-
-	config, err := p.ParseContent("/models/subquery.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	if len(config.Sources) != 1 {
-		t.Fatalf("expected 1 source, got %d: %v", len(config.Sources), config.Sources)
-	}
-	if config.Sources[0] != "raw_customers" {
-		t.Errorf("expected source 'raw_customers', got %q", config.Sources[0])
-	}
-}
-
-func TestParser_ParseContent_AutoDetectCTE(t *testing.T) {
-	p := NewParser("/models")
-
-	// Test: CTE - should only include real table sources, not the CTE itself
-	content := `WITH customer_orders AS (
-		SELECT customer_id, COUNT(*) as order_count
-		FROM raw_orders
-		GROUP BY customer_id
-	)
-	SELECT c.*, co.order_count
-	FROM raw_customers c
-	JOIN customer_orders co ON c.id = co.customer_id`
-
-	config, err := p.ParseContent("/models/cte.sql", content)
-	if err != nil {
-		t.Fatalf("failed to parse content: %v", err)
-	}
-
-	// Should have 2 sources (raw_orders and raw_customers), not the CTE (customer_orders)
-	sourcesMap := make(map[string]bool)
-	for _, s := range config.Sources {
-		sourcesMap[s] = true
-	}
-
-	if !sourcesMap["raw_orders"] {
-		t.Errorf("expected 'raw_orders' in sources, got %v", config.Sources)
-	}
-	if !sourcesMap["raw_customers"] {
-		t.Errorf("expected 'raw_customers' in sources, got %v", config.Sources)
-	}
-	if sourcesMap["customer_orders"] {
-		t.Error("CTE 'customer_orders' should NOT be in sources")
 	}
 }
 

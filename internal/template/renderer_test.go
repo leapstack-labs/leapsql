@@ -26,264 +26,173 @@ func newTestContext() *starctx.ExecutionContext {
 	return starctx.NewExecutionContext(config, "dev", target, this)
 }
 
-func TestRenderer_PlainText(t *testing.T) {
-	input := "SELECT * FROM users"
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestRenderer_Expressions(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"plain text", "SELECT * FROM users", "SELECT * FROM users"},
+		{"simple expression", `SELECT * FROM {{ target.schema }}.users`, "SELECT * FROM analytics.users"},
+		{"multiple expressions", `{{ target.schema }}.{{ this.name }}`, "analytics.test_model"},
+		{"env variable", `{{ env }}`, "dev"},
+		{"config access", `{{ config["materialized"] }}`, "table"},
+		{"string concatenation", `{{ target.schema + "." + this.name }}`, "analytics.test_model"},
+		{"integer expression", `{{ 1 + 2 }}`, "3"},
+		{"boolean expression", `{{ True }}`, "True"},
 	}
 
-	if result != input {
-		t.Errorf("expected %q, got %q", input, result)
-	}
-}
-
-func TestRenderer_SimpleExpression(t *testing.T) {
-	input := `SELECT * FROM {{ target.schema }}.users`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := "SELECT * FROM analytics.users"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
-	}
-}
-
-func TestRenderer_MultipleExpressions(t *testing.T) {
-	input := `{{ target.schema }}.{{ this.name }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := "analytics.test_model"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
-	}
-}
-
-func TestRenderer_EnvVariable(t *testing.T) {
-	input := `{{ env }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "dev" {
-		t.Errorf("expected 'dev', got %q", result)
-	}
-}
-
-func TestRenderer_ConfigAccess(t *testing.T) {
-	input := `{{ config["materialized"] }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "table" {
-		t.Errorf("expected 'table', got %q", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newTestContext()
+			result, err := RenderString(tt.input, "test.sql", ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
 	}
 }
 
 func TestRenderer_ForLoop(t *testing.T) {
-	input := `SELECT
+	tests := []struct {
+		name        string
+		input       string
+		expected    string
+		containsAll []string // for cases where exact match is hard due to whitespace
+	}{
+		{
+			name:     "inline loop",
+			input:    `{* for x in [1, 2, 3]: *}{{ x }}{* endfor *}`,
+			expected: "123",
+		},
+		{
+			name:     "empty loop",
+			input:    `before{* for x in []: *}{{ x }}{* endfor *}after`,
+			expected: "beforeafter",
+		},
+		{
+			name: "loop with list",
+			input: `SELECT
 {* for col in ["id", "name", "email"]: *}
     {{ col }},
 {* endfor *}
-FROM users`
-
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+FROM users`,
+			containsAll: []string{"id", "name", "email"},
+		},
+		{
+			name: "nested loop",
+			input: `{* for i in [0, 1, 2]: *}
+{* for j in [0, 1]: *}
+({{ i }}, {{ j }})
+{* endfor *}
+{* endfor *}`,
+			containsAll: []string{"(0, 0)", "(0, 1)", "(1, 0)", "(1, 1)", "(2, 0)", "(2, 1)"},
+		},
 	}
 
-	// Check that all columns are present
-	for _, col := range []string{"id", "name", "email"} {
-		if !strings.Contains(result, col) {
-			t.Errorf("expected result to contain %q, got %q", col, result)
-		}
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newTestContext()
+			result, err := RenderString(tt.input, "test.sql", ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-func TestRenderer_ForLoopInline(t *testing.T) {
-	input := `{* for x in [1, 2, 3]: *}{{ x }}{* endfor *}`
-	ctx := newTestContext()
+			if tt.expected != "" && result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
 
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "123" {
-		t.Errorf("expected '123', got %q", result)
-	}
-}
-
-func TestRenderer_IfTrue(t *testing.T) {
-	input := `{* if env == "dev": *}DEV{* endif *}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "DEV" {
-		t.Errorf("expected 'DEV', got %q", result)
+			for _, s := range tt.containsAll {
+				if !strings.Contains(result, s) {
+					t.Errorf("expected result to contain %q, got %q", s, result)
+				}
+			}
+		})
 	}
 }
 
-func TestRenderer_IfFalse(t *testing.T) {
-	input := `{* if env == "prod": *}PROD{* endif *}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestRenderer_IfStatement(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"if true", `{* if env == "dev": *}DEV{* endif *}`, "DEV"},
+		{"if false", `{* if env == "prod": *}PROD{* endif *}`, ""},
+		{"if-else true branch", `{* if env == "dev": *}DEV{* else: *}NOT_DEV{* endif *}`, "DEV"},
+		{"if-else false branch", `{* if env == "prod": *}PROD{* else: *}NOT_PROD{* endif *}`, "NOT_PROD"},
+		{"if-elif-else", `{* if env == "prod": *}PROD{* elif env == "dev": *}DEV{* else: *}OTHER{* endif *}`, "DEV"},
+		{"nested for-if", `{* for x in [1, 2, 3]: *}{* if x > 1: *}{{ x }}{* endif *}{* endfor *}`, "23"},
 	}
 
-	if result != "" {
-		t.Errorf("expected empty, got %q", result)
-	}
-}
-
-func TestRenderer_IfElse(t *testing.T) {
-	input := `{* if env == "prod": *}PROD{* else: *}NOT_PROD{* endif *}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "NOT_PROD" {
-		t.Errorf("expected 'NOT_PROD', got %q", result)
-	}
-}
-
-func TestRenderer_IfElif(t *testing.T) {
-	input := `{* if env == "prod": *}PROD{* elif env == "dev": *}DEV{* else: *}OTHER{* endif *}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "DEV" {
-		t.Errorf("expected 'DEV', got %q", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newTestContext()
+			result, err := RenderString(tt.input, "test.sql", ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
 	}
 }
 
-func TestRenderer_NestedForIf(t *testing.T) {
-	input := `{* for x in [1, 2, 3]: *}{* if x > 1: *}{{ x }}{* endif *}{* endfor *}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestRenderer_TruthyFalsy(t *testing.T) {
+	tests := []struct {
+		name      string
+		condition string
+		expected  string
+	}{
+		{"True", `True`, "yes"},
+		{"False", `False`, "no"},
+		{"1", `1`, "yes"},
+		{"0", `0`, "no"},
+		{"empty string", `""`, "no"},
+		{"non-empty string", `"hello"`, "yes"},
+		{"empty list", `[]`, "no"},
+		{"non-empty list", `[1]`, "yes"},
 	}
 
-	if result != "23" {
-		t.Errorf("expected '23', got %q", result)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := `{* if ` + tt.condition + `: *}yes{* else: *}no{* endif *}`
+			ctx := newTestContext()
 
-func TestRenderer_StringConcatenation(t *testing.T) {
-	input := `{{ target.schema + "." + this.name }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := "analytics.test_model"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
-	}
-}
-
-func TestRenderer_IntegerExpression(t *testing.T) {
-	input := `{{ 1 + 2 }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "3" {
-		t.Errorf("expected '3', got %q", result)
+			result, err := RenderString(input, "test.sql", ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
 	}
 }
 
-func TestRenderer_BooleanExpression(t *testing.T) {
-	input := `{{ True }}`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestRenderer_Errors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"undefined variable", `{{ undefined_variable }}`},
+		{"undefined iterator", `{* for x in undefined: *}{{ x }}{* endfor *}`},
+		{"undefined condition", `{* if undefined: *}yes{* endif *}`},
+		{"non-iterable for", `{* for x in 42: *}{{ x }}{* endfor *}`},
 	}
 
-	if result != "True" {
-		t.Errorf("expected 'True', got %q", result)
-	}
-}
-
-func TestRenderer_ErrorInExpression(t *testing.T) {
-	input := `{{ undefined_variable }}`
-	ctx := newTestContext()
-
-	_, err := RenderString(input, "test.sql", ctx)
-	if err == nil {
-		t.Fatal("expected error for undefined variable")
-	}
-}
-
-func TestRenderer_ErrorInForIterator(t *testing.T) {
-	input := `{* for x in undefined: *}{{ x }}{* endfor *}`
-	ctx := newTestContext()
-
-	_, err := RenderString(input, "test.sql", ctx)
-	if err == nil {
-		t.Fatal("expected error for undefined iterator")
-	}
-}
-
-func TestRenderer_ErrorInCondition(t *testing.T) {
-	input := `{* if undefined: *}yes{* endif *}`
-	ctx := newTestContext()
-
-	_, err := RenderString(input, "test.sql", ctx)
-	if err == nil {
-		t.Fatal("expected error for undefined condition")
-	}
-}
-
-func TestRenderer_NonIterableFor(t *testing.T) {
-	input := `{* for x in 42: *}{{ x }}{* endfor *}`
-	ctx := newTestContext()
-
-	_, err := RenderString(input, "test.sql", ctx)
-	if err == nil {
-		t.Fatal("expected error for non-iterable")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newTestContext()
+			_, err := RenderString(tt.input, "test.sql", ctx)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -326,74 +235,5 @@ FROM {{ target.schema }}.users`
 	// Should have correct table reference
 	if !strings.Contains(result, "analytics.users") {
 		t.Error("expected result to contain 'analytics.users'")
-	}
-}
-
-func TestRenderer_LoopWithIndex(t *testing.T) {
-	// Testing that nested variables work correctly
-	input := `{* for i in [0, 1, 2]: *}
-{* for j in [0, 1]: *}
-({{ i }}, {{ j }})
-{* endfor *}
-{* endfor *}`
-
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Check for some expected pairs
-	expected := []string{"(0, 0)", "(0, 1)", "(1, 0)", "(1, 1)", "(2, 0)", "(2, 1)"}
-	for _, exp := range expected {
-		if !strings.Contains(result, exp) {
-			t.Errorf("expected result to contain %q, got %q", exp, result)
-		}
-	}
-}
-
-func TestRenderer_EmptyLoop(t *testing.T) {
-	input := `before{* for x in []: *}{{ x }}{* endfor *}after`
-	ctx := newTestContext()
-
-	result, err := RenderString(input, "test.sql", ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result != "beforeafter" {
-		t.Errorf("expected 'beforeafter', got %q", result)
-	}
-}
-
-func TestRenderer_TruthyFalsy(t *testing.T) {
-	tests := []struct {
-		condition string
-		expected  string
-	}{
-		{`True`, "yes"},
-		{`False`, "no"},
-		{`1`, "yes"},
-		{`0`, "no"},
-		{`""`, "no"},
-		{`"hello"`, "yes"},
-		{`[]`, "no"},
-		{`[1]`, "yes"},
-	}
-
-	for _, tt := range tests {
-		input := `{* if ` + tt.condition + `: *}yes{* else: *}no{* endif *}`
-		ctx := newTestContext()
-
-		result, err := RenderString(input, "test.sql", ctx)
-		if err != nil {
-			t.Errorf("condition %s: unexpected error: %v", tt.condition, err)
-			continue
-		}
-
-		if result != tt.expected {
-			t.Errorf("condition %s: expected %q, got %q", tt.condition, tt.expected, result)
-		}
 	}
 }

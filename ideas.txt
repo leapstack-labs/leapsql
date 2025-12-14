@@ -1,5 +1,4 @@
 progressive disclosure tests?
-table-test
 dialect specific test
 marco external packages main.star
 macro package management: packages.yaml packages-lock.yaml

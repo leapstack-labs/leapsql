@@ -29,28 +29,47 @@ func TestGraph_AddNodeAndEdge(t *testing.T) {
 	}
 }
 
-func TestGraph_AddEdge_InvalidNodes(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-
-	err := g.AddEdge("a", "nonexistent")
-	if err == nil {
-		t.Error("expected error for nonexistent child node")
+func TestGraph_AddEdge_Errors(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(g *Graph)
+		from   string
+		to     string
+		errMsg string
+	}{
+		{
+			name:   "nonexistent child node",
+			setup:  func(g *Graph) { g.AddNode("a", nil) },
+			from:   "a",
+			to:     "nonexistent",
+			errMsg: "expected error for nonexistent child node",
+		},
+		{
+			name:   "nonexistent parent node",
+			setup:  func(g *Graph) { g.AddNode("a", nil) },
+			from:   "nonexistent",
+			to:     "a",
+			errMsg: "expected error for nonexistent parent node",
+		},
+		{
+			name:   "self loop",
+			setup:  func(g *Graph) { g.AddNode("a", nil) },
+			from:   "a",
+			to:     "a",
+			errMsg: "expected error for self-loop",
+		},
 	}
 
-	err = g.AddEdge("nonexistent", "a")
-	if err == nil {
-		t.Error("expected error for nonexistent parent node")
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewGraph()
+			tt.setup(g)
 
-func TestGraph_AddEdge_SelfLoop(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-
-	err := g.AddEdge("a", "a")
-	if err == nil {
-		t.Error("expected error for self-loop")
+			err := g.AddEdge(tt.from, tt.to)
+			if err == nil {
+				t.Error(tt.errMsg)
+			}
+		})
 	}
 }
 
@@ -76,124 +95,175 @@ func TestGraph_GetParentsAndChildren(t *testing.T) {
 	}
 }
 
-func TestGraph_HasCycle_NoCycle(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
+func TestGraph_HasCycle(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(g *Graph)
+		wantCycle bool
+	}{
+		{
+			name: "no cycle",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("b", "c")
+			},
+			wantCycle: false,
+		},
+		{
+			name: "with cycle",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("b", "c")
+				g.AddEdge("c", "a") // Creates cycle
+			},
+			wantCycle: true,
+		},
+	}
 
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "c")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewGraph()
+			tt.setup(g)
 
-	hasCycle, path := g.HasCycle()
-	if hasCycle {
-		t.Errorf("expected no cycle, but found: %v", path)
+			hasCycle, path := g.HasCycle()
+			if hasCycle != tt.wantCycle {
+				t.Errorf("expected hasCycle=%v, got %v (path: %v)", tt.wantCycle, hasCycle, path)
+			}
+			if tt.wantCycle && len(path) == 0 {
+				t.Error("expected cycle path to be non-empty")
+			}
+		})
 	}
 }
 
-func TestGraph_HasCycle_WithCycle(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
-
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "c")
-	g.AddEdge("c", "a") // Creates cycle
-
-	hasCycle, path := g.HasCycle()
-	if !hasCycle {
-		t.Error("expected cycle to be detected")
+func TestGraph_TopologicalSort(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(g *Graph)
+		wantNodes int
+		wantErr   bool
+		verify    func(t *testing.T, sorted []*Node)
+	}{
+		{
+			name: "simple chain",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("b", "c")
+			},
+			wantNodes: 3,
+			verify: func(t *testing.T, sorted []*Node) {
+				positions := make(map[string]int)
+				for i, node := range sorted {
+					positions[node.ID] = i
+				}
+				if positions["a"] >= positions["b"] {
+					t.Error("a should come before b")
+				}
+				if positions["b"] >= positions["c"] {
+					t.Error("b should come before c")
+				}
+			},
+		},
+		{
+			name: "diamond dependency",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddNode("d", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("a", "c")
+				g.AddEdge("b", "d")
+				g.AddEdge("c", "d")
+			},
+			wantNodes: 4,
+			verify: func(t *testing.T, sorted []*Node) {
+				positions := make(map[string]int)
+				for i, node := range sorted {
+					positions[node.ID] = i
+				}
+				if positions["a"] != 0 {
+					t.Error("a should be first")
+				}
+				if positions["d"] != 3 {
+					t.Error("d should be last")
+				}
+				if positions["b"] <= positions["a"] || positions["b"] >= positions["d"] {
+					t.Error("b should be between a and d")
+				}
+				if positions["c"] <= positions["a"] || positions["c"] >= positions["d"] {
+					t.Error("c should be between a and d")
+				}
+			},
+		},
+		{
+			name: "with cycle",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("b", "a") // Cycle
+			},
+			wantErr: true,
+		},
+		{
+			name: "disconnected components",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddNode("d", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("c", "d")
+			},
+			wantNodes: 4,
+			verify: func(t *testing.T, sorted []*Node) {
+				positions := make(map[string]int)
+				for i, node := range sorted {
+					positions[node.ID] = i
+				}
+				if positions["a"] >= positions["b"] {
+					t.Error("a should come before b")
+				}
+				if positions["c"] >= positions["d"] {
+					t.Error("c should come before d")
+				}
+			},
+		},
 	}
-	if len(path) == 0 {
-		t.Error("expected cycle path to be non-empty")
-	}
-}
 
-func TestGraph_TopologicalSort_Simple(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewGraph()
+			tt.setup(g)
 
-	// b depends on a, c depends on b
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "c")
+			sorted, err := g.TopologicalSort()
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error for cyclic graph")
+				}
+				return
+			}
 
-	sorted, err := g.TopologicalSort()
-	if err != nil {
-		t.Fatalf("failed to sort: %v", err)
-	}
-
-	if len(sorted) != 3 {
-		t.Fatalf("expected 3 nodes, got %d", len(sorted))
-	}
-
-	// Verify order: a must come before b, b must come before c
-	positions := make(map[string]int)
-	for i, node := range sorted {
-		positions[node.ID] = i
-	}
-
-	if positions["a"] >= positions["b"] {
-		t.Error("a should come before b")
-	}
-	if positions["b"] >= positions["c"] {
-		t.Error("b should come before c")
-	}
-}
-
-func TestGraph_TopologicalSort_Diamond(t *testing.T) {
-	// Diamond dependency: a -> b, a -> c, b -> d, c -> d
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
-	g.AddNode("d", nil)
-
-	g.AddEdge("a", "b")
-	g.AddEdge("a", "c")
-	g.AddEdge("b", "d")
-	g.AddEdge("c", "d")
-
-	sorted, err := g.TopologicalSort()
-	if err != nil {
-		t.Fatalf("failed to sort: %v", err)
-	}
-
-	positions := make(map[string]int)
-	for i, node := range sorted {
-		positions[node.ID] = i
-	}
-
-	// a must be first
-	if positions["a"] != 0 {
-		t.Error("a should be first")
-	}
-	// d must be last
-	if positions["d"] != 3 {
-		t.Error("d should be last")
-	}
-	// b and c must be between a and d
-	if positions["b"] <= positions["a"] || positions["b"] >= positions["d"] {
-		t.Error("b should be between a and d")
-	}
-	if positions["c"] <= positions["a"] || positions["c"] >= positions["d"] {
-		t.Error("c should be between a and d")
-	}
-}
-
-func TestGraph_TopologicalSort_WithCycle(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "a") // Cycle
-
-	_, err := g.TopologicalSort()
-	if err == nil {
-		t.Error("expected error for cyclic graph")
+			if err != nil {
+				t.Fatalf("failed to sort: %v", err)
+			}
+			if len(sorted) != tt.wantNodes {
+				t.Fatalf("expected %d nodes, got %d", tt.wantNodes, len(sorted))
+			}
+			if tt.verify != nil {
+				tt.verify(t, sorted)
+			}
+		})
 	}
 }
 
@@ -285,33 +355,54 @@ func TestGraph_GetUpstreamNodes(t *testing.T) {
 	}
 }
 
-func TestGraph_GetRoots(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
-
-	g.AddEdge("a", "c")
-	g.AddEdge("b", "c")
-
-	roots := g.GetRoots()
-	if len(roots) != 2 {
-		t.Errorf("expected 2 roots, got %d", len(roots))
+func TestGraph_GetRootsAndLeaves(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(g *Graph)
+		wantRoots  int
+		wantLeaves int
+	}{
+		{
+			name: "diamond",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddEdge("a", "b")
+				g.AddEdge("a", "c")
+			},
+			wantRoots:  1,
+			wantLeaves: 2,
+		},
+		{
+			name: "merge",
+			setup: func(g *Graph) {
+				g.AddNode("a", nil)
+				g.AddNode("b", nil)
+				g.AddNode("c", nil)
+				g.AddEdge("a", "c")
+				g.AddEdge("b", "c")
+			},
+			wantRoots:  2,
+			wantLeaves: 1,
+		},
 	}
-}
 
-func TestGraph_GetLeaves(t *testing.T) {
-	g := NewGraph()
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewGraph()
+			tt.setup(g)
 
-	g.AddEdge("a", "b")
-	g.AddEdge("a", "c")
+			roots := g.GetRoots()
+			if len(roots) != tt.wantRoots {
+				t.Errorf("expected %d roots, got %d", tt.wantRoots, len(roots))
+			}
 
-	leaves := g.GetLeaves()
-	if len(leaves) != 2 {
-		t.Errorf("expected 2 leaves, got %d", len(leaves))
+			leaves := g.GetLeaves()
+			if len(leaves) != tt.wantLeaves {
+				t.Errorf("expected %d leaves, got %d", tt.wantLeaves, len(leaves))
+			}
+		})
 	}
 }
 
@@ -340,40 +431,6 @@ func TestGraph_Subgraph(t *testing.T) {
 	children := sub.GetChildren("b")
 	if len(children) != 1 || children[0] != "c" {
 		t.Error("expected edge from b to c")
-	}
-}
-
-func TestGraph_DisconnectedComponents(t *testing.T) {
-	g := NewGraph()
-	// Two disconnected chains: a->b and c->d
-	g.AddNode("a", nil)
-	g.AddNode("b", nil)
-	g.AddNode("c", nil)
-	g.AddNode("d", nil)
-
-	g.AddEdge("a", "b")
-	g.AddEdge("c", "d")
-
-	sorted, err := g.TopologicalSort()
-	if err != nil {
-		t.Fatalf("failed to sort: %v", err)
-	}
-
-	if len(sorted) != 4 {
-		t.Errorf("expected 4 nodes, got %d", len(sorted))
-	}
-
-	// Check both chains maintain their order
-	positions := make(map[string]int)
-	for i, node := range sorted {
-		positions[node.ID] = i
-	}
-
-	if positions["a"] >= positions["b"] {
-		t.Error("a should come before b")
-	}
-	if positions["c"] >= positions["d"] {
-		t.Error("c should come before d")
 	}
 }
 

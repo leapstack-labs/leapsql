@@ -7,34 +7,81 @@ import (
 	"testing"
 )
 
-func TestDuckDBAdapter_ConnectInMemory(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	err := adapter.Connect(ctx, Config{Path: ":memory:"})
-	if err != nil {
-		t.Fatalf("failed to connect to in-memory DuckDB: %v", err)
+func TestDuckDBAdapter_Connect(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupPath func(t *testing.T) string
+		verify    func(t *testing.T, path string)
+	}{
+		{
+			name: "in-memory",
+			setupPath: func(t *testing.T) string {
+				return ":memory:"
+			},
+		},
+		{
+			name: "file-based",
+			setupPath: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				return filepath.Join(tmpDir, "test.duckdb")
+			},
+			verify: func(t *testing.T, path string) {
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Error("database file was not created")
+				}
+			},
+		},
 	}
-	defer adapter.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			adapter := NewDuckDBAdapter()
+
+			dbPath := tt.setupPath(t)
+			err := adapter.Connect(ctx, Config{Path: dbPath})
+			if err != nil {
+				t.Fatalf("failed to connect: %v", err)
+			}
+			defer adapter.Close()
+
+			if tt.verify != nil {
+				tt.verify(t, dbPath)
+			}
+		})
+	}
 }
 
-func TestDuckDBAdapter_ConnectFileBased(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	// Create a temporary file for the database
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.duckdb")
-
-	err := adapter.Connect(ctx, Config{Path: dbPath})
-	if err != nil {
-		t.Fatalf("failed to connect to file-based DuckDB: %v", err)
+func TestDuckDBAdapter_NotConnected(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation func(ctx context.Context, adapter *DuckDBAdapter) error
+	}{
+		{
+			name: "exec without connect",
+			operation: func(ctx context.Context, adapter *DuckDBAdapter) error {
+				return adapter.Exec(ctx, "SELECT 1")
+			},
+		},
+		{
+			name: "query without connect",
+			operation: func(ctx context.Context, adapter *DuckDBAdapter) error {
+				_, err := adapter.Query(ctx, "SELECT 1")
+				return err
+			},
+		},
 	}
-	defer adapter.Close()
 
-	// Verify the file was created
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		t.Error("database file was not created")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			adapter := NewDuckDBAdapter()
+
+			err := tt.operation(ctx, adapter)
+			if err == nil {
+				t.Error("expected error when operating without connection, got nil")
+			}
+		})
 	}
 }
 
@@ -129,90 +176,112 @@ func TestDuckDBAdapter_Query(t *testing.T) {
 }
 
 func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
+	tests := []struct {
+		name        string
+		setupTable  func(t *testing.T, adapter *DuckDBAdapter, ctx context.Context)
+		tableName   string
+		wantErr     bool
+		wantColumns int
+		wantRows    int64
+		checkFunc   func(t *testing.T, meta *Metadata)
+	}{
+		{
+			name: "existing table with data",
+			setupTable: func(t *testing.T, adapter *DuckDBAdapter, ctx context.Context) {
+				if err := adapter.Exec(ctx, `
+					CREATE TABLE products (
+						product_id INTEGER NOT NULL,
+						name VARCHAR,
+						price DOUBLE,
+						in_stock BOOLEAN
+					)
+				`); err != nil {
+					t.Fatalf("failed to create table: %v", err)
+				}
+				if err := adapter.Exec(ctx, `
+					INSERT INTO products VALUES 
+						(1, 'Widget', 9.99, true),
+						(2, 'Gadget', 19.99, false)
+				`); err != nil {
+					t.Fatalf("failed to insert data: %v", err)
+				}
+			},
+			tableName:   "products",
+			wantColumns: 4,
+			wantRows:    2,
+			checkFunc: func(t *testing.T, meta *Metadata) {
+				if meta.Name != "products" {
+					t.Errorf("got table name %q, want %q", meta.Name, "products")
+				}
+				if meta.Schema != "main" {
+					t.Errorf("got schema %q, want %q", meta.Schema, "main")
+				}
 
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
+				expectedColumns := map[string]string{
+					"product_id": "INTEGER",
+					"name":       "VARCHAR",
+					"price":      "DOUBLE",
+					"in_stock":   "BOOLEAN",
+				}
+
+				for _, col := range meta.Columns {
+					expectedType, ok := expectedColumns[col.Name]
+					if !ok {
+						t.Errorf("unexpected column: %s", col.Name)
+						continue
+					}
+					if col.Type != expectedType {
+						t.Errorf("column %s: got type %q, want %q", col.Name, col.Type, expectedType)
+					}
+				}
+			},
+		},
+		{
+			name:      "nonexistent table",
+			tableName: "nonexistent_table",
+			wantErr:   true,
+		},
 	}
-	defer adapter.Close()
 
-	// Create a table
-	if err := adapter.Exec(ctx, `
-		CREATE TABLE products (
-			product_id INTEGER NOT NULL,
-			name VARCHAR,
-			price DOUBLE,
-			in_stock BOOLEAN
-		)
-	`); err != nil {
-		t.Fatalf("failed to create table: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			adapter := NewDuckDBAdapter()
 
-	// Insert some data
-	if err := adapter.Exec(ctx, `
-		INSERT INTO products VALUES 
-			(1, 'Widget', 9.99, true),
-			(2, 'Gadget', 19.99, false)
-	`); err != nil {
-		t.Fatalf("failed to insert data: %v", err)
-	}
+			if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
+				t.Fatalf("failed to connect: %v", err)
+			}
+			defer adapter.Close()
 
-	// Get metadata
-	metadata, err := adapter.GetTableMetadata(ctx, "products")
-	if err != nil {
-		t.Fatalf("failed to get metadata: %v", err)
-	}
+			if tt.setupTable != nil {
+				tt.setupTable(t, adapter, ctx)
+			}
 
-	// Verify metadata
-	if metadata.Name != "products" {
-		t.Errorf("got table name %q, want %q", metadata.Name, "products")
-	}
+			metadata, err := adapter.GetTableMetadata(ctx, tt.tableName)
 
-	if metadata.Schema != "main" {
-		t.Errorf("got schema %q, want %q", metadata.Schema, "main")
-	}
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
 
-	if len(metadata.Columns) != 4 {
-		t.Errorf("got %d columns, want 4", len(metadata.Columns))
-	}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-	if metadata.RowCount != 2 {
-		t.Errorf("got row count %d, want 2", metadata.RowCount)
-	}
+			if len(metadata.Columns) != tt.wantColumns {
+				t.Errorf("got %d columns, want %d", len(metadata.Columns), tt.wantColumns)
+			}
 
-	// Check specific columns
-	expectedColumns := map[string]string{
-		"product_id": "INTEGER",
-		"name":       "VARCHAR",
-		"price":      "DOUBLE",
-		"in_stock":   "BOOLEAN",
-	}
+			if metadata.RowCount != tt.wantRows {
+				t.Errorf("got row count %d, want %d", metadata.RowCount, tt.wantRows)
+			}
 
-	for _, col := range metadata.Columns {
-		expectedType, ok := expectedColumns[col.Name]
-		if !ok {
-			t.Errorf("unexpected column: %s", col.Name)
-			continue
-		}
-		if col.Type != expectedType {
-			t.Errorf("column %s: got type %q, want %q", col.Name, col.Type, expectedType)
-		}
-	}
-}
-
-func TestDuckDBAdapter_GetTableMetadata_NotFound(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer adapter.Close()
-
-	_, err := adapter.GetTableMetadata(ctx, "nonexistent_table")
-	if err == nil {
-		t.Error("expected error for nonexistent table, got nil")
+			if tt.checkFunc != nil {
+				tt.checkFunc(t, metadata)
+			}
+		})
 	}
 }
 
@@ -272,42 +341,30 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 	}
 }
 
-func TestDuckDBAdapter_ExecWithoutConnect(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	err := adapter.Exec(ctx, "SELECT 1")
-	if err == nil {
-		t.Error("expected error when executing without connection, got nil")
-	}
-}
-
-func TestDuckDBAdapter_QueryWithoutConnect(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	_, err := adapter.Query(ctx, "SELECT 1")
-	if err == nil {
-		t.Error("expected error when querying without connection, got nil")
-	}
-}
-
 func TestDuckDBAdapter_Close(t *testing.T) {
-	ctx := context.Background()
-	adapter := NewDuckDBAdapter()
-
-	// Close without connect should not error
-	if err := adapter.Close(); err != nil {
-		t.Errorf("close without connect should not error: %v", err)
+	tests := []struct {
+		name    string
+		connect bool
+	}{
+		{"close without connect", false},
+		{"close after connect", true},
 	}
 
-	// Connect and close
-	if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			adapter := NewDuckDBAdapter()
 
-	if err := adapter.Close(); err != nil {
-		t.Errorf("failed to close: %v", err)
+			if tt.connect {
+				if err := adapter.Connect(ctx, Config{Path: ":memory:"}); err != nil {
+					t.Fatalf("failed to connect: %v", err)
+				}
+			}
+
+			if err := adapter.Close(); err != nil {
+				t.Errorf("close should not error: %v", err)
+			}
+		})
 	}
 }
 

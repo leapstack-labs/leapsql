@@ -4,317 +4,241 @@ import (
 	"testing"
 )
 
-func TestParser_PlainText(t *testing.T) {
-	input := "SELECT * FROM users"
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+func TestParser_ValidInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantNodes int
+		checkFunc func(t *testing.T, tmpl *Template)
+	}{
+		{
+			name:      "plain text",
+			input:     "SELECT * FROM users",
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				text, ok := tmpl.Nodes[0].(*TextNode)
+				if !ok {
+					t.Fatalf("expected TextNode, got %T", tmpl.Nodes[0])
+				}
+				if text.Text != "SELECT * FROM users" {
+					t.Errorf("expected %q, got %q", "SELECT * FROM users", text.Text)
+				}
+			},
+		},
+		{
+			name:      "simple expression",
+			input:     "SELECT {{ column }} FROM users",
+			wantNodes: 3,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				text1, ok := tmpl.Nodes[0].(*TextNode)
+				if !ok {
+					t.Fatalf("node[0]: expected TextNode, got %T", tmpl.Nodes[0])
+				}
+				if text1.Text != "SELECT " {
+					t.Errorf("node[0]: expected %q, got %q", "SELECT ", text1.Text)
+				}
 
-	if len(tmpl.Nodes) != 1 {
-		t.Fatalf("expected 1 node, got %d", len(tmpl.Nodes))
-	}
+				expr, ok := tmpl.Nodes[1].(*ExprNode)
+				if !ok {
+					t.Fatalf("node[1]: expected ExprNode, got %T", tmpl.Nodes[1])
+				}
+				if expr.Expr != "column" {
+					t.Errorf("node[1]: expected %q, got %q", "column", expr.Expr)
+				}
 
-	text, ok := tmpl.Nodes[0].(*TextNode)
-	if !ok {
-		t.Fatalf("expected TextNode, got %T", tmpl.Nodes[0])
-	}
-	if text.Text != input {
-		t.Errorf("expected %q, got %q", input, text.Text)
-	}
-}
-
-func TestParser_SimpleExpression(t *testing.T) {
-	input := "SELECT {{ column }} FROM users"
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(tmpl.Nodes) != 3 {
-		t.Fatalf("expected 3 nodes, got %d", len(tmpl.Nodes))
-	}
-
-	// First node: text
-	text1, ok := tmpl.Nodes[0].(*TextNode)
-	if !ok {
-		t.Fatalf("node[0]: expected TextNode, got %T", tmpl.Nodes[0])
-	}
-	if text1.Text != "SELECT " {
-		t.Errorf("node[0]: expected %q, got %q", "SELECT ", text1.Text)
-	}
-
-	// Second node: expression
-	expr, ok := tmpl.Nodes[1].(*ExprNode)
-	if !ok {
-		t.Fatalf("node[1]: expected ExprNode, got %T", tmpl.Nodes[1])
-	}
-	if expr.Expr != "column" {
-		t.Errorf("node[1]: expected %q, got %q", "column", expr.Expr)
-	}
-
-	// Third node: text
-	text2, ok := tmpl.Nodes[2].(*TextNode)
-	if !ok {
-		t.Fatalf("node[2]: expected TextNode, got %T", tmpl.Nodes[2])
-	}
-	if text2.Text != " FROM users" {
-		t.Errorf("node[2]: expected %q, got %q", " FROM users", text2.Text)
-	}
-}
-
-func TestParser_ForLoop(t *testing.T) {
-	input := `{* for col in columns: *}
+				text2, ok := tmpl.Nodes[2].(*TextNode)
+				if !ok {
+					t.Fatalf("node[2]: expected TextNode, got %T", tmpl.Nodes[2])
+				}
+				if text2.Text != " FROM users" {
+					t.Errorf("node[2]: expected %q, got %q", " FROM users", text2.Text)
+				}
+			},
+		},
+		{
+			name: "for loop",
+			input: `{* for col in columns: *}
 {{ col }}
-{* endfor *}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(tmpl.Nodes) != 1 {
-		t.Fatalf("expected 1 node, got %d", len(tmpl.Nodes))
-	}
-
-	forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-	if !ok {
-		t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-	}
-
-	if forBlock.VarName != "col" {
-		t.Errorf("expected var name 'col', got %q", forBlock.VarName)
-	}
-	if forBlock.IterExpr != "columns" {
-		t.Errorf("expected iter expr 'columns', got %q", forBlock.IterExpr)
-	}
-
-	// Check body
-	if len(forBlock.Body) != 3 { // text, expr, text
-		t.Fatalf("expected 3 body nodes, got %d", len(forBlock.Body))
-	}
-
-	expr, ok := forBlock.Body[1].(*ExprNode)
-	if !ok {
-		t.Fatalf("body[1]: expected ExprNode, got %T", forBlock.Body[1])
-	}
-	if expr.Expr != "col" {
-		t.Errorf("body[1]: expected %q, got %q", "col", expr.Expr)
-	}
-}
-
-func TestParser_ForLoopWithList(t *testing.T) {
-	input := `{* for x in ["a", "b", "c"]: *}{{ x }}{* endfor *}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-	if !ok {
-		t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-	}
-
-	if forBlock.VarName != "x" {
-		t.Errorf("expected var name 'x', got %q", forBlock.VarName)
-	}
-	if forBlock.IterExpr != `["a", "b", "c"]` {
-		t.Errorf("expected iter expr '[\"a\", \"b\", \"c\"]', got %q", forBlock.IterExpr)
-	}
-}
-
-func TestParser_IfElse(t *testing.T) {
-	input := `{* if condition: *}
+{* endfor *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
+				if !ok {
+					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
+				}
+				if forBlock.VarName != "col" {
+					t.Errorf("expected var name 'col', got %q", forBlock.VarName)
+				}
+				if forBlock.IterExpr != "columns" {
+					t.Errorf("expected iter expr 'columns', got %q", forBlock.IterExpr)
+				}
+				if len(forBlock.Body) != 3 {
+					t.Fatalf("expected 3 body nodes, got %d", len(forBlock.Body))
+				}
+				expr, ok := forBlock.Body[1].(*ExprNode)
+				if !ok {
+					t.Fatalf("body[1]: expected ExprNode, got %T", forBlock.Body[1])
+				}
+				if expr.Expr != "col" {
+					t.Errorf("body[1]: expected %q, got %q", "col", expr.Expr)
+				}
+			},
+		},
+		{
+			name:      "for loop with list",
+			input:     `{* for x in ["a", "b", "c"]: *}{{ x }}{* endfor *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
+				if !ok {
+					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
+				}
+				if forBlock.VarName != "x" {
+					t.Errorf("expected var name 'x', got %q", forBlock.VarName)
+				}
+				if forBlock.IterExpr != `["a", "b", "c"]` {
+					t.Errorf("expected iter expr '[\"a\", \"b\", \"c\"]', got %q", forBlock.IterExpr)
+				}
+			},
+		},
+		{
+			name: "if-else",
+			input: `{* if condition: *}
 yes
 {* else: *}
 no
-{* endif *}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(tmpl.Nodes) != 1 {
-		t.Fatalf("expected 1 node, got %d", len(tmpl.Nodes))
-	}
-
-	ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-	if !ok {
-		t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-	}
-
-	if ifBlock.Condition != "condition" {
-		t.Errorf("expected condition 'condition', got %q", ifBlock.Condition)
-	}
-
-	// Check if body
-	if len(ifBlock.Body) != 1 {
-		t.Fatalf("expected 1 if body node, got %d", len(ifBlock.Body))
-	}
-
-	// Check else body
-	if ifBlock.Else == nil {
-		t.Fatal("expected else body")
-	}
-	if len(ifBlock.Else) != 1 {
-		t.Fatalf("expected 1 else body node, got %d", len(ifBlock.Else))
-	}
-}
-
-func TestParser_IfElif(t *testing.T) {
-	input := `{* if a: *}
+{* endif *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
+				if !ok {
+					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
+				}
+				if ifBlock.Condition != "condition" {
+					t.Errorf("expected condition 'condition', got %q", ifBlock.Condition)
+				}
+				if len(ifBlock.Body) != 1 {
+					t.Fatalf("expected 1 if body node, got %d", len(ifBlock.Body))
+				}
+				if ifBlock.Else == nil {
+					t.Fatal("expected else body")
+				}
+				if len(ifBlock.Else) != 1 {
+					t.Fatalf("expected 1 else body node, got %d", len(ifBlock.Else))
+				}
+			},
+		},
+		{
+			name: "if-elif",
+			input: `{* if a: *}
 A
 {* elif b: *}
 B
 {* elif c: *}
 C
-{* endif *}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-	if !ok {
-		t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-	}
-
-	if ifBlock.Condition != "a" {
-		t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
-	}
-
-	if len(ifBlock.ElseIfs) != 2 {
-		t.Fatalf("expected 2 elif branches, got %d", len(ifBlock.ElseIfs))
-	}
-
-	if ifBlock.ElseIfs[0].Condition != "b" {
-		t.Errorf("elif[0]: expected condition 'b', got %q", ifBlock.ElseIfs[0].Condition)
-	}
-	if ifBlock.ElseIfs[1].Condition != "c" {
-		t.Errorf("elif[1]: expected condition 'c', got %q", ifBlock.ElseIfs[1].Condition)
-	}
-}
-
-func TestParser_IfElifElse(t *testing.T) {
-	input := `{* if a: *}
+{* endif *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
+				if !ok {
+					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
+				}
+				if ifBlock.Condition != "a" {
+					t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
+				}
+				if len(ifBlock.ElseIfs) != 2 {
+					t.Fatalf("expected 2 elif branches, got %d", len(ifBlock.ElseIfs))
+				}
+				if ifBlock.ElseIfs[0].Condition != "b" {
+					t.Errorf("elif[0]: expected condition 'b', got %q", ifBlock.ElseIfs[0].Condition)
+				}
+				if ifBlock.ElseIfs[1].Condition != "c" {
+					t.Errorf("elif[1]: expected condition 'c', got %q", ifBlock.ElseIfs[1].Condition)
+				}
+			},
+		},
+		{
+			name: "if-elif-else",
+			input: `{* if a: *}
 A
 {* elif b: *}
 B
 {* else: *}
 C
-{* endif *}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
-	if !ok {
-		t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
-	}
-
-	if ifBlock.Condition != "a" {
-		t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
-	}
-
-	if len(ifBlock.ElseIfs) != 1 {
-		t.Fatalf("expected 1 elif branch, got %d", len(ifBlock.ElseIfs))
-	}
-
-	if ifBlock.Else == nil {
-		t.Fatal("expected else body")
-	}
-}
-
-func TestParser_NestedBlocks(t *testing.T) {
-	input := `{* for x in items: *}
+{* endif *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				ifBlock, ok := tmpl.Nodes[0].(*IfBlock)
+				if !ok {
+					t.Fatalf("expected IfBlock, got %T", tmpl.Nodes[0])
+				}
+				if ifBlock.Condition != "a" {
+					t.Errorf("expected condition 'a', got %q", ifBlock.Condition)
+				}
+				if len(ifBlock.ElseIfs) != 1 {
+					t.Fatalf("expected 1 elif branch, got %d", len(ifBlock.ElseIfs))
+				}
+				if ifBlock.Else == nil {
+					t.Fatal("expected else body")
+				}
+			},
+		},
+		{
+			name: "nested blocks",
+			input: `{* for x in items: *}
 {* if x > 0: *}
 {{ x }}
 {* endif *}
-{* endfor *}`
+{* endfor *}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				forBlock, ok := tmpl.Nodes[0].(*ForBlock)
+				if !ok {
+					t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
+				}
 
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+				var foundIf bool
+				for _, node := range forBlock.Body {
+					if _, ok := node.(*IfBlock); ok {
+						foundIf = true
+						break
+					}
+				}
+				if !foundIf {
+					t.Error("expected nested IfBlock in ForBlock body")
+				}
+			},
+		},
+		{
+			name:      "complex expression",
+			input:     `{{ target.schema + "." + this.name }}`,
+			wantNodes: 1,
+			checkFunc: func(t *testing.T, tmpl *Template) {
+				expr, ok := tmpl.Nodes[0].(*ExprNode)
+				if !ok {
+					t.Fatalf("expected ExprNode, got %T", tmpl.Nodes[0])
+				}
+				expected := `target.schema + "." + this.name`
+				if expr.Expr != expected {
+					t.Errorf("expected %q, got %q", expected, expr.Expr)
+				}
+			},
+		},
 	}
 
-	forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-	if !ok {
-		t.Fatalf("expected ForBlock, got %T", tmpl.Nodes[0])
-	}
-
-	// Find the IfBlock in the for body
-	var foundIf bool
-	for _, node := range forBlock.Body {
-		if _, ok := node.(*IfBlock); ok {
-			foundIf = true
-			break
-		}
-	}
-	if !foundIf {
-		t.Error("expected nested IfBlock in ForBlock body")
-	}
-}
-
-func TestParser_UnmatchedFor(t *testing.T) {
-	input := `{* for x in items: *}
-{{ x }}`
-
-	_, err := ParseString(input, "test.sql")
-	if err == nil {
-		t.Fatal("expected error for unmatched for")
-	}
-
-	unmatchedErr, ok := err.(*UnmatchedBlockError)
-	if !ok {
-		t.Fatalf("expected UnmatchedBlockError, got %T: %v", err, err)
-	}
-	if unmatchedErr.BlockKind != StmtFor {
-		t.Errorf("expected StmtFor, got %s", unmatchedErr.BlockKind)
-	}
-}
-
-func TestParser_UnmatchedEndFor(t *testing.T) {
-	input := `{{ x }}
-{* endfor *}`
-
-	_, err := ParseString(input, "test.sql")
-	if err == nil {
-		t.Fatal("expected error for unmatched endfor")
-	}
-}
-
-func TestParser_UnmatchedIf(t *testing.T) {
-	input := `{* if condition: *}
-yes`
-
-	_, err := ParseString(input, "test.sql")
-	if err == nil {
-		t.Fatal("expected error for unmatched if")
-	}
-}
-
-func TestParser_UnmatchedElse(t *testing.T) {
-	input := `yes
-{* else: *}
-no`
-
-	_, err := ParseString(input, "test.sql")
-	if err == nil {
-		t.Fatal("expected error for unmatched else")
-	}
-}
-
-func TestParser_InvalidStatement(t *testing.T) {
-	input := `{* while true: *}`
-
-	_, err := ParseString(input, "test.sql")
-	if err == nil {
-		t.Fatal("expected error for invalid statement")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl, err := ParseString(tt.input, "test.sql")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(tmpl.Nodes) != tt.wantNodes {
+				t.Fatalf("expected %d node(s), got %d", tt.wantNodes, len(tmpl.Nodes))
+			}
+			if tt.checkFunc != nil {
+				tt.checkFunc(t, tmpl)
+			}
+		})
 	}
 }
 
@@ -326,39 +250,70 @@ func TestParser_ForWithoutColon(t *testing.T) {
 	}
 
 	for _, input := range inputs {
-		tmpl, err := ParseString(input, "test.sql")
-		if err != nil {
-			t.Errorf("input %q: unexpected error: %v", input, err)
-			continue
-		}
+		t.Run(input[:20]+"...", func(t *testing.T) {
+			tmpl, err := ParseString(input, "test.sql")
+			if err != nil {
+				t.Fatalf("input %q: unexpected error: %v", input, err)
+			}
 
-		forBlock, ok := tmpl.Nodes[0].(*ForBlock)
-		if !ok {
-			t.Errorf("input %q: expected ForBlock, got %T", input, tmpl.Nodes[0])
-			continue
-		}
+			forBlock, ok := tmpl.Nodes[0].(*ForBlock)
+			if !ok {
+				t.Fatalf("input %q: expected ForBlock, got %T", input, tmpl.Nodes[0])
+			}
 
-		if forBlock.VarName != "x" {
-			t.Errorf("input %q: expected var 'x', got %q", input, forBlock.VarName)
-		}
+			if forBlock.VarName != "x" {
+				t.Errorf("input %q: expected var 'x', got %q", input, forBlock.VarName)
+			}
+		})
 	}
 }
 
-func TestParser_ComplexExpression(t *testing.T) {
-	input := `{{ target.schema + "." + this.name }}`
-
-	tmpl, err := ParseString(input, "test.sql")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestParser_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		errType string // optional: specific error type expected
+	}{
+		{
+			name: "unmatched for",
+			input: `{* for x in items: *}
+{{ x }}`,
+			errType: "UnmatchedBlockError",
+		},
+		{
+			name: "unmatched endfor",
+			input: `{{ x }}
+{* endfor *}`,
+		},
+		{
+			name: "unmatched if",
+			input: `{* if condition: *}
+yes`,
+		},
+		{
+			name: "unmatched else",
+			input: `yes
+{* else: *}
+no`,
+		},
+		{
+			name:  "invalid statement",
+			input: `{* while true: *}`,
+		},
 	}
 
-	expr, ok := tmpl.Nodes[0].(*ExprNode)
-	if !ok {
-		t.Fatalf("expected ExprNode, got %T", tmpl.Nodes[0])
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseString(tt.input, "test.sql")
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
 
-	expected := `target.schema + "." + this.name`
-	if expr.Expr != expected {
-		t.Errorf("expected %q, got %q", expected, expr.Expr)
+			if tt.errType == "UnmatchedBlockError" {
+				if _, ok := err.(*UnmatchedBlockError); !ok {
+					t.Errorf("expected UnmatchedBlockError, got %T: %v", err, err)
+				}
+			}
+		})
 	}
 }

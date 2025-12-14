@@ -52,393 +52,491 @@ func TestSQLiteStore_InitSchema(t *testing.T) {
 	}
 }
 
-// --- Run tests ---
+// --- Run lifecycle tests ---
 
-func TestSQLiteStore_CreateRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run, err := store.CreateRun("production")
-	if err != nil {
-		t.Fatalf("failed to create run: %v", err)
+func TestSQLiteStore_RunLifecycle(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, store *SQLiteStore) *Run
+		operation func(t *testing.T, store *SQLiteStore, run *Run)
+		verify    func(t *testing.T, store *SQLiteStore, run *Run)
+	}{
+		{
+			name: "create run",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				run, err := store.CreateRun("production")
+				if err != nil {
+					t.Fatalf("failed to create run: %v", err)
+				}
+				return run
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+				if run.ID == "" {
+					t.Error("run ID should not be empty")
+				}
+				if run.Environment != "production" {
+					t.Errorf("expected environment 'production', got %q", run.Environment)
+				}
+				if run.Status != RunStatusRunning {
+					t.Errorf("expected status 'running', got %q", run.Status)
+				}
+			},
+		},
+		{
+			name: "get run",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				run, err := store.CreateRun("staging")
+				if err != nil {
+					t.Fatalf("failed to create run: %v", err)
+				}
+				return run
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+				retrieved, err := store.GetRun(run.ID)
+				if err != nil {
+					t.Fatalf("failed to get run: %v", err)
+				}
+				if retrieved.ID != run.ID {
+					t.Errorf("expected ID %q, got %q", run.ID, retrieved.ID)
+				}
+				if retrieved.Environment != "staging" {
+					t.Errorf("expected environment 'staging', got %q", retrieved.Environment)
+				}
+			},
+		},
+		{
+			name: "get run not found",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				return nil
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+				_, err := store.GetRun("nonexistent-id")
+				if err == nil {
+					t.Error("expected error for nonexistent run")
+				}
+			},
+		},
+		{
+			name: "complete run success",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				run, _ := store.CreateRun("dev")
+				return run
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+				err := store.CompleteRun(run.ID, RunStatusCompleted, "")
+				if err != nil {
+					t.Fatalf("failed to complete run: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+				retrieved, _ := store.GetRun(run.ID)
+				if retrieved.Status != RunStatusCompleted {
+					t.Errorf("expected status 'completed', got %q", retrieved.Status)
+				}
+				if retrieved.CompletedAt == nil {
+					t.Error("completed_at should not be nil")
+				}
+			},
+		},
+		{
+			name: "complete run with error",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				run, _ := store.CreateRun("dev")
+				return run
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+				err := store.CompleteRun(run.ID, RunStatusFailed, "something went wrong")
+				if err != nil {
+					t.Fatalf("failed to complete run: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+				retrieved, _ := store.GetRun(run.ID)
+				if retrieved.Status != RunStatusFailed {
+					t.Errorf("expected status 'failed', got %q", retrieved.Status)
+				}
+				if retrieved.Error != "something went wrong" {
+					t.Errorf("expected error message, got %q", retrieved.Error)
+				}
+			},
+		},
+		{
+			name: "get latest run",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				store.CreateRun("prod")
+				time.Sleep(10 * time.Millisecond)
+				run2, _ := store.CreateRun("prod")
+				return run2
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+				latest, err := store.GetLatestRun("prod")
+				if err != nil {
+					t.Fatalf("failed to get latest run: %v", err)
+				}
+				if latest.ID != run.ID {
+					t.Errorf("expected latest run ID %q, got %q", run.ID, latest.ID)
+				}
+			},
+		},
+		{
+			name: "get latest run no runs",
+			setup: func(t *testing.T, store *SQLiteStore) *Run {
+				return nil
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+				latest, err := store.GetLatestRun("nonexistent")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if latest != nil {
+					t.Error("expected nil for nonexistent environment")
+				}
+			},
+		},
 	}
 
-	if run.ID == "" {
-		t.Error("run ID should not be empty")
-	}
-	if run.Environment != "production" {
-		t.Errorf("expected environment 'production', got %q", run.Environment)
-	}
-	if run.Status != RunStatusRunning {
-		t.Errorf("expected status 'running', got %q", run.Status)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-func TestSQLiteStore_GetRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	created, err := store.CreateRun("staging")
-	if err != nil {
-		t.Fatalf("failed to create run: %v", err)
-	}
-
-	retrieved, err := store.GetRun(created.ID)
-	if err != nil {
-		t.Fatalf("failed to get run: %v", err)
-	}
-
-	if retrieved.ID != created.ID {
-		t.Errorf("expected ID %q, got %q", created.ID, retrieved.ID)
-	}
-	if retrieved.Environment != "staging" {
-		t.Errorf("expected environment 'staging', got %q", retrieved.Environment)
-	}
-}
-
-func TestSQLiteStore_GetRun_NotFound(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	_, err := store.GetRun("nonexistent-id")
-	if err == nil {
-		t.Error("expected error for nonexistent run")
-	}
-}
-
-func TestSQLiteStore_CompleteRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run, _ := store.CreateRun("dev")
-
-	err := store.CompleteRun(run.ID, RunStatusCompleted, "")
-	if err != nil {
-		t.Fatalf("failed to complete run: %v", err)
-	}
-
-	retrieved, _ := store.GetRun(run.ID)
-	if retrieved.Status != RunStatusCompleted {
-		t.Errorf("expected status 'completed', got %q", retrieved.Status)
-	}
-	if retrieved.CompletedAt == nil {
-		t.Error("completed_at should not be nil")
-	}
-}
-
-func TestSQLiteStore_CompleteRun_WithError(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run, _ := store.CreateRun("dev")
-
-	err := store.CompleteRun(run.ID, RunStatusFailed, "something went wrong")
-	if err != nil {
-		t.Fatalf("failed to complete run: %v", err)
-	}
-
-	retrieved, _ := store.GetRun(run.ID)
-	if retrieved.Status != RunStatusFailed {
-		t.Errorf("expected status 'failed', got %q", retrieved.Status)
-	}
-	if retrieved.Error != "something went wrong" {
-		t.Errorf("expected error message, got %q", retrieved.Error)
-	}
-}
-
-func TestSQLiteStore_GetLatestRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	// Create multiple runs
-	store.CreateRun("prod")
-	time.Sleep(10 * time.Millisecond) // Ensure different timestamps
-	run2, _ := store.CreateRun("prod")
-
-	latest, err := store.GetLatestRun("prod")
-	if err != nil {
-		t.Fatalf("failed to get latest run: %v", err)
-	}
-
-	if latest.ID != run2.ID {
-		t.Errorf("expected latest run ID %q, got %q", run2.ID, latest.ID)
-	}
-}
-
-func TestSQLiteStore_GetLatestRun_NoRuns(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	latest, err := store.GetLatestRun("nonexistent")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if latest != nil {
-		t.Error("expected nil for nonexistent environment")
-	}
-}
-
-// --- Model tests ---
-
-func TestSQLiteStore_RegisterModel(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.staging.stg_users",
-		Name:         "stg_users",
-		Materialized: "table",
-		ContentHash:  "abc123",
-	}
-
-	err := store.RegisterModel(model)
-	if err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	if model.ID == "" {
-		t.Error("model ID should be generated")
-	}
-}
-
-func TestSQLiteStore_RegisterModel_Upsert(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.staging.stg_users",
-		Name:         "stg_users",
-		Materialized: "table",
-		ContentHash:  "abc123",
-	}
-
-	store.RegisterModel(model)
-
-	// Update with new hash
-	model.ContentHash = "def456"
-	err := store.RegisterModel(model)
-	if err != nil {
-		t.Fatalf("failed to upsert model: %v", err)
-	}
-
-	retrieved, _ := store.GetModelByPath("models.staging.stg_users")
-	if retrieved.ContentHash != "def456" {
-		t.Errorf("expected hash 'def456', got %q", retrieved.ContentHash)
+			var run *Run
+			if tt.setup != nil {
+				run = tt.setup(t, store)
+			}
+			if tt.operation != nil {
+				tt.operation(t, store, run)
+			}
+			if tt.verify != nil {
+				tt.verify(t, store, run)
+			}
+		})
 	}
 }
 
-func TestSQLiteStore_GetModelByID(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
+// --- Model operations tests ---
 
-	model := &Model{
-		Path:         "models.staging.stg_orders",
-		Name:         "stg_orders",
-		Materialized: "view",
-		ContentHash:  "hash123",
+func TestSQLiteStore_ModelOperations(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, store *SQLiteStore) *Model
+		operation func(t *testing.T, store *SQLiteStore, model *Model)
+		verify    func(t *testing.T, store *SQLiteStore, model *Model)
+	}{
+		{
+			name: "register model",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				model := &Model{
+					Path:         "models.staging.stg_users",
+					Name:         "stg_users",
+					Materialized: "table",
+					ContentHash:  "abc123",
+				}
+				err := store.RegisterModel(model)
+				if err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+				return model
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				if model.ID == "" {
+					t.Error("model ID should be generated")
+				}
+			},
+		},
+		{
+			name: "register model upsert",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				model := &Model{
+					Path:         "models.staging.stg_users",
+					Name:         "stg_users",
+					Materialized: "table",
+					ContentHash:  "abc123",
+				}
+				store.RegisterModel(model)
+				return model
+			},
+			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
+				model.ContentHash = "def456"
+				err := store.RegisterModel(model)
+				if err != nil {
+					t.Fatalf("failed to upsert model: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				retrieved, _ := store.GetModelByPath("models.staging.stg_users")
+				if retrieved.ContentHash != "def456" {
+					t.Errorf("expected hash 'def456', got %q", retrieved.ContentHash)
+				}
+			},
+		},
+		{
+			name: "get model by ID",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				model := &Model{
+					Path:         "models.staging.stg_orders",
+					Name:         "stg_orders",
+					Materialized: "view",
+					ContentHash:  "hash123",
+				}
+				store.RegisterModel(model)
+				return model
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				retrieved, err := store.GetModelByID(model.ID)
+				if err != nil {
+					t.Fatalf("failed to get model: %v", err)
+				}
+				if retrieved.Name != "stg_orders" {
+					t.Errorf("expected name 'stg_orders', got %q", retrieved.Name)
+				}
+			},
+		},
+		{
+			name: "get model by path",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				model := &Model{
+					Path:         "models.marts.revenue",
+					Name:         "revenue",
+					Materialized: "incremental",
+					UniqueKey:    "transaction_id",
+					ContentHash:  "xyz789",
+				}
+				store.RegisterModel(model)
+				return model
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				retrieved, err := store.GetModelByPath("models.marts.revenue")
+				if err != nil {
+					t.Fatalf("failed to get model: %v", err)
+				}
+				if retrieved.Materialized != "incremental" {
+					t.Errorf("expected materialized 'incremental', got %q", retrieved.Materialized)
+				}
+				if retrieved.UniqueKey != "transaction_id" {
+					t.Errorf("expected unique_key 'transaction_id', got %q", retrieved.UniqueKey)
+				}
+			},
+		},
+		{
+			name: "get model by path not found",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				return nil
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				retrieved, err := store.GetModelByPath("nonexistent.model")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if retrieved != nil {
+					t.Error("expected nil for nonexistent model")
+				}
+			},
+		},
+		{
+			name: "update model hash",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				model := &Model{
+					Path:         "models.test",
+					Name:         "test",
+					Materialized: "table",
+					ContentHash:  "original",
+				}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+				return model
+			},
+			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
+				err := store.UpdateModelHash(model.ID, "updated")
+				if err != nil {
+					t.Fatalf("failed to update hash: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				retrieved, _ := store.GetModelByID(model.ID)
+				if retrieved.ContentHash != "updated" {
+					t.Errorf("expected hash 'updated', got %q", retrieved.ContentHash)
+				}
+			},
+		},
+		{
+			name: "list models",
+			setup: func(t *testing.T, store *SQLiteStore) *Model {
+				models := []*Model{
+					{Path: "models.a", Name: "a", Materialized: "table", ContentHash: "1"},
+					{Path: "models.b", Name: "b", Materialized: "table", ContentHash: "2"},
+					{Path: "models.c", Name: "c", Materialized: "table", ContentHash: "3"},
+				}
+				for _, m := range models {
+					if err := store.RegisterModel(m); err != nil {
+						t.Fatalf("failed to register model: %v", err)
+					}
+				}
+				return nil
+			},
+			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+				list, err := store.ListModels()
+				if err != nil {
+					t.Fatalf("failed to list models: %v", err)
+				}
+				if len(list) != 3 {
+					t.Errorf("expected 3 models, got %d", len(list))
+				}
+			},
+		},
 	}
-	store.RegisterModel(model)
 
-	retrieved, err := store.GetModelByID(model.ID)
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-	if retrieved.Name != "stg_orders" {
-		t.Errorf("expected name 'stg_orders', got %q", retrieved.Name)
-	}
-}
-
-func TestSQLiteStore_GetModelByPath(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.marts.revenue",
-		Name:         "revenue",
-		Materialized: "incremental",
-		UniqueKey:    "transaction_id",
-		ContentHash:  "xyz789",
-	}
-	store.RegisterModel(model)
-
-	retrieved, err := store.GetModelByPath("models.marts.revenue")
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
-
-	if retrieved.Materialized != "incremental" {
-		t.Errorf("expected materialized 'incremental', got %q", retrieved.Materialized)
-	}
-	if retrieved.UniqueKey != "transaction_id" {
-		t.Errorf("expected unique_key 'transaction_id', got %q", retrieved.UniqueKey)
-	}
-}
-
-func TestSQLiteStore_GetModelByPath_NotFound(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	retrieved, err := store.GetModelByPath("nonexistent.model")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if retrieved != nil {
-		t.Error("expected nil for nonexistent model")
-	}
-}
-
-func TestSQLiteStore_UpdateModelHash(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.test",
-		Name:         "test",
-		Materialized: "table",
-		ContentHash:  "original",
-	}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	err := store.UpdateModelHash(model.ID, "updated")
-	if err != nil {
-		t.Fatalf("failed to update hash: %v", err)
-	}
-
-	retrieved, _ := store.GetModelByID(model.ID)
-	if retrieved.ContentHash != "updated" {
-		t.Errorf("expected hash 'updated', got %q", retrieved.ContentHash)
-	}
-}
-
-func TestSQLiteStore_ListModels(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	models := []*Model{
-		{Path: "models.a", Name: "a", Materialized: "table", ContentHash: "1"},
-		{Path: "models.b", Name: "b", Materialized: "table", ContentHash: "2"},
-		{Path: "models.c", Name: "c", Materialized: "table", ContentHash: "3"},
-	}
-
-	for _, m := range models {
-		if err := store.RegisterModel(m); err != nil {
-			t.Fatalf("failed to register model: %v", err)
-		}
-	}
-
-	list, err := store.ListModels()
-	if err != nil {
-		t.Fatalf("failed to list models: %v", err)
-	}
-
-	if len(list) != 3 {
-		t.Errorf("expected 3 models, got %d", len(list))
+			var model *Model
+			if tt.setup != nil {
+				model = tt.setup(t, store)
+			}
+			if tt.operation != nil {
+				tt.operation(t, store, model)
+			}
+			if tt.verify != nil {
+				tt.verify(t, store, model)
+			}
+		})
 	}
 }
 
 // --- Model frontmatter fields tests ---
 
-func TestSQLiteStore_RegisterModel_WithFrontmatterFields(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.staging.stg_users",
-		Name:         "stg_users",
-		Materialized: "incremental",
-		UniqueKey:    "user_id",
-		ContentHash:  "abc123",
-		Owner:        "data-team",
-		Schema:       "analytics",
-		Tags:         []string{"pii", "daily"},
-		Tests: []TestConfig{
-			{Unique: []string{"user_id"}},
-			{NotNull: []string{"user_id", "email"}},
+func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
+	tests := []struct {
+		name   string
+		model  *Model
+		verify func(t *testing.T, retrieved *Model)
+	}{
+		{
+			name: "with all frontmatter fields",
+			model: &Model{
+				Path:         "models.staging.stg_users",
+				Name:         "stg_users",
+				Materialized: "incremental",
+				UniqueKey:    "user_id",
+				ContentHash:  "abc123",
+				Owner:        "data-team",
+				Schema:       "analytics",
+				Tags:         []string{"pii", "daily"},
+				Tests: []TestConfig{
+					{Unique: []string{"user_id"}},
+					{NotNull: []string{"user_id", "email"}},
+				},
+				Meta: map[string]any{
+					"priority": "high",
+					"sla":      24,
+				},
+			},
+			verify: func(t *testing.T, retrieved *Model) {
+				if retrieved.Owner != "data-team" {
+					t.Errorf("expected owner 'data-team', got %q", retrieved.Owner)
+				}
+				if retrieved.Schema != "analytics" {
+					t.Errorf("expected schema 'analytics', got %q", retrieved.Schema)
+				}
+				if len(retrieved.Tags) != 2 || retrieved.Tags[0] != "pii" || retrieved.Tags[1] != "daily" {
+					t.Errorf("expected tags [pii, daily], got %v", retrieved.Tags)
+				}
+				if len(retrieved.Tests) != 2 {
+					t.Errorf("expected 2 tests, got %d", len(retrieved.Tests))
+				}
+				if retrieved.Tests[0].Unique[0] != "user_id" {
+					t.Errorf("expected first test unique ['user_id'], got %v", retrieved.Tests[0].Unique)
+				}
+				if retrieved.Meta["priority"] != "high" {
+					t.Errorf("expected meta.priority 'high', got %v", retrieved.Meta["priority"])
+				}
+				if sla, ok := retrieved.Meta["sla"].(float64); !ok || sla != 24 {
+					t.Errorf("expected meta.sla 24, got %v", retrieved.Meta["sla"])
+				}
+			},
 		},
-		Meta: map[string]any{
-			"priority": "high",
-			"sla":      24,
+		{
+			name: "with empty optional fields",
+			model: &Model{
+				Path:         "models.simple",
+				Name:         "simple",
+				Materialized: "table",
+				ContentHash:  "hash123",
+			},
+			verify: func(t *testing.T, retrieved *Model) {
+				if retrieved.Owner != "" {
+					t.Errorf("expected empty owner, got %q", retrieved.Owner)
+				}
+				if retrieved.Schema != "" {
+					t.Errorf("expected empty schema, got %q", retrieved.Schema)
+				}
+				if len(retrieved.Tags) != 0 {
+					t.Errorf("expected empty tags, got %v", retrieved.Tags)
+				}
+				if len(retrieved.Tests) != 0 {
+					t.Errorf("expected empty tests, got %v", retrieved.Tests)
+				}
+				if len(retrieved.Meta) != 0 {
+					t.Errorf("expected empty meta, got %v", retrieved.Meta)
+				}
+			},
+		},
+		{
+			name: "with accepted values test",
+			model: &Model{
+				Path:         "models.accepted_values_test",
+				Name:         "accepted_values_test",
+				Materialized: "table",
+				ContentHash:  "hash",
+				Tests: []TestConfig{
+					{
+						AcceptedValues: &AcceptedValuesConfig{
+							Column: "status",
+							Values: []string{"active", "inactive", "pending"},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, retrieved *Model) {
+				if len(retrieved.Tests) != 1 {
+					t.Fatalf("expected 1 test, got %d", len(retrieved.Tests))
+				}
+				if retrieved.Tests[0].AcceptedValues == nil {
+					t.Fatal("expected AcceptedValues to not be nil")
+				}
+				if retrieved.Tests[0].AcceptedValues.Column != "status" {
+					t.Errorf("expected column 'status', got %q", retrieved.Tests[0].AcceptedValues.Column)
+				}
+				if len(retrieved.Tests[0].AcceptedValues.Values) != 3 {
+					t.Errorf("expected 3 values, got %d", len(retrieved.Tests[0].AcceptedValues.Values))
+				}
+			},
 		},
 	}
 
-	err := store.RegisterModel(model)
-	if err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-	// Retrieve and verify all fields
-	retrieved, err := store.GetModelByPath("models.staging.stg_users")
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
+			if err := store.RegisterModel(tt.model); err != nil {
+				t.Fatalf("failed to register model: %v", err)
+			}
 
-	if retrieved.Owner != "data-team" {
-		t.Errorf("expected owner 'data-team', got %q", retrieved.Owner)
-	}
-	if retrieved.Schema != "analytics" {
-		t.Errorf("expected schema 'analytics', got %q", retrieved.Schema)
-	}
-	if len(retrieved.Tags) != 2 || retrieved.Tags[0] != "pii" || retrieved.Tags[1] != "daily" {
-		t.Errorf("expected tags [pii, daily], got %v", retrieved.Tags)
-	}
-	if len(retrieved.Tests) != 2 {
-		t.Errorf("expected 2 tests, got %d", len(retrieved.Tests))
-	}
-	if retrieved.Tests[0].Unique[0] != "user_id" {
-		t.Errorf("expected first test unique ['user_id'], got %v", retrieved.Tests[0].Unique)
-	}
-	if retrieved.Meta["priority"] != "high" {
-		t.Errorf("expected meta.priority 'high', got %v", retrieved.Meta["priority"])
-	}
-	// JSON unmarshals numbers as float64
-	if sla, ok := retrieved.Meta["sla"].(float64); !ok || sla != 24 {
-		t.Errorf("expected meta.sla 24, got %v", retrieved.Meta["sla"])
+			retrieved, err := store.GetModelByPath(tt.model.Path)
+			if err != nil {
+				t.Fatalf("failed to get model: %v", err)
+			}
+
+			tt.verify(t, retrieved)
+		})
 	}
 }
 
-func TestSQLiteStore_RegisterModel_WithEmptyOptionalFields(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:         "models.simple",
-		Name:         "simple",
-		Materialized: "table",
-		ContentHash:  "hash123",
-		// All optional fields empty/nil
-	}
-
-	err := store.RegisterModel(model)
-	if err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	retrieved, err := store.GetModelByPath("models.simple")
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
-
-	if retrieved.Owner != "" {
-		t.Errorf("expected empty owner, got %q", retrieved.Owner)
-	}
-	if retrieved.Schema != "" {
-		t.Errorf("expected empty schema, got %q", retrieved.Schema)
-	}
-	if len(retrieved.Tags) != 0 {
-		t.Errorf("expected empty tags, got %v", retrieved.Tags)
-	}
-	if len(retrieved.Tests) != 0 {
-		t.Errorf("expected empty tests, got %v", retrieved.Tests)
-	}
-	if len(retrieved.Meta) != 0 {
-		t.Errorf("expected empty meta, got %v", retrieved.Meta)
-	}
-}
-
-func TestSQLiteStore_RegisterModel_UpdateFrontmatterFields(t *testing.T) {
+func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	store := setupTestStore(t)
 	defer store.Close()
 
@@ -484,7 +582,6 @@ func TestSQLiteStore_RegisterModel_UpdateFrontmatterFields(t *testing.T) {
 	if len(retrieved.Tests) != 1 {
 		t.Errorf("expected 1 test, got %d", len(retrieved.Tests))
 	}
-	// JSON unmarshals numbers as float64
 	if version, ok := retrieved.Meta["version"].(float64); !ok || version != 2 {
 		t.Errorf("expected meta.version 2, got %v", retrieved.Meta["version"])
 	}
@@ -555,7 +652,6 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 		t.Fatalf("expected 2 models, got %d", len(list))
 	}
 
-	// Check first model
 	if list[0].Owner != "team-a" {
 		t.Errorf("expected owner 'team-a', got %q", list[0].Owner)
 	}
@@ -563,704 +659,751 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 		t.Errorf("expected tags [tag-a], got %v", list[0].Tags)
 	}
 
-	// Check second model
 	if list[1].Owner != "team-b" {
 		t.Errorf("expected owner 'team-b', got %q", list[1].Owner)
 	}
 }
 
-func TestSQLiteStore_RegisterModel_WithAcceptedValues(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
+// --- Model run tests ---
 
-	model := &Model{
-		Path:         "models.accepted_values_test",
-		Name:         "accepted_values_test",
-		Materialized: "table",
-		ContentHash:  "hash",
-		Tests: []TestConfig{
-			{
-				AcceptedValues: &AcceptedValuesConfig{
-					Column: "status",
-					Values: []string{"active", "inactive", "pending"},
-				},
+func TestSQLiteStore_ModelRun(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, store *SQLiteStore) (*Run, *Model)
+		operation func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun
+		verify    func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun)
+	}{
+		{
+			name: "record model run",
+			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+				run, _ := store.CreateRun("test")
+				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+				return run, model
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
+				modelRun := &ModelRun{
+					RunID:   run.ID,
+					ModelID: model.ID,
+					Status:  ModelRunStatusRunning,
+				}
+				err := store.RecordModelRun(modelRun)
+				if err != nil {
+					t.Fatalf("failed to record model run: %v", err)
+				}
+				return modelRun
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+				if modelRun.ID == "" {
+					t.Error("model run ID should be generated")
+				}
+			},
+		},
+		{
+			name: "update model run",
+			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+				run, _ := store.CreateRun("test")
+				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+				return run, model
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
+				modelRun := &ModelRun{
+					RunID:   run.ID,
+					ModelID: model.ID,
+					Status:  ModelRunStatusRunning,
+				}
+				if err := store.RecordModelRun(modelRun); err != nil {
+					t.Fatalf("failed to record model run: %v", err)
+				}
+
+				time.Sleep(10 * time.Millisecond)
+
+				err := store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, "")
+				if err != nil {
+					t.Fatalf("failed to update model run: %v", err)
+				}
+				return modelRun
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+				runs, _ := store.GetModelRunsForRun(run.ID)
+				if len(runs) != 1 {
+					t.Fatalf("expected 1 model run, got %d", len(runs))
+				}
+				if runs[0].Status != ModelRunStatusSuccess {
+					t.Errorf("expected status 'success', got %q", runs[0].Status)
+				}
+				if runs[0].RowsAffected != 100 {
+					t.Errorf("expected 100 rows affected, got %d", runs[0].RowsAffected)
+				}
+				if runs[0].ExecutionMS == 0 {
+					t.Error("execution_ms should be > 0")
+				}
+			},
+		},
+		{
+			name: "get latest model run",
+			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+				run1, err := store.CreateRun("test")
+				if err != nil {
+					t.Fatalf("failed to create run1: %v", err)
+				}
+				run2, err := store.CreateRun("test")
+				if err != nil {
+					t.Fatalf("failed to create run2: %v", err)
+				}
+				model := &Model{Path: "models.test", Name: "test", ContentHash: "hash"}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+
+				mr1 := &ModelRun{RunID: run1.ID, ModelID: model.ID, Status: ModelRunStatusSuccess}
+				if err := store.RecordModelRun(mr1); err != nil {
+					t.Fatalf("failed to record model run 1: %v", err)
+				}
+
+				time.Sleep(10 * time.Millisecond)
+
+				return run2, model
+			},
+			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
+				mr2 := &ModelRun{RunID: run.ID, ModelID: model.ID, Status: ModelRunStatusRunning}
+				if err := store.RecordModelRun(mr2); err != nil {
+					t.Fatalf("failed to record model run 2: %v", err)
+				}
+				return mr2
+			},
+			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+				model, _ := store.GetModelByPath("models.test")
+				latest, err := store.GetLatestModelRun(model.ID)
+				if err != nil {
+					t.Fatalf("failed to get latest model run: %v", err)
+				}
+				if latest == nil {
+					t.Fatal("expected latest model run, got nil")
+				}
+				if latest.ID != modelRun.ID {
+					t.Errorf("expected latest model run ID %q, got %q", modelRun.ID, latest.ID)
+				}
 			},
 		},
 	}
 
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-	retrieved, err := store.GetModelByPath("models.accepted_values_test")
-	if err != nil {
-		t.Fatalf("failed to get model: %v", err)
-	}
-
-	if len(retrieved.Tests) != 1 {
-		t.Fatalf("expected 1 test, got %d", len(retrieved.Tests))
-	}
-	if retrieved.Tests[0].AcceptedValues == nil {
-		t.Fatal("expected AcceptedValues to not be nil")
-	}
-	if retrieved.Tests[0].AcceptedValues.Column != "status" {
-		t.Errorf("expected column 'status', got %q", retrieved.Tests[0].AcceptedValues.Column)
-	}
-	if len(retrieved.Tests[0].AcceptedValues.Values) != 3 {
-		t.Errorf("expected 3 values, got %d", len(retrieved.Tests[0].AcceptedValues.Values))
-	}
-}
-
-// --- Model run tests ---
-
-func TestSQLiteStore_RecordModelRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run, _ := store.CreateRun("test")
-	model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	modelRun := &ModelRun{
-		RunID:   run.ID,
-		ModelID: model.ID,
-		Status:  ModelRunStatusRunning,
-	}
-
-	err := store.RecordModelRun(modelRun)
-	if err != nil {
-		t.Fatalf("failed to record model run: %v", err)
-	}
-
-	if modelRun.ID == "" {
-		t.Error("model run ID should be generated")
-	}
-}
-
-func TestSQLiteStore_UpdateModelRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run, _ := store.CreateRun("test")
-	model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	modelRun := &ModelRun{
-		RunID:   run.ID,
-		ModelID: model.ID,
-		Status:  ModelRunStatusRunning,
-	}
-	if err := store.RecordModelRun(modelRun); err != nil {
-		t.Fatalf("failed to record model run: %v", err)
-	}
-
-	time.Sleep(10 * time.Millisecond) // Ensure some execution time
-
-	err := store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, "")
-	if err != nil {
-		t.Fatalf("failed to update model run: %v", err)
-	}
-
-	runs, _ := store.GetModelRunsForRun(run.ID)
-	if len(runs) != 1 {
-		t.Fatalf("expected 1 model run, got %d", len(runs))
-	}
-
-	if runs[0].Status != ModelRunStatusSuccess {
-		t.Errorf("expected status 'success', got %q", runs[0].Status)
-	}
-	if runs[0].RowsAffected != 100 {
-		t.Errorf("expected 100 rows affected, got %d", runs[0].RowsAffected)
-	}
-	if runs[0].ExecutionMS == 0 {
-		t.Error("execution_ms should be > 0")
-	}
-}
-
-func TestSQLiteStore_GetLatestModelRun(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	run1, err := store.CreateRun("test")
-	if err != nil {
-		t.Fatalf("failed to create run1: %v", err)
-	}
-	run2, err := store.CreateRun("test")
-	if err != nil {
-		t.Fatalf("failed to create run2: %v", err)
-	}
-
-	model := &Model{Path: "models.test", Name: "test", ContentHash: "hash"}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	mr1 := &ModelRun{RunID: run1.ID, ModelID: model.ID, Status: ModelRunStatusSuccess}
-	if err := store.RecordModelRun(mr1); err != nil {
-		t.Fatalf("failed to record model run 1: %v", err)
-	}
-
-	time.Sleep(10 * time.Millisecond)
-
-	mr2 := &ModelRun{RunID: run2.ID, ModelID: model.ID, Status: ModelRunStatusRunning}
-	if err := store.RecordModelRun(mr2); err != nil {
-		t.Fatalf("failed to record model run 2: %v", err)
-	}
-
-	latest, err := store.GetLatestModelRun(model.ID)
-	if err != nil {
-		t.Fatalf("failed to get latest model run: %v", err)
-	}
-
-	if latest == nil {
-		t.Fatal("expected latest model run, got nil")
-	}
-
-	if latest.ID != mr2.ID {
-		t.Errorf("expected latest model run ID %q, got %q", mr2.ID, latest.ID)
+			var run *Run
+			var model *Model
+			if tt.setup != nil {
+				run, model = tt.setup(t, store)
+			}
+			var modelRun *ModelRun
+			if tt.operation != nil {
+				modelRun = tt.operation(t, store, run, model)
+			}
+			if tt.verify != nil {
+				tt.verify(t, store, run, modelRun)
+			}
+		})
 	}
 }
 
 // --- Dependency tests ---
 
-func TestSQLiteStore_SetDependencies(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
+func TestSQLiteStore_Dependencies(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T, store *SQLiteStore) []*Model
+		verify func(t *testing.T, store *SQLiteStore, models []*Model)
+	}{
+		{
+			name: "set dependencies",
+			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+				parent1 := &Model{Path: "models.parent1", Name: "parent1", ContentHash: "1"}
+				parent2 := &Model{Path: "models.parent2", Name: "parent2", ContentHash: "2"}
+				child := &Model{Path: "models.child", Name: "child", ContentHash: "3"}
 
-	// Create models
-	parent1 := &Model{Path: "models.parent1", Name: "parent1", ContentHash: "1"}
-	parent2 := &Model{Path: "models.parent2", Name: "parent2", ContentHash: "2"}
-	child := &Model{Path: "models.child", Name: "child", ContentHash: "3"}
+				store.RegisterModel(parent1)
+				store.RegisterModel(parent2)
+				store.RegisterModel(child)
 
-	store.RegisterModel(parent1)
-	store.RegisterModel(parent2)
-	store.RegisterModel(child)
+				err := store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID})
+				if err != nil {
+					t.Fatalf("failed to set dependencies: %v", err)
+				}
+				return []*Model{parent1, parent2, child}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+				child := models[2]
+				deps, _ := store.GetDependencies(child.ID)
+				if len(deps) != 2 {
+					t.Errorf("expected 2 dependencies, got %d", len(deps))
+				}
+			},
+		},
+		{
+			name: "replace dependencies",
+			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+				parent1 := &Model{Path: "models.p1", Name: "p1", ContentHash: "1"}
+				parent2 := &Model{Path: "models.p2", Name: "p2", ContentHash: "2"}
+				child := &Model{Path: "models.c", Name: "c", ContentHash: "3"}
 
-	err := store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID})
-	if err != nil {
-		t.Fatalf("failed to set dependencies: %v", err)
+				store.RegisterModel(parent1)
+				store.RegisterModel(parent2)
+				store.RegisterModel(child)
+
+				store.SetDependencies(child.ID, []string{parent1.ID})
+				err := store.SetDependencies(child.ID, []string{parent2.ID})
+				if err != nil {
+					t.Fatalf("failed to replace dependencies: %v", err)
+				}
+				return []*Model{parent1, parent2, child}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+				parent2 := models[1]
+				child := models[2]
+				deps, _ := store.GetDependencies(child.ID)
+				if len(deps) != 1 {
+					t.Errorf("expected 1 dependency, got %d", len(deps))
+				}
+				if deps[0] != parent2.ID {
+					t.Errorf("expected parent2 ID, got %q", deps[0])
+				}
+			},
+		},
+		{
+			name: "get dependents",
+			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+				parent := &Model{Path: "models.parent", Name: "parent", ContentHash: "1"}
+				child1 := &Model{Path: "models.child1", Name: "child1", ContentHash: "2"}
+				child2 := &Model{Path: "models.child2", Name: "child2", ContentHash: "3"}
+
+				store.RegisterModel(parent)
+				store.RegisterModel(child1)
+				store.RegisterModel(child2)
+
+				store.SetDependencies(child1.ID, []string{parent.ID})
+				store.SetDependencies(child2.ID, []string{parent.ID})
+
+				return []*Model{parent, child1, child2}
+			},
+			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+				parent := models[0]
+				dependents, err := store.GetDependents(parent.ID)
+				if err != nil {
+					t.Fatalf("failed to get dependents: %v", err)
+				}
+				if len(dependents) != 2 {
+					t.Errorf("expected 2 dependents, got %d", len(dependents))
+				}
+			},
+		},
 	}
 
-	deps, _ := store.GetDependencies(child.ID)
-	if len(deps) != 2 {
-		t.Errorf("expected 2 dependencies, got %d", len(deps))
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-func TestSQLiteStore_SetDependencies_Replace(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	parent1 := &Model{Path: "models.p1", Name: "p1", ContentHash: "1"}
-	parent2 := &Model{Path: "models.p2", Name: "p2", ContentHash: "2"}
-	child := &Model{Path: "models.c", Name: "c", ContentHash: "3"}
-
-	store.RegisterModel(parent1)
-	store.RegisterModel(parent2)
-	store.RegisterModel(child)
-
-	// Set initial dependency
-	store.SetDependencies(child.ID, []string{parent1.ID})
-
-	// Replace with new dependency
-	err := store.SetDependencies(child.ID, []string{parent2.ID})
-	if err != nil {
-		t.Fatalf("failed to replace dependencies: %v", err)
-	}
-
-	deps, _ := store.GetDependencies(child.ID)
-	if len(deps) != 1 {
-		t.Errorf("expected 1 dependency, got %d", len(deps))
-	}
-	if deps[0] != parent2.ID {
-		t.Errorf("expected parent2 ID, got %q", deps[0])
-	}
-}
-
-func TestSQLiteStore_GetDependents(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	parent := &Model{Path: "models.parent", Name: "parent", ContentHash: "1"}
-	child1 := &Model{Path: "models.child1", Name: "child1", ContentHash: "2"}
-	child2 := &Model{Path: "models.child2", Name: "child2", ContentHash: "3"}
-
-	store.RegisterModel(parent)
-	store.RegisterModel(child1)
-	store.RegisterModel(child2)
-
-	store.SetDependencies(child1.ID, []string{parent.ID})
-	store.SetDependencies(child2.ID, []string{parent.ID})
-
-	dependents, err := store.GetDependents(parent.ID)
-	if err != nil {
-		t.Fatalf("failed to get dependents: %v", err)
-	}
-
-	if len(dependents) != 2 {
-		t.Errorf("expected 2 dependents, got %d", len(dependents))
+			var models []*Model
+			if tt.setup != nil {
+				models = tt.setup(t, store)
+			}
+			if tt.verify != nil {
+				tt.verify(t, store, models)
+			}
+		})
 	}
 }
 
 // --- Environment tests ---
 
-func TestSQLiteStore_CreateEnvironment(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	env, err := store.CreateEnvironment("staging")
-	if err != nil {
-		t.Fatalf("failed to create environment: %v", err)
+func TestSQLiteStore_Environment(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation func(t *testing.T, store *SQLiteStore)
+	}{
+		{
+			name: "create environment",
+			operation: func(t *testing.T, store *SQLiteStore) {
+				env, err := store.CreateEnvironment("staging")
+				if err != nil {
+					t.Fatalf("failed to create environment: %v", err)
+				}
+				if env.Name != "staging" {
+					t.Errorf("expected name 'staging', got %q", env.Name)
+				}
+			},
+		},
+		{
+			name: "get environment",
+			operation: func(t *testing.T, store *SQLiteStore) {
+				store.CreateEnvironment("production")
+				env, err := store.GetEnvironment("production")
+				if err != nil {
+					t.Fatalf("failed to get environment: %v", err)
+				}
+				if env.Name != "production" {
+					t.Errorf("expected name 'production', got %q", env.Name)
+				}
+			},
+		},
+		{
+			name: "get environment not found",
+			operation: func(t *testing.T, store *SQLiteStore) {
+				env, err := store.GetEnvironment("nonexistent")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if env != nil {
+					t.Error("expected nil for nonexistent environment")
+				}
+			},
+		},
+		{
+			name: "update environment ref",
+			operation: func(t *testing.T, store *SQLiteStore) {
+				store.CreateEnvironment("dev")
+				err := store.UpdateEnvironmentRef("dev", "abc123")
+				if err != nil {
+					t.Fatalf("failed to update environment ref: %v", err)
+				}
+				env, _ := store.GetEnvironment("dev")
+				if env.CommitRef != "abc123" {
+					t.Errorf("expected commit_ref 'abc123', got %q", env.CommitRef)
+				}
+			},
+		},
 	}
 
-	if env.Name != "staging" {
-		t.Errorf("expected name 'staging', got %q", env.Name)
-	}
-}
-
-func TestSQLiteStore_GetEnvironment(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	store.CreateEnvironment("production")
-
-	env, err := store.GetEnvironment("production")
-	if err != nil {
-		t.Fatalf("failed to get environment: %v", err)
-	}
-
-	if env.Name != "production" {
-		t.Errorf("expected name 'production', got %q", env.Name)
-	}
-}
-
-func TestSQLiteStore_GetEnvironment_NotFound(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	env, err := store.GetEnvironment("nonexistent")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if env != nil {
-		t.Error("expected nil for nonexistent environment")
-	}
-}
-
-func TestSQLiteStore_UpdateEnvironmentRef(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	store.CreateEnvironment("dev")
-
-	err := store.UpdateEnvironmentRef("dev", "abc123")
-	if err != nil {
-		t.Fatalf("failed to update environment ref: %v", err)
-	}
-
-	env, _ := store.GetEnvironment("dev")
-	if env.CommitRef != "abc123" {
-		t.Errorf("expected commit_ref 'abc123', got %q", env.CommitRef)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
+			tt.operation(t, store)
+		})
 	}
 }
 
 // --- Column lineage tests ---
 
-func TestSQLiteStore_SaveModelColumns(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	// Register the model first (required for foreign key)
-	model := &Model{
-		Path:        "staging.stg_customers",
-		Name:        "stg_customers",
-		ContentHash: "abc123",
-	}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	columns := []ColumnInfo{
+func TestSQLiteStore_ColumnLineage(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T, store *SQLiteStore)
+		verify func(t *testing.T, store *SQLiteStore)
+	}{
 		{
-			Name:          "customer_id",
-			Index:         0,
-			TransformType: "",
-			Function:      "",
-			Sources: []SourceRef{
-				{Table: "raw_customers", Column: "id"},
+			name: "save and get model columns",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				model := &Model{
+					Path:        "staging.stg_customers",
+					Name:        "stg_customers",
+					ContentHash: "abc123",
+				}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+
+				columns := []ColumnInfo{
+					{
+						Name:          "customer_id",
+						Index:         0,
+						TransformType: "",
+						Function:      "",
+						Sources: []SourceRef{
+							{Table: "raw_customers", Column: "id"},
+						},
+					},
+					{
+						Name:          "full_name",
+						Index:         1,
+						TransformType: "EXPR",
+						Function:      "concat",
+						Sources: []SourceRef{
+							{Table: "raw_customers", Column: "first_name"},
+							{Table: "raw_customers", Column: "last_name"},
+						},
+					},
+				}
+
+				err := store.SaveModelColumns("staging.stg_customers", columns)
+				if err != nil {
+					t.Fatalf("failed to save model columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				retrieved, err := store.GetModelColumns("staging.stg_customers")
+				if err != nil {
+					t.Fatalf("failed to get model columns: %v", err)
+				}
+
+				if len(retrieved) != 2 {
+					t.Fatalf("expected 2 columns, got %d", len(retrieved))
+				}
+
+				if retrieved[0].Name != "customer_id" {
+					t.Errorf("expected column name 'customer_id', got %q", retrieved[0].Name)
+				}
+				if len(retrieved[0].Sources) != 1 {
+					t.Errorf("expected 1 source for customer_id, got %d", len(retrieved[0].Sources))
+				}
+
+				if retrieved[1].Name != "full_name" {
+					t.Errorf("expected column name 'full_name', got %q", retrieved[1].Name)
+				}
+				if retrieved[1].TransformType != "EXPR" {
+					t.Errorf("expected transform_type 'EXPR', got %q", retrieved[1].TransformType)
+				}
+				if retrieved[1].Function != "concat" {
+					t.Errorf("expected function 'concat', got %q", retrieved[1].Function)
+				}
+				if len(retrieved[1].Sources) != 2 {
+					t.Errorf("expected 2 sources for full_name, got %d", len(retrieved[1].Sources))
+				}
 			},
 		},
 		{
-			Name:          "full_name",
-			Index:         1,
-			TransformType: "EXPR",
-			Function:      "concat",
-			Sources: []SourceRef{
-				{Table: "raw_customers", Column: "first_name"},
-				{Table: "raw_customers", Column: "last_name"},
+			name: "save model columns upsert",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				model := &Model{
+					Path:        "staging.stg_orders",
+					Name:        "stg_orders",
+					ContentHash: "abc123",
+				}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+
+				initialColumns := []ColumnInfo{
+					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
+				}
+				if err := store.SaveModelColumns("staging.stg_orders", initialColumns); err != nil {
+					t.Fatalf("failed to save initial columns: %v", err)
+				}
+
+				updatedColumns := []ColumnInfo{
+					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "order_id"}}},
+					{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
+				}
+				if err := store.SaveModelColumns("staging.stg_orders", updatedColumns); err != nil {
+					t.Fatalf("failed to save updated columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				retrieved, err := store.GetModelColumns("staging.stg_orders")
+				if err != nil {
+					t.Fatalf("failed to get model columns: %v", err)
+				}
+
+				if len(retrieved) != 2 {
+					t.Fatalf("expected 2 columns after update, got %d", len(retrieved))
+				}
+
+				if len(retrieved[0].Sources) != 1 || retrieved[0].Sources[0].Column != "order_id" {
+					t.Errorf("expected source column 'order_id', got %v", retrieved[0].Sources)
+				}
+			},
+		},
+		{
+			name:  "get model columns not found",
+			setup: func(t *testing.T, store *SQLiteStore) {},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				columns, err := store.GetModelColumns("nonexistent.model")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if len(columns) != 0 {
+					t.Errorf("expected empty slice for nonexistent model, got %d columns", len(columns))
+				}
+			},
+		},
+		{
+			name: "delete model columns",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				model := &Model{
+					Path:        "staging.stg_products",
+					Name:        "stg_products",
+					ContentHash: "abc123",
+				}
+				if err := store.RegisterModel(model); err != nil {
+					t.Fatalf("failed to register model: %v", err)
+				}
+
+				columns := []ColumnInfo{
+					{Name: "product_id", Index: 0, Sources: []SourceRef{{Table: "raw_products", Column: "id"}}},
+					{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_products", Column: "name"}}},
+				}
+				if err := store.SaveModelColumns("staging.stg_products", columns); err != nil {
+					t.Fatalf("failed to save columns: %v", err)
+				}
+
+				err := store.DeleteModelColumns("staging.stg_products")
+				if err != nil {
+					t.Fatalf("failed to delete columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				retrieved, err := store.GetModelColumns("staging.stg_products")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if len(retrieved) != 0 {
+					t.Errorf("expected 0 columns after deletion, got %d", len(retrieved))
+				}
 			},
 		},
 	}
 
-	err := store.SaveModelColumns("staging.stg_customers", columns)
-	if err != nil {
-		t.Fatalf("failed to save model columns: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-	// Verify columns were saved
-	retrieved, err := store.GetModelColumns("staging.stg_customers")
-	if err != nil {
-		t.Fatalf("failed to get model columns: %v", err)
-	}
-
-	if len(retrieved) != 2 {
-		t.Fatalf("expected 2 columns, got %d", len(retrieved))
-	}
-
-	// Check first column
-	if retrieved[0].Name != "customer_id" {
-		t.Errorf("expected column name 'customer_id', got %q", retrieved[0].Name)
-	}
-	if len(retrieved[0].Sources) != 1 {
-		t.Errorf("expected 1 source for customer_id, got %d", len(retrieved[0].Sources))
-	}
-
-	// Check second column
-	if retrieved[1].Name != "full_name" {
-		t.Errorf("expected column name 'full_name', got %q", retrieved[1].Name)
-	}
-	if retrieved[1].TransformType != "EXPR" {
-		t.Errorf("expected transform_type 'EXPR', got %q", retrieved[1].TransformType)
-	}
-	if retrieved[1].Function != "concat" {
-		t.Errorf("expected function 'concat', got %q", retrieved[1].Function)
-	}
-	if len(retrieved[1].Sources) != 2 {
-		t.Errorf("expected 2 sources for full_name, got %d", len(retrieved[1].Sources))
-	}
-}
-
-func TestSQLiteStore_SaveModelColumns_Upsert(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:        "staging.stg_orders",
-		Name:        "stg_orders",
-		ContentHash: "abc123",
-	}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	// Initial save
-	initialColumns := []ColumnInfo{
-		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
-	}
-	if err := store.SaveModelColumns("staging.stg_orders", initialColumns); err != nil {
-		t.Fatalf("failed to save initial columns: %v", err)
-	}
-
-	// Update with different columns (should replace)
-	updatedColumns := []ColumnInfo{
-		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "order_id"}}},
-		{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
-	}
-	if err := store.SaveModelColumns("staging.stg_orders", updatedColumns); err != nil {
-		t.Fatalf("failed to save updated columns: %v", err)
-	}
-
-	retrieved, err := store.GetModelColumns("staging.stg_orders")
-	if err != nil {
-		t.Fatalf("failed to get model columns: %v", err)
-	}
-
-	if len(retrieved) != 2 {
-		t.Fatalf("expected 2 columns after update, got %d", len(retrieved))
-	}
-
-	// Check that the source was updated
-	if len(retrieved[0].Sources) != 1 || retrieved[0].Sources[0].Column != "order_id" {
-		t.Errorf("expected source column 'order_id', got %v", retrieved[0].Sources)
-	}
-}
-
-func TestSQLiteStore_GetModelColumns_NotFound(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	columns, err := store.GetModelColumns("nonexistent.model")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(columns) != 0 {
-		t.Errorf("expected empty slice for nonexistent model, got %d columns", len(columns))
-	}
-}
-
-func TestSQLiteStore_DeleteModelColumns(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	model := &Model{
-		Path:        "staging.stg_products",
-		Name:        "stg_products",
-		ContentHash: "abc123",
-	}
-	if err := store.RegisterModel(model); err != nil {
-		t.Fatalf("failed to register model: %v", err)
-	}
-
-	columns := []ColumnInfo{
-		{Name: "product_id", Index: 0, Sources: []SourceRef{{Table: "raw_products", Column: "id"}}},
-		{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_products", Column: "name"}}},
-	}
-	if err := store.SaveModelColumns("staging.stg_products", columns); err != nil {
-		t.Fatalf("failed to save columns: %v", err)
-	}
-
-	// Delete columns
-	err := store.DeleteModelColumns("staging.stg_products")
-	if err != nil {
-		t.Fatalf("failed to delete columns: %v", err)
-	}
-
-	// Verify deletion
-	retrieved, err := store.GetModelColumns("staging.stg_products")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(retrieved) != 0 {
-		t.Errorf("expected 0 columns after deletion, got %d", len(retrieved))
-	}
-}
-
-func TestSQLiteStore_TraceColumnBackward(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	// Create a chain of models:
-	// raw_customers -> stg_customers -> customer_summary
-	// The trace should show the upstream lineage
-
-	stgModel := &Model{
-		Path:        "staging.stg_customers",
-		Name:        "stg_customers",
-		ContentHash: "abc",
-	}
-	martModel := &Model{
-		Path:        "marts.customer_summary",
-		Name:        "customer_summary",
-		ContentHash: "def",
-	}
-	if err := store.RegisterModel(stgModel); err != nil {
-		t.Fatalf("failed to register stg model: %v", err)
-	}
-	if err := store.RegisterModel(martModel); err != nil {
-		t.Fatalf("failed to register mart model: %v", err)
-	}
-
-	// stg_customers gets customer_id from raw_customers.id
-	stgColumns := []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
-	}
-	if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
-		t.Fatalf("failed to save stg columns: %v", err)
-	}
-
-	// customer_summary gets customer_id from stg_customers.customer_id
-	martColumns := []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-	}
-	if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
-		t.Fatalf("failed to save mart columns: %v", err)
-	}
-
-	// Trace backward from customer_summary.customer_id
-	results, err := store.TraceColumnBackward("marts.customer_summary", "customer_id")
-	if err != nil {
-		t.Fatalf("failed to trace column backward: %v", err)
-	}
-
-	// Should find at least the direct source (stg_customers.customer_id)
-	if len(results) == 0 {
-		t.Fatal("expected at least 1 trace result, got 0")
-	}
-
-	// First result should be depth 1 (direct source)
-	foundStgCustomers := false
-	foundRawCustomers := false
-	for _, r := range results {
-		if r.ModelPath == "stg_customers" && r.ColumnName == "customer_id" && r.Depth == 1 {
-			foundStgCustomers = true
-			if r.IsExternal {
-				t.Error("stg_customers should not be marked as external")
+			if tt.setup != nil {
+				tt.setup(t, store)
 			}
-		}
-		if r.ModelPath == "raw_customers" && r.ColumnName == "id" && r.Depth == 2 {
-			foundRawCustomers = true
-			if !r.IsExternal {
-				t.Error("raw_customers should be marked as external (not a registered model)")
+			if tt.verify != nil {
+				tt.verify(t, store)
 			}
-		}
-	}
-
-	if !foundStgCustomers {
-		t.Error("did not find stg_customers.customer_id at depth 1")
-	}
-	if !foundRawCustomers {
-		t.Error("did not find raw_customers.id at depth 2")
+		})
 	}
 }
 
-func TestSQLiteStore_TraceColumnForward(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
+// --- Trace tests ---
 
-	// Create models: stg_customers -> customer_summary
-	stgModel := &Model{
-		Path:        "staging.stg_customers",
-		Name:        "stg_customers",
-		ContentHash: "abc",
-	}
-	martModel := &Model{
-		Path:        "marts.customer_summary",
-		Name:        "customer_summary",
-		ContentHash: "def",
-	}
-	if err := store.RegisterModel(stgModel); err != nil {
-		t.Fatalf("failed to register stg model: %v", err)
-	}
-	if err := store.RegisterModel(martModel); err != nil {
-		t.Fatalf("failed to register mart model: %v", err)
+func TestSQLiteStore_Trace(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T, store *SQLiteStore)
+		verify func(t *testing.T, store *SQLiteStore)
+	}{
+		{
+			name: "trace column backward",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				stgModel := &Model{
+					Path:        "staging.stg_customers",
+					Name:        "stg_customers",
+					ContentHash: "abc",
+				}
+				martModel := &Model{
+					Path:        "marts.customer_summary",
+					Name:        "customer_summary",
+					ContentHash: "def",
+				}
+				if err := store.RegisterModel(stgModel); err != nil {
+					t.Fatalf("failed to register stg model: %v", err)
+				}
+				if err := store.RegisterModel(martModel); err != nil {
+					t.Fatalf("failed to register mart model: %v", err)
+				}
+
+				stgColumns := []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+				}
+				if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
+					t.Fatalf("failed to save stg columns: %v", err)
+				}
+
+				martColumns := []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				}
+				if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
+					t.Fatalf("failed to save mart columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				results, err := store.TraceColumnBackward("marts.customer_summary", "customer_id")
+				if err != nil {
+					t.Fatalf("failed to trace column backward: %v", err)
+				}
+
+				if len(results) == 0 {
+					t.Fatal("expected at least 1 trace result, got 0")
+				}
+
+				foundStgCustomers := false
+				foundRawCustomers := false
+				for _, r := range results {
+					if r.ModelPath == "stg_customers" && r.ColumnName == "customer_id" && r.Depth == 1 {
+						foundStgCustomers = true
+						if r.IsExternal {
+							t.Error("stg_customers should not be marked as external")
+						}
+					}
+					if r.ModelPath == "raw_customers" && r.ColumnName == "id" && r.Depth == 2 {
+						foundRawCustomers = true
+						if !r.IsExternal {
+							t.Error("raw_customers should be marked as external (not a registered model)")
+						}
+					}
+				}
+
+				if !foundStgCustomers {
+					t.Error("did not find stg_customers.customer_id at depth 1")
+				}
+				if !foundRawCustomers {
+					t.Error("did not find raw_customers.id at depth 2")
+				}
+			},
+		},
+		{
+			name: "trace column forward",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				stgModel := &Model{
+					Path:        "staging.stg_customers",
+					Name:        "stg_customers",
+					ContentHash: "abc",
+				}
+				martModel := &Model{
+					Path:        "marts.customer_summary",
+					Name:        "customer_summary",
+					ContentHash: "def",
+				}
+				if err := store.RegisterModel(stgModel); err != nil {
+					t.Fatalf("failed to register stg model: %v", err)
+				}
+				if err := store.RegisterModel(martModel); err != nil {
+					t.Fatalf("failed to register mart model: %v", err)
+				}
+
+				stgColumns := []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+					{Name: "email", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "email"}}},
+				}
+				if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
+					t.Fatalf("failed to save stg columns: %v", err)
+				}
+
+				martColumns := []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+					{Name: "contact", Index: 1, Sources: []SourceRef{{Table: "stg_customers", Column: "email"}}},
+				}
+				if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
+					t.Fatalf("failed to save mart columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
+				if err != nil {
+					t.Fatalf("failed to trace column forward: %v", err)
+				}
+
+				if len(results) == 0 {
+					t.Fatal("expected at least 1 trace result, got 0")
+				}
+
+				found := false
+				for _, r := range results {
+					if r.ModelPath == "marts.customer_summary" && r.ColumnName == "customer_id" && r.Depth == 1 {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Error("did not find marts.customer_summary.customer_id at depth 1")
+				}
+			},
+		},
+		{
+			name: "trace column forward multiple consumers",
+			setup: func(t *testing.T, store *SQLiteStore) {
+				stgModel := &Model{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"}
+				summaryModel := &Model{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "def"}
+				metricsModel := &Model{Path: "marts.customer_metrics", Name: "customer_metrics", ContentHash: "ghi"}
+
+				for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
+					if err := store.RegisterModel(m); err != nil {
+						t.Fatalf("failed to register model %s: %v", m.Path, err)
+					}
+				}
+
+				if err := store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw", Column: "id"}}},
+				}); err != nil {
+					t.Fatalf("failed to save stg columns: %v", err)
+				}
+
+				if err := store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
+					{Name: "cust_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				}); err != nil {
+					t.Fatalf("failed to save summary columns: %v", err)
+				}
+				if err := store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				}); err != nil {
+					t.Fatalf("failed to save metrics columns: %v", err)
+				}
+			},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
+				if err != nil {
+					t.Fatalf("failed to trace column forward: %v", err)
+				}
+
+				if len(results) < 2 {
+					t.Fatalf("expected at least 2 trace results, got %d", len(results))
+				}
+
+				foundSummary := false
+				foundMetrics := false
+				for _, r := range results {
+					if r.ModelPath == "marts.customer_summary" {
+						foundSummary = true
+					}
+					if r.ModelPath == "marts.customer_metrics" {
+						foundMetrics = true
+					}
+				}
+
+				if !foundSummary {
+					t.Error("did not find marts.customer_summary in forward trace")
+				}
+				if !foundMetrics {
+					t.Error("did not find marts.customer_metrics in forward trace")
+				}
+			},
+		},
+		{
+			name:  "trace column empty results",
+			setup: func(t *testing.T, store *SQLiteStore) {},
+			verify: func(t *testing.T, store *SQLiteStore) {
+				backward, err := store.TraceColumnBackward("nonexistent.model", "col")
+				if err != nil {
+					t.Fatalf("unexpected error on backward trace: %v", err)
+				}
+				if len(backward) != 0 {
+					t.Errorf("expected empty backward trace, got %d results", len(backward))
+				}
+
+				forward, err := store.TraceColumnForward("nonexistent.model", "col")
+				if err != nil {
+					t.Fatalf("unexpected error on forward trace: %v", err)
+				}
+				if len(forward) != 0 {
+					t.Errorf("expected empty forward trace, got %d results", len(forward))
+				}
+			},
+		},
 	}
 
-	// stg_customers has customer_id
-	stgColumns := []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
-		{Name: "email", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "email"}}},
-	}
-	if err := store.SaveModelColumns("staging.stg_customers", stgColumns); err != nil {
-		t.Fatalf("failed to save stg columns: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupTestStore(t)
+			defer store.Close()
 
-	// customer_summary uses stg_customers.customer_id
-	martColumns := []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-		{Name: "contact", Index: 1, Sources: []SourceRef{{Table: "stg_customers", Column: "email"}}},
-	}
-	if err := store.SaveModelColumns("marts.customer_summary", martColumns); err != nil {
-		t.Fatalf("failed to save mart columns: %v", err)
-	}
-
-	// Trace forward from stg_customers.customer_id - where does it go?
-	results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
-	if err != nil {
-		t.Fatalf("failed to trace column forward: %v", err)
-	}
-
-	if len(results) == 0 {
-		t.Fatal("expected at least 1 trace result, got 0")
-	}
-
-	// Should find customer_summary.customer_id at depth 1
-	found := false
-	for _, r := range results {
-		if r.ModelPath == "marts.customer_summary" && r.ColumnName == "customer_id" && r.Depth == 1 {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("did not find marts.customer_summary.customer_id at depth 1")
-	}
-}
-
-func TestSQLiteStore_TraceColumnForward_MultipleConsumers(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	// Create models: stg_customers -> (customer_summary, customer_metrics)
-	stgModel := &Model{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"}
-	summaryModel := &Model{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "def"}
-	metricsModel := &Model{Path: "marts.customer_metrics", Name: "customer_metrics", ContentHash: "ghi"}
-
-	for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
-		if err := store.RegisterModel(m); err != nil {
-			t.Fatalf("failed to register model %s: %v", m.Path, err)
-		}
-	}
-
-	// stg_customers has customer_id
-	if err := store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw", Column: "id"}}},
-	}); err != nil {
-		t.Fatalf("failed to save stg columns: %v", err)
-	}
-
-	// Both mart models use stg_customers.customer_id
-	if err := store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
-		{Name: "cust_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-	}); err != nil {
-		t.Fatalf("failed to save summary columns: %v", err)
-	}
-	if err := store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-	}); err != nil {
-		t.Fatalf("failed to save metrics columns: %v", err)
-	}
-
-	// Trace forward - should find both consumers
-	results, err := store.TraceColumnForward("staging.stg_customers", "customer_id")
-	if err != nil {
-		t.Fatalf("failed to trace column forward: %v", err)
-	}
-
-	if len(results) < 2 {
-		t.Fatalf("expected at least 2 trace results, got %d", len(results))
-	}
-
-	foundSummary := false
-	foundMetrics := false
-	for _, r := range results {
-		if r.ModelPath == "marts.customer_summary" {
-			foundSummary = true
-		}
-		if r.ModelPath == "marts.customer_metrics" {
-			foundMetrics = true
-		}
-	}
-
-	if !foundSummary {
-		t.Error("did not find marts.customer_summary in forward trace")
-	}
-	if !foundMetrics {
-		t.Error("did not find marts.customer_metrics in forward trace")
-	}
-}
-
-func TestSQLiteStore_TraceColumn_EmptyResults(t *testing.T) {
-	store := setupTestStore(t)
-	defer store.Close()
-
-	// Trace a column that doesn't exist
-	backward, err := store.TraceColumnBackward("nonexistent.model", "col")
-	if err != nil {
-		t.Fatalf("unexpected error on backward trace: %v", err)
-	}
-	if len(backward) != 0 {
-		t.Errorf("expected empty backward trace, got %d results", len(backward))
-	}
-
-	forward, err := store.TraceColumnForward("nonexistent.model", "col")
-	if err != nil {
-		t.Fatalf("unexpected error on forward trace: %v", err)
-	}
-	if len(forward) != 0 {
-		t.Errorf("expected empty forward trace, got %d results", len(forward))
+			if tt.setup != nil {
+				tt.setup(t, store)
+			}
+			if tt.verify != nil {
+				tt.verify(t, store)
+			}
+		})
 	}
 }
