@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Window specification parsing: OVER clauses, PARTITION BY, ORDER BY, frame specs.
 //

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/lineage"
+	"github.com/leapstack-labs/leapsql/pkg/sql"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -431,7 +431,7 @@ func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
 
 func TestCatalogSearchFunctions(t *testing.T) {
 	// Test the underlying catalog search
-	results := lineage.SearchFunctions("DATE")
+	results := sql.SearchFunctions("DATE")
 	assert.NotEmpty(t, results, "expected DATE functions")
 
 	// All results should start with DATE

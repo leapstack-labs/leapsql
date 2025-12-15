@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 import (
 	"strings"

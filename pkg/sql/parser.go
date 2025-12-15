@@ -1,4 +1,4 @@
-// Package lineage provides SQL parsing and column-level lineage extraction.
+// Package sql provides SQL parsing and column-level lineage extraction.
 //
 // # Parser Architecture
 //
@@ -14,7 +14,7 @@
 //
 // # Usage
 //
-//	stmt, err := lineage.Parse("SELECT a, b FROM t")
+//	stmt, err := sql.Parse("SELECT a, b FROM t")
 //	if err != nil {
 //	    // handle error
 //	}
@@ -30,7 +30,7 @@
 //	                [QUALIFY expr] [ORDER BY order_list] [LIMIT expr]
 //
 // See each file for detailed grammar rules for that section.
-package lineage
+package sql
 
 import "fmt"
 

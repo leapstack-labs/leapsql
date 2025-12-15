@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Statement represents a SQL statement.
 type Statement interface {

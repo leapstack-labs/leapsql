@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Special expression parsing: CASE, CAST, EXISTS, parenthesized expressions, subqueries.
 //

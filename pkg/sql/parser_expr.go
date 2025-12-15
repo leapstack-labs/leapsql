@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Expression precedence parsing: OR, AND, NOT, comparisons, arithmetic operators.
 //

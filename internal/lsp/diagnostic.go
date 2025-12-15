@@ -8,7 +8,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/template"
-	"github.com/leapstack-labs/leapsql/pkg/lineage"
+	"github.com/leapstack-labs/leapsql/pkg/sql"
 )
 
 // publishDiagnostics parses the document and publishes any errors.
@@ -139,15 +139,15 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Extract SQL content (skip frontmatter, simplify templates)
-	sql := extractSQL(doc.Content)
-	if strings.TrimSpace(sql) == "" {
+	sqlContent := extractSQL(doc.Content)
+	if strings.TrimSpace(sqlContent) == "" {
 		return diagnostics
 	}
 
 	// Parse with lineage parser
-	_, err := lineage.Parse(sql)
+	_, err := sql.Parse(sqlContent)
 	if err != nil {
-		var pe *lineage.ParseError
+		var pe *sql.ParseError
 		if errors.As(err, &pe) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Range: Range{

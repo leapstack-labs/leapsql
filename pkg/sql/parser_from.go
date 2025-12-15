@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // FROM clause parsing: table references, derived tables, lateral joins, JOINs.
 //

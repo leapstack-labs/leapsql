@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Statement parsing: WITH clause, CTEs, SELECT body, SELECT list, ORDER BY.
 //

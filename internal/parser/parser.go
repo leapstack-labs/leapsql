@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/lineage"
+	"github.com/leapstack-labs/leapsql/internal/lineage"
 )
 
 // ModelConfig holds configuration extracted from SQL model pragmas and frontmatter.

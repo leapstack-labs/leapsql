@@ -1,6 +1,6 @@
-// Package lineage provides SQL parsing and column-level lineage tracking.
+// Package sql provides SQL parsing and column-level lineage tracking.
 // This file contains the DuckDB function catalog for LSP completions.
-package lineage
+package sql
 
 // FunctionCategory classifies SQL functions by their purpose.
 type FunctionCategory string

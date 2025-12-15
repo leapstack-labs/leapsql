@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // Resolver walks the AST and resolves:
 // - CTE definitions (names and columns)

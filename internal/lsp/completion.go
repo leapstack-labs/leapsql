@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/lineage"
+	"github.com/leapstack-labs/leapsql/pkg/sql"
 )
 
 // CompletionContextType describes what kind of completion context we're in.
@@ -92,7 +92,7 @@ var sqlKeywords = []CompletionItem{
 
 // getSQLFunctionCompletions returns SQL function completions from the DuckDB catalog.
 func getSQLFunctionCompletions(prefix string) []CompletionItem {
-	functions := lineage.SearchFunctions(prefix)
+	functions := sql.SearchFunctions(prefix)
 	items := make([]CompletionItem, 0, len(functions))
 	for _, fn := range functions {
 		item := CompletionItem{
@@ -389,12 +389,12 @@ func (s *Server) getHover(params HoverParams) *Hover {
 
 	// Check for SQL functions in the catalog
 	upperWord := strings.ToUpper(word)
-	for _, fn := range lineage.DuckDBCatalog {
+	for _, fn := range sql.DuckDBCatalog {
 		if fn.Name == upperWord {
 			content := fmt.Sprintf("**%s** (%s)\n\n%s", fn.Name, fn.Signature, fn.Description)
 			if fn.IsAggregate {
 				content += "\n\n*Aggregate function*"
-			} else if fn.Category == lineage.CategoryWindow {
+			} else if fn.Category == sql.CategoryWindow {
 				content += "\n\n*Window function*"
 			}
 			return &Hover{

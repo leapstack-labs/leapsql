@@ -1,4 +1,4 @@
-package lineage
+package sql
 
 // DuckDB dialect definition.
 // For additional dialects, create new files like dialect_snowflake.go, dialect_bigquery.go, etc.
