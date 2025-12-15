@@ -109,7 +109,7 @@ func (e *Engine) Discover(opts DiscoveryOptions) (*DiscoveryResult, error) {
 
 // shouldParseFile checks if a file needs re-parsing based on content hash.
 func (e *Engine) shouldParseFile(filePath string, forceRefresh bool) (needsParse bool, newHash string, content []byte) {
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is validated by filepath.Walk
 	if err != nil {
 		return true, "", nil // File error, try to parse anyway
 	}
@@ -146,9 +146,9 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 	// Track which files we've seen (for deletion detection)
 	seenFiles := make(map[string]bool)
 
-	err := filepath.Walk(macrosDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".star") {
-			return nil
+	err := filepath.Walk(macrosDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".star") {
+			return nil //nolint:nilerr // Skip directories and non-.star files
 		}
 
 		absPath, _ := filepath.Abs(path)
@@ -162,20 +162,20 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 		}
 
 		// Parse the .star file
-		parsed, err := macro.ParseStarlarkFile(absPath, content)
-		if err != nil {
+		parsed, parseErr := macro.ParseStarlarkFile(absPath, content)
+		if parseErr != nil {
 			result.Errors = append(result.Errors, DiscoveryError{
-				Path: absPath, Type: "parse", Message: err.Error(),
+				Path: absPath, Type: "parse", Message: parseErr.Error(),
 			})
-			return nil // Continue with other files (graceful degradation)
+			return nil //nolint:nilerr // Continue with other files (graceful degradation)
 		}
 
 		// Save to SQLite
-		if err := e.saveMacroToStore(parsed, absPath, newHash); err != nil {
+		if saveErr := e.saveMacroToStore(parsed, absPath, newHash); saveErr != nil {
 			result.Errors = append(result.Errors, DiscoveryError{
-				Path: absPath, Type: "save", Message: err.Error(),
+				Path: absPath, Type: "save", Message: saveErr.Error(),
 			})
-			return nil
+			return nil //nolint:nilerr // Continue with other files
 		}
 
 		// Update in-memory macro registry (reload from file)
@@ -185,7 +185,7 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 			modules, _ := loader.Load()
 			for _, mod := range modules {
 				if mod.Path == absPath {
-					e.macroRegistry.Register(mod)
+					_ = e.macroRegistry.Register(mod)
 					break
 				}
 			}
@@ -258,9 +258,9 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 
 	scanner := parser.NewScanner(absModelsDir)
 
-	err := filepath.Walk(absModelsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".sql") {
-			return nil
+	err := filepath.Walk(absModelsDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".sql") {
+			return nil //nolint:nilerr // Skip directories and non-.sql files
 		}
 
 		absPath, _ := filepath.Abs(path)
@@ -288,7 +288,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 				result.Errors = append(result.Errors, DiscoveryError{
 					Path: absPath, Type: "parse", Message: parseErr.Error(),
 				})
-				return nil // Continue with other files
+				return nil //nolint:nilerr // Continue with other files (graceful degradation)
 			}
 
 			// Save to SQLite
@@ -319,7 +319,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 }
 
 // reconstructModelConfig creates a ModelConfig from stored state and file content.
-func (e *Engine) reconstructModelConfig(stored *state.Model, filePath string, content []byte) *parser.ModelConfig {
+func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content []byte) *parser.ModelConfig {
 	// We need to re-parse the file to get the full SQL and sources
 	// But we can skip the full parse validation since we know it was valid before
 	scanner := parser.NewScanner(e.modelsDir)
@@ -370,7 +370,7 @@ func (e *Engine) saveModelToStore(m *parser.ModelConfig, absPath, hash string) e
 			})
 		}
 
-		e.store.DeleteModelColumns(m.Path)
+		_ = e.store.DeleteModelColumns(m.Path)
 		if err := e.store.SaveModelColumns(m.Path, stateColumns); err != nil {
 			return err
 		}
@@ -479,8 +479,8 @@ func (e *Engine) cleanupDeletedMacros(seenFiles map[string]bool) int {
 
 	for _, path := range existingPaths {
 		if !seenFiles[path] {
-			e.store.DeleteMacroNamespaceByFilePath(path)
-			e.store.DeleteContentHash(path)
+			_ = e.store.DeleteMacroNamespaceByFilePath(path)
+			_ = e.store.DeleteContentHash(path)
 			deleted++
 		}
 	}
@@ -495,8 +495,8 @@ func (e *Engine) cleanupDeletedModels(seenFiles map[string]bool) int {
 
 	for _, path := range existingPaths {
 		if !seenFiles[path] {
-			e.store.DeleteModelByFilePath(path)
-			e.store.DeleteContentHash(path)
+			_ = e.store.DeleteModelByFilePath(path)
+			_ = e.store.DeleteContentHash(path)
 			deleted++
 		}
 	}

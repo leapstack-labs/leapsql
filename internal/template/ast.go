@@ -39,6 +39,7 @@ type ExprNode struct {
 // StmtKind identifies the type of control flow statement.
 type StmtKind int
 
+// StmtKind constants for control flow statement types.
 const (
 	StmtUnknown StmtKind = iota // Unknown/invalid statement
 	StmtFor                     // {* for x in items: *}

@@ -8,7 +8,7 @@ package lineage
 type Resolver struct {
 	dialect *Dialect
 	schema  Schema
-	errors  []error
+	errors  []error //nolint:unused // Reserved for future error collection
 }
 
 // NewResolver creates a new resolver with the given dialect and schema.
@@ -268,7 +268,7 @@ func (r *Resolver) extractSelectColumns(scope *Scope, body *SelectBody) []string
 }
 
 // extractColumnName extracts the output name for a SELECT item.
-func (r *Resolver) extractColumnName(scope *Scope, item SelectItem, index int) string {
+func (r *Resolver) extractColumnName(_ *Scope, item SelectItem, index int) string {
 	// Explicit alias takes precedence
 	if item.Alias != "" {
 		return item.Alias

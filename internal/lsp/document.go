@@ -135,8 +135,8 @@ func (d *Document) OffsetToPosition(offset int) Position {
 
 	character := offset - d.Lines[line]
 	return Position{
-		Line:      uint32(line),
-		Character: uint32(character),
+		Line:      uint32(line),      //nolint:gosec // G115: line is always non-negative
+		Character: uint32(character), //nolint:gosec // G115: character is always non-negative
 	}
 }
 

@@ -71,7 +71,7 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	ctx := context.Background()
 	startTime := time.Now()
@@ -79,7 +79,7 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 	verbose := viper.GetBool("verbose")
 
 	// Create renderer
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	if opts.JSONOutput {
 		mode = output.ModeJSON
 	}
@@ -275,9 +275,10 @@ func runWithJSON(eng *engine.Engine, r *output.Renderer, envName string, selectM
 				})
 
 				status := string(mr.Status)
-				if mr.Status == state.ModelRunStatusSuccess {
+				switch mr.Status {
+				case state.ModelRunStatusSuccess:
 					successful++
-				} else if mr.Status == state.ModelRunStatusFailed {
+				case state.ModelRunStatusFailed:
 					failed++
 				}
 
@@ -370,7 +371,7 @@ func createEngine(cfg *Config) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {
-		if err := os.MkdirAll(stateDir, 0755); err != nil {
+		if err := os.MkdirAll(stateDir, 0750); err != nil {
 			return nil, fmt.Errorf("failed to create state directory: %w", err)
 		}
 	}

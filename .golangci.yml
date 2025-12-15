@@ -14,21 +14,22 @@ linters:
     - unused
 
     # --- Error Handling & Naming ---
-    - errname       # Enforces "Err" prefix and "Error" suffix
-    - errorlint     # Enforces Go 1.13+ error wrapping (%w)
-    - nilerr        # Finds code that returns nil even if checks fail
+    - errname # Enforces "Err" prefix and "Error" suffix
+    - errorlint # Enforces Go 1.13+ error wrapping (%w)
+    - nilerr # Finds code that returns nil even if checks fail
 
     # --- Database & Logging ---
     - sqlclosecheck # Prevents connection leaks (vital for SQLite)
-    - sloglint      # Ensures structured logging consistency
+    - rowserrcheck # Ensures rows.Err() is checked after iteration
+    - sloglint # Ensures structured logging consistency
 
     # --- Quality & Security ---
-    - revive        # General Go style
-    - gosec         # Security (SQL Injection, file permissions)
-    - gocritic      # Catches subtle bugs and performance issues
-    - misspell      # Fixes typos
-    - nolintlint    # Ensures //nolint comments are actually needed
-    - testifylint   # Ensures correct testify usage
+    - revive # General Go style
+    - gosec # Security (SQL Injection, file permissions)
+    - gocritic # Catches subtle bugs and performance issues
+    - misspell # Fixes typos
+    - nolintlint # Ensures //nolint comments are actually needed
+    - testifylint # Ensures correct testify usage
 
 linters-settings:
   errcheck:
@@ -41,8 +42,8 @@ linters-settings:
 issues:
   exclude-dirs:
     - vendor
-    - context      # External repos cloned for reference
+    - context # External repos cloned for reference
   exclude-rules:
     - path: _test\.go
       linters:
-        - gosec    # Security checks less critical in tests
+        - gosec # Security checks less critical in tests

@@ -148,8 +148,8 @@ func TestLexer_UnclosedExpression(t *testing.T) {
 	_, err := lexer.Tokenize()
 	require.Error(t, err, "expected error for unclosed expression")
 
-	lexErr, ok := err.(*LexError)
-	require.True(t, ok, "expected LexError, got %T", err)
+	var lexErr *LexError
+	require.ErrorAs(t, err, &lexErr)
 
 	assert.Equal(t, 1, lexErr.Position().Line, "expected line 1")
 }
@@ -173,7 +173,7 @@ func TestLexer_NestedBraces(t *testing.T) {
 	require.Len(t, tokens, 2, "expected 2 tokens") // EXPR + EOF
 
 	assert.Equal(t, TokenExpr, tokens[0].Type, "expected EXPR")
-	assert.Equal(t, `{"key": "value"}`, tokens[0].Value, "expected dict literal")
+	assert.JSONEq(t, `{"key": "value"}`, tokens[0].Value, "expected dict literal")
 }
 
 func TestLexer_PositionTracking(t *testing.T) {

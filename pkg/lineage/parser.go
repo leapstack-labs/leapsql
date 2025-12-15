@@ -100,7 +100,7 @@ func (p *Parser) match(t TokenType) bool {
 }
 
 // matchAny consumes the current token if it matches any of the given types.
-func (p *Parser) matchAny(types ...TokenType) bool {
+func (p *Parser) matchAny(types ...TokenType) bool { //nolint:unused // Reserved for future use
 	for _, t := range types {
 		if p.check(t) {
 			p.nextToken()

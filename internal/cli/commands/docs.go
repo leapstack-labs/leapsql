@@ -43,7 +43,7 @@ func newDocsBuildCommand() *cobra.Command {
 
   # Build with custom project name
   leapsql docs build --project "My Data Platform"`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return runDocsBuild(modelsPath, outputPath, projectName)
 		},
 	}
@@ -71,7 +71,7 @@ func newDocsServeCommand() *cobra.Command {
 
   # Serve on custom port
   leapsql docs serve --port 3000`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return runDocsServe(modelsPath, outputPath, projectName, port)
 		},
 	}

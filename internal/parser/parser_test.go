@@ -254,11 +254,11 @@ func TestScanner_ScanDir(t *testing.T) {
 	// Create temp directory with test models
 	tmpDir, err := os.MkdirTemp("", "parser-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create subdirectory
 	stagingDir := filepath.Join(tmpDir, "staging")
-	require.NoError(t, os.MkdirAll(stagingDir, 0755))
+	require.NoError(t, os.MkdirAll(stagingDir, 0750))
 
 	// Create test files
 	files := map[string]string{
@@ -271,7 +271,7 @@ SELECT COUNT(*) FROM staging.users`,
 	}
 
 	for path, content := range files {
-		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
 	}
 
 	// Scan directory
@@ -302,11 +302,11 @@ SELECT COUNT(*) FROM staging.users`,
 func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "parser-test-hidden")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create regular file and hidden file
-	os.WriteFile(filepath.Join(tmpDir, "users.sql"), []byte("SELECT 1"), 0644)
-	os.WriteFile(filepath.Join(tmpDir, ".hidden.sql"), []byte("SELECT 1"), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "users.sql"), []byte("SELECT 1"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".hidden.sql"), []byte("SELECT 1"), 0600))
 
 	scanner := NewScanner(tmpDir)
 	models, err := scanner.ScanDir(tmpDir)

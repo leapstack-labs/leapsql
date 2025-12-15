@@ -44,7 +44,7 @@ func NewRootCmd() *cobra.Command {
 It allows you to define SQL models with dependencies, templating, and macros,
 then execute them in the correct order with state tracking and lineage.`,
 		Version: Version,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip config loading for help and completion commands
 			if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "__complete" {
 				return nil
@@ -61,7 +61,7 @@ then execute them in the correct order with state tracking and lineage.`,
 			ctx := context.WithValue(cmd.Context(), configKey{}, cfg)
 
 			// Create and store renderer based on output mode
-			mode := output.OutputMode(cfg.OutputFormat)
+			mode := output.Mode(cfg.OutputFormat)
 			renderer := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 			ctx = context.WithValue(ctx, rendererKey{}, renderer)
 			cmd.SetContext(ctx)
@@ -100,25 +100,25 @@ Built with Go and DuckDB
 	rootCmd.PersistentFlags().StringP("output", "o", "", "Output format (auto|text|markdown|json)")
 
 	// Register completion for output flag
-	rootCmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	_ = rootCmd.RegisterFlagCompletionFunc("output", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{"auto", "text", "markdown", "json"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	// Register completion for target flag
-	rootCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	_ = rootCmd.RegisterFlagCompletionFunc("target", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		// Return common environment names
 		return []string{"dev", "staging", "prod"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	// Bind flags to viper
-	viper.BindPFlag("models_dir", rootCmd.PersistentFlags().Lookup("models-dir"))
-	viper.BindPFlag("seeds_dir", rootCmd.PersistentFlags().Lookup("seeds-dir"))
-	viper.BindPFlag("macros_dir", rootCmd.PersistentFlags().Lookup("macros-dir"))
-	viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
-	viper.BindPFlag("state_path", rootCmd.PersistentFlags().Lookup("state"))
-	viper.BindPFlag("environment", rootCmd.PersistentFlags().Lookup("env"))
-	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
+	_ = viper.BindPFlag("models_dir", rootCmd.PersistentFlags().Lookup("models-dir"))
+	_ = viper.BindPFlag("seeds_dir", rootCmd.PersistentFlags().Lookup("seeds-dir"))
+	_ = viper.BindPFlag("macros_dir", rootCmd.PersistentFlags().Lookup("macros-dir"))
+	_ = viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
+	_ = viper.BindPFlag("state_path", rootCmd.PersistentFlags().Lookup("state"))
+	_ = viper.BindPFlag("environment", rootCmd.PersistentFlags().Lookup("env"))
+	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 
 	// Add subcommands
 	rootCmd.AddCommand(commands.NewVersionCommand(Version))
@@ -176,7 +176,7 @@ func CreateEngine(cfg *Config) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {
-		if err := os.MkdirAll(stateDir, 0755); err != nil {
+		if err := os.MkdirAll(stateDir, 0750); err != nil {
 			return nil, fmt.Errorf("failed to create state directory: %w", err)
 		}
 	}

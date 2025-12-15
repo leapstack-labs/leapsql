@@ -9,6 +9,7 @@ import (
 // RunStatus represents the status of a pipeline run.
 type RunStatus string
 
+// RunStatus constants for pipeline execution states.
 const (
 	RunStatusRunning   RunStatus = "running"
 	RunStatusCompleted RunStatus = "completed"
@@ -19,6 +20,7 @@ const (
 // ModelRunStatus represents the status of an individual model execution.
 type ModelRunStatus string
 
+// ModelRunStatus constants for individual model execution states.
 const (
 	ModelRunStatusPending ModelRunStatus = "pending"
 	ModelRunStatusRunning ModelRunStatus = "running"
@@ -135,8 +137,8 @@ type MacroFunction struct {
 	Line      int      `json:"line"`      // Line number for go-to-definition
 }
 
-// StateStore defines the interface for state management operations.
-type StateStore interface {
+// Store defines the interface for state management operations.
+type Store interface {
 	// Open opens a connection to the state store at the given path.
 	Open(path string) error
 

@@ -11,6 +11,7 @@ import (
 // CompletionContextType describes what kind of completion context we're in.
 type CompletionContextType int
 
+// Completion context type constants.
 const (
 	ContextUnknown CompletionContextType = iota
 	ContextSelectClause
@@ -447,8 +448,8 @@ func (s *Server) getDefinition(params DefinitionParams) *Location {
 			return &Location{
 				URI: PathToURI(ns.FilePath),
 				Range: Range{
-					Start: Position{Line: uint32(line), Character: 0},
-					End:   Position{Line: uint32(line), Character: 0},
+					Start: Position{Line: uint32(line), Character: 0}, //nolint:gosec // G115: line is always non-negative from AST
+					End:   Position{Line: uint32(line), Character: 0}, //nolint:gosec // G115: line is always non-negative from AST
 				},
 			}
 		}

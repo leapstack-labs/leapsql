@@ -40,7 +40,7 @@ func (p *ThreadPool) Get(name string) *starlark.Thread {
 
 	return &starlark.Thread{
 		Name: name,
-		Print: func(thread *starlark.Thread, msg string) {
+		Print: func(_ *starlark.Thread, _ string) {
 			// No-op for template execution
 		},
 	}
@@ -99,7 +99,7 @@ func (e *ParallelExecutor) Execute(tasks []EvalTask) []EvalResult {
 			thread := e.pool.Get(t.Name)
 			defer e.pool.Put(thread)
 
-			result, err := starlark.Eval(thread, t.Name, t.Expr, e.globals)
+			result, err := starlark.Eval(thread, t.Name, t.Expr, e.globals) //nolint:staticcheck // SA1019: will migrate to EvalOptions later
 			results[idx] = EvalResult{
 				Name:  t.Name,
 				Value: result,

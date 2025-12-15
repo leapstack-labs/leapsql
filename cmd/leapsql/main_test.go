@@ -29,7 +29,7 @@ func TestVersionCommand(t *testing.T) {
 	cmd.SetArgs([]string{"version"})
 
 	err := cmd.Execute()
-	assert.NoError(t, err, "version command error")
+	require.NoError(t, err, "version command error")
 
 	output := buf.String()
 	assert.Contains(t, output, "LeapSQL", "version output should contain 'LeapSQL'")
@@ -43,7 +43,7 @@ func TestHelpCommand(t *testing.T) {
 	cmd.SetArgs([]string{"--help"})
 
 	err := cmd.Execute()
-	assert.NoError(t, err, "help command error")
+	require.NoError(t, err, "help command error")
 
 	output := buf.String()
 	expectedCommands := []string{"run", "list", "dag", "seed", "lineage", "render", "docs"}
@@ -69,7 +69,7 @@ func TestListCommand(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	assert.NoError(t, err, "list command error")
+	require.NoError(t, err, "list command error")
 
 	output := buf.String()
 	assert.Contains(t, output, "Models", "list output should contain 'Models'")
@@ -264,7 +264,7 @@ func TestLineageCommandInvalidModel(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	assert.Error(t, err, "lineage with invalid model should return an error")
+	require.Error(t, err, "lineage with invalid model should return an error")
 	assert.Contains(t, err.Error(), "not found", "error should mention 'not found'")
 }
 

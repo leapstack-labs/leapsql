@@ -68,7 +68,7 @@ func runLineage(cmd *cobra.Command, modelPath string, opts *LineageOptions) erro
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
@@ -86,7 +86,7 @@ func runLineage(cmd *cobra.Command, modelPath string, opts *LineageOptions) erro
 	}
 
 	// Create renderer
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	effectiveMode := r.EffectiveMode()
@@ -160,10 +160,7 @@ func lineageMarkdown(eng *engine.Engine, r *output.Renderer, modelPath string, u
 		downstreamNodes := getDownstreamWithDepth(graph, modelPath, depth)
 		r.Println(output.FormatHeader(2, fmt.Sprintf("Downstream (%d)", len(downstreamNodes))))
 		if len(downstreamNodes) > 0 {
-			var items []string
-			for _, node := range downstreamNodes {
-				items = append(items, node)
-			}
+			items := append([]string{}, downstreamNodes...)
 			r.Print(output.FormatList(items))
 		} else {
 			r.Println("*No downstream dependents*")

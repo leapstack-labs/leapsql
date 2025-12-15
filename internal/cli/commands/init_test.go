@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,16 +33,16 @@ func TestNewInitCommand(t *testing.T) {
 		},
 		{
 			name: "init existing config without force",
-			setupDir: func(t *testing.T, dir string) {
-				os.WriteFile(filepath.Join(dir, "leapsql.yaml"), []byte("existing"), 0644)
+			setupDir: func(_ *testing.T, dir string) {
+				_ = os.WriteFile(filepath.Join(dir, "leapsql.yaml"), []byte("existing"), 0600)
 			},
 			args:    []string{},
 			wantErr: true,
 		},
 		{
 			name: "init existing config with force",
-			setupDir: func(t *testing.T, dir string) {
-				os.WriteFile(filepath.Join(dir, "leapsql.yaml"), []byte("existing"), 0644)
+			setupDir: func(_ *testing.T, dir string) {
+				_ = os.WriteFile(filepath.Join(dir, "leapsql.yaml"), []byte("existing"), 0600)
 			},
 			args:    []string{"--force"},
 			wantErr: false,
@@ -59,8 +58,8 @@ func TestNewInitCommand(t *testing.T) {
 			// Create temp directory and change to it
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
-			os.Chdir(tmpDir)
-			defer os.Chdir(oldWd)
+			require.NoError(t, os.Chdir(tmpDir))
+			defer func() { _ = os.Chdir(oldWd) }()
 
 			// Run setup if provided
 			if tt.setupDir != nil {
@@ -78,7 +77,7 @@ func TestNewInitCommand(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Check expected files exist
 			for _, f := range tt.wantFiles {
@@ -101,8 +100,8 @@ func TestInitCommandMetadata(t *testing.T) {
 func TestInitCreatesValidConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldWd)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	cmd := NewInitCommand()
 	cmd.SetOut(new(bytes.Buffer))
@@ -123,6 +122,6 @@ func TestInitCreatesValidConfig(t *testing.T) {
 	}
 
 	for _, expected := range expectedContents {
-		assert.True(t, strings.Contains(string(content), expected), "config should contain %q", expected)
+		assert.Contains(t, string(content), expected, "config should contain %q", expected)
 	}
 }

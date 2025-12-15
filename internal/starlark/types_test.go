@@ -85,7 +85,7 @@ func TestGoToStarlark(t *testing.T) {
 	}
 }
 
-func TestStarlarkToGo(t *testing.T) {
+func TestToGo(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   starlark.Value
@@ -126,13 +126,13 @@ func TestStarlarkToGo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StarlarkToGo(tt.input)
+			got, err := ToGo(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err, "expected error")
 				return
 			}
 			require.NoError(t, err, "unexpected error")
-			assert.Equal(t, tt.want, got, "StarlarkToGo()")
+			assert.Equal(t, tt.want, got, "ToGo()")
 		})
 	}
 }

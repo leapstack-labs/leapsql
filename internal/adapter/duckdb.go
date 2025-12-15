@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb" // duckdb driver
 )
 
 func init() {
@@ -40,7 +40,7 @@ func (a *DuckDBAdapter) Connect(ctx context.Context, cfg Config) error {
 
 	// Test the connection
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return fmt.Errorf("failed to ping duckdb: %w", err)
 	}
 
@@ -78,6 +78,7 @@ func (a *DuckDBAdapter) Query(ctx context.Context, sqlStr string) (*Rows, error)
 		return nil, fmt.Errorf("database connection not established")
 	}
 
+	//nolint:rowserrcheck // rows.Err() must be checked by caller after iteration completes
 	rows, err := a.db.QueryContext(ctx, sqlStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
@@ -116,7 +117,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column metadata: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []Column
 	for rows.Next() {
@@ -138,7 +139,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 	}
 
 	// Get row count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", schema, tableName)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", schema, tableName) //nolint:gosec // Table names are validated by caller
 	var rowCount int64
 	if err := a.db.QueryRowContext(ctx, countQuery).Scan(&rowCount); err != nil {
 		// Non-fatal error, just set to 0

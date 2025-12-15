@@ -292,7 +292,7 @@ func convertColumns(columns []parser.ColumnInfo) []ColumnDoc {
 }
 
 // buildColumnLineage constructs the column-level lineage graph.
-func (g *Generator) buildColumnLineage(models []*parser.ModelConfig, modelDocs map[string]*ModelDoc) ColumnLineageDoc {
+func (g *Generator) buildColumnLineage(models []*parser.ModelConfig, _ map[string]*ModelDoc) ColumnLineageDoc {
 	lineage := ColumnLineageDoc{
 		Nodes: []ColumnLineageNode{},
 		Edges: []ColumnLineageEdge{},
@@ -429,13 +429,13 @@ func (g *Generator) Build(outputDir string) error {
 	catalog := g.GenerateCatalog()
 
 	// Create output directory
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	// Create data directory
 	dataDir := filepath.Join(outputDir, "data")
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
@@ -444,7 +444,7 @@ func (g *Generator) Build(outputDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal catalog: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, "catalog.json"), catalogJSON, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "catalog.json"), catalogJSON, 0600); err != nil {
 		return fmt.Errorf("failed to write catalog.json: %w", err)
 	}
 
@@ -473,7 +473,7 @@ func (g *Generator) copyStaticFiles(outputDir string) error {
 		outPath := filepath.Join(outputDir, relPath)
 
 		if d.IsDir() {
-			return os.MkdirAll(outPath, 0755)
+			return os.MkdirAll(outPath, 0750)
 		}
 
 		// Copy file
@@ -482,7 +482,7 @@ func (g *Generator) copyStaticFiles(outputDir string) error {
 			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
 
-		return os.WriteFile(outPath, content, 0644)
+		return os.WriteFile(outPath, content, 0600)
 	})
 }
 
@@ -496,7 +496,12 @@ func (g *Generator) Serve(outputDir string, port int) error {
 	addr := fmt.Sprintf(":%d", port)
 	fmt.Printf("Serving docs at http://localhost%s\n", addr)
 
-	return http.ListenAndServe(addr, http.FileServer(http.Dir(outputDir)))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           http.FileServer(http.Dir(outputDir)),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	return server.ListenAndServe()
 }
 
 // ServeFromFS serves the documentation site from the generated files.
@@ -504,16 +509,21 @@ func ServeFromFS(outputDir string, port int) error {
 	addr := fmt.Sprintf(":%d", port)
 	fmt.Printf("Serving docs at http://localhost%s\n", addr)
 
-	return http.ListenAndServe(addr, http.FileServer(http.Dir(outputDir)))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           http.FileServer(http.Dir(outputDir)),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	return server.ListenAndServe()
 }
 
 // WriteJSON writes any data structure to a JSON file.
 func WriteJSON(path string, data interface{}) error {
-	f, err := os.Create(path)
+	f, err := os.Create(path) //nolint:gosec // G304: path is from trusted source
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
@@ -522,17 +532,17 @@ func WriteJSON(path string, data interface{}) error {
 
 // CopyFile copies a file from src to dst.
 func CopyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
+	srcFile, err := os.Open(src) //nolint:gosec // G304: src is from trusted source
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
-	dstFile, err := os.Create(dst)
+	dstFile, err := os.Create(dst) //nolint:gosec // G304: dst is from trusted source
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err

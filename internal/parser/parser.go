@@ -100,7 +100,7 @@ var (
 
 // ParseFile parses a single SQL model file.
 func (p *Parser) ParseFile(filePath string) (*ModelConfig, error) {
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is validated by filepath.Walk
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}

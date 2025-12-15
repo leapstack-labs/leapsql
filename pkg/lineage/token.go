@@ -5,17 +5,21 @@ import "fmt"
 // TokenType represents the type of a lexical token.
 type TokenType int
 
+//nolint:revive // TOKEN_* names are intentionally ALL_CAPS for SQL token conventions
 const (
-	// Special tokens
+	// TokenEOF represents end of file.
 	TOKEN_EOF TokenType = iota
+	// TokenIllegal represents an illegal/unrecognized token.
 	TOKEN_ILLEGAL
 
-	// Literals
-	TOKEN_IDENT  // identifier
+	// TokenIdent represents an identifier.
+	TOKEN_IDENT
+	// TokenNumber represents a numeric literal.
 	TOKEN_NUMBER // 123, 45.67, 1e10
+	// TokenString represents a string literal.
 	TOKEN_STRING // 'hello'
 
-	// Operators
+	// TokenPlus represents the + operator.
 	TOKEN_PLUS     // +
 	TOKEN_MINUS    // -
 	TOKEN_STAR     // *

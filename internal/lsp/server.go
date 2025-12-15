@@ -3,6 +3,7 @@ package lsp
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,7 +27,7 @@ type Server struct {
 	initialized bool
 
 	// State store (may be nil if discover not run)
-	store state.StateStore
+	store state.Store
 
 	// Memory caches for fast lookups
 	macroNamespaceCache map[string]bool
@@ -76,7 +77,7 @@ func (s *Server) Run() error {
 		// Read message
 		msg, err := s.readMessage()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				s.logger.Println("Client disconnected")
 				return nil
 			}
@@ -196,8 +197,8 @@ func (s *Server) writeMessage(msg *JSONRPCMessage) {
 	}
 
 	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	s.writer.Write([]byte(header))
-	s.writer.Write(body)
+	_, _ = s.writer.Write([]byte(header))
+	_, _ = s.writer.Write(body)
 }
 
 // handleMessage dispatches a message to the appropriate handler.
@@ -286,7 +287,7 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 	return nil
 }
 
-func (s *Server) handleInitialized(msg *JSONRPCMessage) error {
+func (s *Server) handleInitialized(_ *JSONRPCMessage) error {
 	s.initialized = true
 	s.logger.Println("Server initialized")
 
@@ -307,7 +308,7 @@ func (s *Server) handleShutdown(msg *JSONRPCMessage) error {
 	s.shutdownMu.Unlock()
 
 	if s.store != nil {
-		s.store.Close()
+		_ = s.store.Close()
 	}
 
 	s.sendResponse(msg.ID, nil, nil)
@@ -315,7 +316,7 @@ func (s *Server) handleShutdown(msg *JSONRPCMessage) error {
 	return nil
 }
 
-func (s *Server) handleExit(msg *JSONRPCMessage) error {
+func (s *Server) handleExit(_ *JSONRPCMessage) error {
 	s.logger.Println("Server exit")
 	os.Exit(0)
 	return nil

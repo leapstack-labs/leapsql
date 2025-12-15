@@ -22,37 +22,37 @@ func TestLoader_Load(t *testing.T) {
 	}{
 		{
 			name: "empty directory",
-			setupDir: func(t *testing.T) string {
+			setupDir: func(_ *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				require.NoError(t, os.Mkdir(macrosDir, 0755))
+				require.NoError(t, os.Mkdir(macrosDir, 0750))
 				return macrosDir
 			},
 			wantModules: 0,
 		},
 		{
 			name: "non-existent directory",
-			setupDir: func(t *testing.T) string {
+			setupDir: func(_ *testing.T) string {
 				return "/nonexistent/path/to/macros"
 			},
 			wantNil: true,
 		},
 		{
 			name: "not a directory",
-			setupDir: func(t *testing.T) string {
+			setupDir: func(_ *testing.T) string {
 				dir := t.TempDir()
 				filePath := filepath.Join(dir, "macros")
-				require.NoError(t, os.WriteFile(filePath, []byte("not a dir"), 0644))
+				require.NoError(t, os.WriteFile(filePath, []byte("not a dir"), 0600))
 				return filePath
 			},
 			wantErr: true,
 		},
 		{
 			name: "single macro with multiple functions",
-			setupDir: func(t *testing.T) string {
+			setupDir: func(_ *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				require.NoError(t, os.Mkdir(macrosDir, 0755))
+				require.NoError(t, os.Mkdir(macrosDir, 0750))
 				macroContent := `
 def greet(name):
     return "Hello, " + name + "!"
@@ -63,7 +63,7 @@ def add(a, b):
 _private = "should not be exported"
 `
 				macroPath := filepath.Join(macrosDir, "utils.star")
-				require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0644))
+				require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0600))
 				return macrosDir
 			},
 			wantModules:    1,
@@ -74,10 +74,10 @@ _private = "should not be exported"
 		},
 		{
 			name: "multiple macro files",
-			setupDir: func(t *testing.T) string {
+			setupDir: func(_ *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				require.NoError(t, os.Mkdir(macrosDir, 0755))
+				require.NoError(t, os.Mkdir(macrosDir, 0750))
 				files := map[string]string{
 					"datetime.star": `
 def now():
@@ -90,7 +90,7 @@ def square(x):
 				}
 				for name, content := range files {
 					path := filepath.Join(macrosDir, name)
-					require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+					require.NoError(t, os.WriteFile(path, []byte(content), 0600))
 				}
 				return macrosDir
 			},
@@ -102,13 +102,13 @@ def square(x):
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				require.NoError(t, os.Mkdir(macrosDir, 0755))
+				require.NoError(t, os.Mkdir(macrosDir, 0750))
 				badContent := `
 def broken(:
     return 1
 `
 				macroPath := filepath.Join(macrosDir, "broken.star")
-				require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0644))
+				require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0600))
 				return macrosDir
 			},
 			wantErr: true,
@@ -118,9 +118,9 @@ def broken(:
 			setupDir: func(t *testing.T) string {
 				dir := t.TempDir()
 				macrosDir := filepath.Join(dir, "macros")
-				require.NoError(t, os.Mkdir(macrosDir, 0755))
+				require.NoError(t, os.Mkdir(macrosDir, 0750))
 				macroPath := filepath.Join(macrosDir, "123invalid.star")
-				require.NoError(t, os.WriteFile(macroPath, []byte("x = 1"), 0644))
+				require.NoError(t, os.WriteFile(macroPath, []byte("x = 1"), 0600))
 				return macrosDir
 			},
 			wantErr: true,
@@ -184,21 +184,21 @@ func TestLoader_Load_SyntaxError_Details(t *testing.T) {
 	// This test verifies the LoadError structure specifically
 	dir := t.TempDir()
 	macrosDir := filepath.Join(dir, "macros")
-	require.NoError(t, os.Mkdir(macrosDir, 0755))
+	require.NoError(t, os.Mkdir(macrosDir, 0750))
 
 	badContent := `
 def broken(:
     return 1
 `
 	macroPath := filepath.Join(macrosDir, "broken.star")
-	require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0644))
+	require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0600))
 
 	loader := NewLoader(macrosDir)
 	_, err := loader.Load()
 	require.Error(t, err)
 
-	loadErr, ok := err.(*LoadError)
-	require.True(t, ok, "expected *LoadError, got %T", err)
+	var loadErr *LoadError
+	require.ErrorAs(t, err, &loadErr)
 	assert.Equal(t, macroPath, loadErr.File)
 }
 
@@ -234,7 +234,7 @@ func TestValidateNamespace(t *testing.T) {
 func TestLoader_ExecuteFunction(t *testing.T) {
 	dir := t.TempDir()
 	macrosDir := filepath.Join(dir, "macros")
-	require.NoError(t, os.Mkdir(macrosDir, 0755))
+	require.NoError(t, os.Mkdir(macrosDir, 0750))
 
 	// Create a macro with a function we can call
 	macroContent := `
@@ -242,7 +242,7 @@ def double(x):
     return x * 2
 `
 	macroPath := filepath.Join(macrosDir, "math.star")
-	require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0644))
+	require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0600))
 
 	loader := NewLoader(macrosDir)
 	modules, err := loader.Load()

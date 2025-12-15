@@ -19,7 +19,7 @@ The project root and state database are determined by the
 client's initialization request (rootUri parameter).`,
 		Example: `  # Start LSP server (usually called by an IDE)
   leapsql lsp`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return runLSP()
 		},
 	}

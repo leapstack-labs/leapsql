@@ -47,7 +47,7 @@ func runDiscover(cmd *cobra.Command) error {
 	cfg := getConfig()
 
 	// Create renderer
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	// Create engine (no DB connection needed for discovery)
@@ -55,7 +55,7 @@ func runDiscover(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Run unified discovery
 	force, _ := cmd.Flags().GetBool("force")

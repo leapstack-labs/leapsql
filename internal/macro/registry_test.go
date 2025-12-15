@@ -39,8 +39,8 @@ func TestRegistry_ReservedNamespace(t *testing.T) {
 			err := registry.Register(module)
 			require.Error(t, err, "expected error for reserved namespace %q", reserved)
 
-			regErr, ok := err.(*RegistryError)
-			require.True(t, ok, "expected *RegistryError, got %T", err)
+			var regErr *RegistryError
+			require.ErrorAs(t, err, &regErr)
 			assert.Equal(t, reserved, regErr.Namespace, "expected namespace %q", reserved)
 		})
 	}
@@ -66,8 +66,8 @@ func TestRegistry_DuplicateNamespace(t *testing.T) {
 	err = registry.Register(module2)
 	require.Error(t, err, "expected error for duplicate namespace")
 
-	regErr, ok := err.(*RegistryError)
-	require.True(t, ok, "expected *RegistryError, got %T", err)
+	var regErr *RegistryError
+	require.ErrorAs(t, err, &regErr)
 	assert.Equal(t, "utils", regErr.Namespace, "expected namespace 'utils'")
 }
 
@@ -116,7 +116,7 @@ func TestRegistry_Get(t *testing.T) {
 			"now": starlark.String("func"),
 		},
 	}
-	registry.Register(module)
+	_ = registry.Register(module)
 
 	got := registry.Get("datetime")
 	assert.Equal(t, module, got, "Get returned wrong module")
@@ -133,7 +133,7 @@ func TestRegistry_Namespaces(t *testing.T) {
 		{Namespace: "alpha", Path: "/alpha.star", Exports: starlark.StringDict{}},
 		{Namespace: "beta", Path: "/beta.star", Exports: starlark.StringDict{}},
 	}
-	registry.RegisterAll(modules)
+	_ = registry.RegisterAll(modules)
 
 	namespaces := registry.Namespaces()
 	require.Len(t, namespaces, 3, "expected 3 namespaces")
@@ -156,7 +156,7 @@ func TestRegistry_ToStarlarkDict(t *testing.T) {
 			"add":   starlark.String("add_func"),
 		},
 	}
-	registry.Register(module)
+	_ = registry.Register(module)
 
 	dict := registry.ToStarlarkDict()
 	require.Len(t, dict, 1, "expected 1 entry")

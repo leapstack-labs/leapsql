@@ -1,11 +1,11 @@
 // Package lineage provides SQL parsing and column-level lineage tracking.
 // This file contains the DuckDB function catalog for LSP completions.
-
 package lineage
 
 // FunctionCategory classifies SQL functions by their purpose.
 type FunctionCategory string
 
+// FunctionCategory constants for SQL function classification.
 const (
 	CategoryAggregate   FunctionCategory = "aggregate"
 	CategoryWindow      FunctionCategory = "window"

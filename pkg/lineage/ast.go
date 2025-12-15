@@ -48,6 +48,7 @@ type SelectBody struct {
 // SetOpType represents the type of set operation.
 type SetOpType string
 
+// SetOpType constants for set operations in queries.
 const (
 	SetOpNone      SetOpType = ""
 	SetOpUnion     SetOpType = "UNION"
@@ -94,6 +95,7 @@ type Join struct {
 // JoinType represents the type of join.
 type JoinType string
 
+// JoinType constants for SQL join types.
 const (
 	JoinInner JoinType = "INNER"
 	JoinLeft  JoinType = "LEFT"
@@ -159,6 +161,7 @@ func (*Literal) exprNode() {}
 // LiteralType represents the type of a literal.
 type LiteralType int
 
+// LiteralType constants for SQL literal value types.
 const (
 	LiteralNumber LiteralType = iota
 	LiteralString
@@ -213,6 +216,7 @@ type FrameSpec struct {
 // FrameType represents the type of window frame.
 type FrameType string
 
+// FrameType constants for window frame specification types.
 const (
 	FrameRows   FrameType = "ROWS"
 	FrameRange  FrameType = "RANGE"
@@ -228,6 +232,7 @@ type FrameBound struct {
 // FrameBoundType represents the type of frame bound.
 type FrameBoundType string
 
+// FrameBoundType constants for window frame bound types.
 const (
 	FrameUnboundedPreceding FrameBoundType = "UNBOUNDED PRECEDING"
 	FrameUnboundedFollowing FrameBoundType = "UNBOUNDED FOLLOWING"

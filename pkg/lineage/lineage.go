@@ -184,7 +184,7 @@ func (e *lineageExtractor) extractSelectItemLineage(scope *Scope, colResolver *C
 }
 
 // expandStar expands a SELECT * or table.* into individual column lineages.
-func (e *lineageExtractor) expandStar(scope *Scope, tableName string, startIndex int) []*ColumnLineage {
+func (e *lineageExtractor) expandStar(scope *Scope, tableName string, _ int) []*ColumnLineage {
 	refs := scope.ExpandStar(tableName)
 	if len(refs) == 0 {
 		// No schema info available - return a single "unknown" lineage

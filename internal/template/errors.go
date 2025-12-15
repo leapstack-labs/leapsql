@@ -2,8 +2,8 @@ package template
 
 import "fmt"
 
-// TemplateError is the base interface for all template errors.
-type TemplateError interface {
+// Error is the base interface for all template errors.
+type Error interface {
 	error
 	Position() Position
 }

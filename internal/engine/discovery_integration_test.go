@@ -69,7 +69,7 @@ func copyTestdata(t *testing.T, scenario string) string {
 }
 
 // assertModelInSQLite verifies model exists in state store.
-func assertModelInSQLite(t *testing.T, store state.StateStore, modelPath string) {
+func assertModelInSQLite(t *testing.T, store state.Store, modelPath string) {
 	t.Helper()
 	model, err := store.GetModelByPath(modelPath)
 	if err != nil || model == nil {
@@ -78,7 +78,7 @@ func assertModelInSQLite(t *testing.T, store state.StateStore, modelPath string)
 }
 
 // assertHashInSQLite verifies content hash exists.
-func assertHashInSQLite(t *testing.T, store state.StateStore, filePath string) {
+func assertHashInSQLite(t *testing.T, store state.Store, filePath string) {
 	t.Helper()
 	hash, err := store.GetContentHash(filePath)
 	if err != nil || hash == "" {

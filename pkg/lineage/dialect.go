@@ -34,12 +34,12 @@ type OperatorConfig struct {
 	ConcatCoalesce bool // CONCAT treats NULL as empty string (default: false)
 }
 
-// LineageType classifies how a function affects lineage.
-type LineageType int
+// Type classifies how a function affects lineage.
+type Type int
 
 const (
 	// LineagePassthrough means all input columns pass through (default for unknown functions).
-	LineagePassthrough LineageType = iota
+	LineagePassthrough Type = iota
 	// LineageAggregate means many rows aggregate to one value (SUM, COUNT, etc.).
 	LineageAggregate
 	// LineageGenerator means function generates values with no upstream columns (NOW, UUID, etc.).
@@ -48,8 +48,8 @@ const (
 	LineageWindow
 )
 
-// String returns the string representation of LineageType.
-func (t LineageType) String() string {
+// String returns the string representation of Type.
+func (t Type) String() string {
 	switch t {
 	case LineagePassthrough:
 		return "passthrough"
@@ -78,7 +78,7 @@ type Dialect struct {
 }
 
 // FunctionLineageType returns the lineage classification for a function.
-func (d *Dialect) FunctionLineageType(name string) LineageType {
+func (d *Dialect) FunctionLineageType(name string) Type {
 	normalized := d.NormalizeName(name)
 
 	// Check for alias first

@@ -229,8 +229,8 @@ no`,
 			require.Error(t, err)
 
 			if tt.errType == "UnmatchedBlockError" {
-				_, ok := err.(*UnmatchedBlockError)
-				assert.True(t, ok, "expected UnmatchedBlockError, got %T: %v", err, err)
+				var unmatchedErr *UnmatchedBlockError
+				assert.ErrorAs(t, err, &unmatchedErr)
 			}
 		})
 	}

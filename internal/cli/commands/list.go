@@ -38,7 +38,7 @@ Use --output to override: auto, text, markdown, json`,
 
   # List models with verbose output
   leapsql list -v`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runList(cmd)
 		},
 	}
@@ -53,7 +53,7 @@ func runList(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Discover models
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
@@ -61,7 +61,7 @@ func runList(cmd *cobra.Command) error {
 	}
 
 	// Create renderer based on output format
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	effectiveMode := r.EffectiveMode()

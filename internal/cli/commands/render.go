@@ -49,7 +49,7 @@ func runRender(cmd *cobra.Command, modelPath string) error {
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
@@ -61,7 +61,7 @@ func runRender(cmd *cobra.Command, modelPath string) error {
 	}
 
 	// Create renderer
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	effectiveMode := r.EffectiveMode()

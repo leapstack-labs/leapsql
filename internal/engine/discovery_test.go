@@ -14,11 +14,11 @@ func TestShouldParseFile_NewFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create a test model file
 	modelPath := filepath.Join(modelsDir, "test.sql")
-	os.WriteFile(modelPath, []byte("SELECT 1"), 0644)
+	require.NoError(t, os.WriteFile(modelPath, []byte("SELECT 1"), 0600))
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -27,7 +27,7 @@ func TestShouldParseFile_NewFile(t *testing.T) {
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// File not in SQLite -> should parse
 	needsParse, hash, content := eng.shouldParseFile(modelPath, false)
@@ -41,12 +41,12 @@ func TestShouldParseFile_UnchangedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create a test model file
 	modelPath := filepath.Join(modelsDir, "test.sql")
 	content := []byte("SELECT 1")
-	os.WriteFile(modelPath, content, 0644)
+	require.NoError(t, os.WriteFile(modelPath, content, 0600))
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -55,7 +55,7 @@ func TestShouldParseFile_UnchangedFile(t *testing.T) {
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// First check - should parse
 	needsParse, hash, _ := eng.shouldParseFile(modelPath, false)
@@ -74,11 +74,11 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create a test model file
 	modelPath := filepath.Join(modelsDir, "test.sql")
-	os.WriteFile(modelPath, []byte("SELECT 1"), 0644)
+	require.NoError(t, os.WriteFile(modelPath, []byte("SELECT 1"), 0600))
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -87,14 +87,14 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Store initial hash
 	_, hash, _ := eng.shouldParseFile(modelPath, false)
-	eng.store.SetContentHash(modelPath, hash, "model")
+	require.NoError(t, eng.store.SetContentHash(modelPath, hash, "model"))
 
 	// Modify the file
-	os.WriteFile(modelPath, []byte("SELECT 2"), 0644)
+	require.NoError(t, os.WriteFile(modelPath, []byte("SELECT 2"), 0600))
 
 	// Should parse because content changed
 	needsParse, newHash, _ := eng.shouldParseFile(modelPath, false)
@@ -107,11 +107,11 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create a test model file
 	modelPath := filepath.Join(modelsDir, "test.sql")
-	os.WriteFile(modelPath, []byte("SELECT 1"), 0644)
+	require.NoError(t, os.WriteFile(modelPath, []byte("SELECT 1"), 0600))
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -120,11 +120,11 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Store hash
 	_, hash, _ := eng.shouldParseFile(modelPath, false)
-	eng.store.SetContentHash(modelPath, hash, "model")
+	require.NoError(t, eng.store.SetContentHash(modelPath, hash, "model"))
 
 	// Force flag should always parse
 	needsParse, _, _ := eng.shouldParseFile(modelPath, true)
@@ -136,19 +136,19 @@ func TestDiscoverModels_IncrementalSkip(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create test models
-	os.WriteFile(filepath.Join(modelsDir, "model1.sql"), []byte(`---
+	_ = os.WriteFile(filepath.Join(modelsDir, "model1.sql"), []byte(`---
 name: model1
 materialized: table
 ---
-SELECT 1`), 0644)
-	os.WriteFile(filepath.Join(modelsDir, "model2.sql"), []byte(`---
+SELECT 1`), 0600)
+	_ = os.WriteFile(filepath.Join(modelsDir, "model2.sql"), []byte(`---
 name: model2
 materialized: view
 ---
-SELECT 2`), 0644)
+SELECT 2`), 0600)
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -157,7 +157,7 @@ SELECT 2`), 0644)
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// First discovery - should parse all
 	result1, err := eng.Discover(DiscoveryOptions{})
@@ -181,15 +181,15 @@ func TestDiscoverModels_DeletedFileCleanup(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create test model
 	modelPath := filepath.Join(modelsDir, "to_delete.sql")
-	os.WriteFile(modelPath, []byte(`---
+	_ = os.WriteFile(modelPath, []byte(`---
 name: to_delete
 materialized: table
 ---
-SELECT 1`), 0644)
+SELECT 1`), 0600)
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -198,7 +198,7 @@ SELECT 1`), 0644)
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// First discovery
 	result1, err := eng.Discover(DiscoveryOptions{})
@@ -206,7 +206,7 @@ SELECT 1`), 0644)
 	assert.Equal(t, 1, result1.ModelsTotal, "Expected 1 model")
 
 	// Delete the file
-	os.Remove(modelPath)
+	_ = os.Remove(modelPath)
 
 	// Second discovery - should detect deletion
 	result2, err := eng.Discover(DiscoveryOptions{})
@@ -225,20 +225,20 @@ func TestDiscoverModels_GracefulDegradation(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	// Create one valid model
-	os.WriteFile(filepath.Join(modelsDir, "valid.sql"), []byte(`---
+	_ = os.WriteFile(filepath.Join(modelsDir, "valid.sql"), []byte(`---
 name: valid_model
 materialized: table
 ---
-SELECT 1`), 0644)
+SELECT 1`), 0600)
 
 	// Create one file with unreadable content (we'll make it unreadable)
 	invalidPath := filepath.Join(modelsDir, "unreadable")
-	os.MkdirAll(invalidPath, 0755) // Create as directory instead of file
+	_ = os.MkdirAll(invalidPath, 0750) // Create as directory instead of file
 	// Rename to .sql extension - it will fail when trying to walk
-	os.Rename(invalidPath, filepath.Join(modelsDir, "unreadable.sql"))
+	_ = os.Rename(invalidPath, filepath.Join(modelsDir, "unreadable.sql"))
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -247,7 +247,7 @@ SELECT 1`), 0644)
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Discovery should succeed - the directory named .sql will be skipped
 	result, err := eng.Discover(DiscoveryOptions{})
@@ -266,14 +266,14 @@ func TestDiscoverMacros_IncrementalSkip(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	macrosDir := filepath.Join(tmpDir, "macros")
-	os.MkdirAll(macrosDir, 0755)
+	require.NoError(t, os.MkdirAll(macrosDir, 0750))
 
 	// Create test macro
-	os.WriteFile(filepath.Join(macrosDir, "utils.star"), []byte(`
+	_ = os.WriteFile(filepath.Join(macrosDir, "utils.star"), []byte(`
 def hello(name):
     """Say hello to someone."""
     return "Hello, " + name
-`), 0644)
+`), 0600)
 
 	cfg := Config{
 		MacrosDir: macrosDir,
@@ -282,7 +282,7 @@ def hello(name):
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// First discovery
 	result1, err := eng.Discover(DiscoveryOptions{})
@@ -304,13 +304,13 @@ func TestDiscover_ForceFullRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
-	os.WriteFile(filepath.Join(modelsDir, "model.sql"), []byte(`---
+	_ = os.WriteFile(filepath.Join(modelsDir, "model.sql"), []byte(`---
 name: model
 materialized: table
 ---
-SELECT 1`), 0644)
+SELECT 1`), 0600)
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -319,7 +319,7 @@ SELECT 1`), 0644)
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// First discovery
 	_, err = eng.Discover(DiscoveryOptions{})
@@ -339,18 +339,18 @@ func TestDiscover_SeedValidation(t *testing.T) {
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
 	seedsDir := filepath.Join(tmpDir, "seeds")
-	os.MkdirAll(modelsDir, 0755)
-	os.MkdirAll(seedsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
+	require.NoError(t, os.MkdirAll(seedsDir, 0750))
 
 	// Create model that references a seed
-	os.WriteFile(filepath.Join(modelsDir, "model.sql"), []byte(`---
+	_ = os.WriteFile(filepath.Join(modelsDir, "model.sql"), []byte(`---
 name: model
 materialized: table
 ---
-SELECT * FROM raw_data`), 0644)
+SELECT * FROM raw_data`), 0600)
 
 	// Create only one seed file (raw_data is missing)
-	os.WriteFile(filepath.Join(seedsDir, "other_data.csv"), []byte("id\n1\n"), 0644)
+	_ = os.WriteFile(filepath.Join(seedsDir, "other_data.csv"), []byte("id\n1\n"), 0600)
 
 	cfg := Config{
 		ModelsDir: modelsDir,
@@ -360,7 +360,7 @@ SELECT * FROM raw_data`), 0644)
 
 	eng, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	result, err := eng.Discover(DiscoveryOptions{})
 	require.NoError(t, err, "Discover() failed")

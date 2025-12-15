@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -134,11 +133,11 @@ func TestDefaultSchemaForType(t *testing.T) {
 // TestExpandEnvVars tests the expandEnvVars function.
 func TestExpandEnvVars(t *testing.T) {
 	// Set test environment variables
-	os.Setenv("TEST_VAR_ONE", "value_one")
-	os.Setenv("TEST_VAR_TWO", "value_two")
+	require.NoError(t, os.Setenv("TEST_VAR_ONE", "value_one"))
+	require.NoError(t, os.Setenv("TEST_VAR_TWO", "value_two"))
 	defer func() {
-		os.Unsetenv("TEST_VAR_ONE")
-		os.Unsetenv("TEST_VAR_TWO")
+		_ = os.Unsetenv("TEST_VAR_ONE")
+		_ = os.Unsetenv("TEST_VAR_TWO")
 	}()
 
 	tests := []struct {
@@ -270,7 +269,7 @@ func TestTargetConfig_ApplyDefaults(t *testing.T) {
 
 // TestLoadConfigWithTarget_Fixtures tests LoadConfigWithTarget using fixture files.
 func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
-	testdataDir := filepath.Join("testdata")
+	testdataDir := "testdata"
 
 	t.Run("valid duckdb config", func(t *testing.T) {
 		cfgPath := filepath.Join(testdataDir, "valid_duckdb.yaml")
@@ -331,13 +330,13 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 
 	t.Run("config with env vars", func(t *testing.T) {
 		// Set test env vars
-		os.Setenv("TEST_DB_PATH", "/path/to/test.db")
-		os.Setenv("TEST_DB_USER", "testuser")
-		os.Setenv("TEST_DB_PASSWORD", "secret123")
+		require.NoError(t, os.Setenv("TEST_DB_PATH", "/path/to/test.db"))
+		require.NoError(t, os.Setenv("TEST_DB_USER", "testuser"))
+		require.NoError(t, os.Setenv("TEST_DB_PASSWORD", "secret123"))
 		defer func() {
-			os.Unsetenv("TEST_DB_PATH")
-			os.Unsetenv("TEST_DB_USER")
-			os.Unsetenv("TEST_DB_PASSWORD")
+			_ = os.Unsetenv("TEST_DB_PATH")
+			_ = os.Unsetenv("TEST_DB_USER")
+			_ = os.Unsetenv("TEST_DB_PASSWORD")
 		}()
 
 		cfgPath := filepath.Join(testdataDir, "valid_env_vars.yaml")
@@ -352,7 +351,7 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 
 // TestLoadConfigWithTarget_NonexistentEnvironment tests loading with a non-existent environment.
 func TestLoadConfigWithTarget_NonexistentEnvironment(t *testing.T) {
-	testdataDir := filepath.Join("testdata")
+	testdataDir := "testdata"
 	cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
 	// Load with non-existent environment - should still work, using base target
@@ -374,6 +373,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := &Config{ModelsDir: ""}
 		err := cfg.Validate()
 		require.Error(t, err, "expected error for empty models_dir")
-		assert.True(t, strings.Contains(err.Error(), "models_dir is required"), "error should mention models_dir")
+		assert.Contains(t, err.Error(), "models_dir is required")
 	})
 }

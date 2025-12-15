@@ -11,7 +11,7 @@ import (
 
 func newTestContext() *starctx.ExecutionContext {
 	config := starlark.NewDict(1)
-	config.SetKey(starlark.String("materialized"), starlark.String("table"))
+	_ = config.SetKey(starlark.String("materialized"), starlark.String("table"))
 
 	target := &starctx.TargetInfo{
 		Type:     "duckdb",

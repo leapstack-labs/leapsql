@@ -33,7 +33,7 @@ Use --output to override: auto, text, markdown, json`,
 
   # Load seeds from a specific directory
   leapsql seed --seeds-dir ./data/seeds`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runSeed(cmd)
 		},
 	}
@@ -45,14 +45,14 @@ func runSeed(cmd *cobra.Command) error {
 	cfg := getConfig()
 
 	// Create renderer based on output format
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	eng, err := createEngine(cfg)
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	ctx := context.Background()
 

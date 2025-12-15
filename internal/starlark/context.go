@@ -122,7 +122,7 @@ func (ctx *ExecutionContext) EvalExprWithLocals(expr string, filename string, li
 	}
 
 	// Use starlark.Eval for expression evaluation
-	result, err := starlark.Eval(thread, filename, expr, globals)
+	result, err := starlark.Eval(thread, filename, expr, globals) //nolint:staticcheck // SA1019: will migrate to EvalOptions later
 	if err != nil {
 		return nil, &EvalError{
 			File:    filename,
@@ -164,7 +164,7 @@ func (ctx *ExecutionContext) EvalExprStringWithLocals(expr string, filename stri
 func (ctx *ExecutionContext) newThread(name string) *starlark.Thread {
 	return &starlark.Thread{
 		Name: name,
-		Print: func(thread *starlark.Thread, msg string) {
+		Print: func(_ *starlark.Thread, _ string) {
 			// Template execution should not print - this is a no-op
 			// In the future, we could capture prints for debugging
 		},

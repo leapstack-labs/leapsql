@@ -26,18 +26,21 @@ func TestSQLiteStore_OpenClose(t *testing.T) {
 func TestSQLiteStore_InitSchema(t *testing.T) {
 	store := NewSQLiteStore()
 	require.NoError(t, store.Open(":memory:"))
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	require.NoError(t, store.InitSchema())
 
 	// Verify tables exist by querying them
 	tables := []string{"runs", "models", "model_runs", "dependencies", "environments", "model_columns", "column_lineage"}
 	for _, table := range tables {
-		rows, err := store.db.Query("SELECT 1 FROM " + table + " LIMIT 1")
-		assert.NoError(t, err, "table %s should exist", table)
-		if rows != nil {
-			rows.Close()
-		}
+		func(tableName string) {
+			rows, err := store.db.Query("SELECT 1 FROM " + tableName + " LIMIT 1") //nolint:gosec // Test code with known table names
+			require.NoError(t, err, "table %s should exist", tableName)
+			if rows != nil {
+				defer func() { _ = rows.Close() }()
+				assert.NoError(t, rows.Err())
+			}
+		}(table)
 	}
 }
 
@@ -57,7 +60,7 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 				require.NoError(t, err)
 				return run
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, _ *SQLiteStore, run *Run) {
 				assert.NotEmpty(t, run.ID)
 				assert.Equal(t, "production", run.Environment)
 				assert.Equal(t, RunStatusRunning, run.Status)
@@ -79,17 +82,17 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "get run not found",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, _ *SQLiteStore) *Run {
 				return nil
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+			operation: func(t *testing.T, store *SQLiteStore, _ *Run) {
 				_, err := store.GetRun("nonexistent-id")
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "complete run success",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, store *SQLiteStore) *Run {
 				run, _ := store.CreateRun("dev")
 				return run
 			},
@@ -104,7 +107,7 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "complete run with error",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, store *SQLiteStore) *Run {
 				run, _ := store.CreateRun("dev")
 				return run
 			},
@@ -119,8 +122,8 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "get latest run",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
-				store.CreateRun("prod")
+			setup: func(_ *testing.T, store *SQLiteStore) *Run {
+				_, _ = store.CreateRun("prod")
 				time.Sleep(10 * time.Millisecond)
 				run2, _ := store.CreateRun("prod")
 				return run2
@@ -133,10 +136,10 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "get latest run no runs",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, _ *SQLiteStore) *Run {
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Run) {
 				latest, err := store.GetLatestRun("nonexistent")
 				require.NoError(t, err)
 				assert.Nil(t, latest)
@@ -147,7 +150,7 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var run *Run
 			if tt.setup != nil {
@@ -184,41 +187,41 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, _ *SQLiteStore, model *Model) {
 				assert.NotEmpty(t, model.ID)
 			},
 		},
 		{
 			name: "register model upsert",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *Model {
 				model := &Model{
 					Path:         "models.staging.stg_users",
 					Name:         "stg_users",
 					Materialized: "table",
 					ContentHash:  "abc123",
 				}
-				store.RegisterModel(model)
+				_ = store.RegisterModel(model)
 				return model
 			},
 			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
 				model.ContentHash = "def456"
 				require.NoError(t, store.RegisterModel(model))
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
 				retrieved, _ := store.GetModelByPath("models.staging.stg_users")
 				assert.Equal(t, "def456", retrieved.ContentHash)
 			},
 		},
 		{
 			name: "get model by ID",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *Model {
 				model := &Model{
 					Path:         "models.staging.stg_orders",
 					Name:         "stg_orders",
 					Materialized: "view",
 					ContentHash:  "hash123",
 				}
-				store.RegisterModel(model)
+				_ = store.RegisterModel(model)
 				return model
 			},
 			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
@@ -229,7 +232,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		},
 		{
 			name: "get model by path",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *Model {
 				model := &Model{
 					Path:         "models.marts.revenue",
 					Name:         "revenue",
@@ -237,10 +240,10 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 					UniqueKey:    "transaction_id",
 					ContentHash:  "xyz789",
 				}
-				store.RegisterModel(model)
+				_ = store.RegisterModel(model)
 				return model
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
 				retrieved, err := store.GetModelByPath("models.marts.revenue")
 				require.NoError(t, err)
 				assert.Equal(t, "incremental", retrieved.Materialized)
@@ -249,10 +252,10 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		},
 		{
 			name: "get model by path not found",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, _ *SQLiteStore) *Model {
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
 				retrieved, err := store.GetModelByPath("nonexistent.model")
 				require.NoError(t, err)
 				assert.Nil(t, retrieved)
@@ -291,7 +294,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 				}
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
 				list, err := store.ListModels()
 				require.NoError(t, err)
 				assert.Len(t, list, 3)
@@ -302,7 +305,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var model *Model
 			if tt.setup != nil {
@@ -353,7 +356,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				require.Len(t, retrieved.Tests, 2)
 				assert.Equal(t, []string{"user_id"}, retrieved.Tests[0].Unique)
 				assert.Equal(t, "high", retrieved.Meta["priority"])
-				assert.Equal(t, float64(24), retrieved.Meta["sla"])
+				assert.InEpsilon(t, float64(24), retrieved.Meta["sla"], 0.0001)
 			},
 		},
 		{
@@ -400,7 +403,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			require.NoError(t, store.RegisterModel(tt.model))
 
@@ -414,7 +417,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 
 func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	store := setupTestStore(t)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	// Register initial model
 	model := &Model{
@@ -444,12 +447,12 @@ func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	assert.Equal(t, "new_schema", retrieved.Schema)
 	assert.Equal(t, []string{"updated", "v2"}, retrieved.Tags)
 	assert.Len(t, retrieved.Tests, 1)
-	assert.Equal(t, float64(2), retrieved.Meta["version"])
+	assert.InEpsilon(t, float64(2), retrieved.Meta["version"], 0.0001)
 }
 
 func TestSQLiteStore_GetModelByID_WithFrontmatterFields(t *testing.T) {
 	store := setupTestStore(t)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	model := &Model{
 		Path:         "models.get_by_id_test",
@@ -474,7 +477,7 @@ func TestSQLiteStore_GetModelByID_WithFrontmatterFields(t *testing.T) {
 
 func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 	store := setupTestStore(t)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	models := []*Model{
 		{
@@ -526,7 +529,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 				require.NoError(t, store.RecordModelRun(modelRun))
 				return modelRun
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+			verify: func(t *testing.T, _ *SQLiteStore, _ *Run, modelRun *ModelRun) {
 				assert.NotEmpty(t, modelRun.ID)
 			},
 		},
@@ -551,12 +554,12 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 				require.NoError(t, store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, ""))
 				return modelRun
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+			verify: func(t *testing.T, store *SQLiteStore, run *Run, _ *ModelRun) {
 				runs, _ := store.GetModelRunsForRun(run.ID)
 				require.Len(t, runs, 1)
 				assert.Equal(t, ModelRunStatusSuccess, runs[0].Status)
 				assert.Equal(t, int64(100), runs[0].RowsAffected)
-				assert.Greater(t, runs[0].ExecutionMS, int64(0))
+				assert.Positive(t, runs[0].ExecutionMS)
 			},
 		},
 		{
@@ -581,7 +584,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 				require.NoError(t, store.RecordModelRun(mr2))
 				return mr2
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *Run, modelRun *ModelRun) {
 				model, _ := store.GetModelByPath("models.test")
 				latest, err := store.GetLatestModelRun(model.ID)
 				require.NoError(t, err)
@@ -594,7 +597,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var run *Run
 			var model *Model
@@ -627,9 +630,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				parent2 := &Model{Path: "models.parent2", Name: "parent2", ContentHash: "2"}
 				child := &Model{Path: "models.child", Name: "child", ContentHash: "3"}
 
-				store.RegisterModel(parent1)
-				store.RegisterModel(parent2)
-				store.RegisterModel(child)
+				_ = store.RegisterModel(parent1)
+				_ = store.RegisterModel(parent2)
+				_ = store.RegisterModel(child)
 
 				require.NoError(t, store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID}))
 				return []*Model{parent1, parent2, child}
@@ -647,11 +650,11 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				parent2 := &Model{Path: "models.p2", Name: "p2", ContentHash: "2"}
 				child := &Model{Path: "models.c", Name: "c", ContentHash: "3"}
 
-				store.RegisterModel(parent1)
-				store.RegisterModel(parent2)
-				store.RegisterModel(child)
+				_ = store.RegisterModel(parent1)
+				_ = store.RegisterModel(parent2)
+				_ = store.RegisterModel(child)
 
-				store.SetDependencies(child.ID, []string{parent1.ID})
+				_ = store.SetDependencies(child.ID, []string{parent1.ID})
 				require.NoError(t, store.SetDependencies(child.ID, []string{parent2.ID}))
 				return []*Model{parent1, parent2, child}
 			},
@@ -665,17 +668,17 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		},
 		{
 			name: "get dependents",
-			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+			setup: func(_ *testing.T, store *SQLiteStore) []*Model {
 				parent := &Model{Path: "models.parent", Name: "parent", ContentHash: "1"}
 				child1 := &Model{Path: "models.child1", Name: "child1", ContentHash: "2"}
 				child2 := &Model{Path: "models.child2", Name: "child2", ContentHash: "3"}
 
-				store.RegisterModel(parent)
-				store.RegisterModel(child1)
-				store.RegisterModel(child2)
+				_ = store.RegisterModel(parent)
+				_ = store.RegisterModel(child1)
+				_ = store.RegisterModel(child2)
 
-				store.SetDependencies(child1.ID, []string{parent.ID})
-				store.SetDependencies(child2.ID, []string{parent.ID})
+				_ = store.SetDependencies(child1.ID, []string{parent.ID})
+				_ = store.SetDependencies(child2.ID, []string{parent.ID})
 
 				return []*Model{parent, child1, child2}
 			},
@@ -691,7 +694,7 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var models []*Model
 			if tt.setup != nil {
@@ -722,7 +725,7 @@ func TestSQLiteStore_Environment(t *testing.T) {
 		{
 			name: "get environment",
 			operation: func(t *testing.T, store *SQLiteStore) {
-				store.CreateEnvironment("production")
+				_, _ = store.CreateEnvironment("production")
 				env, err := store.GetEnvironment("production")
 				require.NoError(t, err)
 				assert.Equal(t, "production", env.Name)
@@ -739,7 +742,7 @@ func TestSQLiteStore_Environment(t *testing.T) {
 		{
 			name: "update environment ref",
 			operation: func(t *testing.T, store *SQLiteStore) {
-				store.CreateEnvironment("dev")
+				_, _ = store.CreateEnvironment("dev")
 				require.NoError(t, store.UpdateEnvironmentRef("dev", "abc123"))
 				env, _ := store.GetEnvironment("dev")
 				assert.Equal(t, "abc123", env.CommitRef)
@@ -750,7 +753,7 @@ func TestSQLiteStore_Environment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 			tt.operation(t, store)
 		})
 	}
@@ -843,7 +846,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 		},
 		{
 			name:  "get model columns not found",
-			setup: func(t *testing.T, store *SQLiteStore) {},
+			setup: func(_ *testing.T, _ *SQLiteStore) {},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				columns, err := store.GetModelColumns("nonexistent.model")
 				require.NoError(t, err)
@@ -878,7 +881,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			if tt.setup != nil {
 				tt.setup(t, store)
@@ -1033,7 +1036,7 @@ func TestSQLiteStore_Trace(t *testing.T) {
 		},
 		{
 			name:  "trace column empty results",
-			setup: func(t *testing.T, store *SQLiteStore) {},
+			setup: func(_ *testing.T, _ *SQLiteStore) {},
 			verify: func(t *testing.T, store *SQLiteStore) {
 				backward, err := store.TraceColumnBackward("nonexistent.model", "col")
 				require.NoError(t, err)
@@ -1049,7 +1052,7 @@ func TestSQLiteStore_Trace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := setupTestStore(t)
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			if tt.setup != nil {
 				tt.setup(t, store)

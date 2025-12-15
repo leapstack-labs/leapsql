@@ -7,18 +7,19 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 )
 
 //go:embed schema.sql
 var schemaSQL string
 
-// SQLiteStore implements StateStore using SQLite with sqlc-generated queries.
+// SQLiteStore implements Store using SQLite with sqlc-generated queries.
 type SQLiteStore struct {
 	db      *sql.DB
 	queries *sqlcgen.Queries
@@ -34,7 +35,7 @@ func NewSQLiteStore() *SQLiteStore {
 // Use ":memory:" for an in-memory database.
 func (s *SQLiteStore) Open(path string) error {
 	// Enable foreign keys and WAL mode for better performance
-	dsn := path
+	var dsn string
 	if path != ":memory:" {
 		dsn = fmt.Sprintf("%s?_foreign_keys=on&_journal_mode=WAL", path)
 	} else {
@@ -48,7 +49,7 @@ func (s *SQLiteStore) Open(path string) error {
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return fmt.Errorf("failed to ping sqlite database: %w", err)
 	}
 
@@ -120,7 +121,7 @@ func (s *SQLiteStore) GetRun(id string) (*Run, error) {
 	}
 
 	row, err := s.queries.GetRun(ctx(), id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("run not found: %s", id)
 	}
 	if err != nil {
@@ -157,7 +158,7 @@ func (s *SQLiteStore) GetLatestRun(env string) (*Run, error) {
 	}
 
 	row, err := s.queries.GetLatestRun(ctx(), env)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No runs found, return nil without error
 	}
 	if err != nil {
@@ -247,7 +248,7 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 	}
 
 	row, err := s.queries.GetModelByID(ctx(), id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("model not found: %s", id)
 	}
 	if err != nil {
@@ -264,7 +265,7 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 	}
 
 	row, err := s.queries.GetModelByPath(ctx(), path)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // Not found, return nil without error
 	}
 	if err != nil {
@@ -281,7 +282,7 @@ func (s *SQLiteStore) GetModelByFilePath(filePath string) (*Model, error) {
 	}
 
 	row, err := s.queries.GetModelByFilePath(ctx(), &filePath)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // Not found, return nil without error
 	}
 	if err != nil {
@@ -450,7 +451,7 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
 	}
 
 	row, err := s.queries.GetLatestModelRun(ctx(), modelID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No runs found
 	}
 	if err != nil {
@@ -473,7 +474,7 @@ func (s *SQLiteStore) SetDependencies(modelID string, parentIDs []string) error 
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.queries.WithTx(tx)
 
@@ -542,7 +543,7 @@ func (s *SQLiteStore) GetEnvironment(name string) (*Environment, error) {
 	}
 
 	row, err := s.queries.GetEnvironment(ctx(), name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -578,7 +579,7 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) e
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.queries.WithTx(tx)
 
@@ -678,7 +679,7 @@ func (s *SQLiteStore) DeleteModelColumns(modelPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.queries.WithTx(tx)
 
@@ -763,7 +764,7 @@ func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroF
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.queries.WithTx(tx)
 
@@ -825,7 +826,7 @@ func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
 	}
 
 	row, err := s.queries.GetMacroNamespace(ctx(), name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -864,7 +865,7 @@ func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*MacroFunction, 
 		Namespace: namespace,
 		Name:      name,
 	})
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -959,7 +960,7 @@ func (s *SQLiteStore) GetContentHash(filePath string) (string, error) {
 	}
 
 	hash, err := s.queries.GetContentHash(ctx(), filePath)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil // Not found, return empty string
 	}
 	if err != nil {
@@ -1023,8 +1024,8 @@ func (s *SQLiteStore) ListMacroFilePaths() ([]string, error) {
 	return s.queries.ListMacroFilePaths(ctx())
 }
 
-// Ensure SQLiteStore implements StateStore interface
-var _ StateStore = (*SQLiteStore)(nil)
+// Ensure SQLiteStore implements Store interface
+var _ Store = (*SQLiteStore)(nil)
 
 // --- Helper functions for type conversion ---
 
@@ -1191,7 +1192,7 @@ func convertMacroFunction(row sqlcgen.MacroFunction) *MacroFunction {
 
 	// Parse args JSON
 	if row.Args != "" {
-		json.Unmarshal([]byte(row.Args), &fn.Args)
+		_ = json.Unmarshal([]byte(row.Args), &fn.Args)
 	}
 
 	if row.Docstring != nil {

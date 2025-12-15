@@ -67,7 +67,7 @@ func (p *Parser) parseComparison() Expr {
 	left := p.parseAddition()
 
 	// Check for special comparison operators
-	not := false
+	var not bool
 	if p.match(TOKEN_NOT) {
 		not = true
 	}

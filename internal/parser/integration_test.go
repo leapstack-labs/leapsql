@@ -49,10 +49,8 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 	// Check mart with dependencies (now using auto-detected sources)
 	if m, ok := modelMap["marts.customer_summary"]; !ok {
 		t.Error("missing marts.customer_summary")
-	} else {
-		if len(m.Sources) != 2 {
-			t.Errorf("customer_summary sources = %d, expected 2 (auto-detected from SQL)", len(m.Sources))
-		}
+	} else if len(m.Sources) != 2 {
+		t.Errorf("customer_summary sources = %d, expected 2 (auto-detected from SQL)", len(m.Sources))
 	}
 
 	// Check incremental model
@@ -243,7 +241,7 @@ func TestIntegration_AffectedNodes(t *testing.T) {
 	for _, m := range models {
 		for _, src := range m.Sources {
 			if modelPath, ok := tableLookup[src]; ok {
-				g.AddEdge(modelPath, m.Path)
+				_ = g.AddEdge(modelPath, m.Path)
 			}
 		}
 	}

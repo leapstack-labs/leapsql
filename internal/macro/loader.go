@@ -73,7 +73,7 @@ func (l *Loader) Load() ([]*LoadedModule, error) {
 // loadFile loads a single .star file and extracts its exports.
 func (l *Loader) loadFile(path string) (*LoadedModule, error) {
 	// Read file content
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(path) //nolint:gosec // G304: path comes from filepath.Walk within macros directory
 	if err != nil {
 		return nil, &LoadError{
 			File:    path,
@@ -96,13 +96,13 @@ func (l *Loader) loadFile(path string) (*LoadedModule, error) {
 	// Create a new Starlark thread for execution
 	thread := &starlark.Thread{
 		Name: fmt.Sprintf("load:%s", namespace),
-		Print: func(_ *starlark.Thread, msg string) {
+		Print: func(_ *starlark.Thread, _ string) {
 			// Ignore prints during macro loading
 		},
 	}
 
 	// Execute the Starlark file
-	globals, err := starlark.ExecFile(thread, path, content, nil)
+	globals, err := starlark.ExecFile(thread, path, content, nil) //nolint:staticcheck // SA1019: will migrate to ExecFileOptions later
 	if err != nil {
 		return nil, &LoadError{
 			File:    path,

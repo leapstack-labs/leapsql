@@ -34,7 +34,7 @@ Output adapts to environment:
 
   # Output as Markdown
   leapsql dag --output markdown`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDAG(cmd)
 		},
 	}
@@ -49,7 +49,7 @@ func runDAG(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Discover models
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
@@ -57,7 +57,7 @@ func runDAG(cmd *cobra.Command) error {
 	}
 
 	// Create renderer
-	mode := output.OutputMode(cfg.OutputFormat)
+	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	graph := eng.GetGraph()

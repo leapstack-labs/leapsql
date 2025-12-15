@@ -89,6 +89,7 @@ type ServerCapabilities struct {
 // TextDocumentSyncKind defines how the client syncs document changes.
 type TextDocumentSyncKind int
 
+// TextDocumentSyncKind constants.
 const (
 	TextDocumentSyncKindNone        TextDocumentSyncKind = 0
 	TextDocumentSyncKindFull        TextDocumentSyncKind = 1
@@ -118,6 +119,7 @@ type CompletionOptions struct {
 // DiagnosticSeverity indicates the severity of a diagnostic.
 type DiagnosticSeverity int
 
+// DiagnosticSeverity constants.
 const (
 	DiagnosticSeverityError       DiagnosticSeverity = 1
 	DiagnosticSeverityWarning     DiagnosticSeverity = 2
@@ -157,6 +159,7 @@ type CompletionContext struct {
 // CompletionItemKind indicates the kind of a completion entry.
 type CompletionItemKind int
 
+// CompletionItemKind constants.
 const (
 	CompletionItemKindText          CompletionItemKind = 1
 	CompletionItemKindMethod        CompletionItemKind = 2
@@ -188,6 +191,7 @@ const (
 // InsertTextFormat defines whether the insert text is plain text or a snippet.
 type InsertTextFormat int
 
+// InsertTextFormat constants.
 const (
 	InsertTextFormatPlainText InsertTextFormat = 1
 	InsertTextFormatSnippet   InsertTextFormat = 2
@@ -231,6 +235,7 @@ type HoverParams struct {
 // MarkupKind describes the markup content type.
 type MarkupKind string
 
+// MarkupKind constants.
 const (
 	MarkupKindPlainText MarkupKind = "plaintext"
 	MarkupKindMarkdown  MarkupKind = "markdown"
@@ -290,6 +295,7 @@ type ShowMessageParams struct {
 // MessageType indicates the type of a message.
 type MessageType int
 
+// MessageType constants for showing messages to the client.
 const (
 	MessageTypeError   MessageType = 1
 	MessageTypeWarning MessageType = 2

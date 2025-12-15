@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -62,13 +63,16 @@ func (s *Server) validateFrontmatter(doc *Document) []Diagnostic {
 		var pos Position
 		var msg string
 
-		switch e := err.(type) {
-		case *parser.FrontmatterParseError:
-			pos = Position{Line: uint32(e.Line), Character: 0}
-			msg = e.Message
-		case *parser.UnknownFieldError:
+		var parseErr *parser.FrontmatterParseError
+		var unknownErr *parser.UnknownFieldError
+
+		switch {
+		case errors.As(err, &parseErr):
+			pos = Position{Line: uint32(parseErr.Line), Character: 0} //nolint:gosec // G115: line is always non-negative from parser
+			msg = parseErr.Message
+		case errors.As(err, &unknownErr):
 			// Unknown field - try to find it in the content
-			msg = fmt.Sprintf("Unknown frontmatter field: %s", e.Field)
+			msg = fmt.Sprintf("Unknown frontmatter field: %s", unknownErr.Field)
 			pos = Position{Line: 0, Character: 0}
 		default:
 			msg = err.Error()
@@ -105,10 +109,11 @@ func (s *Server) validateTemplate(doc *Document) []Diagnostic {
 		var pos Position
 		var msg string
 
-		// Check if the error implements the template.TemplateError interface
-		if te, ok := err.(template.TemplateError); ok {
+		// Check if the error implements the template.Error interface
+		var te template.Error
+		if errors.As(err, &te) {
 			tpos := te.Position()
-			pos = Position{Line: uint32(tpos.Line - 1), Character: uint32(tpos.Column - 1)}
+			pos = Position{Line: uint32(tpos.Line - 1), Character: uint32(tpos.Column - 1)} //nolint:gosec // G115: line/column are always non-negative
 			msg = err.Error()
 		} else {
 			msg = err.Error()
@@ -142,12 +147,12 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 	// Parse with lineage parser
 	_, err := lineage.Parse(sql)
 	if err != nil {
-		pe, ok := err.(*lineage.ParseError)
-		if ok {
+		var pe *lineage.ParseError
+		if errors.As(err, &pe) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Range: Range{
-					Start: Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column - 1)},
-					End:   Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column + 10)},
+					Start: Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column - 1)},  //nolint:gosec // G115: line/column are always non-negative
+					End:   Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column + 10)}, //nolint:gosec // G115: line/column are always non-negative
 				},
 				Severity: DiagnosticSeverityError,
 				Code:     "E003",
@@ -204,7 +209,7 @@ func (s *Server) validateMacroReferences(doc *Document) []Diagnostic {
 			diagnostics = append(diagnostics, Diagnostic{
 				Range: Range{
 					Start: startPos,
-					End:   Position{Line: startPos.Line, Character: startPos.Character + uint32(len(namespace))},
+					End:   Position{Line: startPos.Line, Character: startPos.Character + uint32(len(namespace))}, //nolint:gosec // G115: len is always non-negative
 				},
 				Severity: DiagnosticSeverityError,
 				Code:     "E101",
@@ -231,7 +236,7 @@ func (s *Server) validateMacroReferences(doc *Document) []Diagnostic {
 
 			diagnostics = append(diagnostics, Diagnostic{
 				Range: Range{
-					Start: Position{Line: startPos.Line, Character: startPos.Character + uint32(len(namespace)) + 1},
+					Start: Position{Line: startPos.Line, Character: startPos.Character + uint32(len(namespace)) + 1}, //nolint:gosec // G115: len is always non-negative
 					End:   endPos,
 				},
 				Severity: DiagnosticSeverityError,

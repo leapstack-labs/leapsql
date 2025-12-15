@@ -57,7 +57,7 @@ func ExtractFrontmatter(content string) (*FrontmatterResult, error) {
 	}
 
 	matches := frontmatterPattern.FindStringSubmatch(content)
-	if matches == nil || len(matches) < 2 {
+	if len(matches) < 2 {
 		// No frontmatter found, return content as-is
 		return result, nil
 	}

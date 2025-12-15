@@ -1,3 +1,4 @@
+// Package commands_test provides tests for CLI command creation.
 package commands
 
 import (

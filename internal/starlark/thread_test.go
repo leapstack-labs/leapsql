@@ -62,7 +62,7 @@ func TestThreadPool_Concurrent(t *testing.T) {
 	// Concurrently get and put threads
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
-		go func(n int) {
+		go func(_ int) {
 			defer wg.Done()
 			thread := pool.Get("concurrent")
 			// Simulate some work
@@ -117,7 +117,7 @@ func TestParallelExecutor_ExecuteWithErrors(t *testing.T) {
 	require.Len(t, results, 2, "expected 2 results")
 
 	// First should succeed
-	assert.NoError(t, results[0].Error, "task 0 should succeed")
+	require.NoError(t, results[0].Error, "task 0 should succeed")
 
 	// Second should fail
 	assert.Error(t, results[1].Error, "task 1 should fail with undefined variable")

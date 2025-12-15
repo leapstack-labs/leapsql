@@ -23,12 +23,12 @@ func createTestProject(t *testing.T) (tmpDir, modelsDir, seedsDir, macrosDir str
 	macrosDir = filepath.Join(tmpDir, "macros")
 
 	for _, dir := range []string{modelsDir, seedsDir, macrosDir} {
-		require.NoError(t, os.MkdirAll(dir, 0755), "Failed to create dir %s", dir)
+		require.NoError(t, os.MkdirAll(dir, 0750), "Failed to create dir %s", dir)
 	}
 
 	// Create a simple seed
 	seedContent := "id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@example.com\n"
-	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644), "Failed to write seed")
+	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0600), "Failed to write seed")
 
 	// Create a simple model
 	modelContent := `/*---
@@ -38,7 +38,7 @@ materialized: table
 
 SELECT id, name, email FROM users
 `
-	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644), "Failed to write model")
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0600), "Failed to write model")
 
 	return
 }
@@ -62,7 +62,7 @@ func TestNew(t *testing.T) {
 
 	engine, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer engine.Close()
+	defer func() { _ = engine.Close() }()
 
 	assert.Nil(t, engine.db, "engine.db should be nil (lazy initialization)")
 	assert.False(t, engine.dbConnected, "engine.dbConnected should be false initially")
@@ -91,7 +91,7 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	cfg := Config{
 		ModelsDir:    modelsDir,
@@ -102,7 +102,7 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 
 	engine, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer engine.Close()
+	defer func() { _ = engine.Close() }()
 
 	ctx := testContext()
 	assert.NoError(t, engine.LoadSeeds(ctx), "LoadSeeds() should succeed with empty seeds dir")
@@ -112,7 +112,7 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.db")
 	modelsDir := filepath.Join(tmpDir, "models")
-	os.MkdirAll(modelsDir, 0755)
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
 
 	cfg := Config{
 		ModelsDir:    modelsDir,
@@ -123,7 +123,7 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 
 	engine, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer engine.Close()
+	defer func() { _ = engine.Close() }()
 
 	ctx := testContext()
 	// Should not error, just skip loading
@@ -174,7 +174,7 @@ func TestBuildSQL(t *testing.T) {
 
 	engine, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer engine.Close()
+	defer func() { _ = engine.Close() }()
 
 	// Create a mock model config - LeapSQL uses pure SQL, dependencies are auto-detected
 	modelCfg := &parser.ModelConfig{
@@ -234,18 +234,18 @@ func TestEngine_CustomModels(t *testing.T) {
 	seedsDir := filepath.Join(tmpDir, "seeds")
 
 	// Create directories
-	require.NoError(t, os.MkdirAll(modelsDir, 0755), "Failed to create models dir")
-	require.NoError(t, os.MkdirAll(seedsDir, 0755), "Failed to create seeds dir")
+	require.NoError(t, os.MkdirAll(modelsDir, 0750), "Failed to create models dir")
+	require.NoError(t, os.MkdirAll(seedsDir, 0750), "Failed to create seeds dir")
 
 	// Create a simple seed
 	seedContent := "id,name\n1,Alice\n2,Bob\n"
-	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0644), "Failed to write seed")
+	require.NoError(t, os.WriteFile(filepath.Join(seedsDir, "users.csv"), []byte(seedContent), 0600), "Failed to write seed")
 
 	// Create a simple model
 	modelContent := `-- @config(materialized='table')
 SELECT id, name FROM users
 `
-	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0644), "Failed to write model")
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "active_users.sql"), []byte(modelContent), 0600), "Failed to write model")
 
 	cfg := Config{
 		ModelsDir:    modelsDir,
@@ -256,7 +256,7 @@ SELECT id, name FROM users
 
 	engine, err := New(cfg)
 	require.NoError(t, err, "New() failed")
-	defer engine.Close()
+	defer func() { _ = engine.Close() }()
 
 	ctx := testContext()
 
@@ -281,9 +281,9 @@ SELECT id, name FROM users
 
 	var count int
 	if rows.Next() {
-		rows.Scan(&count)
+		_ = rows.Scan(&count)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	assert.Equal(t, 2, count, "active_users should have 2 rows")
 }

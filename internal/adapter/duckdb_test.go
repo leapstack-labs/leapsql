@@ -18,7 +18,7 @@ func TestDuckDBAdapter_Connect(t *testing.T) {
 	}{
 		{
 			name: "in-memory",
-			setupPath: func(t *testing.T) string {
+			setupPath: func(_ *testing.T) string {
 				return ":memory:"
 			},
 		},
@@ -42,7 +42,7 @@ func TestDuckDBAdapter_Connect(t *testing.T) {
 
 			dbPath := tt.setupPath(t)
 			require.NoError(t, adapter.Connect(ctx, Config{Path: dbPath}))
-			defer adapter.Close()
+			defer func() { _ = adapter.Close() }()
 
 			if tt.verify != nil {
 				tt.verify(t, dbPath)
@@ -87,7 +87,7 @@ func TestDuckDBAdapter_Exec(t *testing.T) {
 	adapter := NewDuckDBAdapter()
 
 	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 
 	// Create a table
 	err := adapter.Exec(ctx, `
@@ -114,7 +114,7 @@ func TestDuckDBAdapter_Query(t *testing.T) {
 	adapter := NewDuckDBAdapter()
 
 	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 
 	// Create and populate a table
 	require.NoError(t, adapter.Exec(ctx, `CREATE TABLE users (id INTEGER, name VARCHAR)`))
@@ -123,7 +123,7 @@ func TestDuckDBAdapter_Query(t *testing.T) {
 	// Query the data
 	rows, err := adapter.Query(ctx, `SELECT id, name FROM users ORDER BY id`)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	expected := []struct {
 		id   int
@@ -212,7 +212,7 @@ func TestDuckDBAdapter_GetTableMetadata(t *testing.T) {
 			adapter := NewDuckDBAdapter()
 
 			require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
-			defer adapter.Close()
+			defer func() { _ = adapter.Close() }()
 
 			if tt.setupTable != nil {
 				tt.setupTable(t, adapter, ctx)
@@ -241,7 +241,7 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 	adapter := NewDuckDBAdapter()
 
 	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 
 	// Create a temporary CSV file
 	tmpDir := t.TempDir()
@@ -252,7 +252,7 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 2,bob,200.75
 3,charlie,300.25`
 
-	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0644))
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0600))
 
 	// Load the CSV
 	require.NoError(t, adapter.LoadCSV(ctx, "test_data", csvPath))
@@ -260,7 +260,7 @@ func TestDuckDBAdapter_LoadCSV(t *testing.T) {
 	// Verify the data was loaded
 	rows, err := adapter.Query(ctx, "SELECT COUNT(*) FROM test_data")
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var count int
 	if rows.Next() {
@@ -303,7 +303,7 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 	adapter := NewDuckDBAdapter()
 
 	require.NoError(t, adapter.Connect(ctx, Config{Path: ":memory:"}))
-	defer adapter.Close()
+	defer func() { _ = adapter.Close() }()
 
 	// Create tables
 	require.NoError(t, adapter.Exec(ctx, `
@@ -346,7 +346,7 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 		ORDER BY total_amount DESC
 	`)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := make(map[string]float64)
 	for rows.Next() {
@@ -357,6 +357,6 @@ func TestDuckDBAdapter_ComplexQuery(t *testing.T) {
 		results[name] = total
 	}
 
-	assert.Equal(t, 250.0, results["Alice"])
-	assert.Equal(t, 200.0, results["Bob"])
+	assert.InEpsilon(t, 250.0, results["Alice"], 0.001)
+	assert.InEpsilon(t, 200.0, results["Bob"], 0.001)
 }

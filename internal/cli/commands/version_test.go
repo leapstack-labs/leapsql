@@ -2,10 +2,10 @@ package commands
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewVersionCommand(t *testing.T) {
@@ -44,11 +44,11 @@ func TestNewVersionCommand(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			output := buf.String()
 			for _, want := range tt.wantOut {
-				assert.True(t, strings.Contains(output, want), "output should contain %q, got: %s", want, output)
+				assert.Contains(t, output, want, "output should contain %q, got: %s", want, output)
 			}
 		})
 	}

@@ -362,7 +362,7 @@ func (g *Graph) Subgraph(nodeIDs []string) *Graph {
 	for _, id := range nodeIDs {
 		for _, childID := range g.edges[id] {
 			if nodeSet[childID] {
-				subgraph.AddEdge(id, childID)
+				_ = subgraph.AddEdge(id, childID)
 			}
 		}
 	}

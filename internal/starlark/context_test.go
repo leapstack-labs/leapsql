@@ -11,7 +11,7 @@ import (
 
 func TestNewExecutionContext(t *testing.T) {
 	config := starlark.NewDict(1)
-	config.SetKey(starlark.String("name"), starlark.String("test_model"))
+	_ = config.SetKey(starlark.String("name"), starlark.String("test_model"))
 
 	target := &TargetInfo{
 		Type:     "duckdb",
@@ -40,8 +40,8 @@ func TestNewExecutionContext(t *testing.T) {
 
 func TestExecutionContext_EvalExpr(t *testing.T) {
 	config := starlark.NewDict(2)
-	config.SetKey(starlark.String("name"), starlark.String("my_model"))
-	config.SetKey(starlark.String("materialized"), starlark.String("table"))
+	_ = config.SetKey(starlark.String("name"), starlark.String("my_model"))
+	_ = config.SetKey(starlark.String("materialized"), starlark.String("table"))
 
 	ctx := NewExecutionContext(config, "prod", nil, nil)
 

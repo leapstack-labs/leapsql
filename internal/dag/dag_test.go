@@ -80,9 +80,9 @@ func TestGraph_GetParentsAndChildren(t *testing.T) {
 	g.AddNode("c", nil)
 
 	// b depends on a, c depends on both a and b
-	g.AddEdge("a", "b")
-	g.AddEdge("a", "c")
-	g.AddEdge("b", "c")
+	_ = g.AddEdge("a", "b")
+	_ = g.AddEdge("a", "c")
+	_ = g.AddEdge("b", "c")
 
 	parents := g.GetParents("c")
 	if len(parents) != 2 {
@@ -107,8 +107,8 @@ func TestGraph_HasCycle(t *testing.T) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("b", "c")
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("b", "c")
 			},
 			wantCycle: false,
 		},
@@ -118,9 +118,9 @@ func TestGraph_HasCycle(t *testing.T) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("b", "c")
-				g.AddEdge("c", "a") // Creates cycle
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("b", "c")
+				_ = g.AddEdge("c", "a") // Creates cycle
 			},
 			wantCycle: true,
 		},
@@ -156,8 +156,8 @@ func TestGraph_TopologicalSort(t *testing.T) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("b", "c")
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("b", "c")
 			},
 			wantNodes: 3,
 			verify: func(t *testing.T, sorted []*Node) {
@@ -180,10 +180,10 @@ func TestGraph_TopologicalSort(t *testing.T) {
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
 				g.AddNode("d", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("a", "c")
-				g.AddEdge("b", "d")
-				g.AddEdge("c", "d")
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("a", "c")
+				_ = g.AddEdge("b", "d")
+				_ = g.AddEdge("c", "d")
 			},
 			wantNodes: 4,
 			verify: func(t *testing.T, sorted []*Node) {
@@ -210,8 +210,8 @@ func TestGraph_TopologicalSort(t *testing.T) {
 			setup: func(g *Graph) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("b", "a") // Cycle
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("b", "a") // Cycle
 			},
 			wantErr: true,
 		},
@@ -222,8 +222,8 @@ func TestGraph_TopologicalSort(t *testing.T) {
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
 				g.AddNode("d", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("c", "d")
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("c", "d")
 			},
 			wantNodes: 4,
 			verify: func(t *testing.T, sorted []*Node) {
@@ -278,10 +278,10 @@ func TestGraph_GetExecutionLevels(t *testing.T) {
 	// staging1 depends on raw1
 	// staging2 depends on raw2
 	// mart depends on both staging1 and staging2
-	g.AddEdge("raw1", "staging1")
-	g.AddEdge("raw2", "staging2")
-	g.AddEdge("staging1", "mart")
-	g.AddEdge("staging2", "mart")
+	_ = g.AddEdge("raw1", "staging1")
+	_ = g.AddEdge("raw2", "staging2")
+	_ = g.AddEdge("staging1", "mart")
+	_ = g.AddEdge("staging2", "mart")
 
 	levels, err := g.GetExecutionLevels()
 	if err != nil {
@@ -316,8 +316,8 @@ func TestGraph_GetAffectedNodes(t *testing.T) {
 	g.AddNode("d", nil)
 
 	// b depends on a, c depends on b, d is independent
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "c")
+	_ = g.AddEdge("a", "b")
+	_ = g.AddEdge("b", "c")
 
 	affected := g.GetAffectedNodes([]string{"a"})
 	if len(affected) != 3 {
@@ -345,9 +345,9 @@ func TestGraph_GetUpstreamNodes(t *testing.T) {
 	g.AddNode("d", nil)
 
 	// c depends on a and b, d depends on c
-	g.AddEdge("a", "c")
-	g.AddEdge("b", "c")
-	g.AddEdge("c", "d")
+	_ = g.AddEdge("a", "c")
+	_ = g.AddEdge("b", "c")
+	_ = g.AddEdge("c", "d")
 
 	upstream := g.GetUpstreamNodes("d")
 	if len(upstream) != 3 {
@@ -368,8 +368,8 @@ func TestGraph_GetRootsAndLeaves(t *testing.T) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
-				g.AddEdge("a", "b")
-				g.AddEdge("a", "c")
+				_ = g.AddEdge("a", "b")
+				_ = g.AddEdge("a", "c")
 			},
 			wantRoots:  1,
 			wantLeaves: 2,
@@ -380,8 +380,8 @@ func TestGraph_GetRootsAndLeaves(t *testing.T) {
 				g.AddNode("a", nil)
 				g.AddNode("b", nil)
 				g.AddNode("c", nil)
-				g.AddEdge("a", "c")
-				g.AddEdge("b", "c")
+				_ = g.AddEdge("a", "c")
+				_ = g.AddEdge("b", "c")
 			},
 			wantRoots:  2,
 			wantLeaves: 1,
@@ -413,9 +413,9 @@ func TestGraph_Subgraph(t *testing.T) {
 	g.AddNode("c", "C")
 	g.AddNode("d", "D")
 
-	g.AddEdge("a", "b")
-	g.AddEdge("b", "c")
-	g.AddEdge("c", "d")
+	_ = g.AddEdge("a", "b")
+	_ = g.AddEdge("b", "c")
+	_ = g.AddEdge("c", "d")
 
 	// Create subgraph with only b and c
 	sub := g.Subgraph([]string{"b", "c"})
@@ -440,8 +440,8 @@ func TestGraph_DuplicateEdges(t *testing.T) {
 	g.AddNode("b", nil)
 
 	// Add same edge twice
-	g.AddEdge("a", "b")
-	g.AddEdge("a", "b")
+	_ = g.AddEdge("a", "b")
+	_ = g.AddEdge("a", "b")
 
 	if g.EdgeCount() != 1 {
 		t.Errorf("expected 1 edge (no duplicates), got %d", g.EdgeCount())

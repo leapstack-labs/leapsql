@@ -63,7 +63,7 @@ func TestBuildConfigDict_Empty(t *testing.T) {
 
 func TestPredeclared(t *testing.T) {
 	config := starlark.NewDict(1)
-	config.SetKey(starlark.String("name"), starlark.String("test"))
+	_ = config.SetKey(starlark.String("name"), starlark.String("test"))
 
 	target := &TargetInfo{
 		Type:     "duckdb",

@@ -19,19 +19,19 @@ func BuildConfigDict(name, materialized, uniqueKey, owner, schema string, tags [
 	dict := starlark.NewDict(8)
 
 	if name != "" {
-		dict.SetKey(starlark.String("name"), starlark.String(name))
+		_ = dict.SetKey(starlark.String("name"), starlark.String(name))
 	}
 	if materialized != "" {
-		dict.SetKey(starlark.String("materialized"), starlark.String(materialized))
+		_ = dict.SetKey(starlark.String("materialized"), starlark.String(materialized))
 	}
 	if uniqueKey != "" {
-		dict.SetKey(starlark.String("unique_key"), starlark.String(uniqueKey))
+		_ = dict.SetKey(starlark.String("unique_key"), starlark.String(uniqueKey))
 	}
 	if owner != "" {
-		dict.SetKey(starlark.String("owner"), starlark.String(owner))
+		_ = dict.SetKey(starlark.String("owner"), starlark.String(owner))
 	}
 	if schema != "" {
-		dict.SetKey(starlark.String("schema"), starlark.String(schema))
+		_ = dict.SetKey(starlark.String("schema"), starlark.String(schema))
 	}
 
 	if len(tags) > 0 {
@@ -39,13 +39,13 @@ func BuildConfigDict(name, materialized, uniqueKey, owner, schema string, tags [
 		for i, t := range tags {
 			tagList[i] = starlark.String(t)
 		}
-		dict.SetKey(starlark.String("tags"), starlark.NewList(tagList))
+		_ = dict.SetKey(starlark.String("tags"), starlark.NewList(tagList))
 	}
 
 	if len(meta) > 0 {
 		metaVal, err := GoToStarlark(meta)
 		if err == nil {
-			dict.SetKey(starlark.String("meta"), metaVal)
+			_ = dict.SetKey(starlark.String("meta"), metaVal)
 		}
 	}
 

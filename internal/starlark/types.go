@@ -32,7 +32,7 @@ func (t *TargetInfo) ToStarlark() starlark.Value {
 	})
 }
 
-// ThisToStarlark converts ThisInfo to a Starlark struct value.
+// ToStarlark converts ThisInfo to a Starlark struct value.
 func (t *ThisInfo) ToStarlark() starlark.Value {
 	return starlarkstruct.FromStringDict(starlark.String("this"), starlark.StringDict{
 		"name":   starlark.String(t.Name),
@@ -99,9 +99,9 @@ func GoToStarlark(v any) (starlark.Value, error) {
 	}
 }
 
-// StarlarkToGo converts a Starlark value back to a Go value.
+// ToGo converts a Starlark value back to a Go value.
 // Returns: string, int64, float64, bool, []any, map[string]any, or nil
-func StarlarkToGo(v starlark.Value) (any, error) {
+func ToGo(v starlark.Value) (any, error) {
 	switch val := v.(type) {
 	case starlark.NoneType:
 		return nil, nil
@@ -126,7 +126,7 @@ func StarlarkToGo(v starlark.Value) (any, error) {
 	case *starlark.List:
 		result := make([]any, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			gv, err := StarlarkToGo(val.Index(i))
+			gv, err := ToGo(val.Index(i))
 			if err != nil {
 				return nil, fmt.Errorf("list index %d: %w", i, err)
 			}
@@ -141,7 +141,7 @@ func StarlarkToGo(v starlark.Value) (any, error) {
 			if !ok {
 				return nil, fmt.Errorf("dict key must be string, got %T", item[0])
 			}
-			gv, err := StarlarkToGo(item[1])
+			gv, err := ToGo(item[1])
 			if err != nil {
 				return nil, fmt.Errorf("dict key %q: %w", key, err)
 			}
@@ -152,7 +152,7 @@ func StarlarkToGo(v starlark.Value) (any, error) {
 	case *starlark.Tuple:
 		result := make([]any, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			gv, err := StarlarkToGo(val.Index(i))
+			gv, err := ToGo(val.Index(i))
 			if err != nil {
 				return nil, fmt.Errorf("tuple index %d: %w", i, err)
 			}

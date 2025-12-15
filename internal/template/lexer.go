@@ -8,6 +8,7 @@ import (
 // TokenType identifies the type of token.
 type TokenType int
 
+// TokenType constants for template token types.
 const (
 	TokenText      TokenType = iota // Literal text (SQL)
 	TokenExprStart                  // {{

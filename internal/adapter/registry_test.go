@@ -69,8 +69,8 @@ func TestNewAdapter_UnknownType(t *testing.T) {
 	require.Error(t, err, "NewAdapter(unknown_adapter) should fail")
 
 	// Check error type
-	unknownErr, ok := err.(*UnknownAdapterError)
-	require.True(t, ok, "expected *UnknownAdapterError, got %T", err)
+	var unknownErr *UnknownAdapterError
+	require.ErrorAs(t, err, &unknownErr)
 
 	assert.Equal(t, "unknown_adapter", unknownErr.Type, "error type")
 

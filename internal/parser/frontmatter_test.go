@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -197,8 +198,8 @@ SELECT 1`
 		t.Fatal("expected error for unknown field")
 	}
 
-	unknownErr, ok := err.(*UnknownFieldError)
-	if !ok {
+	var unknownErr *UnknownFieldError
+	if !errors.As(err, &unknownErr) {
 		t.Fatalf("expected UnknownFieldError, got %T: %v", err, err)
 	}
 
@@ -220,8 +221,8 @@ SELECT 1`
 		t.Fatal("expected error for invalid materialized value")
 	}
 
-	parseErr, ok := err.(*FrontmatterParseError)
-	if !ok {
+	var parseErr *FrontmatterParseError
+	if !errors.As(err, &parseErr) {
 		t.Fatalf("expected FrontmatterParseError, got %T: %v", err, err)
 	}
 
@@ -243,8 +244,8 @@ SELECT 1`
 		t.Fatal("expected error for invalid YAML")
 	}
 
-	parseErr, ok := err.(*FrontmatterParseError)
-	if !ok {
+	var parseErr *FrontmatterParseError
+	if !errors.As(err, &parseErr) {
 		t.Fatalf("expected FrontmatterParseError, got %T: %v", err, err)
 	}
 

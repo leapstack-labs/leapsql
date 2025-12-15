@@ -27,7 +27,7 @@ func SetupTestProject(t *testing.T) string {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			t.Fatalf("failed to create directory %s: %v", dir, err)
 		}
 	}
@@ -41,7 +41,7 @@ SELECT
     name AS customer_name
 FROM raw_customers`
 	if err := os.WriteFile(filepath.Join(tmpDir, "models", "staging", "stg_customers.sql"),
-		[]byte(stgCustomers), 0644); err != nil {
+		[]byte(stgCustomers), 0600); err != nil {
 		t.Fatalf("failed to create stg_customers.sql: %v", err)
 	}
 
@@ -50,7 +50,7 @@ FROM raw_customers`
 1,Alice
 2,Bob`
 	if err := os.WriteFile(filepath.Join(tmpDir, "seeds", "raw_customers.csv"),
-		[]byte(rawCustomers), 0644); err != nil {
+		[]byte(rawCustomers), 0600); err != nil {
 		t.Fatalf("failed to create raw_customers.csv: %v", err)
 	}
 
@@ -66,7 +66,7 @@ type TestRenderer struct {
 
 // NewTestRenderer creates a new test renderer with the specified mode and TTY state.
 // Output is captured in buffers for inspection.
-func NewTestRenderer(mode output.OutputMode, isTTY bool) *TestRenderer {
+func NewTestRenderer(mode output.Mode, isTTY bool) *TestRenderer {
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	return &TestRenderer{
@@ -162,7 +162,7 @@ func AssertValidMarkdown(t *testing.T, md string) {
 }
 
 // AssertOutputMode checks that the renderer output matches expected mode characteristics.
-func AssertOutputMode(t *testing.T, tr *TestRenderer, expectedMode output.OutputMode) {
+func AssertOutputMode(t *testing.T, tr *TestRenderer, expectedMode output.Mode) {
 	t.Helper()
 
 	combinedOutput := tr.Output() + tr.ErrorOutput()
@@ -221,7 +221,7 @@ func CaptureOutput(t *testing.T) (file *os.File, cleanup func() string) {
 	os.Stdout = w
 
 	return w, func() string {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		buf := make([]byte, 4096)
 		n, _ := r.Read(buf)

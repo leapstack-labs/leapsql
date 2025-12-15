@@ -88,13 +88,14 @@ func (l *Lexer) NextToken() Token {
 	case '=':
 		tok = l.newToken(TOKEN_EQ, "=")
 	case '<':
-		if l.peekChar() == '=' {
+		switch l.peekChar() {
+		case '=':
 			l.readChar()
 			tok = Token{Type: TOKEN_LE, Literal: "<=", Pos: pos}
-		} else if l.peekChar() == '>' {
+		case '>':
 			l.readChar()
 			tok = Token{Type: TOKEN_NE, Literal: "<>", Pos: pos}
-		} else {
+		default:
 			tok = l.newToken(TOKEN_LT, "<")
 		}
 	case '>':
@@ -142,17 +143,18 @@ func (l *Lexer) NextToken() Token {
 		tok.Pos = pos
 		return tok
 	default:
-		if isLetter(l.ch) || l.ch == '_' {
+		switch {
+		case isLetter(l.ch) || l.ch == '_':
 			tok.Literal = l.readIdentifier()
 			tok.Type = LookupIdent(strings.ToLower(tok.Literal))
 			tok.Pos = pos
 			return tok
-		} else if isDigit(l.ch) {
+		case isDigit(l.ch):
 			tok.Type = TOKEN_NUMBER
 			tok.Literal = l.readNumber()
 			tok.Pos = pos
 			return tok
-		} else {
+		default:
 			tok = l.newToken(TOKEN_ILLEGAL, string(l.ch))
 		}
 	}
@@ -216,16 +218,12 @@ func (l *Lexer) skipBlockComment() {
 }
 
 // readString reads a single-quoted string literal.
-// Handles doubled single quotes as escape: 'it”s' -> it's
+// Handles doubled single quotes as escape: 'it"s' -> it's
 func (l *Lexer) readString() string {
 	l.readChar() // skip opening quote
 
 	var result strings.Builder
-	for {
-		if l.ch == 0 {
-			// Unterminated string
-			break
-		}
+	for l.ch != 0 {
 		if l.ch == '\'' {
 			if l.peekChar() == '\'' {
 				// Doubled quote escape
@@ -251,11 +249,7 @@ func (l *Lexer) readQuotedIdentifier() string {
 	l.readChar() // skip opening quote
 
 	var result strings.Builder
-	for {
-		if l.ch == 0 {
-			// Unterminated identifier
-			break
-		}
+	for l.ch != 0 {
 		if l.ch == '"' {
 			if l.peekChar() == '"' {
 				// Doubled quote escape

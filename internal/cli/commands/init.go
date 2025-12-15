@@ -47,7 +47,7 @@ models (staging + marts), and macros demonstrating best practices.`,
 
 			// Create renderer
 			cfg := getConfig()
-			mode := output.OutputMode(cfg.OutputFormat)
+			mode := output.Mode(cfg.OutputFormat)
 			r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 			if example {
@@ -66,7 +66,7 @@ models (staging + marts), and macros demonstrating best practices.`,
 func runInit(r *output.Renderer, dir string, force bool) error {
 	// Create directory if specified and doesn't exist
 	if dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -87,14 +87,14 @@ func runInit(r *output.Renderer, dir string, force bool) error {
 		filepath.Join(dir, "macros"),
 	}
 	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0755); err != nil {
+		if err := os.MkdirAll(d, 0750); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", d, err)
 		}
 		r.StatusLine(d+"/", "success", "")
 	}
 
 	// Create config file
-	if err := os.WriteFile(configPath, []byte(minimalConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(minimalConfig), 0600); err != nil {
 		return fmt.Errorf("failed to create leapsql.yaml: %w", err)
 	}
 	r.StatusLine("leapsql.yaml", "success", "")
@@ -102,7 +102,7 @@ func runInit(r *output.Renderer, dir string, force bool) error {
 	// Create example model
 	modelPath := filepath.Join(dir, "models", "staging", "stg_example.sql")
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) || force {
-		if err := os.WriteFile(modelPath, []byte(minimalModel), 0644); err != nil {
+		if err := os.WriteFile(modelPath, []byte(minimalModel), 0600); err != nil {
 			return fmt.Errorf("failed to create example model: %w", err)
 		}
 		r.StatusLine("models/staging/stg_example.sql", "success", "")
@@ -111,7 +111,7 @@ func runInit(r *output.Renderer, dir string, force bool) error {
 	// Create .gitignore
 	gitignorePath := filepath.Join(dir, ".gitignore")
 	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) || force {
-		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0600); err != nil {
 			r.Warning(fmt.Sprintf("failed to create .gitignore: %v", err))
 		} else {
 			r.StatusLine(".gitignore", "success", "")
@@ -133,7 +133,7 @@ func runInit(r *output.Renderer, dir string, force bool) error {
 func runInitExample(r *output.Renderer, dir string, force bool) error {
 	// Create directory if specified and doesn't exist
 	if dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -154,7 +154,7 @@ func runInitExample(r *output.Renderer, dir string, force bool) error {
 		filepath.Join(dir, "macros"),
 	}
 	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0755); err != nil {
+		if err := os.MkdirAll(d, 0750); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", d, err)
 		}
 	}
@@ -259,7 +259,7 @@ func runInitExample(r *output.Renderer, dir string, force bool) error {
 
 func writeFileIfNotExists(path, content string, force bool) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) || force {
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 			return fmt.Errorf("failed to create %s: %w", path, err)
 		}
 	}

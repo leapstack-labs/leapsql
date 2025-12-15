@@ -101,9 +101,10 @@ func (p *Parser) parseParenExpr() Expr {
 			// Skip to matching paren
 			depth := 1
 			for depth > 0 && p.token.Type != TOKEN_EOF {
-				if p.token.Type == TOKEN_LPAREN {
+				switch p.token.Type {
+				case TOKEN_LPAREN:
 					depth++
-				} else if p.token.Type == TOKEN_RPAREN {
+				case TOKEN_RPAREN:
 					depth--
 				}
 				p.nextToken()

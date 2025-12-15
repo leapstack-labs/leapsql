@@ -31,7 +31,7 @@ type Engine struct {
 	dbConnected bool
 	dbMu        sync.Mutex
 
-	store         state.StateStore
+	store         state.Store
 	modelsDir     string
 	seedsDir      string
 	macrosDir     string
@@ -51,9 +51,6 @@ type Config struct {
 	SeedsDir string
 	// MacrosDir is the path to the macros directory (optional)
 	MacrosDir string
-	// DatabasePath is the path to the DuckDB database (empty for in-memory)
-	// Deprecated: Use Target configuration instead
-	DatabasePath string
 	// StatePath is the path to the SQLite state database
 	StatePath string
 	// Environment is the current environment (dev, staging, prod)
@@ -62,6 +59,11 @@ type Config struct {
 	Target *starctx.TargetInfo
 	// AdapterConfig contains the full adapter configuration
 	AdapterConfig *adapter.Config
+
+	// DatabasePath is the path to the DuckDB database (empty for in-memory).
+	//
+	// Deprecated: Use Target configuration instead.
+	DatabasePath string
 }
 
 // New creates a new engine with lazy database connection.
@@ -74,7 +76,7 @@ func New(cfg Config) (*Engine, error) {
 	}
 
 	if err := store.InitSchema(); err != nil {
-		store.Close()
+		_ = store.Close()
 		return nil, fmt.Errorf("failed to initialize state schema: %w", err)
 	}
 
@@ -86,7 +88,7 @@ func New(cfg Config) (*Engine, error) {
 		if err != nil {
 			// Log warning but don't fail - macros are optional
 			if !os.IsNotExist(err) {
-				store.Close()
+				_ = store.Close()
 				return nil, fmt.Errorf("failed to load macros: %w", err)
 			}
 			macroRegistry = macro.NewRegistry()
@@ -230,6 +232,7 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 }
 
 // DiscoverLegacy provides backward compatibility for code that uses the old Discover() signature.
+//
 // Deprecated: Use Discover(opts DiscoveryOptions) instead.
 func (e *Engine) DiscoverLegacy() error {
 	_, err := e.Discover(DiscoveryOptions{})
@@ -252,7 +255,7 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	// Get topological order
 	sorted, err := e.graph.TopologicalSort()
 	if err != nil {
-		e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
+		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
 		return run, err
 	}
 
@@ -286,10 +289,10 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 
 		// Update model run status
 		if execErr != nil {
-			e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
+			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
 			runErr = execErr
 		} else {
-			e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
 		}
 
 		_ = executionMS // Note: execution time tracked but not stored in current schema
@@ -301,9 +304,9 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 
 	// Complete the run
 	if runErr != nil {
-		e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
+		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
 	} else {
-		e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
 	}
 
 	// Refresh run from store
@@ -340,7 +343,7 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	// Get topological order of subgraph
 	sorted, err := subgraph.TopologicalSort()
 	if err != nil {
-		e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
+		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
 		return run, err
 	}
 
@@ -372,10 +375,10 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 		_ = int64(time.Since(startTime).Milliseconds())
 
 		if execErr != nil {
-			e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
+			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
 			runErr = execErr
 		} else {
-			e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
 		}
 
 		if runErr != nil {
@@ -384,9 +387,9 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	}
 
 	if runErr != nil {
-		e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
+		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
 	} else {
-		e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
 	}
 
 	run, _ = e.store.GetRun(run.ID)
@@ -426,7 +429,7 @@ func (e *Engine) buildSQL(m *parser.ModelConfig, model *state.Model) string {
 }
 
 // buildSQLLegacy provides backward compatibility with simple string replacement.
-func (e *Engine) buildSQLLegacy(m *parser.ModelConfig, model *state.Model) string {
+func (e *Engine) buildSQLLegacy(m *parser.ModelConfig, _ *state.Model) string {
 	sql := m.SQL
 
 	// Replace {{ this }} with the model's table name
@@ -486,13 +489,13 @@ func (e *Engine) executeTable(ctx context.Context, path, sql string) (int64, err
 	tableName := pathToTableName(path)
 
 	// Drop existing table
-	e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	_ = e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 
 	// Create schema if needed
 	parts := strings.Split(path, ".")
 	if len(parts) > 1 {
 		schema := parts[0]
-		e.db.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema))
+		_ = e.db.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema))
 	}
 
 	// Create new table
@@ -506,11 +509,11 @@ func (e *Engine) executeTable(ctx context.Context, path, sql string) (int64, err
 	if err != nil {
 		return 0, nil // Table created but can't get count
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var count int64
 	if rows.Next() {
-		rows.Scan(&count)
+		_ = rows.Scan(&count)
 	}
 
 	return count, nil
@@ -521,13 +524,13 @@ func (e *Engine) executeView(ctx context.Context, path, sql string) (int64, erro
 	tableName := pathToTableName(path)
 
 	// Drop existing view
-	e.db.Exec(ctx, fmt.Sprintf("DROP VIEW IF EXISTS %s", tableName))
+	_ = e.db.Exec(ctx, fmt.Sprintf("DROP VIEW IF EXISTS %s", tableName))
 
 	// Create schema if needed
 	parts := strings.Split(path, ".")
 	if len(parts) > 1 {
 		schema := parts[0]
-		e.db.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema))
+		_ = e.db.Exec(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema))
 	}
 
 	// Create new view
@@ -540,7 +543,7 @@ func (e *Engine) executeView(ctx context.Context, path, sql string) (int64, erro
 }
 
 // executeIncremental handles incremental model execution.
-func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, model *state.Model, sql string) (int64, error) {
+func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, _ *state.Model, sql string) (int64, error) {
 	tableName := pathToTableName(m.Path)
 
 	// Check if table exists
@@ -573,7 +576,7 @@ func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, 
 		tempTable := tableName + "_temp"
 
 		// Create temp table with new data
-		e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTable))
+		_ = e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTable))
 		createTempSQL := fmt.Sprintf("CREATE TABLE %s AS %s", tempTable, incrementalSQL)
 		if err := e.db.Exec(ctx, createTempSQL); err != nil {
 			return 0, fmt.Errorf("failed to create temp table: %w", err)
@@ -582,7 +585,7 @@ func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, 
 		// Delete matching rows from target
 		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT %s FROM %s)",
 			tableName, m.UniqueKey, m.UniqueKey, tempTable)
-		e.db.Exec(ctx, deleteSQL)
+		_ = e.db.Exec(ctx, deleteSQL)
 
 		// Insert all rows from temp
 		insertSQL := fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", tableName, tempTable)
@@ -594,14 +597,14 @@ func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, 
 		rows, err := e.db.Query(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s", tempTable))
 		var count int64
 		if err == nil {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			if rows.Next() {
-				rows.Scan(&count)
+				_ = rows.Scan(&count)
 			}
 		}
 
 		// Clean up temp table
-		e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTable))
+		_ = e.db.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTable))
 
 		return count, nil
 	}
@@ -626,7 +629,7 @@ func (e *Engine) GetModels() map[string]*parser.ModelConfig {
 }
 
 // GetStateStore returns the state store.
-func (e *Engine) GetStateStore() state.StateStore {
+func (e *Engine) GetStateStore() state.Store {
 	return e.store
 }
 

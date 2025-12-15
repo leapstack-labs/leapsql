@@ -1,6 +1,5 @@
 // Package macro provides functionality for loading and managing Starlark macros.
 // This file contains static parsing functions that extract metadata without execution.
-
 package macro
 
 import (
@@ -30,7 +29,7 @@ type ParsedNamespace struct {
 // ParseStarlarkFile statically parses a .star file and extracts function metadata.
 // This does NOT execute the file - it only analyzes the AST.
 func ParseStarlarkFile(filename string, content []byte) (*ParsedNamespace, error) {
-	f, err := syntax.Parse(filename, content, 0)
+	f, err := syntax.Parse(filename, content, 0) //nolint:staticcheck // SA1019: will migrate to FileOptions.Parse later
 	if err != nil {
 		return nil, &ParseError{
 			File:    filename,
@@ -87,10 +86,11 @@ func extractArgs(params []syntax.Expr) []string {
 		case *syntax.UnaryExpr:
 			// *args or **kwargs
 			if ident, ok := p.X.(*syntax.Ident); ok {
-				prefix := ""
-				if p.Op == syntax.STAR {
+				var prefix string
+				switch p.Op {
+				case syntax.STAR:
 					prefix = "*"
-				} else if p.Op == syntax.STARSTAR {
+				case syntax.STARSTAR:
 					prefix = "**"
 				}
 				args = append(args, prefix+ident.Name)
@@ -163,7 +163,7 @@ func ArgsFromJSON(s string) []string {
 	if s == "" {
 		return args
 	}
-	json.Unmarshal([]byte(s), &args)
+	_ = json.Unmarshal([]byte(s), &args)
 	return args
 }
 
@@ -177,7 +177,7 @@ func (e *ParseError) Error() string {
 	return "parse " + filepath.Base(e.File) + ": " + e.Message
 }
 
-// FunctionInfo returns a human-readable signature for a function.
+// Signature returns a human-readable signature for a function.
 func (f *ParsedFunction) Signature() string {
 	return f.Name + "(" + strings.Join(f.Args, ", ") + ")"
 }
