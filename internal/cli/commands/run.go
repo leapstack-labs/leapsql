@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/adapter"
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // RunOptions holds options for the run command.
@@ -76,7 +76,7 @@ func runRun(cmd *cobra.Command, opts *RunOptions) error {
 	ctx := context.Background()
 	startTime := time.Now()
 
-	verbose := viper.GetBool("verbose")
+	verbose := cfg.Verbose
 
 	// Create renderer
 	mode := output.Mode(cfg.OutputFormat)
@@ -328,46 +328,43 @@ func emitRunEvent(r *output.Renderer, event output.RunEvent) {
 
 // Helper functions shared across commands
 
-func getConfig() *Config {
-	return &Config{
-		ModelsDir:    viper.GetString("models_dir"),
-		SeedsDir:     viper.GetString("seeds_dir"),
-		MacrosDir:    viper.GetString("macros_dir"),
-		DatabasePath: viper.GetString("database"),
-		StatePath:    viper.GetString("state_path"),
-		Environment:  viper.GetString("environment"),
-		Verbose:      viper.GetBool("verbose"),
-		OutputFormat: viper.GetString("output"),
+// getConfig returns the current configuration.
+// It uses config.GetCurrentConfig() if available, otherwise falls back to environment variables.
+func getConfig() *config.Config {
+	if cfg := config.GetCurrentConfig(); cfg != nil {
+		return cfg
+	}
+
+	// Fallback: read from environment with defaults
+	modelsDir := getEnvOrDefault("LEAPSQL_MODELS_DIR", config.DefaultModelsDir)
+	seedsDir := getEnvOrDefault("LEAPSQL_SEEDS_DIR", config.DefaultSeedsDir)
+	macrosDir := getEnvOrDefault("LEAPSQL_MACROS_DIR", config.DefaultMacrosDir)
+	database := os.Getenv("LEAPSQL_DATABASE")
+	statePath := getEnvOrDefault("LEAPSQL_STATE_PATH", config.DefaultStateFile)
+	environment := getEnvOrDefault("LEAPSQL_ENVIRONMENT", config.DefaultEnv)
+	verbose := os.Getenv("LEAPSQL_VERBOSE") == "true"
+	outputFormat := os.Getenv("LEAPSQL_OUTPUT")
+
+	return &config.Config{
+		ModelsDir:    modelsDir,
+		SeedsDir:     seedsDir,
+		MacrosDir:    macrosDir,
+		DatabasePath: database,
+		StatePath:    statePath,
+		Environment:  environment,
+		Verbose:      verbose,
+		OutputFormat: outputFormat,
 	}
 }
 
-// Config mirrors the CLI config for use in commands.
-type Config struct {
-	ModelsDir    string
-	SeedsDir     string
-	MacrosDir    string
-	DatabasePath string
-	StatePath    string
-	Environment  string
-	Verbose      bool
-	OutputFormat string
-	// Target holds target configuration (populated from viper if available)
-	Target *TargetConfig
+func getEnvOrDefault(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
 }
 
-// TargetConfig holds database target configuration for commands.
-type TargetConfig struct {
-	Type     string
-	Database string
-	Host     string
-	Port     int
-	User     string
-	Password string
-	Schema   string
-	Options  map[string]string
-}
-
-func createEngine(cfg *Config) (*engine.Engine, error) {
+func createEngine(cfg *config.Config) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {

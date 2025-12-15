@@ -1,10 +1,11 @@
-package cli
+package config
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -190,22 +191,22 @@ func TestExpandEnvVars(t *testing.T) {
 	}
 }
 
-// TestMergeTargetConfig tests the mergeTargetConfig function.
+// TestMergeTargetConfig tests the MergeTargetConfig function.
 func TestMergeTargetConfig(t *testing.T) {
 	t.Run("nil base returns override", func(t *testing.T) {
 		override := &TargetConfig{Type: "duckdb", Database: "test.db"}
-		result := mergeTargetConfig(nil, override)
+		result := MergeTargetConfig(nil, override)
 		assert.Equal(t, override, result, "nil base should return override")
 	})
 
 	t.Run("nil override returns base", func(t *testing.T) {
 		base := &TargetConfig{Type: "duckdb", Database: "test.db"}
-		result := mergeTargetConfig(base, nil)
+		result := MergeTargetConfig(base, nil)
 		assert.Equal(t, base, result, "nil override should return base")
 	})
 
 	t.Run("both nil returns nil", func(t *testing.T) {
-		result := mergeTargetConfig(nil, nil)
+		result := MergeTargetConfig(nil, nil)
 		assert.Nil(t, result, "both nil should return nil")
 	})
 
@@ -221,7 +222,7 @@ func TestMergeTargetConfig(t *testing.T) {
 			Schema:   "custom",
 		}
 
-		result := mergeTargetConfig(base, override)
+		result := MergeTargetConfig(base, override)
 
 		assert.Equal(t, "duckdb", result.Type, "Type should be inherited from base")
 		assert.Equal(t, "override.db", result.Database, "Database should be from override")
@@ -244,7 +245,7 @@ func TestMergeTargetConfig(t *testing.T) {
 			},
 		}
 
-		result := mergeTargetConfig(base, override)
+		result := MergeTargetConfig(base, override)
 
 		assert.Equal(t, "base_value1", result.Options["key1"], "key1 should be from base")
 		assert.Equal(t, "override_value2", result.Options["key2"], "key2 should be from override")
@@ -269,11 +270,15 @@ func TestTargetConfig_ApplyDefaults(t *testing.T) {
 
 // TestLoadConfigWithTarget_Fixtures tests LoadConfigWithTarget using fixture files.
 func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
-	testdataDir := "testdata"
+	// Reset config before each test
+	ResetConfig()
+
+	testdataDir := "../testdata"
 
 	t.Run("valid duckdb config", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "valid_duckdb.yaml")
-		cfg, err := LoadConfigWithTarget(cfgPath, "")
+		cfg, err := LoadConfigWithTarget(cfgPath, "", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "duckdb", cfg.Target.Type)
@@ -282,19 +287,21 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 	})
 
 	t.Run("valid config with environments", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
 		// Load with default environment (dev)
-		cfg, err := LoadConfigWithTarget(cfgPath, "")
+		cfg, err := LoadConfigWithTarget(cfgPath, "", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "dev.duckdb", cfg.Target.Database)
 	})
 
 	t.Run("config with target override to staging", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
-		cfg, err := LoadConfigWithTarget(cfgPath, "staging")
+		cfg, err := LoadConfigWithTarget(cfgPath, "staging", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "staging.duckdb", cfg.Target.Database)
@@ -302,9 +309,10 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 	})
 
 	t.Run("config with target override to prod", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
-		cfg, err := LoadConfigWithTarget(cfgPath, "prod")
+		cfg, err := LoadConfigWithTarget(cfgPath, "prod", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "prod.duckdb", cfg.Target.Database)
@@ -312,8 +320,9 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 	})
 
 	t.Run("invalid unknown type", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "invalid_unknown_type.yaml")
-		_, err := LoadConfigWithTarget(cfgPath, "")
+		_, err := LoadConfigWithTarget(cfgPath, "", nil)
 		require.Error(t, err, "expected error for unknown type")
 
 		assert.Contains(t, err.Error(), "invalid target configuration")
@@ -321,14 +330,16 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 	})
 
 	t.Run("invalid empty type", func(t *testing.T) {
+		ResetConfig()
 		cfgPath := filepath.Join(testdataDir, "invalid_empty_type.yaml")
-		_, err := LoadConfigWithTarget(cfgPath, "")
+		_, err := LoadConfigWithTarget(cfgPath, "", nil)
 		require.Error(t, err, "expected error for empty type")
 
 		assert.Contains(t, err.Error(), "target type is required")
 	})
 
 	t.Run("config with env vars", func(t *testing.T) {
+		ResetConfig()
 		// Set test env vars
 		require.NoError(t, os.Setenv("TEST_DB_PATH", "/path/to/test.db"))
 		require.NoError(t, os.Setenv("TEST_DB_USER", "testuser"))
@@ -340,7 +351,7 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 		}()
 
 		cfgPath := filepath.Join(testdataDir, "valid_env_vars.yaml")
-		cfg, err := LoadConfigWithTarget(cfgPath, "")
+		cfg, err := LoadConfigWithTarget(cfgPath, "", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "/path/to/test.db", cfg.Target.Database)
@@ -351,11 +362,12 @@ func TestLoadConfigWithTarget_Fixtures(t *testing.T) {
 
 // TestLoadConfigWithTarget_NonexistentEnvironment tests loading with a non-existent environment.
 func TestLoadConfigWithTarget_NonexistentEnvironment(t *testing.T) {
-	testdataDir := "testdata"
+	ResetConfig()
+	testdataDir := "../testdata"
 	cfgPath := filepath.Join(testdataDir, "valid_with_envs.yaml")
 
 	// Load with non-existent environment - should still work, using base target
-	cfg, err := LoadConfigWithTarget(cfgPath, "nonexistent")
+	cfg, err := LoadConfigWithTarget(cfgPath, "nonexistent", nil)
 	require.NoError(t, err)
 
 	// Should fall back to the base target config
@@ -375,4 +387,89 @@ func TestConfig_Validate(t *testing.T) {
 		require.Error(t, err, "expected error for empty models_dir")
 		assert.Contains(t, err.Error(), "models_dir is required")
 	})
+}
+
+// TestLoadConfigWithTarget_FlagPrecedence tests that flags override env vars and config file.
+func TestLoadConfigWithTarget_FlagPrecedence(t *testing.T) {
+	ResetConfig()
+
+	// Create a temp config file with models_dir = "from_file"
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "leapsql.yaml")
+	cfgContent := `models_dir: from_file
+target:
+  type: duckdb
+`
+	require.NoError(t, os.WriteFile(cfgPath, []byte(cfgContent), 0600))
+
+	// Set env var with different value
+	require.NoError(t, os.Setenv("LEAPSQL_MODELS_DIR", "from_env"))
+	defer func() { _ = os.Unsetenv("LEAPSQL_MODELS_DIR") }()
+
+	// Create flag set with yet another value
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.String("models-dir", "", "models directory")
+	require.NoError(t, flags.Set("models-dir", "from_flag"))
+
+	// Load config
+	cfg, err := LoadConfigWithTarget(cfgPath, "", flags)
+	require.NoError(t, err)
+
+	// Flag should win
+	assert.Equal(t, "from_flag", cfg.ModelsDir, "flag value should override config file and env var")
+}
+
+// TestLoadConfigWithTarget_EnvPrecedenceOverFile tests that env vars override config file.
+func TestLoadConfigWithTarget_EnvPrecedenceOverFile(t *testing.T) {
+	ResetConfig()
+
+	// Create a temp config file
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "leapsql.yaml")
+	cfgContent := `models_dir: from_file
+target:
+  type: duckdb
+`
+	require.NoError(t, os.WriteFile(cfgPath, []byte(cfgContent), 0600))
+
+	// Set env var
+	require.NoError(t, os.Setenv("LEAPSQL_MODELS_DIR", "from_env"))
+	defer func() { _ = os.Unsetenv("LEAPSQL_MODELS_DIR") }()
+
+	// Load config with nil flags
+	cfg, err := LoadConfigWithTarget(cfgPath, "", nil)
+	require.NoError(t, err)
+
+	// Env should win over file
+	assert.Equal(t, "from_env", cfg.ModelsDir, "env var should override config file")
+}
+
+// TestLoadConfigWithTarget_FlagNotSetUsesEnv tests that unset flags fall back to env vars.
+func TestLoadConfigWithTarget_FlagNotSetUsesEnv(t *testing.T) {
+	ResetConfig()
+
+	// Create a temp config file
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "leapsql.yaml")
+	cfgContent := `models_dir: from_file
+target:
+  type: duckdb
+`
+	require.NoError(t, os.WriteFile(cfgPath, []byte(cfgContent), 0600))
+
+	// Set env var
+	require.NoError(t, os.Setenv("LEAPSQL_MODELS_DIR", "from_env"))
+	defer func() { _ = os.Unsetenv("LEAPSQL_MODELS_DIR") }()
+
+	// Create flag set but don't set the flag (Changed will be false)
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.String("models-dir", "", "models directory")
+	// Note: not calling flags.Set(), so Changed is false
+
+	// Load config
+	cfg, err := LoadConfigWithTarget(cfgPath, "", flags)
+	require.NoError(t, err)
+
+	// Env should win since flag wasn't explicitly set
+	assert.Equal(t, "from_env", cfg.ModelsDir, "env var should be used when flag is not set")
 }

@@ -1,3 +1,4 @@
+// Package cli provides the command-line interface for LeapSQL.
 package cli
 
 import (
@@ -8,17 +9,17 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/leapstack-labs/leapsql/internal/cli/commands"
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
 	cfgFile    string
 	targetFlag string
-	cfg        *Config
+	cfg        *config.Config
 )
 
 // Version information (set at build time).
@@ -50,9 +51,9 @@ then execute them in the correct order with state tracking and lineage.`,
 				return nil
 			}
 
-			// Load configuration with optional target override
+			// Load configuration with optional target override and CLI flags
 			var err error
-			cfg, err = LoadConfigWithTarget(cfgFile, targetFlag)
+			cfg, err = config.LoadConfigWithTarget(cfgFile, targetFlag, cmd.Root().PersistentFlags())
 			if err != nil {
 				return err
 			}
@@ -68,7 +69,7 @@ then execute them in the correct order with state tracking and lineage.`,
 
 			// Print config file used (if verbose)
 			if cfg.Verbose {
-				if configFile := GetConfigFileUsed(); configFile != "" {
+				if configFile := config.GetConfigFileUsed(); configFile != "" {
 					fmt.Fprintf(os.Stderr, "Using config file: %s\n", configFile)
 				}
 				if targetFlag != "" {
@@ -110,16 +111,6 @@ Built with Go and DuckDB
 		return []string{"dev", "staging", "prod"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	// Bind flags to viper
-	_ = viper.BindPFlag("models_dir", rootCmd.PersistentFlags().Lookup("models-dir"))
-	_ = viper.BindPFlag("seeds_dir", rootCmd.PersistentFlags().Lookup("seeds-dir"))
-	_ = viper.BindPFlag("macros_dir", rootCmd.PersistentFlags().Lookup("macros-dir"))
-	_ = viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
-	_ = viper.BindPFlag("state_path", rootCmd.PersistentFlags().Lookup("state"))
-	_ = viper.BindPFlag("environment", rootCmd.PersistentFlags().Lookup("env"))
-	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
-
 	// Add subcommands
 	rootCmd.AddCommand(commands.NewVersionCommand(Version))
 	rootCmd.AddCommand(commands.NewRunCommand())
@@ -148,17 +139,17 @@ func Execute() error {
 }
 
 // GetConfig retrieves the config from the command context.
-func GetConfig(ctx context.Context) *Config {
-	if c, ok := ctx.Value(configKey{}).(*Config); ok {
+func GetConfig(ctx context.Context) *config.Config {
+	if c, ok := ctx.Value(configKey{}).(*config.Config); ok {
 		return c
 	}
 	// Return default config if none in context
-	return &Config{
-		ModelsDir:   DefaultModelsDir,
-		SeedsDir:    DefaultSeedsDir,
-		MacrosDir:   DefaultMacrosDir,
-		StatePath:   DefaultStateFile,
-		Environment: DefaultEnv,
+	return &config.Config{
+		ModelsDir:   config.DefaultModelsDir,
+		SeedsDir:    config.DefaultSeedsDir,
+		MacrosDir:   config.DefaultMacrosDir,
+		StatePath:   config.DefaultStateFile,
+		Environment: config.DefaultEnv,
 	}
 }
 
@@ -172,7 +163,7 @@ func GetRenderer(ctx context.Context) *output.Renderer {
 }
 
 // CreateEngine creates an engine from the current configuration.
-func CreateEngine(cfg *Config) (*engine.Engine, error) {
+func CreateEngine(cfg *config.Config) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {
