@@ -30,11 +30,6 @@ tasks:
     cmds:
       - gotestsum --format pkgname-and-test-fails ./...
 
-  test:names:
-    desc: Run all tests (show each test name)
-    cmds:
-      - gotestsum --format testname ./...
-
   test:pkg:
     desc: Run tests for a specific package (use PKG=./internal/cli/...)
     cmds:
@@ -47,30 +42,31 @@ tasks:
     cmds:
       - gotestsum --watch --format pkgname-and-test-fails ./...
 
-  test:verbose:
-    desc: Run all tests with standard verbose output
+  test:all:
+    desc: Run all tests including integration tests
     cmds:
-      - go test -v ./...
+      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
 
-  test:go:
-    desc: Run all tests with standard go test (no gotestsum)
+  lint:
+    desc: Run golangci-lint on all packages
     cmds:
-      - go test ./...
+      - golangci-lint run ./...
+
+  lint:fix:
+    desc: Run golangci-lint with auto-fix
+    cmds:
+      - golangci-lint run --fix ./...
+
+  check:
+    desc: Run tests and linting
+    cmds:
+      - task: test
+      - task: lint
 
   generate:
     desc: Run all go generate directives (sqlc)
     cmds:
       - go generate ./...
-
-  test:integration:
-    desc: Run integration tests only (requires integration build tag)
-    cmds:
-      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
-
-  test:all:
-    desc: Run all tests including integration tests
-    cmds:
-      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
 
   run:
     desc: Run all models

@@ -11,11 +11,9 @@ Use progressive disclosure when running tests - start with minimal output and dr
 | Command                        | When to Use                                                          |
 | ------------------------------ | -------------------------------------------------------------------- |
 | `task test`                    | Default. Package-level summary with inline failures. Use this first. |
-| `task test:names`              | When you need to see individual test names                           |
 | `task test:pkg PKG=./path/...` | Focus on a specific package after finding failures                   |
 | `task test:watch`              | During development, auto-reruns on file changes                      |
-| `task test:verbose`            | Last resort - full verbose output                                    |
-| `task test:go`                 | Standard `go test` without gotestsum                                 |
+| `task test:all`                | Includes integration tests (slower)                                  |
 
 ### Workflow
 
@@ -23,3 +21,18 @@ Use progressive disclosure when running tests - start with minimal output and dr
 2. **Identify failures**: Failed packages show test names and output inline
 3. **Drill down**: Use `task test:pkg PKG=./internal/foo/...` for specific package
 4. **Fix and verify**: Run `task test` again to confirm all green
+
+### Writing Tests
+
+- Use table-driven tests with `testify/require` and `testify/assert`
+- `require`: Fatal assertions - use for setup and preconditions
+- `assert`: Non-fatal assertions - use for verifications
+- Structure test cases with `setup`, `operation`, and `verify` funcs as needed
+
+## Linting
+
+Run `task lint`.
+
+## Combined Check
+
+Run `task check` to execute both tests and linting in sequence.
