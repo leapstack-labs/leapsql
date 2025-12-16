@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -47,7 +47,7 @@ type Server struct {
 	writeMu sync.Mutex
 
 	// Logging
-	logger *log.Logger
+	logger *slog.Logger
 
 	// Shutdown state
 	shutdown   bool
@@ -60,7 +60,7 @@ func NewServer(reader io.Reader, writer io.Writer) *Server {
 		documents:           NewDocumentStore(),
 		reader:              bufio.NewReader(reader),
 		writer:              writer,
-		logger:              log.New(os.Stderr, "[lsp] ", log.LstdFlags),
+		logger:              slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
 		macroNamespaceCache: make(map[string]bool),
 		modelNameCache:      make(map[string]bool),
 	}
@@ -68,7 +68,7 @@ func NewServer(reader io.Reader, writer io.Writer) *Server {
 
 // Run starts the server's main loop, processing JSON-RPC messages.
 func (s *Server) Run() error {
-	s.logger.Println("LeapSQL LSP server starting...")
+	s.logger.Info("LeapSQL LSP server starting...")
 
 	for {
 		s.shutdownMu.RLock()
@@ -82,16 +82,16 @@ func (s *Server) Run() error {
 		msg, err := s.readMessage()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				s.logger.Println("Client disconnected")
+				s.logger.Info("Client disconnected")
 				return nil
 			}
-			s.logger.Printf("Error reading message: %v", err)
+			s.logger.Error("Error reading message", "error", err)
 			continue
 		}
 
 		// Handle message
 		if err := s.handleMessage(msg); err != nil {
-			s.logger.Printf("Error handling message: %v", err)
+			s.logger.Error("Error handling message", "error", err)
 		}
 	}
 }
@@ -196,7 +196,7 @@ func (s *Server) writeMessage(msg *JSONRPCMessage) {
 
 	body, err := json.Marshal(msg)
 	if err != nil {
-		s.logger.Printf("Error marshaling message: %v", err)
+		s.logger.Error("Error marshaling message", "error", err)
 		return
 	}
 
@@ -207,7 +207,7 @@ func (s *Server) writeMessage(msg *JSONRPCMessage) {
 
 // handleMessage dispatches a message to the appropriate handler.
 func (s *Server) handleMessage(msg *JSONRPCMessage) error {
-	s.logger.Printf("Received: %s", msg.Method)
+	s.logger.Info("Received", "method", msg.Method)
 
 	switch msg.Method {
 	case "initialize":
@@ -254,13 +254,13 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 	}
 
 	s.projectRoot = URIToPath(params.RootURI)
-	s.logger.Printf("Project root: %s", s.projectRoot)
+	s.logger.Info("Project root", "path", s.projectRoot)
 
 	// Try to open SQLite database
 	dbPath := filepath.Join(s.projectRoot, ".leapsql", "state.db")
 	store := state.NewSQLiteStore()
 	if err := store.Open(dbPath); err != nil {
-		s.logger.Printf("SQLite database not found at %s: %v", dbPath, err)
+		s.logger.Info("SQLite database not found", "path", dbPath, "error", err)
 		s.store = nil
 	} else {
 		s.store = store
@@ -293,7 +293,7 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 
 func (s *Server) handleInitialized(_ *JSONRPCMessage) error {
 	s.initialized = true
-	s.logger.Println("Server initialized")
+	s.logger.Info("Server initialized")
 
 	// Show warning if store not available
 	if s.store == nil {
@@ -324,12 +324,12 @@ func (s *Server) handleShutdown(msg *JSONRPCMessage) error {
 	}
 
 	s.sendResponse(msg.ID, nil, nil)
-	s.logger.Println("Server shutdown")
+	s.logger.Info("Server shutdown")
 	return nil
 }
 
 func (s *Server) handleExit(_ *JSONRPCMessage) error {
-	s.logger.Println("Server exit")
+	s.logger.Info("Server exit")
 	os.Exit(0)
 	return nil
 }
@@ -343,7 +343,7 @@ func (s *Server) handleDidOpen(msg *JSONRPCMessage) error {
 	}
 
 	s.documents.Open(params.TextDocument.URI, params.TextDocument.Text, params.TextDocument.Version)
-	s.logger.Printf("Opened: %s", params.TextDocument.URI)
+	s.logger.Info("Opened", "uri", params.TextDocument.URI)
 
 	// Run diagnostics
 	s.publishDiagnostics(params.TextDocument.URI)
@@ -358,7 +358,7 @@ func (s *Server) handleDidClose(msg *JSONRPCMessage) error {
 	}
 
 	s.documents.Close(params.TextDocument.URI)
-	s.logger.Printf("Closed: %s", params.TextDocument.URI)
+	s.logger.Info("Closed", "uri", params.TextDocument.URI)
 
 	// Clear diagnostics
 	s.sendNotification("textDocument/publishDiagnostics", &PublishDiagnosticsParams{
@@ -394,7 +394,7 @@ func (s *Server) handleDidSave(msg *JSONRPCMessage) error {
 	}
 
 	path := URIToPath(params.TextDocument.URI)
-	s.logger.Printf("Saved: %s", path)
+	s.logger.Info("Saved", "path", path)
 
 	// If it's a .star file, re-index it
 	if strings.HasSuffix(path, ".star") && s.store != nil {
@@ -464,48 +464,48 @@ func (s *Server) loadCaches() {
 		s.modelNameCache[m.Path] = true
 	}
 
-	s.logger.Printf("Loaded %d macro namespaces, %d model references", len(s.macroNamespaceCache), len(s.modelNameCache))
+	s.logger.Info("Loaded caches", "macro_namespaces", len(s.macroNamespaceCache), "model_refs", len(s.modelNameCache))
 }
 
 // reindexMacroFile re-parses and stores a macro file.
 func (s *Server) reindexMacroFile(path string) {
 	// This would call macro.ParseStarlarkFile and store in SQLite
 	// For now, just log
-	s.logger.Printf("TODO: Re-index macro file: %s", path)
+	s.logger.Info("TODO: Re-index macro file", "path", path)
 }
 
 // loadDialectFromConfig loads the dialect from the project's leapsql.yaml config.
 // If no config file is found or target is not specified, dialect will be nil.
 func (s *Server) loadDialectFromConfig() {
 	if s.projectRoot == "" {
-		s.logger.Println("No project root set, cannot load dialect from config")
+		s.logger.Info("No project root set, cannot load dialect from config")
 		return
 	}
 
 	// Load project config
 	cfg, err := config.LoadFromDir(s.projectRoot)
 	if err != nil {
-		s.logger.Printf("Failed to load project config: %v", err)
+		s.logger.Error("Failed to load project config", "error", err)
 		return
 	}
 
 	if cfg == nil {
-		s.logger.Println("No project config found, dialect will be nil")
+		s.logger.Info("No project config found, dialect will be nil")
 		return
 	}
 
 	if cfg.Target == nil || cfg.Target.Type == "" {
-		s.logger.Println("No target specified in project config, dialect will be nil")
+		s.logger.Info("No target specified in project config, dialect will be nil")
 		return
 	}
 
 	// Get dialect from registry
 	d, ok := dialect.Get(cfg.Target.Type)
 	if !ok {
-		s.logger.Printf("Unknown dialect type %q in project config", cfg.Target.Type)
+		s.logger.Warn("Unknown dialect type in project config", "type", cfg.Target.Type)
 		return
 	}
 
 	s.dialect = d
-	s.logger.Printf("Loaded dialect %q from project config", cfg.Target.Type)
+	s.logger.Info("Loaded dialect from project config", "dialect", cfg.Target.Type)
 }

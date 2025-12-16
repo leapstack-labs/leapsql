@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -34,7 +35,7 @@ func TestSQLiteStore_InitSchema(t *testing.T) {
 	tables := []string{"runs", "models", "model_runs", "dependencies", "environments", "model_columns", "column_lineage"}
 	for _, table := range tables {
 		func(tableName string) {
-			rows, err := store.db.Query("SELECT 1 FROM " + tableName + " LIMIT 1") //nolint:gosec // Test code with known table names
+			rows, err := store.db.QueryContext(context.Background(), "SELECT 1 FROM "+tableName+" LIMIT 1")
 			require.NoError(t, err, "table %s should exist", tableName)
 			if rows != nil {
 				defer func() { _ = rows.Close() }()

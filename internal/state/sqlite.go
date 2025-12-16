@@ -48,7 +48,7 @@ func (s *SQLiteStore) Open(path string) error {
 	}
 
 	// Test connection
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
 		return fmt.Errorf("failed to ping sqlite database: %w", err)
 	}
@@ -73,7 +73,7 @@ func (s *SQLiteStore) InitSchema() error {
 		return fmt.Errorf("database not opened")
 	}
 
-	_, err := s.db.Exec(schemaSQL)
+	_, err := s.db.ExecContext(context.Background(), schemaSQL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
@@ -470,7 +470,7 @@ func (s *SQLiteStore) SetDependencies(modelID string, parentIDs []string) error 
 		return fmt.Errorf("database not opened")
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -575,7 +575,7 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) e
 		return fmt.Errorf("database not opened")
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -675,7 +675,7 @@ func (s *SQLiteStore) DeleteModelColumns(modelPath string) error {
 		return fmt.Errorf("database not opened")
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -760,7 +760,7 @@ func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroF
 		return fmt.Errorf("database not opened")
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
