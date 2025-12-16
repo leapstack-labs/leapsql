@@ -1,15 +1,21 @@
-package sql
+// Package dialect provides the DuckDB SQL dialect definition.
+// This package is lightweight and has no database driver dependencies,
+// making it suitable for use in the LSP and other tools that need
+// dialect information without the overhead of database connections.
+package dialect
 
-// DuckDB dialect definition.
-// For additional dialects, create new files like dialect_snowflake.go, dialect_bigquery.go, etc.
+import (
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+)
 
 func init() {
-	RegisterDialect(DuckDB)
+	dialect.Register(DuckDB)
+	dialect.SetDefault(DuckDB) // DuckDB is the default dialect
 }
 
 // DuckDB is the DuckDB dialect configuration.
-var DuckDB = NewDialect("duckdb").
-	Identifiers(`"`, `"`, `""`, NormCaseInsensitive).
+var DuckDB = dialect.NewDialect("duckdb").
+	Identifiers(`"`, `"`, `""`, dialect.NormCaseInsensitive).
 	Operators(true, true). // || is concat, CONCAT coalesces NULL
 	Aggregates(
 		// Standard aggregates
@@ -68,8 +74,3 @@ var DuckDB = NewDialect("duckdb").
 		"ARRAY_LENGTH": "LEN",
 	}).
 	Build()
-
-// DefaultDialect returns the default dialect (DuckDB).
-func DefaultDialect() *Dialect {
-	return DuckDB
-}

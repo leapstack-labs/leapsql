@@ -8,7 +8,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/template"
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 // publishDiagnostics parses the document and publishes any errors.
@@ -145,9 +145,9 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 	}
 
 	// Parse with lineage parser
-	_, err := sql.Parse(sqlContent)
+	_, err := pkgparser.Parse(sqlContent)
 	if err != nil {
-		var pe *sql.ParseError
+		var pe *pkgparser.ParseError
 		if errors.As(err, &pe) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Range: Range{

@@ -1,4 +1,4 @@
-package sql
+package parser
 
 // Statement parsing: WITH clause, CTEs, SELECT body, SELECT list, ORDER BY.
 //

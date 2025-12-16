@@ -11,6 +11,10 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// Import adapter packages to ensure adapters are registered via init()
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
 
 // createTestProject creates a minimal test project in a temp directory.

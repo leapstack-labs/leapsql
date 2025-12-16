@@ -7,12 +7,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/leapstack-labs/leapsql/internal/cli/commands"
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	"github.com/spf13/cobra"
 )
 

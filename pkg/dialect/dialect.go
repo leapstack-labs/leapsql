@@ -1,9 +1,12 @@
-package sql
+// Package dialect provides SQL dialect configuration and function classification.
+//
+// This package contains the public contract for dialect definitions used by the parser,
+// lineage analyzer, and other SQL-aware components. Concrete dialect implementations
+// are registered from pkg/adapters/*/dialect packages.
+package dialect
 
 import (
-	"sort"
 	"strings"
-	"sync"
 )
 
 // NormalizationStrategy defines how unquoted identifiers are normalized.
@@ -134,14 +137,14 @@ func (d *Dialect) IsWindow(name string) bool {
 	return d.FunctionLineageType(name) == LineageWindow
 }
 
-// DialectBuilder provides a fluent API for constructing dialects.
-type DialectBuilder struct {
+// Builder provides a fluent API for constructing dialects.
+type Builder struct {
 	dialect *Dialect
 }
 
 // NewDialect creates a new dialect builder with the given name.
-func NewDialect(name string) *DialectBuilder {
-	return &DialectBuilder{
+func NewDialect(name string) *Builder {
+	return &Builder{
 		dialect: &Dialect{
 			Name: name,
 			Identifiers: IdentifierConfig{
@@ -163,7 +166,7 @@ func NewDialect(name string) *DialectBuilder {
 }
 
 // Identifiers configures identifier quoting and normalization.
-func (b *DialectBuilder) Identifiers(quote, quoteEnd, escape string, norm NormalizationStrategy) *DialectBuilder {
+func (b *Builder) Identifiers(quote, quoteEnd, escape string, norm NormalizationStrategy) *Builder {
 	b.dialect.Identifiers = IdentifierConfig{
 		Quote:         quote,
 		QuoteEnd:      quoteEnd,
@@ -174,7 +177,7 @@ func (b *DialectBuilder) Identifiers(quote, quoteEnd, escape string, norm Normal
 }
 
 // Operators configures operator behaviors.
-func (b *DialectBuilder) Operators(dpipeIsConcat, concatCoalesce bool) *DialectBuilder {
+func (b *Builder) Operators(dpipeIsConcat, concatCoalesce bool) *Builder {
 	b.dialect.Operators = OperatorConfig{
 		DPipeIsConcat:  dpipeIsConcat,
 		ConcatCoalesce: concatCoalesce,
@@ -183,7 +186,7 @@ func (b *DialectBuilder) Operators(dpipeIsConcat, concatCoalesce bool) *DialectB
 }
 
 // Aggregates adds aggregate functions to the dialect.
-func (b *DialectBuilder) Aggregates(funcs ...string) *DialectBuilder {
+func (b *Builder) Aggregates(funcs ...string) *Builder {
 	for _, f := range funcs {
 		b.dialect.aggregates[b.dialect.NormalizeName(f)] = struct{}{}
 	}
@@ -191,7 +194,7 @@ func (b *DialectBuilder) Aggregates(funcs ...string) *DialectBuilder {
 }
 
 // Generators adds generator functions (no input columns) to the dialect.
-func (b *DialectBuilder) Generators(funcs ...string) *DialectBuilder {
+func (b *Builder) Generators(funcs ...string) *Builder {
 	for _, f := range funcs {
 		b.dialect.generators[b.dialect.NormalizeName(f)] = struct{}{}
 	}
@@ -199,7 +202,7 @@ func (b *DialectBuilder) Generators(funcs ...string) *DialectBuilder {
 }
 
 // Windows adds window-only functions to the dialect.
-func (b *DialectBuilder) Windows(funcs ...string) *DialectBuilder {
+func (b *Builder) Windows(funcs ...string) *Builder {
 	for _, f := range funcs {
 		b.dialect.windows[b.dialect.NormalizeName(f)] = struct{}{}
 	}
@@ -207,7 +210,7 @@ func (b *DialectBuilder) Windows(funcs ...string) *DialectBuilder {
 }
 
 // Aliases adds function aliases (alias -> canonical name).
-func (b *DialectBuilder) Aliases(aliases map[string]string) *DialectBuilder {
+func (b *Builder) Aliases(aliases map[string]string) *Builder {
 	for k, v := range aliases {
 		b.dialect.aliases[b.dialect.NormalizeName(k)] = b.dialect.NormalizeName(v)
 	}
@@ -215,39 +218,6 @@ func (b *DialectBuilder) Aliases(aliases map[string]string) *DialectBuilder {
 }
 
 // Build returns the constructed dialect.
-func (b *DialectBuilder) Build() *Dialect {
+func (b *Builder) Build() *Dialect {
 	return b.dialect
-}
-
-// Dialect registry
-var (
-	dialectsMu sync.RWMutex
-	dialects   = make(map[string]*Dialect)
-)
-
-// GetDialect returns a dialect by name.
-func GetDialect(name string) (*Dialect, bool) {
-	dialectsMu.RLock()
-	defer dialectsMu.RUnlock()
-	d, ok := dialects[strings.ToLower(name)]
-	return d, ok
-}
-
-// RegisterDialect registers a custom dialect.
-func RegisterDialect(d *Dialect) {
-	dialectsMu.Lock()
-	defer dialectsMu.Unlock()
-	dialects[strings.ToLower(d.Name)] = d
-}
-
-// ListDialects returns all registered dialect names.
-func ListDialects() []string {
-	dialectsMu.RLock()
-	defer dialectsMu.RUnlock()
-	names := make([]string, 0, len(dialects))
-	for name := range dialects {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }

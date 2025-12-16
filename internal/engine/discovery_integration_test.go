@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state"
+
+	// Import adapter packages to ensure adapters are registered via init()
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
 
 // testdataDir returns path to local testdata directory for a scenario.

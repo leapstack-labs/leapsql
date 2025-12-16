@@ -3,7 +3,7 @@ package lineage
 import (
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 // =============================================================================
@@ -44,7 +44,7 @@ func srcN(n int) *int { return &n }
 type testCase struct {
 	name    string
 	sql     string
-	schema  sql.Schema
+	schema  parser.Schema
 	sources []string  // expected source tables
 	cols    []colSpec // expected columns
 }
@@ -597,7 +597,7 @@ func TestExtractLineage_StarExpansion(t *testing.T) {
 		{
 			name:    "star with schema",
 			sql:     `SELECT * FROM users`,
-			schema:  sql.Schema{"users": {"id", "name", "email", "created_at"}},
+			schema:  parser.Schema{"users": {"id", "name", "email", "created_at"}},
 			sources: []string{"users"},
 			cols: []colSpec{
 				{name: "id", transform: TransformDirect},
@@ -609,7 +609,7 @@ func TestExtractLineage_StarExpansion(t *testing.T) {
 		{
 			name: "table.star with schema",
 			sql:  `SELECT u.*, o.amount FROM users u JOIN orders o ON u.id = o.user_id`,
-			schema: sql.Schema{
+			schema: parser.Schema{
 				"users":  {"id", "name"},
 				"orders": {"id", "user_id", "amount"},
 			},

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
 )
 
 // DefaultSchemaForType returns the default schema for a database type.

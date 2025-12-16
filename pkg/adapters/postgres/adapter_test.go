@@ -1,9 +1,10 @@
-package adapter
+package postgres
 
 import (
 	"context"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -11,12 +12,12 @@ import (
 func TestBuildPostgresDSN(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   Config
+		config   adapter.Config
 		expected string
 	}{
 		{
 			name: "basic connection",
-			config: Config{
+			config: adapter.Config{
 				Host:     "localhost",
 				Port:     5432,
 				Database: "testdb",
@@ -27,7 +28,7 @@ func TestBuildPostgresDSN(t *testing.T) {
 		},
 		{
 			name: "with custom sslmode",
-			config: Config{
+			config: adapter.Config{
 				Host:     "prod.example.com",
 				Port:     5432,
 				Database: "proddb",
@@ -38,14 +39,14 @@ func TestBuildPostgresDSN(t *testing.T) {
 		},
 		{
 			name: "defaults",
-			config: Config{
+			config: adapter.Config{
 				Database: "mydb",
 			},
 			expected: "host=localhost port=5432 dbname=mydb sslmode=disable",
 		},
 		{
 			name: "custom port",
-			config: Config{
+			config: adapter.Config{
 				Host:     "db.example.com",
 				Port:     5433,
 				Database: "analytics",
@@ -59,61 +60,6 @@ func TestBuildPostgresDSN(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dsn := buildPostgresDSN(tt.config)
 			assert.Equal(t, tt.expected, dsn)
-		})
-	}
-}
-
-func TestPostgresAdapter_DialectName(t *testing.T) {
-	adapter := NewPostgresAdapter()
-	assert.Equal(t, "postgres", adapter.DialectName())
-}
-
-func TestPostgresAdapter_NotConnected(t *testing.T) {
-	tests := []struct {
-		name      string
-		operation func(ctx context.Context, adapter *PostgresAdapter) error
-		errMsg    string
-	}{
-		{
-			name: "exec without connect",
-			operation: func(ctx context.Context, adapter *PostgresAdapter) error {
-				return adapter.Exec(ctx, "SELECT 1")
-			},
-			errMsg: "not established",
-		},
-		{
-			name: "query without connect",
-			operation: func(ctx context.Context, adapter *PostgresAdapter) error {
-				_, err := adapter.Query(ctx, "SELECT 1")
-				return err
-			},
-			errMsg: "not established",
-		},
-		{
-			name: "get metadata without connect",
-			operation: func(ctx context.Context, adapter *PostgresAdapter) error {
-				_, err := adapter.GetTableMetadata(ctx, "users")
-				return err
-			},
-			errMsg: "not established",
-		},
-		{
-			name: "load csv without connect",
-			operation: func(ctx context.Context, adapter *PostgresAdapter) error {
-				return adapter.LoadCSV(ctx, "test", "/tmp/test.csv")
-			},
-			errMsg: "not established",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			adapter := NewPostgresAdapter()
-
-			err := tt.operation(ctx, adapter)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errMsg)
 		})
 	}
 }
@@ -170,47 +116,86 @@ func TestIsReservedWord(t *testing.T) {
 	}
 }
 
-func TestNewPostgresAdapter(t *testing.T) {
-	adapter := NewPostgresAdapter()
-	assert.NotNil(t, adapter)
-	assert.Nil(t, adapter.DB)
-	assert.False(t, adapter.IsConnected())
+func TestNew(t *testing.T) {
+	adp := New()
+
+	assert.NotNil(t, adp, "New() should return non-nil adapter")
+	assert.Nil(t, adp.DB, "DB should be nil before Connect")
+	assert.False(t, adp.IsConnected(), "should not be connected initially")
+	assert.Equal(t, "postgres", adp.DialectName(), "dialect name should be postgres")
+
+	// Verify interface compliance
+	var _ adapter.Adapter = (*Adapter)(nil)
+	var _ adapter.Adapter = adp
 }
 
-func TestPostgresAdapter_Close(t *testing.T) {
+func TestAdapter_NotConnected(t *testing.T) {
 	tests := []struct {
-		name string
+		name      string
+		operation func(ctx context.Context, adp *Adapter) error
+		errMsg    string
 	}{
-		{"close without connect"},
+		{
+			name: "exec without connect",
+			operation: func(ctx context.Context, adp *Adapter) error {
+				return adp.Exec(ctx, "SELECT 1")
+			},
+			errMsg: "not established",
+		},
+		{
+			name: "query without connect",
+			operation: func(ctx context.Context, adp *Adapter) error {
+				_, err := adp.Query(ctx, "SELECT 1")
+				return err
+			},
+			errMsg: "not established",
+		},
+		{
+			name: "get metadata without connect",
+			operation: func(ctx context.Context, adp *Adapter) error {
+				_, err := adp.GetTableMetadata(ctx, "users")
+				return err
+			},
+			errMsg: "not established",
+		},
+		{
+			name: "load csv without connect",
+			operation: func(ctx context.Context, adp *Adapter) error {
+				return adp.LoadCSV(ctx, "test", "/tmp/test.csv")
+			},
+			errMsg: "not established",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			adapter := NewPostgresAdapter()
-			// Close should not error even without connection
-			assert.NoError(t, adapter.Close())
+			ctx := context.Background()
+			adp := New()
+
+			err := tt.operation(ctx, adp)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errMsg)
 		})
 	}
 }
 
-// TestPostgresAdapter_Registry verifies the adapter is properly registered.
-func TestPostgresAdapter_Registry(t *testing.T) {
-	assert.True(t, IsRegistered("postgres"), "postgres adapter should be registered")
+func TestAdapter_Registry(t *testing.T) {
+	assert.True(t, adapter.IsRegistered("postgres"), "postgres adapter should be registered")
 
-	factory, ok := Get("postgres")
+	factory, ok := adapter.Get("postgres")
 	require.True(t, ok, "should be able to get postgres factory")
 
-	adapter := factory()
-	assert.NotNil(t, adapter)
+	adp := factory()
+	assert.NotNil(t, adp)
 
-	pg, ok := adapter.(*PostgresAdapter)
-	assert.True(t, ok, "factory should return *PostgresAdapter")
+	pg, ok := adp.(*Adapter)
+	assert.True(t, ok, "factory should return *Adapter")
 	assert.NotNil(t, pg)
 	assert.Equal(t, "postgres", pg.DialectName())
 }
 
-// TestPostgresAdapter_InterfaceCompliance verifies the adapter implements the interface.
-func TestPostgresAdapter_InterfaceCompliance(_ *testing.T) {
-	var _ Adapter = (*PostgresAdapter)(nil)
-	var _ Adapter = NewPostgresAdapter()
+func TestAdapter_Close(t *testing.T) {
+	// Close should not error even without connection
+	adp := New()
+	assert.NoError(t, adp.Close())
 }

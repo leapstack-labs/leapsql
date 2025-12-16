@@ -1,4 +1,4 @@
-package sql
+package parser
 
 // Statement represents a SQL statement.
 type Statement interface {

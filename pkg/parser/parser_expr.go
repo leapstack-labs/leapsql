@@ -1,4 +1,4 @@
-package sql
+package parser
 
 // Expression precedence parsing: OR, AND, NOT, comparisons, arithmetic operators.
 //

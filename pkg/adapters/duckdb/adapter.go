@@ -1,4 +1,5 @@
-package adapter
+// Package duckdb provides a DuckDB database adapter for LeapSQL.
+package duckdb
 
 import (
 	"context"
@@ -7,31 +8,29 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
+
 	_ "github.com/marcboeker/go-duckdb" // duckdb driver
 )
 
-func init() {
-	Register("duckdb", func() Adapter { return NewDuckDBAdapter() })
+// Adapter implements the adapter.Adapter interface for DuckDB.
+type Adapter struct {
+	adapter.BaseSQLAdapter
 }
 
-// DuckDBAdapter implements the Adapter interface for DuckDB.
-type DuckDBAdapter struct {
-	BaseSQLAdapter
-}
-
-// NewDuckDBAdapter creates a new DuckDB adapter instance.
-func NewDuckDBAdapter() *DuckDBAdapter {
-	return &DuckDBAdapter{}
+// New creates a new DuckDB adapter instance.
+func New() *Adapter {
+	return &Adapter{}
 }
 
 // DialectName returns the SQL dialect for this adapter.
-func (a *DuckDBAdapter) DialectName() string {
+func (a *Adapter) DialectName() string {
 	return "duckdb"
 }
 
 // Connect establishes a connection to DuckDB.
 // Use ":memory:" as the path for an in-memory database.
-func (a *DuckDBAdapter) Connect(ctx context.Context, cfg Config) error {
+func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 	path := cfg.Path
 	if path == "" {
 		path = ":memory:"
@@ -55,7 +54,7 @@ func (a *DuckDBAdapter) Connect(ctx context.Context, cfg Config) error {
 }
 
 // GetTableMetadata retrieves metadata for a specified table.
-func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Metadata, error) {
+func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*adapter.Metadata, error) {
 	if a.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
@@ -86,9 +85,9 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 	}
 	defer func() { _ = rows.Close() }()
 
-	var columns []Column
+	var columns []adapter.Column
 	for rows.Next() {
-		var col Column
+		var col adapter.Column
 		var nullable string
 		if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Position); err != nil {
 			return nil, fmt.Errorf("failed to scan column metadata: %w", err)
@@ -113,7 +112,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 		rowCount = 0
 	}
 
-	return &Metadata{
+	return &adapter.Metadata{
 		Schema:   schema,
 		Name:     tableName,
 		Columns:  columns,
@@ -123,7 +122,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 
 // LoadCSV loads data from a CSV file into a table.
 // DuckDB will automatically infer the schema from the CSV file.
-func (a *DuckDBAdapter) LoadCSV(ctx context.Context, tableName string, filePath string) error {
+func (a *Adapter) LoadCSV(ctx context.Context, tableName string, filePath string) error {
 	if a.DB == nil {
 		return fmt.Errorf("database connection not established")
 	}
@@ -148,5 +147,5 @@ func (a *DuckDBAdapter) LoadCSV(ctx context.Context, tableName string, filePath 
 	return nil
 }
 
-// Ensure DuckDBAdapter implements Adapter interface
-var _ Adapter = (*DuckDBAdapter)(nil)
+// Ensure Adapter implements adapter.Adapter interface
+var _ adapter.Adapter = (*Adapter)(nil)

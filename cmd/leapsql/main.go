@@ -5,6 +5,10 @@ import (
 	"os"
 
 	"github.com/leapstack-labs/leapsql/internal/cli"
+
+	// Register adapters
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
 
 func main() {

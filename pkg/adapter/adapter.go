@@ -1,5 +1,8 @@
 // Package adapter provides database adapter interfaces and implementations
-// for DBGo's data transformation engine.
+// for LeapSQL's data transformation engine.
+//
+// This package contains the public contract that all database adapters must implement.
+// Concrete adapter implementations are in pkg/adapters/ subdirectories.
 package adapter
 
 import (

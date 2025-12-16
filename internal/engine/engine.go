@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/adapter"
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/macro"
 	"github.com/leapstack-labs/leapsql/internal/parser"
@@ -21,7 +20,8 @@ import (
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/template"
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Engine orchestrates the execution of SQL models.
@@ -33,7 +33,7 @@ type Engine struct {
 	dbMu        sync.Mutex
 
 	// SQL dialect for the connected adapter (set after connection)
-	dialect *sql.Dialect
+	dialect *dialect.Dialect
 
 	store         state.Store
 	modelsDir     string
@@ -181,11 +181,11 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 
 	// Set dialect based on adapter type
 	dialectName := db.DialectName()
-	if dialect, ok := sql.GetDialect(dialectName); ok {
-		e.dialect = dialect
+	if d, ok := dialect.Get(dialectName); ok {
+		e.dialect = d
 	} else {
 		// Fallback to DuckDB dialect as default
-		e.dialect = sql.DefaultDialect()
+		e.dialect = dialect.Default()
 	}
 
 	return nil
@@ -649,7 +649,7 @@ func (e *Engine) GetStateStore() state.Store {
 
 // GetDialect returns the SQL dialect for the connected adapter.
 // Returns nil if the database is not yet connected.
-func (e *Engine) GetDialect() *sql.Dialect {
+func (e *Engine) GetDialect() *dialect.Dialect {
 	return e.dialect
 }
 

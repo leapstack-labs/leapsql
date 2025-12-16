@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -431,7 +431,7 @@ func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
 
 func TestCatalogSearchFunctions(t *testing.T) {
 	// Test the underlying catalog search
-	results := sql.SearchFunctions("DATE")
+	results := pkgparser.SearchFunctions("DATE")
 	assert.NotEmpty(t, results, "expected DATE functions")
 
 	// All results should start with DATE

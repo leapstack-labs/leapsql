@@ -4,7 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 // TransformType describes how source columns are transformed.
@@ -39,32 +40,32 @@ type ModelLineage struct {
 
 // ExtractLineageOptions configures the lineage extraction.
 type ExtractLineageOptions struct {
-	Dialect *sql.Dialect // SQL dialect (defaults to DuckDB)
-	Schema  sql.Schema   // Schema information for star expansion
+	Dialect *dialect.Dialect // SQL dialect (defaults to DuckDB)
+	Schema  parser.Schema    // Schema information for star expansion
 }
 
 // ExtractLineage extracts column-level lineage from a SQL statement.
 // The schema parameter is optional but required for SELECT * expansion.
-func ExtractLineage(sqlStr string, schema sql.Schema) (*ModelLineage, error) {
+func ExtractLineage(sqlStr string, schema parser.Schema) (*ModelLineage, error) {
 	return ExtractLineageWithOptions(sqlStr, ExtractLineageOptions{Schema: schema})
 }
 
 // ExtractLineageWithOptions extracts lineage with full configuration options.
 func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*ModelLineage, error) {
-	dialect := opts.Dialect
-	if dialect == nil {
-		dialect = sql.DefaultDialect()
+	d := opts.Dialect
+	if d == nil {
+		d = dialect.Default()
 	}
 
 	// Parse the SQL
-	stmt, err := sql.Parse(sqlStr)
+	stmt, err := parser.Parse(sqlStr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create extractor
 	extractor := &lineageExtractor{
-		dialect: dialect,
+		dialect: d,
 		schema:  opts.Schema,
 		sources: make(map[string]struct{}),
 	}
@@ -75,19 +76,19 @@ func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*Mode
 
 // lineageExtractor walks the AST to extract lineage information.
 type lineageExtractor struct {
-	dialect *sql.Dialect
-	schema  sql.Schema
+	dialect *dialect.Dialect
+	schema  parser.Schema
 	sources map[string]struct{} // Collected source tables
 }
 
 // extract extracts lineage from a parsed statement.
-func (e *lineageExtractor) extract(stmt *sql.SelectStmt) (*ModelLineage, error) {
+func (e *lineageExtractor) extract(stmt *parser.SelectStmt) (*ModelLineage, error) {
 	if stmt == nil || stmt.Body == nil {
-		return nil, &sql.ParseError{Message: "empty statement"}
+		return nil, &parser.ParseError{Message: "empty statement"}
 	}
 
 	// Resolve scopes
-	resolver := sql.NewResolver(e.dialect, e.schema)
+	resolver := parser.NewResolver(e.dialect, e.schema)
 	scope, err := resolver.Resolve(stmt)
 	if err != nil {
 		return nil, err
@@ -109,7 +110,7 @@ func (e *lineageExtractor) extract(stmt *sql.SelectStmt) (*ModelLineage, error) 
 }
 
 // extractBodyLineage extracts lineage from a SELECT body.
-func (e *lineageExtractor) extractBodyLineage(scope *sql.Scope, body *sql.SelectBody) []*ColumnLineage {
+func (e *lineageExtractor) extractBodyLineage(scope *parser.Scope, body *parser.SelectBody) []*ColumnLineage {
 	if body == nil || body.Left == nil {
 		return nil
 	}
@@ -139,7 +140,7 @@ func (e *lineageExtractor) extractBodyLineage(scope *sql.Scope, body *sql.Select
 }
 
 // extractCoreLineage extracts lineage from a SELECT core.
-func (e *lineageExtractor) extractCoreLineage(scope *sql.Scope, core *sql.SelectCore) []*ColumnLineage {
+func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.SelectCore) []*ColumnLineage {
 	if core == nil {
 		return nil
 	}
@@ -150,7 +151,7 @@ func (e *lineageExtractor) extractCoreLineage(scope *sql.Scope, core *sql.Select
 	}
 
 	var columns []*ColumnLineage
-	colResolver := sql.NewColumnResolver(scope, e.dialect)
+	colResolver := parser.NewColumnResolver(scope, e.dialect)
 
 	for i, item := range core.Columns {
 		lineages := e.extractSelectItemLineage(scope, colResolver, item, i)
@@ -161,7 +162,7 @@ func (e *lineageExtractor) extractCoreLineage(scope *sql.Scope, core *sql.Select
 }
 
 // extractSelectItemLineage extracts lineage from a single SELECT item.
-func (e *lineageExtractor) extractSelectItemLineage(scope *sql.Scope, colResolver *sql.ColumnResolver, item sql.SelectItem, index int) []*ColumnLineage {
+func (e *lineageExtractor) extractSelectItemLineage(scope *parser.Scope, colResolver *parser.ColumnResolver, item parser.SelectItem, index int) []*ColumnLineage {
 	// Handle SELECT *
 	if item.Star {
 		return e.expandStar(scope, "", index)
@@ -186,7 +187,7 @@ func (e *lineageExtractor) extractSelectItemLineage(scope *sql.Scope, colResolve
 }
 
 // expandStar expands a SELECT * or table.* into individual column lineages.
-func (e *lineageExtractor) expandStar(scope *sql.Scope, tableName string, _ int) []*ColumnLineage {
+func (e *lineageExtractor) expandStar(scope *parser.Scope, tableName string, _ int) []*ColumnLineage {
 	refs := scope.ExpandStar(tableName)
 	if len(refs) == 0 {
 		// No schema info available - return a single "unknown" lineage
@@ -210,13 +211,13 @@ func (e *lineageExtractor) expandStar(scope *sql.Scope, tableName string, _ int)
 		// Record the source table (avoiding CTE/derived names)
 		if entry, ok := scope.Lookup(ref.Table); ok {
 			switch entry.Type {
-			case sql.ScopeTable:
+			case parser.ScopeTable:
 				if entry.SourceTable != "" {
 					e.sources[entry.SourceTable] = struct{}{}
 				} else {
 					e.sources[entry.Name] = struct{}{}
 				}
-			case sql.ScopeCTE, sql.ScopeDerived:
+			case parser.ScopeCTE, parser.ScopeDerived:
 				// For CTEs and derived tables, use underlying sources
 				for _, underlying := range entry.UnderlyingSources {
 					e.sources[underlying] = struct{}{}
@@ -235,7 +236,7 @@ func (e *lineageExtractor) expandStar(scope *sql.Scope, tableName string, _ int)
 }
 
 // extractExprLineage extracts lineage from an expression.
-func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql.ColumnResolver, expr sql.Expr) *ColumnLineage {
+func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *parser.ColumnResolver, expr parser.Expr) *ColumnLineage {
 	lineage := &ColumnLineage{}
 
 	if expr == nil {
@@ -243,7 +244,7 @@ func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql
 	}
 
 	switch ex := expr.(type) {
-	case *sql.ColumnRef:
+	case *parser.ColumnRef:
 		// Direct column reference
 		source := e.resolveColumnRef(scope, ex)
 		if source != nil {
@@ -251,11 +252,11 @@ func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql
 		}
 		lineage.Transform = TransformDirect
 
-	case *sql.Literal:
+	case *parser.Literal:
 		// Literals have no source columns
 		lineage.Transform = TransformExpression
 
-	case *sql.FuncCall:
+	case *parser.FuncCall:
 		// Collect all column refs from the function arguments
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
@@ -263,13 +264,13 @@ func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql
 		// Determine transform type based on function classification
 		funcType := e.dialect.FunctionLineageType(ex.Name)
 		switch funcType {
-		case sql.LineageAggregate:
+		case dialect.LineageAggregate:
 			lineage.Transform = TransformExpression
 			lineage.Function = e.dialect.CanonicalFunctionName(ex.Name)
-		case sql.LineageWindow:
+		case dialect.LineageWindow:
 			lineage.Transform = TransformExpression
 			lineage.Function = e.dialect.CanonicalFunctionName(ex.Name)
-		case sql.LineageGenerator:
+		case dialect.LineageGenerator:
 			// Generator functions have no source columns
 			lineage.Sources = nil
 			lineage.Transform = TransformExpression
@@ -283,30 +284,30 @@ func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql
 			}
 		}
 
-	case *sql.CaseExpr:
+	case *parser.CaseExpr:
 		// Collect all column refs from CASE expression
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
 		lineage.Transform = TransformExpression
 
-	case *sql.CastExpr:
+	case *parser.CastExpr:
 		// CAST preserves lineage but is a transformation
 		innerLineage := e.extractExprLineage(scope, colResolver, ex.Expr)
 		lineage.Sources = innerLineage.Sources
 		lineage.Transform = TransformExpression
 
-	case *sql.BinaryExpr:
+	case *parser.BinaryExpr:
 		// Collect sources from both sides
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
 		lineage.Transform = TransformExpression
 
-	case *sql.UnaryExpr:
+	case *parser.UnaryExpr:
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
 		lineage.Transform = TransformExpression
 
-	case *sql.ParenExpr:
+	case *parser.ParenExpr:
 		return e.extractExprLineage(scope, colResolver, ex.Expr)
 
 	default:
@@ -322,7 +323,7 @@ func (e *lineageExtractor) extractExprLineage(scope *sql.Scope, colResolver *sql
 }
 
 // collectExprSources collects all source columns from an expression.
-func (e *lineageExtractor) collectExprSources(scope *sql.Scope, colResolver *sql.ColumnResolver, expr sql.Expr) []SourceColumn {
+func (e *lineageExtractor) collectExprSources(scope *parser.Scope, colResolver *parser.ColumnResolver, expr parser.Expr) []SourceColumn {
 	refs := colResolver.CollectColumns(expr)
 	var sources []SourceColumn
 	seen := make(map[string]struct{})
@@ -342,7 +343,7 @@ func (e *lineageExtractor) collectExprSources(scope *sql.Scope, colResolver *sql
 }
 
 // resolveColumnRef resolves a column reference to its source.
-func (e *lineageExtractor) resolveColumnRef(scope *sql.Scope, ref *sql.ColumnRef) *SourceColumn {
+func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.ColumnRef) *SourceColumn {
 	if ref == nil {
 		return nil
 	}
@@ -387,7 +388,7 @@ func (e *lineageExtractor) resolveColumnRef(scope *sql.Scope, ref *sql.ColumnRef
 	// Fallback: use the reference as-is, but check if it's a CTE/derived first
 	if ref.Table != "" {
 		if entry, entryOk := scope.Lookup(ref.Table); entryOk {
-			if entry.Type == sql.ScopeCTE || entry.Type == sql.ScopeDerived {
+			if entry.Type == parser.ScopeCTE || entry.Type == parser.ScopeDerived {
 				// Don't add CTE/derived names to sources
 				for _, underlying := range entry.UnderlyingSources {
 					e.sources[underlying] = struct{}{}
@@ -412,7 +413,7 @@ func (e *lineageExtractor) resolveColumnRef(scope *sql.Scope, ref *sql.ColumnRef
 }
 
 // registerFromClause registers tables from a FROM clause.
-func (e *lineageExtractor) registerFromClause(scope *sql.Scope, from *sql.FromClause) {
+func (e *lineageExtractor) registerFromClause(scope *parser.Scope, from *parser.FromClause) {
 	if from == nil {
 		return
 	}
@@ -425,13 +426,13 @@ func (e *lineageExtractor) registerFromClause(scope *sql.Scope, from *sql.FromCl
 }
 
 // registerTableRef registers a table reference as a source.
-func (e *lineageExtractor) registerTableRef(scope *sql.Scope, ref sql.TableRef) {
+func (e *lineageExtractor) registerTableRef(scope *parser.Scope, ref parser.TableRef) {
 	if ref == nil {
 		return
 	}
 
 	switch t := ref.(type) {
-	case *sql.TableName:
+	case *parser.TableName:
 		// Check if it's a CTE reference
 		if _, ok := scope.LookupCTE(t.Name); ok {
 			// CTE references are not external sources
@@ -449,26 +450,26 @@ func (e *lineageExtractor) registerTableRef(scope *sql.Scope, ref sql.TableRef) 
 		parts = append(parts, t.Name)
 		e.sources[strings.Join(parts, ".")] = struct{}{}
 
-	case *sql.DerivedTable:
+	case *parser.DerivedTable:
 		// Derived tables don't add sources directly
 		// Their inner queries' sources are collected when we process them
 
-	case *sql.LateralTable:
+	case *parser.LateralTable:
 		// Same as derived tables
 	}
 }
 
 // collectSources collects sources from scope entries.
-func (e *lineageExtractor) collectSources(scope *sql.Scope) {
+func (e *lineageExtractor) collectSources(scope *parser.Scope) {
 	for _, entry := range scope.AllEntries() {
 		switch entry.Type {
-		case sql.ScopeTable:
+		case parser.ScopeTable:
 			if entry.SourceTable != "" {
 				e.sources[entry.SourceTable] = struct{}{}
 			} else {
 				e.sources[entry.Name] = struct{}{}
 			}
-		case sql.ScopeCTE, sql.ScopeDerived:
+		case parser.ScopeCTE, parser.ScopeDerived:
 			// For CTEs and derived tables, use ONLY underlying sources
 			// Do NOT add the CTE/derived name itself
 			for _, underlying := range entry.UnderlyingSources {
@@ -515,22 +516,22 @@ func (e *lineageExtractor) mergeSources(a, b []SourceColumn) []SourceColumn {
 }
 
 // inferColumnName infers a column name from an expression.
-func (e *lineageExtractor) inferColumnName(expr sql.Expr, index int) string {
+func (e *lineageExtractor) inferColumnName(expr parser.Expr, index int) string {
 	if expr == nil {
 		return e.generateColumnName(index)
 	}
 
 	switch ex := expr.(type) {
-	case *sql.ColumnRef:
+	case *parser.ColumnRef:
 		return ex.Column
 
-	case *sql.FuncCall:
+	case *parser.FuncCall:
 		return strings.ToLower(ex.Name)
 
-	case *sql.CastExpr:
+	case *parser.CastExpr:
 		return e.inferColumnName(ex.Expr, index)
 
-	case *sql.ParenExpr:
+	case *parser.ParenExpr:
 		return e.inferColumnName(ex.Expr, index)
 
 	default:

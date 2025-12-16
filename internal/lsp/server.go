@@ -14,7 +14,7 @@ import (
 	"sync"
 
 	"github.com/leapstack-labs/leapsql/internal/state"
-	"github.com/leapstack-labs/leapsql/pkg/sql"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Server implements the Language Server Protocol for LeapSQL.
@@ -35,7 +35,7 @@ type Server struct {
 	cacheMu             sync.RWMutex
 
 	// SQL dialect for validation
-	dialect *sql.Dialect
+	dialect *dialect.Dialect
 
 	// I/O
 	reader  *bufio.Reader
@@ -264,7 +264,7 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 	}
 
 	// Get dialect (default to duckdb)
-	s.dialect, _ = sql.GetDialect("duckdb")
+	s.dialect, _ = dialect.Get("duckdb")
 
 	result := InitializeResult{
 		Capabilities: ServerCapabilities{

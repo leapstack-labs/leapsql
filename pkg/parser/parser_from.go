@@ -1,4 +1,4 @@
-package sql
+package parser
 
 // FROM clause parsing: table references, derived tables, lateral joins, JOINs.
 //

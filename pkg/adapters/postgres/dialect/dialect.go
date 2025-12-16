@@ -1,15 +1,21 @@
-package sql
+// Package dialect provides the PostgreSQL SQL dialect definition.
+// This package is lightweight and has no database driver dependencies,
+// making it suitable for use in the LSP and other tools that need
+// dialect information without the overhead of database connections.
+package dialect
 
-// PostgreSQL dialect definition.
+import (
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+)
 
 func init() {
-	RegisterDialect(Postgres)
+	dialect.Register(Postgres)
 }
 
 // Postgres is the PostgreSQL dialect configuration.
-var Postgres = NewDialect("postgres").
-	Identifiers(`"`, `"`, `""`, NormLowercase). // Postgres normalizes unquoted identifiers to lowercase
-	Operators(true, false).                     // || is concat, CONCAT does NOT coalesce NULL
+var Postgres = dialect.NewDialect("postgres").
+	Identifiers(`"`, `"`, `""`, dialect.NormLowercase). // Postgres normalizes unquoted identifiers to lowercase
+	Operators(true, false).                             // || is concat, CONCAT does NOT coalesce NULL
 	Aggregates(
 		// Standard aggregates
 		"SUM", "COUNT", "AVG", "MIN", "MAX",

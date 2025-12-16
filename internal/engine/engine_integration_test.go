@@ -9,6 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	// Import adapter packages to ensure adapters are registered via init()
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
 
 // TestIntegration_FullPipeline tests the complete pipeline from seeds to run.

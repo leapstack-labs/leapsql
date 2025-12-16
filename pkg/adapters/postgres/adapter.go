@@ -1,4 +1,5 @@
-package adapter
+// Package postgres provides a PostgreSQL database adapter for LeapSQL.
+package postgres
 
 import (
 	"context"
@@ -11,29 +12,26 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
 )
 
-func init() {
-	Register("postgres", func() Adapter { return NewPostgresAdapter() })
+// Adapter implements the adapter.Adapter interface for PostgreSQL.
+type Adapter struct {
+	adapter.BaseSQLAdapter
 }
 
-// PostgresAdapter implements the Adapter interface for PostgreSQL.
-type PostgresAdapter struct {
-	BaseSQLAdapter
-}
-
-// NewPostgresAdapter creates a new PostgreSQL adapter instance.
-func NewPostgresAdapter() *PostgresAdapter {
-	return &PostgresAdapter{}
+// New creates a new PostgreSQL adapter instance.
+func New() *Adapter {
+	return &Adapter{}
 }
 
 // DialectName returns the SQL dialect for this adapter.
-func (a *PostgresAdapter) DialectName() string {
+func (a *Adapter) DialectName() string {
 	return "postgres"
 }
 
 // Connect establishes a connection to PostgreSQL.
-func (a *PostgresAdapter) Connect(ctx context.Context, cfg Config) error {
+func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 	dsn := buildPostgresDSN(cfg)
 
 	db, err := sql.Open("pgx", dsn)
@@ -52,7 +50,7 @@ func (a *PostgresAdapter) Connect(ctx context.Context, cfg Config) error {
 }
 
 // buildPostgresDSN constructs a PostgreSQL connection string.
-func buildPostgresDSN(cfg Config) string {
+func buildPostgresDSN(cfg adapter.Config) string {
 	// Build key=value format: host=localhost port=5432 user=postgres ...
 	host := cfg.Host
 	if host == "" {
@@ -86,7 +84,7 @@ func buildPostgresDSN(cfg Config) string {
 }
 
 // GetTableMetadata retrieves metadata for a specified table.
-func (a *PostgresAdapter) GetTableMetadata(ctx context.Context, table string) (*Metadata, error) {
+func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*adapter.Metadata, error) {
 	if a.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
@@ -117,9 +115,9 @@ func (a *PostgresAdapter) GetTableMetadata(ctx context.Context, table string) (*
 	}
 	defer func() { _ = rows.Close() }()
 
-	var columns []Column
+	var columns []adapter.Column
 	for rows.Next() {
-		var col Column
+		var col adapter.Column
 		var nullable string
 		if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Position); err != nil {
 			return nil, fmt.Errorf("failed to scan column metadata: %w", err)
@@ -143,7 +141,7 @@ func (a *PostgresAdapter) GetTableMetadata(ctx context.Context, table string) (*
 		rowCount = 0
 	}
 
-	return &Metadata{
+	return &adapter.Metadata{
 		Schema:   schema,
 		Name:     tableName,
 		Columns:  columns,
@@ -153,7 +151,7 @@ func (a *PostgresAdapter) GetTableMetadata(ctx context.Context, table string) (*
 
 // LoadCSV loads data from a CSV file into a table using COPY FROM STDIN.
 // All columns are created as TEXT type for robustness.
-func (a *PostgresAdapter) LoadCSV(ctx context.Context, tableName string, filePath string) error {
+func (a *Adapter) LoadCSV(ctx context.Context, tableName string, filePath string) error {
 	if a.DB == nil {
 		return fmt.Errorf("database connection not established")
 	}
@@ -197,7 +195,7 @@ func (a *PostgresAdapter) LoadCSV(ctx context.Context, tableName string, filePat
 }
 
 // createTextTable creates or replaces a table with all TEXT columns.
-func (a *PostgresAdapter) createTextTable(ctx context.Context, tableName string, columns []string) error {
+func (a *Adapter) createTextTable(ctx context.Context, tableName string, columns []string) error {
 	// Drop existing table
 	dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
 	if _, err := a.DB.ExecContext(ctx, dropSQL); err != nil {
@@ -218,7 +216,7 @@ func (a *PostgresAdapter) createTextTable(ctx context.Context, tableName string,
 }
 
 // copyFromCSV uses PostgreSQL COPY to load CSV data.
-func (a *PostgresAdapter) copyFromCSV(ctx context.Context, tableName string, file *os.File) error {
+func (a *Adapter) copyFromCSV(ctx context.Context, tableName string, file *os.File) error {
 	// Get the underlying pgx connection for COPY support
 	conn, err := a.DB.Conn(ctx)
 	if err != nil {
@@ -264,5 +262,5 @@ func isReservedWord(name string) bool {
 	return reserved[strings.ToLower(name)]
 }
 
-// Ensure PostgresAdapter implements Adapter interface
-var _ Adapter = (*PostgresAdapter)(nil)
+// Ensure Adapter implements adapter.Adapter interface
+var _ adapter.Adapter = (*Adapter)(nil)

@@ -9,8 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Import adapter package to ensure duckdb is registered via init()
-	_ "github.com/leapstack-labs/leapsql/internal/adapter"
+	// Import adapter packages to ensure adapters are registered via init()
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
 
 // TestTargetConfig_Validate tests the Validate method of TargetConfig.

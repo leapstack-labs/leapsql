@@ -1,4 +1,3 @@
-// Package adapter provides database adapter interfaces and implementations.
 package adapter
 
 import (
