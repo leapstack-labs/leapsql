@@ -13,8 +13,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+
+	// Import dialect implementations so they register themselves
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 )
 
 // Server implements the Language Server Protocol for LeapSQL.
@@ -263,8 +267,8 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 		s.loadCaches()
 	}
 
-	// Get dialect (default to duckdb)
-	s.dialect, _ = dialect.Get("duckdb")
+	// Load dialect from project config
+	s.loadDialectFromConfig()
 
 	result := InitializeResult{
 		Capabilities: ServerCapabilities{
@@ -296,6 +300,14 @@ func (s *Server) handleInitialized(_ *JSONRPCMessage) error {
 		s.sendNotification("window/showMessage", &ShowMessageParams{
 			Type:    MessageTypeWarning,
 			Message: "SQLite database not found. Run 'leapsql discover' to enable full IDE features.",
+		})
+	}
+
+	// Show warning if dialect not available
+	if s.dialect == nil {
+		s.sendNotification("window/showMessage", &ShowMessageParams{
+			Type:    MessageTypeWarning,
+			Message: "No target configured in leapsql.yaml. Some features may be limited.",
 		})
 	}
 
@@ -460,4 +472,40 @@ func (s *Server) reindexMacroFile(path string) {
 	// This would call macro.ParseStarlarkFile and store in SQLite
 	// For now, just log
 	s.logger.Printf("TODO: Re-index macro file: %s", path)
+}
+
+// loadDialectFromConfig loads the dialect from the project's leapsql.yaml config.
+// If no config file is found or target is not specified, dialect will be nil.
+func (s *Server) loadDialectFromConfig() {
+	if s.projectRoot == "" {
+		s.logger.Println("No project root set, cannot load dialect from config")
+		return
+	}
+
+	// Load project config
+	cfg, err := config.LoadFromDir(s.projectRoot)
+	if err != nil {
+		s.logger.Printf("Failed to load project config: %v", err)
+		return
+	}
+
+	if cfg == nil {
+		s.logger.Println("No project config found, dialect will be nil")
+		return
+	}
+
+	if cfg.Target == nil || cfg.Target.Type == "" {
+		s.logger.Println("No target specified in project config, dialect will be nil")
+		return
+	}
+
+	// Get dialect from registry
+	d, ok := dialect.Get(cfg.Target.Type)
+	if !ok {
+		s.logger.Printf("Unknown dialect type %q in project config", cfg.Target.Type)
+		return
+	}
+
+	s.dialect = d
+	s.logger.Printf("Loaded dialect %q from project config", cfg.Target.Type)
 }

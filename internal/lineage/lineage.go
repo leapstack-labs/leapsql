@@ -40,21 +40,16 @@ type ModelLineage struct {
 
 // ExtractLineageOptions configures the lineage extraction.
 type ExtractLineageOptions struct {
-	Dialect *dialect.Dialect // SQL dialect (defaults to DuckDB)
+	Dialect *dialect.Dialect // SQL dialect (required)
 	Schema  parser.Schema    // Schema information for star expansion
 }
 
-// ExtractLineage extracts column-level lineage from a SQL statement.
-// The schema parameter is optional but required for SELECT * expansion.
-func ExtractLineage(sqlStr string, schema parser.Schema) (*ModelLineage, error) {
-	return ExtractLineageWithOptions(sqlStr, ExtractLineageOptions{Schema: schema})
-}
-
 // ExtractLineageWithOptions extracts lineage with full configuration options.
+// Returns dialect.ErrDialectRequired if opts.Dialect is nil.
 func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*ModelLineage, error) {
 	d := opts.Dialect
 	if d == nil {
-		d = dialect.Default()
+		return nil, dialect.ErrDialectRequired
 	}
 
 	// Parse the SQL
@@ -88,14 +83,20 @@ func (e *lineageExtractor) extract(stmt *parser.SelectStmt) (*ModelLineage, erro
 	}
 
 	// Resolve scopes
-	resolver := parser.NewResolver(e.dialect, e.schema)
+	resolver, err := parser.NewResolver(e.dialect, e.schema)
+	if err != nil {
+		return nil, err
+	}
 	scope, err := resolver.Resolve(stmt)
 	if err != nil {
 		return nil, err
 	}
 
 	// Extract column lineage from the main SELECT body
-	columns := e.extractBodyLineage(scope, stmt.Body)
+	columns, err := e.extractBodyLineage(scope, stmt.Body)
+	if err != nil {
+		return nil, err
+	}
 
 	// Collect all source tables
 	e.collectSources(scope)
@@ -110,19 +111,25 @@ func (e *lineageExtractor) extract(stmt *parser.SelectStmt) (*ModelLineage, erro
 }
 
 // extractBodyLineage extracts lineage from a SELECT body.
-func (e *lineageExtractor) extractBodyLineage(scope *parser.Scope, body *parser.SelectBody) []*ColumnLineage {
+func (e *lineageExtractor) extractBodyLineage(scope *parser.Scope, body *parser.SelectBody) ([]*ColumnLineage, error) {
 	if body == nil || body.Left == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Extract from the left (main) SELECT
-	columns := e.extractCoreLineage(scope, body.Left)
+	columns, err := e.extractCoreLineage(scope, body.Left)
+	if err != nil {
+		return nil, err
+	}
 
 	// Handle set operations (UNION, INTERSECT, EXCEPT)
 	if body.Right != nil {
 		// For set operations, we merge the lineage from both sides
 		// The output columns come from the left side, but sources come from both
-		rightColumns := e.extractBodyLineage(scope, body.Right)
+		rightColumns, err := e.extractBodyLineage(scope, body.Right)
+		if err != nil {
+			return nil, err
+		}
 
 		// Merge sources from right side into left columns
 		for i, col := range columns {
@@ -136,13 +143,13 @@ func (e *lineageExtractor) extractBodyLineage(scope *parser.Scope, body *parser.
 		}
 	}
 
-	return columns
+	return columns, nil
 }
 
 // extractCoreLineage extracts lineage from a SELECT core.
-func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.SelectCore) []*ColumnLineage {
+func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.SelectCore) ([]*ColumnLineage, error) {
 	if core == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Register tables from FROM clause
@@ -150,15 +157,18 @@ func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.
 		e.registerFromClause(scope, core.From)
 	}
 
-	var columns []*ColumnLineage
-	colResolver := parser.NewColumnResolver(scope, e.dialect)
+	colResolver, err := parser.NewColumnResolver(scope, e.dialect)
+	if err != nil {
+		return nil, err
+	}
 
+	var columns []*ColumnLineage
 	for i, item := range core.Columns {
 		lineages := e.extractSelectItemLineage(scope, colResolver, item, i)
 		columns = append(columns, lineages...)
 	}
 
-	return columns
+	return columns, nil
 }
 
 // extractSelectItemLineage extracts lineage from a single SELECT item.

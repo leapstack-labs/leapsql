@@ -140,10 +140,18 @@ func New(cfg Config) (*Engine, error) {
 		dbConfig.Type = "duckdb"
 	}
 
+	// Get dialect from registry based on target type (no DB connection needed)
+	// This allows lineage extraction during discovery without requiring DB connection
+	var d *dialect.Dialect
+	if resolvedDialect, ok := dialect.Get(dbConfig.Type); ok {
+		d = resolvedDialect
+	}
+
 	return &Engine{
 		db:            nil, // Lazy
 		dbConfig:      dbConfig,
 		dbConnected:   false,
+		dialect:       d,
 		store:         store,
 		modelsDir:     cfg.ModelsDir,
 		seedsDir:      cfg.SeedsDir,
@@ -184,8 +192,8 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 	if d, ok := dialect.Get(dialectName); ok {
 		e.dialect = d
 	} else {
-		// Fallback to DuckDB dialect as default
-		e.dialect = dialect.Default()
+		// No dialect found for this adapter type - this is an error
+		return fmt.Errorf("dialect %q not found for adapter type %q", dialectName, e.dbConfig.Type)
 	}
 
 	return nil

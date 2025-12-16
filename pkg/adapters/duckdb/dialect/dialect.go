@@ -10,7 +10,6 @@ import (
 
 func init() {
 	dialect.Register(DuckDB)
-	dialect.SetDefault(DuckDB) // DuckDB is the default dialect
 }
 
 // DuckDB is the DuckDB dialect configuration.

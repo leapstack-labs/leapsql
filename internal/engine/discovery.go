@@ -256,7 +256,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 	// Track which files we've seen
 	seenFiles := make(map[string]bool)
 
-	scanner := parser.NewScanner(absModelsDir)
+	scanner := parser.NewScanner(absModelsDir, e.dialect)
 
 	err := filepath.Walk(absModelsDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".sql") {
@@ -322,7 +322,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content []byte) *parser.ModelConfig {
 	// We need to re-parse the file to get the full SQL and sources
 	// But we can skip the full parse validation since we know it was valid before
-	scanner := parser.NewScanner(e.modelsDir)
+	scanner := parser.NewScanner(e.modelsDir, e.dialect)
 	config, err := scanner.ParseContent(filePath, content)
 	if err != nil {
 		// If parsing fails now, return nil to trigger full re-parse

@@ -1,9 +1,14 @@
 package lineage
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
+
+	// Import duckdb dialect so it registers itself
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 )
 
 // =============================================================================
@@ -52,11 +57,21 @@ type testCase struct {
 // runLineageTests executes table-driven lineage tests
 func runLineageTests(t *testing.T, tests []testCase) {
 	t.Helper()
+
+	// Get DuckDB dialect for testing
+	duckdb, ok := dialect.Get("duckdb")
+	if !ok {
+		t.Fatal("DuckDB dialect not found - ensure duckdb/dialect package is imported")
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lineage, err := ExtractLineage(tt.sql, tt.schema)
+			lineage, err := ExtractLineageWithOptions(tt.sql, ExtractLineageOptions{
+				Dialect: duckdb,
+				Schema:  tt.schema,
+			})
 			if err != nil {
-				t.Fatalf("ExtractLineage failed: %v", err)
+				t.Fatalf("ExtractLineageWithOptions failed: %v", err)
 			}
 
 			// Check sources
@@ -1354,6 +1369,12 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 // =============================================================================
 
 func TestExtractLineage_Errors(t *testing.T) {
+	// Get DuckDB dialect for testing
+	duckdb, ok := dialect.Get("duckdb")
+	if !ok {
+		t.Fatal("DuckDB dialect not found - ensure duckdb/dialect package is imported")
+	}
+
 	tests := []struct {
 		name string
 		sql  string
@@ -1377,11 +1398,19 @@ func TestExtractLineage_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ExtractLineage(tt.sql, nil)
+			_, err := ExtractLineageWithOptions(tt.sql, ExtractLineageOptions{Dialect: duckdb})
 			if err == nil {
 				t.Error("expected error, got nil")
 			}
 		})
+	}
+}
+
+// TestExtractLineage_DialectRequired verifies that dialect is required.
+func TestExtractLineage_DialectRequired(t *testing.T) {
+	_, err := ExtractLineageWithOptions("SELECT 1", ExtractLineageOptions{})
+	if !errors.Is(err, dialect.ErrDialectRequired) {
+		t.Errorf("expected ErrDialectRequired, got %v", err)
 	}
 }
 
@@ -1390,13 +1419,23 @@ func TestExtractLineage_Errors(t *testing.T) {
 // =============================================================================
 
 func BenchmarkExtractLineage_Simple(b *testing.B) {
+	duckdb, ok := dialect.Get("duckdb")
+	if !ok {
+		b.Fatal("DuckDB dialect not found")
+	}
+
 	sql := `SELECT id, name, email FROM users`
 	for i := 0; i < b.N; i++ {
-		_, _ = ExtractLineage(sql, nil)
+		_, _ = ExtractLineageWithOptions(sql, ExtractLineageOptions{Dialect: duckdb})
 	}
 }
 
 func BenchmarkExtractLineage_Complex(b *testing.B) {
+	duckdb, ok := dialect.Get("duckdb")
+	if !ok {
+		b.Fatal("DuckDB dialect not found")
+	}
+
 	sql := `
 	WITH cte AS (
 		SELECT id, SUM(amount) AS total FROM orders GROUP BY id
@@ -1407,6 +1446,6 @@ func BenchmarkExtractLineage_Complex(b *testing.B) {
 	WHERE u.status = 'active'`
 
 	for i := 0; i < b.N; i++ {
-		_, _ = ExtractLineage(sql, nil)
+		_, _ = ExtractLineageWithOptions(sql, ExtractLineageOptions{Dialect: duckdb})
 	}
 }

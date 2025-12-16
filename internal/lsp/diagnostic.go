@@ -38,6 +38,7 @@ func (s *Server) publishDiagnostics(uri string) {
 	diagnostics = append(diagnostics, templateDiags...)
 
 	// 3. Check SQL syntax (extract SQL from template first)
+	// Note: Basic SQL parsing doesn't require dialect - it's purely syntax checking
 	sqlDiags := s.validateSQL(doc)
 	diagnostics = append(diagnostics, sqlDiags...)
 

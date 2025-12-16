@@ -14,14 +14,15 @@ type Resolver struct {
 }
 
 // NewResolver creates a new resolver with the given dialect and schema.
-func NewResolver(d *dialect.Dialect, schema Schema) *Resolver {
+// Returns an error if dialect is nil.
+func NewResolver(d *dialect.Dialect, schema Schema) (*Resolver, error) {
 	if d == nil {
-		d = dialect.Default()
+		return nil, dialect.ErrDialectRequired
 	}
 	return &Resolver{
 		dialect: d,
 		schema:  schema,
-	}
+	}, nil
 }
 
 // Resolve builds scopes for a SELECT statement and returns the root scope.
@@ -30,7 +31,10 @@ func (r *Resolver) Resolve(stmt *SelectStmt) (*Scope, error) {
 		return nil, &ResolveError{Message: "nil statement"}
 	}
 
-	scope := NewScope(r.dialect, r.schema)
+	scope, err := NewScope(r.dialect, r.schema)
+	if err != nil {
+		return nil, err
+	}
 
 	// First, resolve CTEs
 	if stmt.With != nil {
@@ -354,14 +358,15 @@ type ColumnResolver struct {
 }
 
 // NewColumnResolver creates a column resolver for the given scope.
-func NewColumnResolver(scope *Scope, d *dialect.Dialect) *ColumnResolver {
+// Returns an error if dialect is nil.
+func NewColumnResolver(scope *Scope, d *dialect.Dialect) (*ColumnResolver, error) {
 	if d == nil {
-		d = dialect.Default()
+		return nil, dialect.ErrDialectRequired
 	}
 	return &ColumnResolver{
 		scope:   scope,
 		dialect: d,
-	}
+	}, nil
 }
 
 // CollectColumns collects all column references from an expression.

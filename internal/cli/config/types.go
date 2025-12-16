@@ -1,6 +1,10 @@
 // Package config provides configuration management for LeapSQL CLI.
 package config
 
+import (
+	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
+)
+
 // TargetConfig holds database target configuration.
 type TargetConfig struct {
 	Type string `koanf:"type"` // duckdb, postgres, snowflake, bigquery
@@ -49,11 +53,11 @@ type EnvConfig struct {
 	Target       *TargetConfig `koanf:"target"`
 }
 
-// Default configuration values.
+// Default configuration values - uses shared defaults from internal/config
 const (
-	DefaultModelsDir = "models"
-	DefaultSeedsDir  = "seeds"
-	DefaultMacrosDir = "macros"
+	DefaultModelsDir = sharedcfg.DefaultModelsDir
+	DefaultSeedsDir  = sharedcfg.DefaultSeedsDir
+	DefaultMacrosDir = sharedcfg.DefaultMacrosDir
 	DefaultStateFile = ".leapsql/state.db"
 	DefaultEnv       = "dev"
 	DefaultOutput    = "auto" // Auto-detect: TTY=text, non-TTY=markdown

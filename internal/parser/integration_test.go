@@ -6,7 +6,21 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/dag"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+
+	// Import duckdb dialect so it registers itself
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 )
+
+// getTestDialect returns the DuckDB dialect for integration tests.
+func getTestDialect(t *testing.T) *dialect.Dialect {
+	t.Helper()
+	d, ok := dialect.Get("duckdb")
+	if !ok {
+		t.Fatal("DuckDB dialect not found - ensure duckdb/dialect package is imported")
+	}
+	return d
+}
 
 // TestIntegration_ScanTestDataset tests the parser with the actual test dataset.
 func TestIntegration_ScanTestDataset(t *testing.T) {
@@ -17,7 +31,7 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath)
+	scanner := NewScanner(testdataPath, getTestDialect(t))
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)
@@ -87,7 +101,7 @@ func TestIntegration_BuildDAG(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath)
+	scanner := NewScanner(testdataPath, getTestDialect(t))
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)
@@ -215,7 +229,7 @@ func TestIntegration_AffectedNodes(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath)
+	scanner := NewScanner(testdataPath, getTestDialect(t))
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)

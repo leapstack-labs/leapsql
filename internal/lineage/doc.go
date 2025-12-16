@@ -15,13 +15,17 @@
 //
 // # Basic Usage
 //
-//	schemas := map[string]sql.Schema{
-//	    "users": {
-//	        Columns: []string{"id", "name", "email"},
-//	    },
+//	import _ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+//
+//	duckdb, _ := dialect.Get("duckdb")
+//	schema := parser.Schema{
+//	    "users": []string{"id", "name", "email"},
 //	}
 //
-//	result, err := lineage.ExtractLineage("SELECT id, name FROM users", schemas)
+//	result, err := lineage.ExtractLineageWithOptions("SELECT id, name FROM users", lineage.ExtractLineageOptions{
+//	    Dialect: duckdb,
+//	    Schema:  schema,
+//	})
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

@@ -1,6 +1,7 @@
 package dialect
 
 import (
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +12,9 @@ var (
 	dialectsMu sync.RWMutex
 	dialects   = make(map[string]*Dialect)
 )
+
+// ErrDialectRequired is returned when a dialect is required but not provided.
+var ErrDialectRequired = errors.New("dialect is required")
 
 // Get returns a dialect by name.
 func Get(name string) (*Dialect, bool) {
@@ -38,22 +42,4 @@ func List() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-// defaultDialect stores the default dialect (set by first registration or explicitly)
-var defaultDialect *Dialect
-
-// Default returns the default dialect.
-// Returns nil if no dialects have been registered.
-func Default() *Dialect {
-	dialectsMu.RLock()
-	defer dialectsMu.RUnlock()
-	return defaultDialect
-}
-
-// SetDefault sets the default dialect.
-func SetDefault(d *Dialect) {
-	dialectsMu.Lock()
-	defer dialectsMu.Unlock()
-	defaultDialect = d
 }

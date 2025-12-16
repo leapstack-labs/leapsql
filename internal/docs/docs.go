@@ -117,7 +117,8 @@ func NewGenerator(projectName string) *Generator {
 
 // LoadModels loads models from a directory.
 func (g *Generator) LoadModels(modelsDir string) error {
-	scanner := parser.NewScanner(modelsDir)
+	// Pass nil for dialect - lineage extraction will be skipped for docs
+	scanner := parser.NewScanner(modelsDir, nil)
 	models, err := scanner.ScanDir(modelsDir)
 	if err != nil {
 		return fmt.Errorf("failed to scan models: %w", err)

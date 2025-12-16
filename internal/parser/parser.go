@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/internal/lineage"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // ModelConfig holds configuration extracted from SQL model pragmas and frontmatter.
@@ -77,11 +78,14 @@ type ColumnInfo struct {
 type Parser struct {
 	// BaseDir is the models directory root
 	BaseDir string
+	// Dialect is the SQL dialect for lineage extraction (optional)
+	Dialect *dialect.Dialect
 }
 
-// NewParser creates a new parser with the given base directory.
-func NewParser(baseDir string) *Parser {
-	return &Parser{BaseDir: baseDir}
+// NewParser creates a new parser with the given base directory and dialect.
+// If dialect is nil, lineage extraction will be skipped.
+func NewParser(baseDir string, d *dialect.Dialect) *Parser {
+	return &Parser{BaseDir: baseDir, Dialect: d}
 }
 
 // Pragma patterns
@@ -222,8 +226,9 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 	config.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 
 	// Auto-detect table sources and column lineage using the lineage parser
-	if config.SQL != "" {
-		result, err := extractLineage(config.SQL)
+	// Only if dialect is available
+	if config.SQL != "" && p.Dialect != nil {
+		result, err := p.extractLineage(config.SQL)
 		if err == nil {
 			config.Sources = result.Sources
 			config.Columns = result.Columns
@@ -242,8 +247,14 @@ type lineageResult struct {
 }
 
 // extractLineage uses the lineage parser to extract all table sources and column lineage from SQL.
-func extractLineage(sql string) (*lineageResult, error) {
-	modelLineage, err := lineage.ExtractLineage(sql, nil)
+func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
+	if p.Dialect == nil {
+		return nil, fmt.Errorf("dialect is required for lineage extraction")
+	}
+
+	modelLineage, err := lineage.ExtractLineageWithOptions(sql, lineage.ExtractLineageOptions{
+		Dialect: p.Dialect,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -315,10 +326,11 @@ type Scanner struct {
 	parser *Parser
 }
 
-// NewScanner creates a new directory scanner.
-func NewScanner(baseDir string) *Scanner {
+// NewScanner creates a new directory scanner with the given dialect.
+// If dialect is nil, lineage extraction will be skipped.
+func NewScanner(baseDir string, d *dialect.Dialect) *Scanner {
 	return &Scanner{
-		parser: NewParser(baseDir),
+		parser: NewParser(baseDir, d),
 	}
 }
 

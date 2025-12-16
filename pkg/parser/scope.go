@@ -49,15 +49,16 @@ type Scope struct {
 }
 
 // NewScope creates a new root scope.
-func NewScope(d *dialect.Dialect, schema Schema) *Scope {
+// Returns an error if dialect is nil.
+func NewScope(d *dialect.Dialect, schema Schema) (*Scope, error) {
 	if d == nil {
-		d = dialect.Default()
+		return nil, dialect.ErrDialectRequired
 	}
 	return &Scope{
 		entries: make(map[string]*ScopeEntry),
 		dialect: d,
 		schema:  schema,
-	}
+	}, nil
 }
 
 // Child creates a child scope for nested queries (subqueries, derived tables).

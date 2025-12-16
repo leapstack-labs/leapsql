@@ -5,9 +5,21 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// Import duckdb dialect so it registers itself
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 )
+
+// testDialect returns the DuckDB dialect for testing.
+func testDialect(t *testing.T) *dialect.Dialect {
+	t.Helper()
+	d, ok := dialect.Get("duckdb")
+	require.True(t, ok, "DuckDB dialect not found - ensure duckdb/dialect package is imported")
+	return d
+}
 
 func TestParser_ParseContent(t *testing.T) {
 	tests := []struct {
@@ -118,7 +130,7 @@ WHERE active = true`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser("/models")
+			p := NewParser("/models", testDialect(t))
 			filePath := filePaths[tt.name]
 			config, err := p.ParseContent(filePath, tt.sql)
 			require.NoError(t, err)
@@ -207,7 +219,7 @@ FROM staging.stg_customers`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser("/models")
+			p := NewParser("/models", testDialect(t))
 			config, err := p.ParseContent("/models/test.sql", tt.sql)
 			require.NoError(t, err)
 
@@ -243,7 +255,7 @@ func TestParser_filePathToModelPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser(tt.baseDir)
+			p := NewParser(tt.baseDir, nil) // dialect not needed for path conversion
 			result := p.filePathToModelPath(tt.filePath)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -275,7 +287,7 @@ SELECT COUNT(*) FROM staging.users`,
 	}
 
 	// Scan directory
-	scanner := NewScanner(tmpDir)
+	scanner := NewScanner(tmpDir, testDialect(t))
 	models, err := scanner.ScanDir(tmpDir)
 	require.NoError(t, err)
 	require.Len(t, models, 3)
@@ -308,14 +320,14 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "users.sql"), []byte("SELECT 1"), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".hidden.sql"), []byte("SELECT 1"), 0600))
 
-	scanner := NewScanner(tmpDir)
+	scanner := NewScanner(tmpDir, nil) // dialect not needed for hidden file test
 	models, err := scanner.ScanDir(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, models, 1, "expected 1 model (skipping hidden)")
 }
 
 func TestParser_ParseContent_ColumnLineage(t *testing.T) {
-	p := NewParser("/models")
+	p := NewParser("/models", testDialect(t))
 
 	content := `SELECT 
 		c.customer_id,
