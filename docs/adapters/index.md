@@ -39,6 +39,9 @@ type Adapter interface {
     
     // LoadCSV loads a CSV file into a table
     LoadCSV(ctx context.Context, tableName string, filePath string) error
+    
+    // DialectName returns the SQL dialect name for this adapter
+    DialectName() string
 }
 ```
 
@@ -65,6 +68,7 @@ type Config struct {
 | Adapter | Status | Description |
 |---------|--------|-------------|
 | [DuckDB](/adapters/duckdb) | Stable | High-performance analytical database |
+| [PostgreSQL](/adapters/postgres) | Stable | Production-grade relational database |
 
 ## Metadata
 
@@ -136,7 +140,6 @@ cfg := adapter.Config{Path: "./data/warehouse.duckdb"}
 
 LeapSQL's adapter architecture is designed for extensibility. Potential future adapters include:
 
-- PostgreSQL
 - SQLite
 - ClickHouse
 - Snowflake

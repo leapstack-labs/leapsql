@@ -21,6 +21,7 @@ import (
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/template"
+	"github.com/leapstack-labs/leapsql/pkg/sql"
 )
 
 // Engine orchestrates the execution of SQL models.
@@ -30,6 +31,9 @@ type Engine struct {
 	dbConfig    adapter.Config
 	dbConnected bool
 	dbMu        sync.Mutex
+
+	// SQL dialect for the connected adapter (set after connection)
+	dialect *sql.Dialect
 
 	store         state.Store
 	modelsDir     string
@@ -174,6 +178,16 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 
 	e.db = db
 	e.dbConnected = true
+
+	// Set dialect based on adapter type
+	dialectName := db.DialectName()
+	if dialect, ok := sql.GetDialect(dialectName); ok {
+		e.dialect = dialect
+	} else {
+		// Fallback to DuckDB dialect as default
+		e.dialect = sql.DefaultDialect()
+	}
+
 	return nil
 }
 
@@ -631,6 +645,12 @@ func (e *Engine) GetModels() map[string]*parser.ModelConfig {
 // GetStateStore returns the state store.
 func (e *Engine) GetStateStore() state.Store {
 	return e.store
+}
+
+// GetDialect returns the SQL dialect for the connected adapter.
+// Returns nil if the database is not yet connected.
+func (e *Engine) GetDialect() *sql.Dialect {
+	return e.dialect
 }
 
 // RenderModel renders the SQL for a model with all templates expanded.

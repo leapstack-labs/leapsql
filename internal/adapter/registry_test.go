@@ -15,8 +15,9 @@ func TestDuckDBSelfRegistration(t *testing.T) {
 func TestListAdapters(t *testing.T) {
 	adapters := ListAdapters()
 
-	// Should contain at least duckdb
+	// Should contain at least duckdb and postgres
 	assert.Contains(t, adapters, "duckdb", "duckdb should be in adapter list")
+	assert.Contains(t, adapters, "postgres", "postgres should be in adapter list")
 }
 
 func TestIsRegistered(t *testing.T) {
@@ -26,8 +27,8 @@ func TestIsRegistered(t *testing.T) {
 		expected bool
 	}{
 		{"duckdb registered", "duckdb", true},
+		{"postgres registered", "postgres", true},
 		{"unknown not registered", "unknown_db", false},
-		{"postgres not registered yet", "postgres", false},
 	}
 
 	for _, tt := range tests {

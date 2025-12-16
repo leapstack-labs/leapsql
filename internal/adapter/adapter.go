@@ -101,4 +101,8 @@ type Adapter interface {
 	// LoadCSV loads data from a CSV file into a table.
 	// If the table doesn't exist, it will be created with inferred schema.
 	LoadCSV(ctx context.Context, tableName string, filePath string) error
+
+	// DialectName returns the SQL dialect name for this adapter (e.g., "duckdb", "postgres").
+	// This is used to automatically select the appropriate SQL dialect for lineage analysis.
+	DialectName() string
 }

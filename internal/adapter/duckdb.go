@@ -16,13 +16,17 @@ func init() {
 
 // DuckDBAdapter implements the Adapter interface for DuckDB.
 type DuckDBAdapter struct {
-	db     *sql.DB
-	config Config
+	BaseSQLAdapter
 }
 
 // NewDuckDBAdapter creates a new DuckDB adapter instance.
 func NewDuckDBAdapter() *DuckDBAdapter {
 	return &DuckDBAdapter{}
+}
+
+// DialectName returns the SQL dialect for this adapter.
+func (a *DuckDBAdapter) DialectName() string {
+	return "duckdb"
 }
 
 // Connect establishes a connection to DuckDB.
@@ -44,52 +48,15 @@ func (a *DuckDBAdapter) Connect(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("failed to ping duckdb: %w", err)
 	}
 
-	a.db = db
-	a.config = cfg
+	a.DB = db
+	a.Cfg = cfg
 
 	return nil
-}
-
-// Close closes the DuckDB connection.
-func (a *DuckDBAdapter) Close() error {
-	if a.db != nil {
-		return a.db.Close()
-	}
-	return nil
-}
-
-// Exec executes a SQL statement that doesn't return rows.
-func (a *DuckDBAdapter) Exec(ctx context.Context, sqlStr string) error {
-	if a.db == nil {
-		return fmt.Errorf("database connection not established")
-	}
-
-	_, err := a.db.ExecContext(ctx, sqlStr)
-	if err != nil {
-		return fmt.Errorf("failed to execute SQL: %w", err)
-	}
-
-	return nil
-}
-
-// Query executes a SQL statement that returns rows.
-func (a *DuckDBAdapter) Query(ctx context.Context, sqlStr string) (*Rows, error) {
-	if a.db == nil {
-		return nil, fmt.Errorf("database connection not established")
-	}
-
-	//nolint:rowserrcheck // rows.Err() must be checked by caller after iteration completes
-	rows, err := a.db.QueryContext(ctx, sqlStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
-	}
-
-	return &Rows{Rows: rows}, nil
 }
 
 // GetTableMetadata retrieves metadata for a specified table.
 func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Metadata, error) {
-	if a.db == nil {
+	if a.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
 
@@ -113,7 +80,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 		ORDER BY ordinal_position
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, schema, tableName)
+	rows, err := a.DB.QueryContext(ctx, query, schema, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column metadata: %w", err)
 	}
@@ -141,7 +108,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 	// Get row count
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", schema, tableName) //nolint:gosec // Table names are validated by caller
 	var rowCount int64
-	if err := a.db.QueryRowContext(ctx, countQuery).Scan(&rowCount); err != nil {
+	if err := a.DB.QueryRowContext(ctx, countQuery).Scan(&rowCount); err != nil {
 		// Non-fatal error, just set to 0
 		rowCount = 0
 	}
@@ -157,7 +124,7 @@ func (a *DuckDBAdapter) GetTableMetadata(ctx context.Context, table string) (*Me
 // LoadCSV loads data from a CSV file into a table.
 // DuckDB will automatically infer the schema from the CSV file.
 func (a *DuckDBAdapter) LoadCSV(ctx context.Context, tableName string, filePath string) error {
-	if a.db == nil {
+	if a.DB == nil {
 		return fmt.Errorf("database connection not established")
 	}
 
