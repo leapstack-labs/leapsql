@@ -41,6 +41,10 @@ type Config struct {
 
 	// Options contains additional driver-specific options
 	Options map[string]string
+
+	// Params holds adapter-specific configuration.
+	// The framework passes the raw YAML/JSON structure; adapters parse it.
+	Params map[string]any
 }
 
 // Column represents a column in a database table.

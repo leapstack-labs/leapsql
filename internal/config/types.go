@@ -34,6 +34,9 @@ type TargetConfig struct {
 
 	// Additional driver-specific options
 	Options map[string]string `koanf:"options"`
+
+	// Params holds adapter-specific configuration (e.g., DuckDB extensions, secrets, settings)
+	Params map[string]any `koanf:"params"`
 }
 
 // DefaultSchemaForType returns the default schema for a database type.

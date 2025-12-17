@@ -252,11 +252,17 @@ func MergeTargetConfig(base, override *TargetConfig) *TargetConfig {
 		Warehouse: base.Warehouse,
 		Role:      base.Role,
 		Options:   make(map[string]string),
+		Params:    make(map[string]any),
 	}
 
 	// Copy base options
 	for k, v := range base.Options {
 		merged.Options[k] = v
+	}
+
+	// Copy base params
+	for k, v := range base.Params {
+		merged.Params[k] = v
 	}
 
 	// Apply overrides
@@ -294,6 +300,11 @@ func MergeTargetConfig(base, override *TargetConfig) *TargetConfig {
 	// Merge options
 	for k, v := range override.Options {
 		merged.Options[k] = v
+	}
+
+	// Merge params (override takes precedence)
+	for k, v := range override.Params {
+		merged.Params[k] = v
 	}
 
 	return merged

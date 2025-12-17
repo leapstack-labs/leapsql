@@ -343,3 +343,230 @@ func TestAdapter_LoadCSV(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, metadata.Columns, 3)
 }
+
+func TestBuildCreateSecretSQL(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  SecretConfig
+		want string
+	}{
+		{
+			name: "s3 with credential chain",
+			cfg: SecretConfig{
+				Type:     "s3",
+				Provider: "credential_chain",
+				Region:   "us-west-2",
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    PROVIDER credential_chain,
+    REGION 'us-west-2'
+)`,
+		},
+		{
+			name: "s3 type only",
+			cfg: SecretConfig{
+				Type: "s3",
+			},
+			want: `CREATE SECRET (
+    TYPE s3
+)`,
+		},
+		{
+			name: "s3 with single scope string",
+			cfg: SecretConfig{
+				Type:   "s3",
+				Region: "eu-central-1",
+				Scope:  "s3://my-bucket",
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    REGION 'eu-central-1',
+    SCOPE 's3://my-bucket'
+)`,
+		},
+		{
+			name: "s3 with multiple scopes as []any",
+			cfg: SecretConfig{
+				Type:   "s3",
+				Region: "eu-central-1",
+				Scope:  []any{"s3://bucket1", "s3://bucket2"},
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    REGION 'eu-central-1',
+    SCOPE ('s3://bucket1', 's3://bucket2')
+)`,
+		},
+		{
+			name: "s3 with multiple scopes as []string",
+			cfg: SecretConfig{
+				Type:   "s3",
+				Region: "eu-central-1",
+				Scope:  []string{"s3://bucket1", "s3://bucket2"},
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    REGION 'eu-central-1',
+    SCOPE ('s3://bucket1', 's3://bucket2')
+)`,
+		},
+		{
+			name: "s3 with explicit credentials",
+			cfg: SecretConfig{
+				Type:     "s3",
+				Provider: "config",
+				Region:   "us-east-1",
+				KeyID:    "AKIAIOSFODNN7EXAMPLE",
+				Secret:   "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    PROVIDER config,
+    REGION 'us-east-1',
+    KEY_ID 'AKIAIOSFODNN7EXAMPLE',
+    SECRET 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+)`,
+		},
+		{
+			name: "s3 compatible with endpoint and path style",
+			cfg: SecretConfig{
+				Type:     "s3",
+				Provider: "config",
+				KeyID:    "minioadmin",
+				Secret:   "minioadmin",
+				Endpoint: "localhost:9000",
+				URLStyle: "path",
+				UseSSL:   boolPtrTest(false),
+			},
+			want: `CREATE SECRET (
+    TYPE s3,
+    PROVIDER config,
+    KEY_ID 'minioadmin',
+    SECRET 'minioadmin',
+    ENDPOINT 'localhost:9000',
+    URL_STYLE 'path',
+    USE_SSL false
+)`,
+		},
+		{
+			name: "gcs with service account",
+			cfg: SecretConfig{
+				Type:     "gcs",
+				Provider: "service_account",
+				KeyID:    "my-service-account@project.iam.gserviceaccount.com",
+			},
+			want: `CREATE SECRET (
+    TYPE gcs,
+    PROVIDER service_account,
+    KEY_ID 'my-service-account@project.iam.gserviceaccount.com'
+)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildCreateSecretSQL(tt.cfg)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func boolPtrTest(b bool) *bool {
+	return &b
+}
+
+func TestConnect_WithParams(t *testing.T) {
+	ctx := context.Background()
+	adp := New(nil)
+
+	cfg := adapter.Config{
+		Path: ":memory:",
+		Params: map[string]any{
+			"extensions": []any{"json"},
+			"settings": map[string]any{
+				"threads": "2",
+			},
+		},
+	}
+
+	err := adp.Connect(ctx, cfg)
+	require.NoError(t, err)
+	defer func() { _ = adp.Close() }()
+
+	// Verify extension loaded by checking it's in the loaded extensions list
+	rows, err := adp.Query(ctx, "SELECT extension_name FROM duckdb_extensions() WHERE loaded = true AND extension_name = 'json'")
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	require.True(t, rows.Next(), "json extension should be loaded")
+
+	var extName string
+	require.NoError(t, rows.Scan(&extName))
+	assert.Equal(t, "json", extName)
+}
+
+func TestConnect_WithSettings(t *testing.T) {
+	ctx := context.Background()
+	adp := New(nil)
+
+	cfg := adapter.Config{
+		Path: ":memory:",
+		Params: map[string]any{
+			"settings": map[string]any{
+				"threads": "2",
+			},
+		},
+	}
+
+	err := adp.Connect(ctx, cfg)
+	require.NoError(t, err)
+	defer func() { _ = adp.Close() }()
+
+	// Verify setting was applied
+	rows, err := adp.Query(ctx, "SELECT current_setting('threads')")
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	require.True(t, rows.Next())
+
+	var threadsSetting string
+	require.NoError(t, rows.Scan(&threadsSetting))
+	assert.Equal(t, "2", threadsSetting)
+}
+
+func TestConnect_WithNilParams(t *testing.T) {
+	ctx := context.Background()
+	adp := New(nil)
+
+	cfg := adapter.Config{
+		Path:   ":memory:",
+		Params: nil,
+	}
+
+	err := adp.Connect(ctx, cfg)
+	require.NoError(t, err)
+	defer func() { _ = adp.Close() }()
+
+	// Should work normally
+	rows, err := adp.Query(ctx, "SELECT 1")
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+}
+
+func TestConnect_WithEmptyParams(t *testing.T) {
+	ctx := context.Background()
+	adp := New(nil)
+
+	cfg := adapter.Config{
+		Path:   ":memory:",
+		Params: map[string]any{},
+	}
+
+	err := adp.Connect(ctx, cfg)
+	require.NoError(t, err)
+	defer func() { _ = adp.Close() }()
+
+	// Should work normally
+	rows, err := adp.Query(ctx, "SELECT 1")
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+}

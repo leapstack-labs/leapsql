@@ -395,6 +395,7 @@ func createEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, erro
 			Username: cfg.Target.User,
 			Password: cfg.Target.Password,
 			Options:  cfg.Target.Options,
+			Params:   cfg.Target.Params,
 		}
 	}
 

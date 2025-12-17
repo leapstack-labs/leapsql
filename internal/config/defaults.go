@@ -32,8 +32,7 @@ func (t *TargetConfig) ApplyDefaults() {
 	}
 
 	// Apply type-specific defaults
-	switch t.Type {
-	case "postgres":
+	if t.Type == "postgres" {
 		if t.Port == 0 {
 			t.Port = 5432
 		}

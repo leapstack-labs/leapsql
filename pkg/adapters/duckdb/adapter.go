@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
@@ -60,6 +62,18 @@ func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 	a.DB = db
 	a.Cfg = cfg
 
+	// Parse and apply adapter-specific params
+	params, err := parseParams(cfg.Params)
+	if err != nil {
+		_ = db.Close()
+		return fmt.Errorf("failed to parse duckdb params: %w", err)
+	}
+
+	if err := a.applyParams(ctx, params); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("failed to apply duckdb params: %w", err)
+	}
+
 	return nil
 }
 
@@ -93,6 +107,166 @@ func (a *Adapter) LoadCSV(ctx context.Context, tableName string, filePath string
 	}
 
 	return nil
+}
+
+// parseParams decodes adapter.Config.Params into Params.
+func parseParams(raw map[string]any) (*Params, error) {
+	if raw == nil {
+		return &Params{}, nil
+	}
+
+	var params Params
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &params,
+		WeaklyTypedInput: true,
+		TagName:          "mapstructure",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(raw); err != nil {
+		return nil, fmt.Errorf("invalid duckdb params: %w", err)
+	}
+
+	return &params, nil
+}
+
+// applyParams applies DuckDB-specific configuration after connection.
+func (a *Adapter) applyParams(ctx context.Context, params *Params) error {
+	// 1. Install and load extensions
+	for _, ext := range params.Extensions {
+		if err := a.installExtension(ctx, ext); err != nil {
+			return fmt.Errorf("failed to install extension %q: %w", ext, err)
+		}
+	}
+
+	// 2. Create secrets
+	for i, secret := range params.Secrets {
+		if err := a.createSecret(ctx, secret); err != nil {
+			return fmt.Errorf("failed to create secret %d (%s): %w", i, secret.Type, err)
+		}
+	}
+
+	// 3. Apply settings
+	for key, value := range params.Settings {
+		if err := a.applySetting(ctx, key, value); err != nil {
+			return fmt.Errorf("failed to apply setting %q: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+// installExtension installs and loads a DuckDB extension.
+func (a *Adapter) installExtension(ctx context.Context, name string) error {
+	a.Logger.Debug("installing extension", slog.String("extension", name))
+
+	// INSTALL is idempotent - no-op if already installed
+	if _, err := a.DB.ExecContext(ctx, fmt.Sprintf("INSTALL %s", name)); err != nil {
+		return fmt.Errorf("install failed: %w", err)
+	}
+
+	if _, err := a.DB.ExecContext(ctx, fmt.Sprintf("LOAD %s", name)); err != nil {
+		return fmt.Errorf("load failed: %w", err)
+	}
+
+	return nil
+}
+
+// createSecret creates a DuckDB secret for cloud storage.
+func (a *Adapter) createSecret(ctx context.Context, cfg SecretConfig) error {
+	a.Logger.Debug("creating secret",
+		slog.String("type", cfg.Type),
+		slog.String("provider", cfg.Provider),
+	)
+
+	sql := buildCreateSecretSQL(cfg)
+
+	if _, err := a.DB.ExecContext(ctx, sql); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// buildCreateSecretSQL constructs the CREATE SECRET statement.
+func buildCreateSecretSQL(cfg SecretConfig) string {
+	var b strings.Builder
+	b.WriteString("CREATE SECRET (")
+
+	// Required: TYPE
+	b.WriteString(fmt.Sprintf("\n    TYPE %s", cfg.Type))
+
+	// Optional: PROVIDER
+	if cfg.Provider != "" {
+		b.WriteString(fmt.Sprintf(",\n    PROVIDER %s", cfg.Provider))
+	}
+
+	// Optional: REGION
+	if cfg.Region != "" {
+		b.WriteString(fmt.Sprintf(",\n    REGION '%s'", cfg.Region))
+	}
+
+	// Optional: SCOPE (can be string or []string)
+	if cfg.Scope != nil {
+		switch v := cfg.Scope.(type) {
+		case string:
+			b.WriteString(fmt.Sprintf(",\n    SCOPE '%s'", v))
+		case []any:
+			scopes := make([]string, len(v))
+			for i, s := range v {
+				scopes[i] = fmt.Sprintf("'%s'", s)
+			}
+			b.WriteString(fmt.Sprintf(",\n    SCOPE (%s)", strings.Join(scopes, ", ")))
+		case []string:
+			scopes := make([]string, len(v))
+			for i, s := range v {
+				scopes[i] = fmt.Sprintf("'%s'", s)
+			}
+			b.WriteString(fmt.Sprintf(",\n    SCOPE (%s)", strings.Join(scopes, ", ")))
+		}
+	}
+
+	// Optional: KEY_ID
+	if cfg.KeyID != "" {
+		b.WriteString(fmt.Sprintf(",\n    KEY_ID '%s'", cfg.KeyID))
+	}
+
+	// Optional: SECRET
+	if cfg.Secret != "" {
+		b.WriteString(fmt.Sprintf(",\n    SECRET '%s'", cfg.Secret))
+	}
+
+	// Optional: ENDPOINT
+	if cfg.Endpoint != "" {
+		b.WriteString(fmt.Sprintf(",\n    ENDPOINT '%s'", cfg.Endpoint))
+	}
+
+	// Optional: URL_STYLE
+	if cfg.URLStyle != "" {
+		b.WriteString(fmt.Sprintf(",\n    URL_STYLE '%s'", cfg.URLStyle))
+	}
+
+	// Optional: USE_SSL
+	if cfg.UseSSL != nil {
+		b.WriteString(fmt.Sprintf(",\n    USE_SSL %t", *cfg.UseSSL))
+	}
+
+	b.WriteString("\n)")
+	return b.String()
+}
+
+// applySetting applies a DuckDB session setting.
+func (a *Adapter) applySetting(ctx context.Context, key, value string) error {
+	a.Logger.Debug("applying setting",
+		slog.String("key", key),
+		slog.String("value", value),
+	)
+
+	sql := fmt.Sprintf("SET %s = '%s'", key, value)
+	_, err := a.DB.ExecContext(ctx, sql)
+	return err
 }
 
 // Ensure Adapter implements adapter.Adapter interface
