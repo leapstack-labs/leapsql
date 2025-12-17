@@ -26,17 +26,16 @@ func (t *TargetConfig) ApplyDefaults() {
 		return
 	}
 
+	// Apply default schema based on type
+	if t.Schema == "" {
+		t.Schema = DefaultSchemaForType(t.Type)
+	}
+
+	// Apply type-specific defaults
 	switch t.Type {
 	case "postgres":
 		if t.Port == 0 {
 			t.Port = 5432
-		}
-		if t.Schema == "" {
-			t.Schema = "public"
-		}
-	case "duckdb":
-		if t.Schema == "" {
-			t.Schema = "main"
 		}
 	}
 }

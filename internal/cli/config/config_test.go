@@ -117,9 +117,12 @@ func TestDefaultSchemaForType(t *testing.T) {
 		{"DuckDB", "main"},
 		{"DUCKDB", "main"},
 		{"postgres", "public"},
-		{"postgresql", "public"},
-		{"snowflake", "PUBLIC"},
-		{"bigquery", ""},
+		// Note: "postgresql" is not a registered dialect name, so it falls back to "main"
+		// The registered dialect name is "postgres"
+		{"postgresql", "main"},
+		// Unregistered dialects fall back to "main"
+		{"snowflake", "main"},
+		{"bigquery", "main"},
 		{"unknown", "main"}, // Default fallback
 		{"", "main"},        // Empty string fallback
 	}

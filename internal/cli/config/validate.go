@@ -3,50 +3,14 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 )
 
 // DefaultSchemaForType returns the default schema for a database type.
+// This is a convenience wrapper around the shared config function.
 func DefaultSchemaForType(dbType string) string {
-	switch strings.ToLower(dbType) {
-	case "duckdb":
-		return "main"
-	case "postgres", "postgresql":
-		return "public"
-	case "snowflake":
-		return "PUBLIC"
-	case "bigquery":
-		return "" // BigQuery uses project.dataset.table
-	default:
-		return "main"
-	}
-}
-
-// Validate checks if the target configuration is valid.
-// It uses the adapter registry to determine which adapter types are available.
-func (t *TargetConfig) Validate() error {
-	if t.Type == "" {
-		return fmt.Errorf("target type is required")
-	}
-
-	// Use adapter registry as single source of truth
-	if !adapter.IsRegistered(strings.ToLower(t.Type)) {
-		return &adapter.UnknownAdapterError{
-			Type:      t.Type,
-			Available: adapter.ListAdapters(),
-		}
-	}
-
-	return nil
-}
-
-// ApplyDefaults sets default values based on the database type.
-func (t *TargetConfig) ApplyDefaults() {
-	if t.Schema == "" {
-		t.Schema = DefaultSchemaForType(t.Type)
-	}
+	return sharedcfg.DefaultSchemaForType(dbType)
 }
 
 // Validate checks if the configuration is valid.

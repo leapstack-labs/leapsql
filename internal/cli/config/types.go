@@ -1,34 +1,18 @@
 // Package config provides configuration management for LeapSQL CLI.
+//
+// This package extends the shared configuration types from internal/config
+// with CLI-specific fields and functionality. The shared types (TargetConfig,
+// ProjectConfig) are defined in internal/config and re-exported here via
+// type aliases for convenience.
 package config
 
 import (
 	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 )
 
-// TargetConfig holds database target configuration.
-type TargetConfig struct {
-	Type string `koanf:"type"` // duckdb, postgres, snowflake, bigquery
-
-	// File-based databases (DuckDB, SQLite)
-	Database string `koanf:"database"` // file path or database name
-
-	// Network databases
-	Host     string `koanf:"host"`
-	Port     int    `koanf:"port"`
-	User     string `koanf:"user"`
-	Password string `koanf:"password"`
-
-	// Common
-	Schema string `koanf:"schema"`
-
-	// Snowflake-specific
-	Account   string `koanf:"account"`
-	Warehouse string `koanf:"warehouse"`
-	Role      string `koanf:"role"`
-
-	// Additional driver-specific options
-	Options map[string]string `koanf:"options"`
-}
+// TargetConfig is an alias for the shared target configuration.
+// This allows CLI code to use config.TargetConfig without importing internal/config.
+type TargetConfig = sharedcfg.TargetConfig
 
 // Config holds all CLI configuration options.
 type Config struct {
