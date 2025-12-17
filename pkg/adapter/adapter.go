@@ -8,6 +8,8 @@ package adapter
 import (
 	"context"
 	"database/sql"
+
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Config holds the configuration for connecting to a database.
@@ -105,7 +107,8 @@ type Adapter interface {
 	// If the table doesn't exist, it will be created with inferred schema.
 	LoadCSV(ctx context.Context, tableName string, filePath string) error
 
-	// DialectName returns the SQL dialect name for this adapter (e.g., "duckdb", "postgres").
-	// This is used to automatically select the appropriate SQL dialect for lineage analysis.
-	DialectName() string
+	// Dialect returns the SQL dialect configuration for this adapter.
+	// This is used to select the appropriate SQL dialect for lineage analysis,
+	// get reserved words, format placeholders, and access dialect-specific settings.
+	Dialect() *dialect.Dialect
 }

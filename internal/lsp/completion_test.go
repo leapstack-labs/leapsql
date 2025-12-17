@@ -260,8 +260,10 @@ func TestServer_GetCompletions_Builtins(t *testing.T) {
 }
 
 func TestServer_GetCompletions_SQLKeywords(t *testing.T) {
+	d, _ := dialect.Get("duckdb")
 	server := &Server{
 		documents: NewDocumentStore(),
+		dialect:   d,
 	}
 
 	// Test SQL keyword completion
@@ -333,13 +335,15 @@ func TestCompletionItemKinds(t *testing.T) {
 		}
 	}
 
-	// Verify SQL keywords have correct kind
-	for _, kw := range sqlKeywords {
+	// Verify SQL keywords from dialect have correct kind
+	d, _ := dialect.Get("duckdb")
+	keywords := getSQLKeywordCompletions(d, "")
+	assert.NotEmpty(t, keywords, "expected SQL keywords from dialect")
+	for _, kw := range keywords {
 		assert.Equal(t, CompletionItemKindKeyword, kw.Kind, "SQL keyword %s should be Keyword", kw.Label)
 	}
 
 	// Verify SQL functions from dialect return correct kind when converted
-	d, _ := dialect.Get("duckdb")
 	items := getSQLFunctionCompletions(d, "")
 	for _, item := range items {
 		assert.Equal(t, CompletionItemKindFunction, item.Kind, "SQL function %s should be Function", item.Label)

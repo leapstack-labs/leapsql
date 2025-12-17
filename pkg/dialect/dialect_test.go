@@ -194,3 +194,152 @@ func TestNormalizationStrategies(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatPlaceholder(t *testing.T) {
+	tests := []struct {
+		name  string
+		style PlaceholderStyle
+		index int
+		want  string
+	}{
+		{"question style 1", PlaceholderQuestion, 1, "?"},
+		{"question style 2", PlaceholderQuestion, 2, "?"},
+		{"dollar style 1", PlaceholderDollar, 1, "$1"},
+		{"dollar style 2", PlaceholderDollar, 2, "$2"},
+		{"dollar style 10", PlaceholderDollar, 10, "$10"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDialect("test").
+				PlaceholderStyle(tt.style).
+				Build()
+
+			assert.Equal(t, tt.want, d.FormatPlaceholder(tt.index))
+		})
+	}
+}
+
+func TestDefaultSchema(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema string
+	}{
+		{"duckdb default", "main"},
+		{"postgres default", "public"},
+		{"custom schema", "myschema"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDialect("test").
+				DefaultSchema(tt.schema).
+				Build()
+
+			assert.Equal(t, tt.schema, d.DefaultSchema)
+		})
+	}
+}
+
+func TestIsReservedWord(t *testing.T) {
+	d := NewDialect("test").
+		WithReservedWords("SELECT", "FROM", "WHERE", "user", "ORDER").
+		Build()
+
+	tests := []struct {
+		word string
+		want bool
+	}{
+		{"SELECT", true},
+		{"select", true}, // case insensitive
+		{"FROM", true},
+		{"user", true},
+		{"ORDER", true},
+		{"foo", false},
+		{"mycolumn", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.word, func(t *testing.T) {
+			assert.Equal(t, tt.want, d.IsReservedWord(tt.word))
+		})
+	}
+}
+
+func TestQuoteIdentifier(t *testing.T) {
+	tests := []struct {
+		name     string
+		quote    string
+		quoteEnd string
+		escape   string
+		input    string
+		want     string
+	}{
+		{"double quote simple", `"`, `"`, `""`, "users", `"users"`},
+		{"double quote with quote", `"`, `"`, `""`, `foo"bar`, `"foo""bar"`},
+		{"backtick simple", "`", "`", "``", "users", "`users`"},
+		{"bracket simple", "[", "]", "]]", "users", "[users]"},
+		{"bracket with bracket", "[", "]", "]]", "foo]bar", "[foo]]bar]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDialect("test").
+				Identifiers(tt.quote, tt.quoteEnd, tt.escape, NormLowercase).
+				Build()
+
+			assert.Equal(t, tt.want, d.QuoteIdentifier(tt.input))
+		})
+	}
+}
+
+func TestQuoteIdentifierIfNeeded(t *testing.T) {
+	d := NewDialect("test").
+		Identifiers(`"`, `"`, `""`, NormLowercase).
+		WithReservedWords("SELECT", "user", "ORDER").
+		Build()
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"users", "users"},       // not reserved
+		{"user", `"user"`},       // reserved
+		{"USER", `"USER"`},       // reserved (case insensitive)
+		{"select", `"select"`},   // reserved
+		{"mycolumn", "mycolumn"}, // not reserved
+		{"order", `"order"`},     // reserved
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, d.QuoteIdentifierIfNeeded(tt.name))
+		})
+	}
+}
+
+func TestBuilderWithAllNewMethods(t *testing.T) {
+	// Test that all new builder methods can be chained
+	d := NewDialect("postgres").
+		Identifiers(`"`, `"`, `""`, NormLowercase).
+		Operators(true, false).
+		DefaultSchema("public").
+		PlaceholderStyle(PlaceholderDollar).
+		Aggregates("sum", "count").
+		Generators("now").
+		Windows("row_number").
+		TableFunctions("generate_series").
+		WithKeywords("SELECT", "FROM").
+		WithReservedWords("user", "order", "table").
+		WithDataTypes("INTEGER", "VARCHAR").
+		Build()
+
+	require.NotNil(t, d)
+	assert.Equal(t, "postgres", d.Name)
+	assert.Equal(t, "public", d.DefaultSchema)
+	assert.Equal(t, PlaceholderDollar, d.Placeholder)
+	assert.Equal(t, "$1", d.FormatPlaceholder(1))
+	assert.True(t, d.IsReservedWord("user"))
+	assert.True(t, d.IsReservedWord("ORDER"))
+	assert.False(t, d.IsReservedWord("foo"))
+}

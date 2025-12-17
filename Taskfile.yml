@@ -68,6 +68,17 @@ tasks:
     cmds:
       - go generate ./...
 
+  generate:dialect:
+    desc: Generate DuckDB dialect metadata (functions, keywords, types)
+    cmds:
+      - go run ./scripts/gendialect -dialect=duckdb -gen=all -outdir=pkg/adapters/duckdb/dialect
+
+  generate:all:
+    desc: Run all code generation (sqlc + dialect)
+    cmds:
+      - task: generate
+      - task: generate:dialect
+
   run:
     desc: Run all models
     deps: [build]

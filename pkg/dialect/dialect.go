@@ -6,6 +6,7 @@
 package dialect
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -21,6 +22,16 @@ const (
 	NormCaseSensitive
 	// NormCaseInsensitive normalizes to lowercase for comparison (BigQuery, Hive, DuckDB).
 	NormCaseInsensitive
+)
+
+// PlaceholderStyle defines how query parameters are formatted.
+type PlaceholderStyle int
+
+const (
+	// PlaceholderQuestion uses ? for all parameters (DuckDB, MySQL, SQLite).
+	PlaceholderQuestion PlaceholderStyle = iota
+	// PlaceholderDollar uses $1, $2, etc. for parameters (PostgreSQL).
+	PlaceholderDollar
 )
 
 // IdentifierConfig defines how identifiers are quoted and normalized.
@@ -85,6 +96,10 @@ type Dialect struct {
 	Identifiers IdentifierConfig
 	Operators   OperatorConfig
 
+	// Database-specific settings
+	DefaultSchema string           // Default schema name ("main" for DuckDB, "public" for Postgres)
+	Placeholder   PlaceholderStyle // How to format query parameters
+
 	// Function classifications (normalized to dialect's normalization strategy)
 	aggregates     map[string]struct{}
 	generators     map[string]struct{}
@@ -95,8 +110,9 @@ type Dialect struct {
 	docs map[string]FunctionDoc
 
 	// Keywords and types for autocomplete/highlighting
-	keywords  map[string]struct{}
-	dataTypes []string
+	keywords      map[string]struct{} // Reserved keywords for LSP completions
+	reservedWords map[string]struct{} // All keywords that need quoting as identifiers
+	dataTypes     []string
 }
 
 // FunctionLineageType returns the lineage classification for a function.
@@ -215,6 +231,39 @@ func (d *Dialect) DataTypes() []string {
 	return d.dataTypes
 }
 
+// FormatPlaceholder returns a placeholder for the given parameter index (1-based).
+// Returns "?" for PlaceholderQuestion style, "$1", "$2" etc. for PlaceholderDollar style.
+func (d *Dialect) FormatPlaceholder(index int) string {
+	switch d.Placeholder {
+	case PlaceholderDollar:
+		return "$" + strconv.Itoa(index)
+	default: // PlaceholderQuestion
+		return "?"
+	}
+}
+
+// IsReservedWord returns true if the word needs quoting when used as an identifier.
+func (d *Dialect) IsReservedWord(word string) bool {
+	normalized := d.NormalizeName(word)
+	_, ok := d.reservedWords[normalized]
+	return ok
+}
+
+// QuoteIdentifier quotes an identifier using the dialect's quote characters.
+func (d *Dialect) QuoteIdentifier(name string) string {
+	// Escape any existing quote end characters in the name (e.g., ] -> ]])
+	escaped := strings.ReplaceAll(name, d.Identifiers.QuoteEnd, d.Identifiers.Escape)
+	return d.Identifiers.Quote + escaped + d.Identifiers.QuoteEnd
+}
+
+// QuoteIdentifierIfNeeded quotes an identifier only if it's a reserved word.
+func (d *Dialect) QuoteIdentifierIfNeeded(name string) string {
+	if d.IsReservedWord(name) {
+		return d.QuoteIdentifier(name)
+	}
+	return name
+}
+
 // Builder provides a fluent API for constructing dialects.
 type Builder struct {
 	dialect *Dialect
@@ -241,6 +290,7 @@ func NewDialect(name string) *Builder {
 			tableFunctions: make(map[string]struct{}),
 			docs:           make(map[string]FunctionDoc),
 			keywords:       make(map[string]struct{}),
+			reservedWords:  make(map[string]struct{}),
 			dataTypes:      nil,
 		},
 	}
@@ -317,6 +367,29 @@ func (b *Builder) WithKeywords(kws ...string) *Builder {
 // WithDataTypes registers supported data types.
 func (b *Builder) WithDataTypes(types ...string) *Builder {
 	b.dialect.dataTypes = append(b.dialect.dataTypes, types...)
+	return b
+}
+
+// DefaultSchema sets the default schema name.
+func (b *Builder) DefaultSchema(schema string) *Builder {
+	b.dialect.DefaultSchema = schema
+	return b
+}
+
+// PlaceholderStyle sets how query parameters are formatted.
+func (b *Builder) PlaceholderStyle(style PlaceholderStyle) *Builder {
+	b.dialect.Placeholder = style
+	return b
+}
+
+// WithReservedWords registers words that need quoting when used as identifiers.
+func (b *Builder) WithReservedWords(words ...string) *Builder {
+	if b.dialect.reservedWords == nil {
+		b.dialect.reservedWords = make(map[string]struct{})
+	}
+	for _, w := range words {
+		b.dialect.reservedWords[b.dialect.NormalizeName(w)] = struct{}{}
+	}
 	return b
 }
 

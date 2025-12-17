@@ -198,16 +198,13 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 	e.db = db
 	e.dbConnected = true
 
-	// Set dialect based on adapter type
-	dialectName := db.DialectName()
-	if d, ok := dialect.Get(dialectName); ok {
-		e.dialect = d
-	} else {
-		// No dialect found for this adapter type - this is an error
-		return fmt.Errorf("dialect %q not found for adapter type %q", dialectName, e.dbConfig.Type)
+	// Set dialect directly from adapter
+	e.dialect = db.Dialect()
+	if e.dialect == nil {
+		return fmt.Errorf("adapter returned nil dialect for type %q", e.dbConfig.Type)
 	}
 
-	e.logger.Debug("database connected", "dialect", dialectName)
+	e.logger.Debug("database connected", "dialect", e.dialect.Name)
 
 	return nil
 }

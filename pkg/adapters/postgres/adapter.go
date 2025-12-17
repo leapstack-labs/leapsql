@@ -14,6 +14,8 @@ import (
 
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Adapter implements the adapter.Adapter interface for PostgreSQL.
@@ -32,9 +34,9 @@ func New(logger *slog.Logger) *Adapter {
 	}
 }
 
-// DialectName returns the SQL dialect for this adapter.
-func (a *Adapter) DialectName() string {
-	return "postgres"
+// Dialect returns the SQL dialect configuration for this adapter.
+func (a *Adapter) Dialect() *dialect.Dialect {
+	return pgdialect.Postgres
 }
 
 // Connect establishes a connection to PostgreSQL.
@@ -94,68 +96,7 @@ func buildPostgresDSN(cfg adapter.Config) string {
 
 // GetTableMetadata retrieves metadata for a specified table.
 func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*adapter.Metadata, error) {
-	if a.DB == nil {
-		return nil, fmt.Errorf("database connection not established")
-	}
-
-	// Parse schema.table if provided
-	schema := "public"
-	tableName := table
-	if parts := strings.Split(table, "."); len(parts) == 2 {
-		schema = parts[0]
-		tableName = parts[1]
-	}
-
-	// Query column information
-	query := `
-		SELECT 
-			column_name,
-			data_type,
-			is_nullable,
-			ordinal_position
-		FROM information_schema.columns 
-		WHERE table_schema = $1 AND table_name = $2
-		ORDER BY ordinal_position
-	`
-
-	rows, err := a.DB.QueryContext(ctx, query, schema, tableName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query column metadata: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var columns []adapter.Column
-	for rows.Next() {
-		var col adapter.Column
-		var nullable string
-		if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Position); err != nil {
-			return nil, fmt.Errorf("failed to scan column metadata: %w", err)
-		}
-		col.Nullable = nullable == "YES"
-		columns = append(columns, col)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating column metadata: %w", err)
-	}
-
-	if len(columns) == 0 {
-		return nil, fmt.Errorf("table %s not found", table)
-	}
-
-	// Get row count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", schema, tableName) //nolint:gosec // Table names are validated by caller
-	var rowCount int64
-	if err := a.DB.QueryRowContext(ctx, countQuery).Scan(&rowCount); err != nil {
-		rowCount = 0
-	}
-
-	return &adapter.Metadata{
-		Schema:   schema,
-		Name:     tableName,
-		Columns:  columns,
-		RowCount: rowCount,
-	}, nil
+	return a.GetTableMetadataCommon(ctx, table, a.Dialect())
 }
 
 // LoadCSV loads data from a CSV file into a table using COPY FROM STDIN.
@@ -214,8 +155,8 @@ func (a *Adapter) createTextTable(ctx context.Context, tableName string, columns
 	// Build CREATE TABLE with TEXT columns
 	var colDefs []string
 	for _, col := range columns {
-		// Sanitize column name
-		safeName := sanitizeIdentifier(col)
+		// Sanitize column name using dialect
+		safeName := sanitizeIdentifier(col, a.Dialect())
 		colDefs = append(colDefs, fmt.Sprintf("%s TEXT", safeName))
 	}
 
@@ -250,25 +191,16 @@ func (a *Adapter) copyFromCSV(ctx context.Context, tableName string, file *os.Fi
 	})
 }
 
-// sanitizeIdentifier makes a column name safe for SQL.
-func sanitizeIdentifier(name string) string {
+// sanitizeIdentifier makes a column name safe for SQL using the dialect's reserved word list.
+func sanitizeIdentifier(name string, d *dialect.Dialect) string {
 	// Replace problematic characters
 	safe := strings.ReplaceAll(name, " ", "_")
 	safe = strings.ReplaceAll(safe, "-", "_")
 	// Quote if it contains special chars or is a reserved word
-	if strings.ContainsAny(safe, "()[]{}") || isReservedWord(safe) {
-		return fmt.Sprintf(`"%s"`, safe)
+	if strings.ContainsAny(safe, "()[]{}") || d.IsReservedWord(safe) {
+		return d.QuoteIdentifier(safe)
 	}
 	return safe
-}
-
-// isReservedWord checks if a name is a PostgreSQL reserved word.
-func isReservedWord(name string) bool {
-	reserved := map[string]bool{
-		"user": true, "order": true, "group": true, "table": true,
-		"select": true, "from": true, "where": true, "index": true,
-	}
-	return reserved[strings.ToLower(name)]
 }
 
 // Ensure Adapter implements adapter.Adapter interface

@@ -54,41 +54,31 @@ var builtinGlobals = []CompletionItem{
 	},
 }
 
-// sqlKeywords for basic SQL completion
-var sqlKeywords = []CompletionItem{
-	{Label: "SELECT", Kind: CompletionItemKindKeyword},
-	{Label: "FROM", Kind: CompletionItemKindKeyword},
-	{Label: "WHERE", Kind: CompletionItemKindKeyword},
-	{Label: "JOIN", Kind: CompletionItemKindKeyword},
-	{Label: "LEFT JOIN", Kind: CompletionItemKindKeyword},
-	{Label: "RIGHT JOIN", Kind: CompletionItemKindKeyword},
-	{Label: "INNER JOIN", Kind: CompletionItemKindKeyword},
-	{Label: "GROUP BY", Kind: CompletionItemKindKeyword},
-	{Label: "ORDER BY", Kind: CompletionItemKindKeyword},
-	{Label: "HAVING", Kind: CompletionItemKindKeyword},
-	{Label: "LIMIT", Kind: CompletionItemKindKeyword},
-	{Label: "OFFSET", Kind: CompletionItemKindKeyword},
-	{Label: "AS", Kind: CompletionItemKindKeyword},
-	{Label: "ON", Kind: CompletionItemKindKeyword},
-	{Label: "AND", Kind: CompletionItemKindKeyword},
-	{Label: "OR", Kind: CompletionItemKindKeyword},
-	{Label: "NOT", Kind: CompletionItemKindKeyword},
-	{Label: "IN", Kind: CompletionItemKindKeyword},
-	{Label: "BETWEEN", Kind: CompletionItemKindKeyword},
-	{Label: "LIKE", Kind: CompletionItemKindKeyword},
-	{Label: "IS NULL", Kind: CompletionItemKindKeyword},
-	{Label: "IS NOT NULL", Kind: CompletionItemKindKeyword},
-	{Label: "DISTINCT", Kind: CompletionItemKindKeyword},
-	{Label: "CASE", Kind: CompletionItemKindKeyword},
-	{Label: "WHEN", Kind: CompletionItemKindKeyword},
-	{Label: "THEN", Kind: CompletionItemKindKeyword},
-	{Label: "ELSE", Kind: CompletionItemKindKeyword},
-	{Label: "END", Kind: CompletionItemKindKeyword},
-	{Label: "WITH", Kind: CompletionItemKindKeyword},
-	{Label: "UNION", Kind: CompletionItemKindKeyword},
-	{Label: "UNION ALL", Kind: CompletionItemKindKeyword},
-	{Label: "EXCEPT", Kind: CompletionItemKindKeyword},
-	{Label: "INTERSECT", Kind: CompletionItemKindKeyword},
+// getSQLKeywordCompletions returns keyword completions from the dialect.
+// Returns nil if no dialect is set - adapters should be properly configured.
+func getSQLKeywordCompletions(d *dialect.Dialect, prefix string) []CompletionItem {
+	if d == nil {
+		return nil
+	}
+
+	keywords := d.Keywords()
+	if len(keywords) == 0 {
+		return nil
+	}
+
+	var items []CompletionItem
+	upperPrefix := strings.ToUpper(prefix)
+	for _, kw := range keywords {
+		upperKW := strings.ToUpper(kw)
+		if prefix != "" && !strings.HasPrefix(upperKW, upperPrefix) {
+			continue
+		}
+		items = append(items, CompletionItem{
+			Label: upperKW,
+			Kind:  CompletionItemKindKeyword,
+		})
+	}
+	return items
 }
 
 // getSQLFunctionCompletions returns SQL function completions from the dialect.
@@ -254,11 +244,7 @@ func (s *Server) getCompletions(params CompletionParams) []CompletionItem {
 
 	default:
 		// Default: provide SQL keywords and functions from dialect
-		for _, kw := range sqlKeywords {
-			if strings.HasPrefix(strings.ToUpper(kw.Label), strings.ToUpper(prefix)) {
-				items = append(items, kw)
-			}
-		}
+		items = append(items, getSQLKeywordCompletions(s.dialect, prefix)...)
 		items = append(items, getSQLFunctionCompletions(s.dialect, prefix)...)
 	}
 

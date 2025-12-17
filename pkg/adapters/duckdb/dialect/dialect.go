@@ -8,7 +8,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
-//go:generate go run ../../../../scripts/gendialect -dialect=duckdb -out=functions_gen.go
+//go:generate go run ../../../../scripts/gendialect -dialect=duckdb -gen=all -outdir=.
 
 func init() {
 	dialect.Register(DuckDB)
@@ -18,10 +18,15 @@ func init() {
 var DuckDB = dialect.NewDialect("duckdb").
 	Identifiers(`"`, `"`, `""`, dialect.NormCaseInsensitive).
 	Operators(true, true). // || is concat, CONCAT coalesces NULL
+	DefaultSchema("main").
+	PlaceholderStyle(dialect.PlaceholderQuestion).
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).
 	Windows(duckDBWindows...).
 	TableFunctions(duckDBTableFunctions...).
 	WithDocs(duckDBFunctionDocs).
 	WithDocs(duckDBWindowDocs).
+	WithKeywords(duckDBCompletionKeywords...).
+	WithReservedWords(duckDBAllKeywords...).
+	WithDataTypes(duckDBTypes...).
 	Build()

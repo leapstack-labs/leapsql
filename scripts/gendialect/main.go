@@ -4,6 +4,8 @@
 // Usage:
 //
 //	go run ./scripts/gendialect -dialect=duckdb -out=pkg/adapters/duckdb/dialect/functions_gen.go
+//	go run ./scripts/gendialect -dialect=duckdb -gen=keywords -out=pkg/adapters/duckdb/dialect/keywords_gen.go
+//	go run ./scripts/gendialect -dialect=duckdb -gen=types -out=pkg/adapters/duckdb/dialect/types_gen.go
 package main
 
 import (
@@ -25,7 +27,9 @@ import (
 
 var (
 	dialectFlag = flag.String("dialect", "duckdb", "dialect to generate (only 'duckdb' supported)")
-	outFlag     = flag.String("out", "", "output file path (required)")
+	genFlag     = flag.String("gen", "functions", "what to generate: functions, keywords, types, all")
+	outFlag     = flag.String("out", "", "output file path (required for single generation)")
+	outDirFlag  = flag.String("outdir", "", "output directory (for 'all' generation)")
 )
 
 // FunctionInfo holds metadata about a SQL function.
@@ -41,12 +45,19 @@ type FunctionInfo struct {
 func main() {
 	flag.Parse()
 
-	if *outFlag == "" {
-		log.Fatal("--out flag is required")
-	}
-
 	if *dialectFlag != "duckdb" {
 		log.Fatalf("unsupported dialect: %s (only 'duckdb' is supported)", *dialectFlag)
+	}
+
+	// Validate flags
+	if *genFlag == "all" {
+		if *outDirFlag == "" {
+			log.Fatal("--outdir flag is required when using -gen=all")
+		}
+	} else {
+		if *outFlag == "" {
+			log.Fatal("--out flag is required")
+		}
 	}
 
 	// Connect to DuckDB
@@ -65,10 +76,34 @@ func main() {
 	}
 	log.Printf("Connected to DuckDB %s", version)
 
+	// Validate gen flag early (before defer)
+	validGenFlags := map[string]bool{"functions": true, "keywords": true, "types": true, "all": true}
+	if !validGenFlags[*genFlag] {
+		_ = db.Close()
+		log.Fatalf("unknown -gen value: %s (use: functions, keywords, types, all)", *genFlag)
+	}
+
+	// Ensure db is closed at the end
+	defer func() { _ = db.Close() }()
+
+	switch *genFlag {
+	case "functions":
+		generateFunctionsFile(ctx, db, version, *outFlag)
+	case "keywords":
+		generateKeywordsFile(ctx, db, version, *outFlag)
+	case "types":
+		generateTypesFile(ctx, db, version, *outFlag)
+	case "all":
+		generateFunctionsFile(ctx, db, version, *outDirFlag+"/functions_gen.go")
+		generateKeywordsFile(ctx, db, version, *outDirFlag+"/keywords_gen.go")
+		generateTypesFile(ctx, db, version, *outDirFlag+"/types_gen.go")
+	}
+}
+
+func generateFunctionsFile(ctx context.Context, db *sql.DB, version, outPath string) {
 	// Extract functions
 	functions, err := extractFunctions(ctx, db)
 	if err != nil {
-		_ = db.Close()
 		log.Fatalf("failed to extract functions: %v", err)
 	}
 	log.Printf("Extracted %d functions", len(functions))
@@ -77,18 +112,49 @@ func main() {
 	functions = filterFunctions(functions)
 	log.Printf("After filtering: %d functions", len(functions))
 
-	// Close db now that we're done with it
-	if err := db.Close(); err != nil {
-		log.Printf("warning: failed to close db: %v", err)
-	}
-
 	// Classify functions
 	aggregates, tableFuncs, docs := classifyFunctions(functions)
 	log.Printf("Classification: %d aggregates, %d table functions", len(aggregates), len(tableFuncs))
 
 	// Generate code
-	code := generateCode(version, aggregates, tableFuncs, docs)
+	code := generateFunctionsCode(version, aggregates, tableFuncs, docs)
+	writeFormattedCode(outPath, code)
+}
 
+func generateKeywordsFile(ctx context.Context, db *sql.DB, version, outPath string) {
+	// Extract reserved keywords (for LSP completions)
+	reservedKeywords, err := extractKeywords(ctx, db, true)
+	if err != nil {
+		log.Fatalf("failed to extract reserved keywords: %v", err)
+	}
+	log.Printf("Extracted %d reserved keywords", len(reservedKeywords))
+
+	// Extract all keywords (for identifier quoting)
+	allKeywords, err := extractKeywords(ctx, db, false)
+	if err != nil {
+		log.Fatalf("failed to extract all keywords: %v", err)
+	}
+	log.Printf("Extracted %d total keywords", len(allKeywords))
+
+	// Generate code
+	code := generateKeywordsCode(version, reservedKeywords, allKeywords)
+	writeFormattedCode(outPath, code)
+}
+
+func generateTypesFile(ctx context.Context, db *sql.DB, version, outPath string) {
+	// Extract data types
+	types, err := extractTypes(ctx, db)
+	if err != nil {
+		log.Fatalf("failed to extract types: %v", err)
+	}
+	log.Printf("Extracted %d data types", len(types))
+
+	// Generate code
+	code := generateTypesCode(version, types)
+	writeFormattedCode(outPath, code)
+}
+
+func writeFormattedCode(outPath, code string) {
 	// Format the code
 	formatted, err := format.Source([]byte(code))
 	if err != nil {
@@ -97,11 +163,104 @@ func main() {
 	}
 
 	// Write output
-	if err := os.WriteFile(*outFlag, formatted, 0o600); err != nil {
+	if err := os.WriteFile(outPath, formatted, 0o600); err != nil {
 		log.Fatalf("failed to write output: %v", err)
 	}
 
-	log.Printf("Generated %s", *outFlag)
+	log.Printf("Generated %s", outPath)
+}
+
+func extractKeywords(ctx context.Context, db *sql.DB, reservedOnly bool) ([]string, error) {
+	query := "SELECT keyword_name FROM duckdb_keywords()"
+	if reservedOnly {
+		query += " WHERE keyword_category = 'reserved'"
+	}
+	query += " ORDER BY keyword_name"
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query keywords: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var keywords []string
+	for rows.Next() {
+		var kw string
+		if err := rows.Scan(&kw); err != nil {
+			return nil, fmt.Errorf("scan keyword: %w", err)
+		}
+		keywords = append(keywords, strings.ToUpper(kw))
+	}
+
+	return keywords, rows.Err()
+}
+
+func extractTypes(ctx context.Context, db *sql.DB) ([]string, error) {
+	query := `
+		SELECT DISTINCT type_name
+		FROM duckdb_types()
+		WHERE type_category NOT IN ('INVALID')
+		ORDER BY type_name
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query types: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var types []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, fmt.Errorf("scan type: %w", err)
+		}
+		types = append(types, strings.ToUpper(t))
+	}
+
+	return types, rows.Err()
+}
+
+func generateKeywordsCode(version string, reserved, all []string) string {
+	var buf bytes.Buffer
+
+	buf.WriteString("// Code generated by scripts/gendialect. DO NOT EDIT.\n")
+	fmt.Fprintf(&buf, "// Source: DuckDB %s\n", version)
+	fmt.Fprintf(&buf, "// Generated: %s\n\n", time.Now().Format("2006-01-02"))
+	buf.WriteString("package dialect\n\n")
+
+	// Generate reserved keywords (for LSP completions)
+	buf.WriteString("// duckDBCompletionKeywords contains reserved keywords for LSP completions.\n")
+	buf.WriteString("// Source: SELECT keyword_name FROM duckdb_keywords() WHERE keyword_category = 'reserved'\n")
+	buf.WriteString("var duckDBCompletionKeywords = []string{\n")
+	writeStringSlice(&buf, reserved)
+	buf.WriteString("}\n\n")
+
+	// Generate all keywords (for identifier quoting)
+	buf.WriteString("// duckDBAllKeywords contains all keywords that need quoting when used as identifiers.\n")
+	buf.WriteString("// Source: SELECT keyword_name FROM duckdb_keywords()\n")
+	buf.WriteString("var duckDBAllKeywords = []string{\n")
+	writeStringSlice(&buf, all)
+	buf.WriteString("}\n")
+
+	return buf.String()
+}
+
+func generateTypesCode(version string, types []string) string {
+	var buf bytes.Buffer
+
+	buf.WriteString("// Code generated by scripts/gendialect. DO NOT EDIT.\n")
+	fmt.Fprintf(&buf, "// Source: DuckDB %s\n", version)
+	fmt.Fprintf(&buf, "// Generated: %s\n\n", time.Now().Format("2006-01-02"))
+	buf.WriteString("package dialect\n\n")
+
+	buf.WriteString("// duckDBTypes contains all supported data types for LSP completions.\n")
+	buf.WriteString("// Source: SELECT DISTINCT type_name FROM duckdb_types()\n")
+	buf.WriteString("var duckDBTypes = []string{\n")
+	writeStringSlice(&buf, types)
+	buf.WriteString("}\n")
+
+	return buf.String()
 }
 
 func extractFunctions(ctx context.Context, db *sql.DB) ([]FunctionInfo, error) {
@@ -308,7 +467,7 @@ func mapToSortedSlice(m map[string]bool) []string {
 	return result
 }
 
-func generateCode(version string, aggregates, tableFuncs []string, docs map[string]FunctionDoc) string {
+func generateFunctionsCode(version string, aggregates, tableFuncs []string, docs map[string]FunctionDoc) string {
 	var buf bytes.Buffer
 
 	buf.WriteString("// Code generated by scripts/gendialect. DO NOT EDIT.\n")

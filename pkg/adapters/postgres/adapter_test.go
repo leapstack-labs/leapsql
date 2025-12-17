@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,6 +66,8 @@ func TestBuildPostgresDSN(t *testing.T) {
 }
 
 func TestSanitizeIdentifier(t *testing.T) {
+	d := pgdialect.Postgres // Use the dialect for reserved word checking
+
 	tests := []struct {
 		input    string
 		expected string
@@ -86,13 +89,15 @@ func TestSanitizeIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := sanitizeIdentifier(tt.input)
+			result := sanitizeIdentifier(tt.input, d)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestIsReservedWord(t *testing.T) {
+	d := pgdialect.Postgres // Use the dialect for reserved word checking
+
 	tests := []struct {
 		name     string
 		input    string
@@ -110,7 +115,7 @@ func TestIsReservedWord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isReservedWord(tt.input)
+			result := d.IsReservedWord(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -122,7 +127,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, adp, "New() should return non-nil adapter")
 	assert.Nil(t, adp.DB, "DB should be nil before Connect")
 	assert.False(t, adp.IsConnected(), "should not be connected initially")
-	assert.Equal(t, "postgres", adp.DialectName(), "dialect name should be postgres")
+	assert.Equal(t, "postgres", adp.Dialect().Name, "dialect name should be postgres")
 
 	// Verify interface compliance
 	var _ adapter.Adapter = (*Adapter)(nil)
@@ -191,7 +196,7 @@ func TestAdapter_Registry(t *testing.T) {
 	pg, ok := adp.(*Adapter)
 	assert.True(t, ok, "factory should return *Adapter")
 	assert.NotNil(t, pg)
-	assert.Equal(t, "postgres", pg.DialectName())
+	assert.Equal(t, "postgres", pg.Dialect().Name)
 }
 
 func TestAdapter_Close(t *testing.T) {
