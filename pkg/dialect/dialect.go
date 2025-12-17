@@ -49,6 +49,8 @@ const (
 	LineageGenerator
 	// LineageWindow means function requires OVER clause (ROW_NUMBER, LAG, etc.).
 	LineageWindow
+	// LineageTable means function returns rows and acts as a table source (read_csv, generate_series, etc.).
+	LineageTable
 )
 
 // String returns the string representation of Type.
@@ -62,9 +64,19 @@ func (t Type) String() string {
 		return "generator"
 	case LineageWindow:
 		return "window"
+	case LineageTable:
+		return "table"
 	default:
 		return "unknown"
 	}
+}
+
+// FunctionDoc contains documentation metadata for LSP features.
+type FunctionDoc struct {
+	Description string   // Brief description
+	Signatures  []string // Overloaded signatures, e.g. ["datediff(part, start, end) -> BIGINT"]
+	ReturnType  string   // e.g. "INTEGER", "TABLE", "VARCHAR"
+	Example     string   // Optional usage example
 }
 
 // Dialect represents a SQL dialect configuration.
@@ -74,19 +86,26 @@ type Dialect struct {
 	Operators   OperatorConfig
 
 	// Function classifications (normalized to dialect's normalization strategy)
-	aggregates map[string]struct{}
-	generators map[string]struct{}
-	windows    map[string]struct{}
-	aliases    map[string]string // alias -> canonical name
+	aggregates     map[string]struct{}
+	generators     map[string]struct{}
+	windows        map[string]struct{}
+	tableFunctions map[string]struct{} // Table-valued functions (read_csv, generate_series, etc.)
+
+	// Documentation for LSP
+	docs map[string]FunctionDoc
+
+	// Keywords and types for autocomplete/highlighting
+	keywords  map[string]struct{}
+	dataTypes []string
 }
 
 // FunctionLineageType returns the lineage classification for a function.
 func (d *Dialect) FunctionLineageType(name string) Type {
 	normalized := d.NormalizeName(name)
 
-	// Check for alias first
-	if canonical, ok := d.aliases[normalized]; ok {
-		normalized = canonical
+	// Check table functions first (highest priority)
+	if _, ok := d.tableFunctions[normalized]; ok {
+		return LineageTable
 	}
 
 	if _, ok := d.aggregates[normalized]; ok {
@@ -113,15 +132,6 @@ func (d *Dialect) NormalizeName(name string) string {
 	}
 }
 
-// CanonicalFunctionName returns the canonical name for a function (resolving aliases).
-func (d *Dialect) CanonicalFunctionName(name string) string {
-	normalized := d.NormalizeName(name)
-	if canonical, ok := d.aliases[normalized]; ok {
-		return canonical
-	}
-	return normalized
-}
-
 // IsAggregate returns true if the function is an aggregate function.
 func (d *Dialect) IsAggregate(name string) bool {
 	return d.FunctionLineageType(name) == LineageAggregate
@@ -135,6 +145,74 @@ func (d *Dialect) IsGenerator(name string) bool {
 // IsWindow returns true if the function is a window-only function.
 func (d *Dialect) IsWindow(name string) bool {
 	return d.FunctionLineageType(name) == LineageWindow
+}
+
+// IsTableFunction returns true if the function acts as a table source.
+func (d *Dialect) IsTableFunction(name string) bool {
+	return d.FunctionLineageType(name) == LineageTable
+}
+
+// GetDoc returns documentation for a function.
+func (d *Dialect) GetDoc(name string) (FunctionDoc, bool) {
+	normalized := d.NormalizeName(name)
+	doc, ok := d.docs[normalized]
+	return doc, ok
+}
+
+// AllFunctions returns all known function names.
+func (d *Dialect) AllFunctions() []string {
+	seen := make(map[string]struct{})
+	var funcs []string
+
+	// Collect from all function categories
+	for f := range d.aggregates {
+		if _, ok := seen[f]; !ok {
+			seen[f] = struct{}{}
+			funcs = append(funcs, f)
+		}
+	}
+	for f := range d.generators {
+		if _, ok := seen[f]; !ok {
+			seen[f] = struct{}{}
+			funcs = append(funcs, f)
+		}
+	}
+	for f := range d.windows {
+		if _, ok := seen[f]; !ok {
+			seen[f] = struct{}{}
+			funcs = append(funcs, f)
+		}
+	}
+	for f := range d.tableFunctions {
+		if _, ok := seen[f]; !ok {
+			seen[f] = struct{}{}
+			funcs = append(funcs, f)
+		}
+	}
+
+	// Also include any functions that have documentation but aren't classified
+	for f := range d.docs {
+		if _, ok := seen[f]; !ok {
+			seen[f] = struct{}{}
+			funcs = append(funcs, f)
+		}
+	}
+
+	return funcs
+}
+
+// Keywords returns all reserved keywords.
+func (d *Dialect) Keywords() []string {
+	kws := make([]string, 0, len(d.keywords))
+	for kw := range d.keywords {
+		kws = append(kws, kw)
+	}
+	return kws
+}
+
+// DataTypes returns all supported data types.
+func (d *Dialect) DataTypes() []string {
+	return d.dataTypes
 }
 
 // Builder provides a fluent API for constructing dialects.
@@ -157,10 +235,13 @@ func NewDialect(name string) *Builder {
 				DPipeIsConcat:  true,
 				ConcatCoalesce: false,
 			},
-			aggregates: make(map[string]struct{}),
-			generators: make(map[string]struct{}),
-			windows:    make(map[string]struct{}),
-			aliases:    make(map[string]string),
+			aggregates:     make(map[string]struct{}),
+			generators:     make(map[string]struct{}),
+			windows:        make(map[string]struct{}),
+			tableFunctions: make(map[string]struct{}),
+			docs:           make(map[string]FunctionDoc),
+			keywords:       make(map[string]struct{}),
+			dataTypes:      nil,
 		},
 	}
 }
@@ -209,11 +290,33 @@ func (b *Builder) Windows(funcs ...string) *Builder {
 	return b
 }
 
-// Aliases adds function aliases (alias -> canonical name).
-func (b *Builder) Aliases(aliases map[string]string) *Builder {
-	for k, v := range aliases {
-		b.dialect.aliases[b.dialect.NormalizeName(k)] = b.dialect.NormalizeName(v)
+// TableFunctions adds table-valued functions to the dialect.
+func (b *Builder) TableFunctions(funcs ...string) *Builder {
+	for _, f := range funcs {
+		b.dialect.tableFunctions[b.dialect.NormalizeName(f)] = struct{}{}
 	}
+	return b
+}
+
+// WithDocs registers documentation for functions.
+func (b *Builder) WithDocs(docs map[string]FunctionDoc) *Builder {
+	for name, doc := range docs {
+		b.dialect.docs[b.dialect.NormalizeName(name)] = doc
+	}
+	return b
+}
+
+// WithKeywords registers reserved keywords.
+func (b *Builder) WithKeywords(kws ...string) *Builder {
+	for _, kw := range kws {
+		b.dialect.keywords[b.dialect.NormalizeName(kw)] = struct{}{}
+	}
+	return b
+}
+
+// WithDataTypes registers supported data types.
+func (b *Builder) WithDataTypes(types ...string) *Builder {
+	b.dialect.dataTypes = append(b.dialect.dataTypes, types...)
 	return b
 }
 

@@ -268,6 +268,27 @@ func TestExtractLineage_WindowFunctions(t *testing.T) {
 	})
 }
 
+func TestExtractLineage_TableFunctions(t *testing.T) {
+	runLineageTests(t, []testCase{
+		{
+			name:    "generate_series as source",
+			sql:     `SELECT i FROM generate_series(1, 10) AS t(i)`,
+			sources: []string{}, // table function is the source, not a table
+			cols: []colSpec{
+				{name: "i", transform: TransformDirect},
+			},
+		},
+		{
+			name:    "table function in expression",
+			sql:     `SELECT generate_series(1, 10) AS series_val`,
+			sources: []string{},
+			cols: []colSpec{
+				{name: "series_val", transform: TransformExpression, function: "generate_series", srcCount: srcN(0)},
+			},
+		},
+	})
+}
+
 func TestExtractLineage_CTEs(t *testing.T) {
 	runLineageTests(t, []testCase{
 		{

@@ -60,15 +60,4 @@ var Postgres = dialect.NewDialect("postgres").
 		// Value functions
 		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
 	).
-	Aliases(map[string]string{
-		// NULL handling
-		"IFNULL": "COALESCE",
-		"NVL":    "COALESCE",
-		// String functions
-		"SUBSTR":      "SUBSTRING",
-		"LEN":         "LENGTH",
-		"CHAR_LENGTH": "LENGTH",
-		"UCASE":       "UPPER",
-		"LCASE":       "LOWER",
-	}).
 	Build()

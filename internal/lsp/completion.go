@@ -3,9 +3,10 @@ package lsp
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
-	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // CompletionContextType describes what kind of completion context we're in.
@@ -90,24 +91,71 @@ var sqlKeywords = []CompletionItem{
 	{Label: "INTERSECT", Kind: CompletionItemKindKeyword},
 }
 
-// getSQLFunctionCompletions returns SQL function completions from the DuckDB catalog.
-func getSQLFunctionCompletions(prefix string) []CompletionItem {
-	functions := pkgparser.SearchFunctions(prefix)
-	items := make([]CompletionItem, 0, len(functions))
-	for _, fn := range functions {
-		item := CompletionItem{
-			Label:         fn.Name,
-			Kind:          CompletionItemKindFunction,
-			Detail:        fn.Signature,
-			Documentation: fn.Description,
+// getSQLFunctionCompletions returns SQL function completions from the dialect.
+func getSQLFunctionCompletions(d *dialect.Dialect, prefix string) []CompletionItem {
+	if d == nil {
+		return nil
+	}
+
+	funcs := d.AllFunctions()
+	sort.Strings(funcs)
+
+	var items []CompletionItem
+	lowerPrefix := strings.ToLower(prefix)
+
+	for _, name := range funcs {
+		if prefix != "" && !strings.HasPrefix(name, lowerPrefix) {
+			continue
 		}
-		if fn.Snippet != "" {
-			item.InsertText = fn.Snippet
+
+		doc, _ := d.GetDoc(name)
+		upperName := strings.ToUpper(name)
+
+		item := CompletionItem{
+			Label:         upperName,
+			Kind:          CompletionItemKindFunction,
+			Documentation: doc.Description,
+		}
+
+		// Use first signature as detail
+		if len(doc.Signatures) > 0 {
+			item.Detail = doc.Signatures[0]
+			// Generate snippet from signature
+			item.InsertText = generateSnippet(name, doc.Signatures[0])
 			item.InsertTextFormat = InsertTextFormatSnippet
 		}
+
 		items = append(items, item)
 	}
 	return items
+}
+
+// generateSnippet creates an LSP snippet from a function signature.
+// E.g., "count(expr BIGINT) -> BIGINT" => "COUNT($1)"
+func generateSnippet(name string, signature string) string {
+	// Extract parameter count from signature
+	// Format is: "func_name(param1 TYPE, param2 TYPE) -> RETURN"
+	parenStart := strings.Index(signature, "(")
+	parenEnd := strings.Index(signature, ")")
+
+	if parenStart == -1 || parenEnd == -1 || parenEnd <= parenStart+1 {
+		// No parameters or empty parens
+		return strings.ToUpper(name) + "()"
+	}
+
+	paramStr := signature[parenStart+1 : parenEnd]
+	if strings.TrimSpace(paramStr) == "" {
+		return strings.ToUpper(name) + "()"
+	}
+
+	// Count parameters by counting commas
+	params := strings.Split(paramStr, ",")
+	var snippetParts []string
+	for i := range params {
+		snippetParts = append(snippetParts, fmt.Sprintf("$%d", i+1))
+	}
+
+	return strings.ToUpper(name) + "(" + strings.Join(snippetParts, ", ") + ")"
 }
 
 // configKeys for config.* completion
@@ -185,8 +233,8 @@ func (s *Server) getCompletions(params CompletionParams) []CompletionItem {
 		}
 
 	case ContextSelectClause, ContextWhereClause:
-		// Suggest SQL functions from catalog
-		items = append(items, getSQLFunctionCompletions(prefix)...)
+		// Suggest SQL functions from dialect
+		items = append(items, getSQLFunctionCompletions(s.dialect, prefix)...)
 
 	case ContextFromClause:
 		// Suggest models from SQLite
@@ -205,13 +253,13 @@ func (s *Server) getCompletions(params CompletionParams) []CompletionItem {
 		}
 
 	default:
-		// Default: provide SQL keywords and functions from catalog
+		// Default: provide SQL keywords and functions from dialect
 		for _, kw := range sqlKeywords {
 			if strings.HasPrefix(strings.ToUpper(kw.Label), strings.ToUpper(prefix)) {
 				items = append(items, kw)
 			}
 		}
-		items = append(items, getSQLFunctionCompletions(prefix)...)
+		items = append(items, getSQLFunctionCompletions(s.dialect, prefix)...)
 	}
 
 	return items
@@ -387,20 +435,38 @@ func (s *Server) getHover(params HoverParams) *Hover {
 		}
 	}
 
-	// Check for SQL functions in the catalog
-	upperWord := strings.ToUpper(word)
-	for _, fn := range pkgparser.DuckDBCatalog {
-		if fn.Name == upperWord {
-			content := fmt.Sprintf("**%s** (%s)\n\n%s", fn.Name, fn.Signature, fn.Description)
-			if fn.IsAggregate {
-				content += "\n\n*Aggregate function*"
-			} else if fn.Category == pkgparser.CategoryWindow {
-				content += "\n\n*Window function*"
+	// Check for SQL functions in the dialect
+	if s.dialect != nil {
+		doc, ok := s.dialect.GetDoc(word)
+		if ok {
+			var content strings.Builder
+			content.WriteString(fmt.Sprintf("**%s**\n\n", strings.ToUpper(word)))
+
+			for _, sig := range doc.Signatures {
+				content.WriteString(fmt.Sprintf("```\n%s\n```\n", sig))
 			}
+
+			if doc.Description != "" {
+				content.WriteString("\n" + doc.Description)
+			}
+
+			// Show function classification
+			lineageType := s.dialect.FunctionLineageType(word)
+			switch lineageType {
+			case dialect.LineageAggregate:
+				content.WriteString("\n\n*Aggregate function*")
+			case dialect.LineageWindow:
+				content.WriteString("\n\n*Window function*")
+			case dialect.LineageTable:
+				content.WriteString("\n\n*Table-valued function*")
+			case dialect.LineageGenerator:
+				content.WriteString("\n\n*Generator function*")
+			}
+
 			return &Hover{
 				Contents: MarkupContent{
 					Kind:  MarkupKindMarkdown,
-					Value: content,
+					Value: content.String(),
 				},
 			}
 		}

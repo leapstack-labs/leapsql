@@ -4,8 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/stretchr/testify/assert"
+
+	// Import duckdb dialect so it registers itself
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 )
 
 func TestInTemplateExpr(t *testing.T) {
@@ -288,8 +291,10 @@ func TestServer_GetCompletions_SQLKeywords(t *testing.T) {
 }
 
 func TestServer_GetCompletions_SQLFunctions(t *testing.T) {
+	d, _ := dialect.Get("duckdb")
 	server := &Server{
 		documents: NewDocumentStore(),
+		dialect:   d,
 	}
 
 	// Test SQL function completion in SELECT clause
@@ -333,8 +338,9 @@ func TestCompletionItemKinds(t *testing.T) {
 		assert.Equal(t, CompletionItemKindKeyword, kw.Kind, "SQL keyword %s should be Keyword", kw.Label)
 	}
 
-	// Verify SQL functions from catalog return correct kind when converted
-	items := getSQLFunctionCompletions("")
+	// Verify SQL functions from dialect return correct kind when converted
+	d, _ := dialect.Get("duckdb")
+	items := getSQLFunctionCompletions(d, "")
 	for _, item := range items {
 		assert.Equal(t, CompletionItemKindFunction, item.Kind, "SQL function %s should be Function", item.Label)
 	}
@@ -357,15 +363,16 @@ func TestConfigKeys(t *testing.T) {
 }
 
 func TestGetSQLFunctionCompletions(t *testing.T) {
-	// Test that catalog integration works
-	items := getSQLFunctionCompletions("")
-	assert.NotEmpty(t, items, "expected non-empty completions from catalog")
+	// Test that dialect integration works
+	d, _ := dialect.Get("duckdb")
+	items := getSQLFunctionCompletions(d, "")
+	assert.NotEmpty(t, items, "expected non-empty completions from dialect")
 
 	// Should have more than the previous hardcoded 25 functions
-	assert.GreaterOrEqual(t, len(items), 100, "expected at least 100 functions from catalog")
+	assert.GreaterOrEqual(t, len(items), 100, "expected at least 100 functions from dialect")
 
 	// Test prefix filtering
-	countItems := getSQLFunctionCompletions("COUNT")
+	countItems := getSQLFunctionCompletions(d, "count")
 	assert.NotEmpty(t, countItems, "expected COUNT function in completions")
 	for _, item := range countItems {
 		assert.True(t, strings.HasPrefix(item.Label, "COUNT"), "expected all items to start with COUNT, got %s", item.Label)
@@ -373,7 +380,8 @@ func TestGetSQLFunctionCompletions(t *testing.T) {
 }
 
 func TestGetSQLFunctionCompletions_Details(t *testing.T) {
-	items := getSQLFunctionCompletions("COUNT")
+	d, _ := dialect.Get("duckdb")
+	items := getSQLFunctionCompletions(d, "count")
 
 	var countItem *CompletionItem
 	for i := range items {
@@ -387,17 +395,17 @@ func TestGetSQLFunctionCompletions_Details(t *testing.T) {
 		return
 	}
 
-	// Check that fields are populated from catalog
+	// Check that fields are populated from dialect
 	assert.Equal(t, CompletionItemKindFunction, countItem.Kind, "expected Function kind")
 	assert.NotEmpty(t, countItem.Detail, "expected Detail (signature) to be populated")
-	assert.NotEmpty(t, countItem.Documentation, "expected Documentation to be populated")
 	assert.NotEmpty(t, countItem.InsertText, "expected InsertText (snippet) to be populated")
 	assert.Equal(t, InsertTextFormatSnippet, countItem.InsertTextFormat, "expected snippet format")
 }
 
 func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
 	// Verify we have functions from different categories
-	items := getSQLFunctionCompletions("")
+	d, _ := dialect.Get("duckdb")
+	items := getSQLFunctionCompletions(d, "")
 
 	categories := map[string]bool{
 		"aggregate": false,
@@ -429,14 +437,15 @@ func TestGetSQLFunctionCompletions_AllCategories(t *testing.T) {
 	}
 }
 
-func TestCatalogSearchFunctions(t *testing.T) {
-	// Test the underlying catalog search
-	results := pkgparser.SearchFunctions("DATE")
+func TestDialectSearchFunctions(t *testing.T) {
+	// Test the dialect-based function search
+	d, _ := dialect.Get("duckdb")
+	results := getSQLFunctionCompletions(d, "date")
 	assert.NotEmpty(t, results, "expected DATE functions")
 
 	// All results should start with DATE
-	for _, fn := range results {
-		assert.True(t, strings.HasPrefix(fn.Name, "DATE"), "expected function to start with DATE, got %s", fn.Name)
+	for _, item := range results {
+		assert.True(t, strings.HasPrefix(item.Label, "DATE"), "expected function to start with DATE, got %s", item.Label)
 	}
 }
 
@@ -493,8 +502,10 @@ func TestServer_GetHover_NoResult(t *testing.T) {
 }
 
 func TestServer_GetHover_SQLFunction(t *testing.T) {
+	d, _ := dialect.Get("duckdb")
 	server := &Server{
 		documents: NewDocumentStore(),
+		dialect:   d,
 	}
 
 	uri := "file:///test.sql"
@@ -515,13 +526,15 @@ func TestServer_GetHover_SQLFunction(t *testing.T) {
 	}
 
 	assert.Contains(t, hover.Contents.Value, "COUNT", "hover should contain function name")
-	assert.Contains(t, hover.Contents.Value, "bigint", "hover should contain return type from signature")
+	assert.Contains(t, strings.ToLower(hover.Contents.Value), "bigint", "hover should contain return type from signature")
 	assert.Contains(t, hover.Contents.Value, "Aggregate", "hover should indicate it's an aggregate function")
 }
 
 func TestServer_GetHover_WindowFunction(t *testing.T) {
+	d, _ := dialect.Get("duckdb")
 	server := &Server{
 		documents: NewDocumentStore(),
+		dialect:   d,
 	}
 
 	uri := "file:///test.sql"

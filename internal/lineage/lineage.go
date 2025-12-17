@@ -273,18 +273,25 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 
 		// Determine transform type based on function classification
 		funcType := e.dialect.FunctionLineageType(ex.Name)
+		funcName := e.dialect.NormalizeName(ex.Name)
 		switch funcType {
+		case dialect.LineageTable:
+			// Table function acts as a data source, not a transformation
+			// SELECT * FROM read_csv('file.csv') - the CSV is the source, not upstream columns
+			lineage.Sources = nil
+			lineage.Transform = TransformExpression
+			lineage.Function = funcName
 		case dialect.LineageAggregate:
 			lineage.Transform = TransformExpression
-			lineage.Function = e.dialect.CanonicalFunctionName(ex.Name)
+			lineage.Function = funcName
 		case dialect.LineageWindow:
 			lineage.Transform = TransformExpression
-			lineage.Function = e.dialect.CanonicalFunctionName(ex.Name)
+			lineage.Function = funcName
 		case dialect.LineageGenerator:
 			// Generator functions have no source columns
 			lineage.Sources = nil
 			lineage.Transform = TransformExpression
-			lineage.Function = e.dialect.CanonicalFunctionName(ex.Name)
+			lineage.Function = funcName
 		default:
 			// Passthrough - keep all source columns
 			if len(sources) == 1 {
