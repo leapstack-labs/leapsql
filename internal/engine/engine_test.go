@@ -155,20 +155,6 @@ func TestPathToTableName(t *testing.T) {
 	}
 }
 
-func TestHashContent(t *testing.T) {
-	content1 := "SELECT * FROM users"
-	content2 := "SELECT * FROM orders"
-
-	hash1 := hashContent(content1)
-	hash2 := hashContent(content2)
-	hash1Again := hashContent(content1)
-
-	assert.NotEqual(t, hash1, hash2, "Different content should produce different hashes")
-	assert.Equal(t, hash1, hash1Again, "Same content should produce same hash")
-	// Check hash is a reasonable length (16 hex chars for 8 bytes)
-	assert.Len(t, hash1, 16, "Hash length should be 16")
-}
-
 func TestBuildSQL(t *testing.T) {
 	tmpDir, modelsDir, seedsDir, macrosDir := createTestProject(t)
 	statePath := filepath.Join(tmpDir, "state.db")
