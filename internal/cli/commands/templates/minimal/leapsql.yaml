@@ -1,0 +1,12 @@
+# LeapSQL Configuration
+models_dir: models
+seeds_dir: seeds
+macros_dir: macros
+state_path: .leapsql/state.db
+environment: dev
+
+# Database target
+target:
+  type: duckdb
+  database: ""  # Empty for in-memory DuckDB
+  schema: main

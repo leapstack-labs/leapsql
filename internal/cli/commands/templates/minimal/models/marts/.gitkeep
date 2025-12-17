@@ -1,0 +1,18 @@
+# Marts Directory
+
+Place your mart models here (aggregations, dimensions, facts).
+
+Example:
+```sql
+/*---
+materialized: table
+description: Customer dimension
+---*/
+SELECT
+    c.customer_id,
+    c.customer_name,
+    COUNT(DISTINCT o.order_id) AS total_orders
+FROM staging.stg_customers c
+LEFT JOIN staging.stg_orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.customer_name
+```

@@ -1,0 +1,17 @@
+# Macros Directory
+
+Place your Starlark macro files here (*.star).
+
+Example:
+```starlark
+def generate_surrogate_key(*columns):
+    parts = []
+    for col in columns:
+        parts.append("CAST({} AS VARCHAR)".format(col))
+    return "MD5({})".format(" || '-' || ".join(parts))
+```
+
+Usage in SQL:
+```sql
+{{ utils.generate_surrogate_key('col1', 'col2') }}
+```

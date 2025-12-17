@@ -1,0 +1,13 @@
+# Seeds Directory
+
+Place your CSV seed files here.
+
+Example:
+```
+seeds/
+├── raw_customers.csv
+├── raw_orders.csv
+└── raw_products.csv
+```
+
+Load seeds with: `leapsql seed`
