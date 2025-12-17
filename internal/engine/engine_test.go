@@ -9,6 +9,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -62,6 +63,7 @@ func TestNew(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "", // in-memory DuckDB
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)
@@ -85,6 +87,7 @@ func TestNew_InvalidStatePath(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    "/nonexistent/path/state.db",
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	_, err := New(cfg)
@@ -102,6 +105,7 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 		SeedsDir:     "", // No seeds dir
 		DatabasePath: "",
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)
@@ -123,6 +127,7 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 		SeedsDir:     filepath.Join(tmpDir, "nonexistent"),
 		DatabasePath: "",
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)
@@ -174,6 +179,7 @@ func TestBuildSQL(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)
@@ -218,6 +224,7 @@ func TestEngine_Close(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)
@@ -256,6 +263,7 @@ SELECT id, name FROM users
 		SeedsDir:     seedsDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Logger:       testutil.NewTestLogger(t),
 	}
 
 	engine, err := New(cfg)

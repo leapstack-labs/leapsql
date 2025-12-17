@@ -5,27 +5,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestStore(t *testing.T) *SQLiteStore {
 	t.Helper()
-	store := NewSQLiteStore()
+	store := NewSQLiteStore(testutil.NewTestLogger(t))
 	require.NoError(t, store.Open(":memory:"))
 	require.NoError(t, store.InitSchema())
 	return store
 }
 
 func TestSQLiteStore_OpenClose(t *testing.T) {
-	store := NewSQLiteStore()
+	store := NewSQLiteStore(testutil.NewTestLogger(t))
 
 	require.NoError(t, store.Open(":memory:"))
 	require.NoError(t, store.Close())
 }
 
 func TestSQLiteStore_InitSchema(t *testing.T) {
-	store := NewSQLiteStore()
+	store := NewSQLiteStore(testutil.NewTestLogger(t))
 	require.NoError(t, store.Open(":memory:"))
 	defer func() { _ = store.Close() }()
 

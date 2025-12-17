@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/engine"
@@ -63,8 +64,9 @@ Output adapts to environment:
 
 func runLineage(cmd *cobra.Command, modelPath string, opts *LineageOptions) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return err
 	}

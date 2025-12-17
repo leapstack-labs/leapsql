@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
@@ -44,8 +45,9 @@ Output adapts to environment:
 
 func runDAG(cmd *cobra.Command) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return err
 	}

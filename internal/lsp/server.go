@@ -56,11 +56,19 @@ type Server struct {
 
 // NewServer creates a new LSP server instance.
 func NewServer(reader io.Reader, writer io.Writer) *Server {
+	return NewServerWithLogger(reader, writer, nil)
+}
+
+// NewServerWithLogger creates a new LSP server instance with a custom logger.
+func NewServerWithLogger(reader io.Reader, writer io.Writer, logger *slog.Logger) *Server {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	}
 	return &Server{
 		documents:           NewDocumentStore(),
 		reader:              bufio.NewReader(reader),
 		writer:              writer,
-		logger:              slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		logger:              logger,
 		macroNamespaceCache: make(map[string]bool),
 		modelNameCache:      make(map[string]bool),
 	}
@@ -258,7 +266,7 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 
 	// Try to open SQLite database
 	dbPath := filepath.Join(s.projectRoot, ".leapsql", "state.db")
-	store := state.NewSQLiteStore()
+	store := state.NewSQLiteStore(s.logger)
 	if err := store.Open(dbPath); err != nil {
 		s.logger.Info("SQLite database not found", "path", dbPath, "error", err)
 		s.store = nil

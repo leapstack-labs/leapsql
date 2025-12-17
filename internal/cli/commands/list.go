@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/engine"
@@ -48,8 +49,9 @@ Use --output to override: auto, text, markdown, json`,
 
 func runList(cmd *cobra.Command) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return err
 	}

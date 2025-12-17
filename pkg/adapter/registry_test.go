@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func TestUnknownAdapterError_Error(t *testing.T) {
 
 func TestRegister(t *testing.T) {
 	// Register a mock adapter
-	Register("test_adapter_internal", func() Adapter { return nil })
+	Register("test_adapter_internal", func(_ *slog.Logger) Adapter { return nil })
 
 	assert.True(t, IsRegistered("test_adapter_internal"), "test_adapter_internal should be registered after Register()")
 
@@ -41,7 +42,7 @@ func TestNewAdapter_EmptyType(t *testing.T) {
 		Type: "",
 	}
 
-	_, err := NewAdapter(cfg)
+	_, err := NewAdapter(cfg, nil)
 	require.Error(t, err, "NewAdapter with empty type should fail")
 	assert.Equal(t, "adapter type not specified", err.Error(), "error message")
 }

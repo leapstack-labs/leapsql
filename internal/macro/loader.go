@@ -4,6 +4,7 @@ package macro
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,12 +14,27 @@ import (
 
 // Loader scans a directory for .star files and loads them as Starlark modules.
 type Loader struct {
-	dir string
+	dir    string
+	logger *slog.Logger
 }
 
 // NewLoader creates a new macro loader for the specified directory.
 func NewLoader(dir string) *Loader {
-	return &Loader{dir: dir}
+	return &Loader{
+		dir:    dir,
+		logger: slog.New(slog.DiscardHandler),
+	}
+}
+
+// NewLoaderWithLogger creates a new macro loader with a custom logger.
+func NewLoaderWithLogger(dir string, logger *slog.Logger) *Loader {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	return &Loader{
+		dir:    dir,
+		logger: logger,
+	}
 }
 
 // LoadedModule represents a parsed Starlark macro file.
@@ -36,11 +52,14 @@ type LoadedModule struct {
 // Load scans the macro directory and loads all .star files.
 // Returns a slice of loaded modules and any errors encountered.
 func (l *Loader) Load() ([]*LoadedModule, error) {
+	l.logger.Debug("loading macros", "dir", l.dir)
+
 	// Check if directory exists
 	info, err := os.Stat(l.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// No macros directory is fine - return empty slice
+			l.logger.Debug("macros directory does not exist", "dir", l.dir)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to access macros directory: %w", err)
@@ -57,6 +76,8 @@ func (l *Loader) Load() ([]*LoadedModule, error) {
 		return nil, fmt.Errorf("failed to scan macros directory: %w", err)
 	}
 
+	l.logger.Debug("found macro files", "count", len(files))
+
 	var modules []*LoadedModule
 
 	for _, file := range files {
@@ -66,6 +87,8 @@ func (l *Loader) Load() ([]*LoadedModule, error) {
 		}
 		modules = append(modules, module)
 	}
+
+	l.logger.Debug("loaded macros", "count", len(modules))
 
 	return modules, nil
 }
@@ -84,6 +107,8 @@ func (l *Loader) loadFile(path string) (*LoadedModule, error) {
 	// Derive namespace from filename
 	base := filepath.Base(path)
 	namespace := strings.TrimSuffix(base, ".star")
+
+	l.logger.Debug("loading macro file", "path", path, "namespace", namespace)
 
 	// Validate namespace name
 	if err := validateNamespace(namespace); err != nil {
@@ -104,6 +129,7 @@ func (l *Loader) loadFile(path string) (*LoadedModule, error) {
 	// Execute the Starlark file
 	globals, err := starlark.ExecFile(thread, path, content, nil) //nolint:staticcheck // SA1019: will migrate to ExecFileOptions later
 	if err != nil {
+		l.logger.Debug("macro execution error", "path", path, "error", err.Error())
 		return nil, &LoadError{
 			File:    path,
 			Message: fmt.Sprintf("Starlark execution error: %v", err),
@@ -117,6 +143,8 @@ func (l *Loader) loadFile(path string) (*LoadedModule, error) {
 			exports[name] = value
 		}
 	}
+
+	l.logger.Debug("loaded macro", "namespace", namespace, "exports", len(exports))
 
 	return &LoadedModule{
 		Namespace: namespace,

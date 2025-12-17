@@ -117,7 +117,7 @@ func TestIsReservedWord(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	adp := New()
+	adp := New(nil)
 
 	assert.NotNil(t, adp, "New() should return non-nil adapter")
 	assert.Nil(t, adp.DB, "DB should be nil before Connect")
@@ -170,7 +170,7 @@ func TestAdapter_NotConnected(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			err := tt.operation(ctx, adp)
 			require.Error(t, err)
@@ -185,7 +185,7 @@ func TestAdapter_Registry(t *testing.T) {
 	factory, ok := adapter.Get("postgres")
 	require.True(t, ok, "should be able to get postgres factory")
 
-	adp := factory()
+	adp := factory(nil)
 	assert.NotNil(t, adp)
 
 	pg, ok := adp.(*Adapter)
@@ -196,6 +196,6 @@ func TestAdapter_Registry(t *testing.T) {
 
 func TestAdapter_Close(t *testing.T) {
 	// Close should not error even without connection
-	adp := New()
+	adp := New(nil)
 	assert.NoError(t, adp.Close())
 }

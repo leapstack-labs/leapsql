@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,9 @@ type Engine struct {
 
 	// SQL dialect for the connected adapter (set after connection)
 	dialect *dialect.Dialect
+
+	// Structured logger
+	logger *slog.Logger
 
 	store         state.Store
 	modelsDir     string
@@ -63,6 +67,8 @@ type Config struct {
 	Target *starctx.TargetInfo
 	// AdapterConfig contains the full adapter configuration
 	AdapterConfig *adapter.Config
+	// Logger is the structured logger (optional, uses discard if nil)
+	Logger *slog.Logger
 
 	// DatabasePath is the path to the DuckDB database (empty for in-memory).
 	//
@@ -73,8 +79,16 @@ type Config struct {
 // New creates a new engine with lazy database connection.
 // The database adapter is only connected when Run() or LoadSeeds() is called.
 func New(cfg Config) (*Engine, error) {
+	// Initialize logger (use discard handler if nil)
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
+	logger.Debug("initializing engine", "models_dir", cfg.ModelsDir, "environment", cfg.Environment)
+
 	// Create state store (always needed)
-	store := state.NewSQLiteStore()
+	store := state.NewSQLiteStore(logger)
 	if err := store.Open(cfg.StatePath); err != nil {
 		return nil, fmt.Errorf("failed to open state store: %w", err)
 	}
@@ -152,6 +166,7 @@ func New(cfg Config) (*Engine, error) {
 		dbConfig:      dbConfig,
 		dbConnected:   false,
 		dialect:       d,
+		logger:        logger,
 		store:         store,
 		modelsDir:     cfg.ModelsDir,
 		seedsDir:      cfg.SeedsDir,
@@ -174,8 +189,10 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 		return nil
 	}
 
+	e.logger.Debug("connecting to database", "adapter_type", e.dbConfig.Type)
+
 	// Use adapter registry to create the appropriate adapter
-	db, err := adapter.NewAdapter(e.dbConfig)
+	db, err := adapter.NewAdapter(e.dbConfig, e.logger)
 	if err != nil {
 		return fmt.Errorf("failed to create database adapter: %w", err)
 	}
@@ -196,11 +213,15 @@ func (e *Engine) ensureDBConnected(ctx context.Context) error {
 		return fmt.Errorf("dialect %q not found for adapter type %q", dialectName, e.dbConfig.Type)
 	}
 
+	e.logger.Debug("database connected", "dialect", dialectName)
+
 	return nil
 }
 
 // Close releases all resources.
 func (e *Engine) Close() error {
+	e.logger.Debug("closing engine")
+
 	var errs []error
 	if e.db != nil {
 		if err := e.db.Close(); err != nil {
@@ -224,6 +245,8 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 		return nil
 	}
 
+	e.logger.Debug("loading seeds", "seeds_dir", e.seedsDir)
+
 	// Ensure database is connected before loading seeds
 	if err := e.ensureDBConnected(ctx); err != nil {
 		return err
@@ -245,6 +268,8 @@ func (e *Engine) LoadSeeds(ctx context.Context) error {
 		tableName := strings.TrimSuffix(entry.Name(), ".csv")
 		csvPath := filepath.Join(e.seedsDir, entry.Name())
 
+		e.logger.Debug("loading seed file", "table", tableName, "path", csvPath)
+
 		if err := e.db.LoadCSV(ctx, tableName, csvPath); err != nil {
 			return fmt.Errorf("failed to load seed %s: %w", entry.Name(), err)
 		}
@@ -263,6 +288,8 @@ func (e *Engine) DiscoverLegacy() error {
 
 // Run executes all models in topological order.
 func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
+	e.logger.Info("starting run", "environment", env)
+
 	// Ensure database is connected before execution
 	if err := e.ensureDBConnected(ctx); err != nil {
 		return nil, err
@@ -274,12 +301,16 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 		return nil, fmt.Errorf("failed to create run: %w", err)
 	}
 
+	e.logger.Debug("created run", "run_id", run.ID)
+
 	// Get topological order
 	sorted, err := e.graph.TopologicalSort()
 	if err != nil {
 		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
 		return run, err
 	}
+
+	e.logger.Debug("executing models", "count", len(sorted))
 
 	// Execute each model
 	var runErr error
@@ -311,9 +342,11 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 
 		// Update model run status
 		if execErr != nil {
+			e.logger.Debug("model execution failed", "model", m.Path, "error", execErr.Error())
 			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
 			runErr = execErr
 		} else {
+			e.logger.Debug("model executed", "model", m.Path, "rows_affected", rowsAffected, "duration_ms", executionMS)
 			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
 		}
 
@@ -326,8 +359,10 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 
 	// Complete the run
 	if runErr != nil {
+		e.logger.Info("run failed", "run_id", run.ID, "error", runErr.Error())
 		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
 	} else {
+		e.logger.Info("run completed", "run_id", run.ID)
 		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
 	}
 
@@ -420,6 +455,8 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 
 // executeModel executes a single model and returns rows affected.
 func (e *Engine) executeModel(ctx context.Context, m *parser.ModelConfig, model *state.Model) (int64, error) {
+	e.logger.Debug("executing model", "model_path", m.Path, "materialization", m.Materialized)
+
 	sql := e.buildSQL(m, model)
 
 	switch m.Materialized {

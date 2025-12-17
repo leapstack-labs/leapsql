@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -67,14 +68,24 @@ then execute them in the correct order with state tracking and lineage.`,
 			ctx = context.WithValue(ctx, rendererKey{}, renderer)
 			cmd.SetContext(ctx)
 
-			// Print config file used (if verbose)
+			// Determine log level from verbose flag
+			level := slog.LevelInfo
 			if cfg.Verbose {
-				if configFile := config.GetConfigFileUsed(); configFile != "" {
-					fmt.Fprintf(os.Stderr, "Using config file: %s\n", configFile)
-				}
-				if targetFlag != "" {
-					fmt.Fprintf(os.Stderr, "Using target: %s\n", targetFlag)
-				}
+				level = slog.LevelDebug
+			}
+
+			// Create logger - always writes to stderr (data goes to stdout)
+			handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+			logger := slog.New(handler)
+			ctx = context.WithValue(ctx, config.LoggerKey(), logger)
+			cmd.SetContext(ctx)
+
+			// Log config file used (at debug level)
+			if configFile := config.GetConfigFileUsed(); configFile != "" {
+				logger.Debug("using config file", "path", configFile)
+			}
+			if targetFlag != "" {
+				logger.Debug("using target", "target", targetFlag)
 			}
 
 			return nil
@@ -162,8 +173,13 @@ func GetRenderer(ctx context.Context) *output.Renderer {
 	return output.NewRenderer(os.Stdout, os.Stderr, output.ModeAuto)
 }
 
+// GetLogger retrieves the logger from the command context.
+func GetLogger(ctx context.Context) *slog.Logger {
+	return config.GetLogger(ctx)
+}
+
 // CreateEngine creates an engine from the current configuration.
-func CreateEngine(cfg *config.Config) (*engine.Engine, error) {
+func CreateEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {
@@ -207,6 +223,7 @@ func CreateEngine(cfg *config.Config) (*engine.Engine, error) {
 		Environment:   cfg.Environment,
 		Target:        targetInfo,
 		AdapterConfig: adapterConfig,
+		Logger:        logger,
 	}
 
 	return engine.New(engineCfg)

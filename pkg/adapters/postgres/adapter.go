@@ -7,6 +7,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,8 +22,14 @@ type Adapter struct {
 }
 
 // New creates a new PostgreSQL adapter instance.
-func New() *Adapter {
-	return &Adapter{}
+// If logger is nil, a discard logger is used.
+func New(logger *slog.Logger) *Adapter {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	return &Adapter{
+		BaseSQLAdapter: adapter.BaseSQLAdapter{Logger: logger},
+	}
 }
 
 // DialectName returns the SQL dialect for this adapter.
@@ -33,6 +40,8 @@ func (a *Adapter) DialectName() string {
 // Connect establishes a connection to PostgreSQL.
 func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 	dsn := buildPostgresDSN(cfg)
+
+	a.Logger.Debug("connecting to postgres", slog.String("host", cfg.Host), slog.String("database", cfg.Database))
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {

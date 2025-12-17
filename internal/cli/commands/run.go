@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,8 +67,9 @@ Output adapts to environment:
 
 func runRun(cmd *cobra.Command, opts *RunOptions) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return err
 	}
@@ -364,7 +366,7 @@ func getEnvOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
-func createEngine(cfg *config.Config) (*engine.Engine, error) {
+func createEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, error) {
 	// Ensure state directory exists
 	stateDir := filepath.Dir(cfg.StatePath)
 	if stateDir != "." && stateDir != "" {
@@ -405,6 +407,7 @@ func createEngine(cfg *config.Config) (*engine.Engine, error) {
 		Environment:   cfg.Environment,
 		Target:        targetInfo,
 		AdapterConfig: adapterConfig,
+		Logger:        logger,
 	}
 
 	return engine.New(engineCfg)

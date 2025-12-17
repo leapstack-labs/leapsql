@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ func TestShouldParseFile_NewFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -51,6 +53,7 @@ func TestShouldParseFile_UnchangedFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -83,6 +86,7 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -116,6 +120,7 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -153,6 +158,7 @@ SELECT 2`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -194,6 +200,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -243,6 +250,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -278,6 +286,7 @@ def hello(name):
 	cfg := Config{
 		MacrosDir: macrosDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -315,6 +324,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)
@@ -356,6 +366,7 @@ SELECT * FROM raw_data`), 0600)
 		ModelsDir: modelsDir,
 		SeedsDir:  seedsDir,
 		StatePath: statePath,
+		Logger:    testutil.NewTestLogger(t),
 	}
 
 	eng, err := New(cfg)

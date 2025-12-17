@@ -1,7 +1,9 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -14,6 +16,10 @@ import (
 	"github.com/knadh/koanf/v2"
 	"github.com/spf13/pflag"
 )
+
+// loggerKey is used to store logger in context.
+// This key is shared with root.go via both using the same type.
+type loggerKey struct{}
 
 // Package-level koanf instance and config file tracking
 var (
@@ -180,6 +186,22 @@ func GetConfigFileUsed() string {
 // This is available after LoadConfig or LoadConfigWithTarget is called.
 func GetCurrentConfig() *Config {
 	return currentConfig
+}
+
+// LoggerKey returns the context key used for storing the logger.
+// This allows the commands package to retrieve the logger from context
+// without creating an import cycle with the cli package.
+func LoggerKey() interface{} {
+	return loggerKey{}
+}
+
+// GetLogger retrieves the logger from the command context.
+func GetLogger(ctx context.Context) *slog.Logger {
+	if l, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok {
+		return l
+	}
+	// Return discard logger as safe fallback
+	return slog.New(slog.DiscardHandler)
 }
 
 // expandEnvVars expands ${VAR} patterns in a string with environment variable values.

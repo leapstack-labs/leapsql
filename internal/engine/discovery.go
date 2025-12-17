@@ -80,6 +80,8 @@ func (e *Engine) Discover(opts DiscoveryOptions) (*DiscoveryResult, error) {
 	start := time.Now()
 	result := &DiscoveryResult{}
 
+	e.logger.Info("starting discovery")
+
 	// 1. Discover macros first (models may reference them in templates)
 	if err := e.discoverMacros(opts, result); err != nil {
 		return result, fmt.Errorf("macro discovery failed: %w", err)
@@ -104,6 +106,14 @@ func (e *Engine) Discover(opts DiscoveryOptions) (*DiscoveryResult, error) {
 	}
 
 	result.Duration = time.Since(start)
+
+	e.logger.Info("discovery completed",
+		"models_total", result.ModelsTotal,
+		"models_changed", result.ModelsChanged,
+		"models_skipped", result.ModelsSkipped,
+		"macros_total", result.MacrosTotal,
+		"duration_ms", result.Duration.Milliseconds())
+
 	return result, nil
 }
 
@@ -143,6 +153,8 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 		return nil // No macros dir is OK
 	}
 
+	e.logger.Debug("discovering macros", "macros_dir", macrosDir)
+
 	// Track which files we've seen (for deletion detection)
 	seenFiles := make(map[string]bool)
 
@@ -157,6 +169,7 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 
 		needsParse, newHash, content := e.shouldParseFile(absPath, opts.ForceFullRefresh)
 		if !needsParse {
+			e.logger.Debug("skipping unchanged macro", "path", absPath)
 			result.MacrosSkipped++
 			return nil
 		}
@@ -164,11 +177,14 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 		// Parse the .star file
 		parsed, parseErr := macro.ParseStarlarkFile(absPath, content)
 		if parseErr != nil {
+			e.logger.Debug("macro parse error", "path", absPath, "error", parseErr.Error())
 			result.Errors = append(result.Errors, DiscoveryError{
 				Path: absPath, Type: "parse", Message: parseErr.Error(),
 			})
-			return nil //nolint:nilerr // Continue with other files (graceful degradation)
+			return nil // Continue with other files (graceful degradation)
 		}
+
+		e.logger.Debug("parsed macro", "path", absPath, "namespace", parsed.Name)
 
 		// Save to SQLite
 		if saveErr := e.saveMacroToStore(parsed, absPath, newHash); saveErr != nil {
@@ -249,6 +265,8 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 		return fmt.Errorf("failed to resolve models directory: %w", absErr)
 	}
 
+	e.logger.Debug("discovering models", "models_dir", absModelsDir)
+
 	// Clear in-memory state for fresh build
 	e.models = make(map[string]*parser.ModelConfig)
 	e.registry = registry.NewModelRegistry()
@@ -276,6 +294,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 			storedModel, err := e.store.GetModelByFilePath(absPath)
 			if err == nil && storedModel != nil {
 				modelConfig = e.reconstructModelConfig(storedModel, absPath, content)
+				e.logger.Debug("skipping unchanged model", "path", absPath)
 				result.ModelsSkipped++
 			}
 		}
@@ -285,11 +304,14 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 			var parseErr error
 			modelConfig, parseErr = scanner.ParseContent(absPath, content)
 			if parseErr != nil {
+				e.logger.Debug("model parse error", "path", absPath, "error", parseErr.Error())
 				result.Errors = append(result.Errors, DiscoveryError{
 					Path: absPath, Type: "parse", Message: parseErr.Error(),
 				})
-				return nil //nolint:nilerr // Continue with other files (graceful degradation)
+				return nil // Continue with other files (graceful degradation)
 			}
+
+			e.logger.Debug("parsed model", "path", absPath, "model_name", modelConfig.Name)
 
 			// Save to SQLite
 			if err := e.saveModelToStore(modelConfig, absPath, newHash); err != nil {

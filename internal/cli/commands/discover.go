@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
@@ -45,13 +46,14 @@ Output adapts to environment:
 
 func runDiscover(cmd *cobra.Command) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
 	// Create renderer
 	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	// Create engine (no DB connection needed for discovery)
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}

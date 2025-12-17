@@ -39,7 +39,7 @@ func TestAdapter_Connect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			dbPath := tt.setupPath(t)
 			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: dbPath}))
@@ -75,7 +75,7 @@ func TestAdapter_NotConnected(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			err := tt.operation(ctx, adp)
 			assert.Error(t, err, "expected error when operating without connection")
@@ -95,7 +95,7 @@ func TestAdapter_Close(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			if tt.connect {
 				require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
@@ -202,7 +202,7 @@ func TestAdapter_QueryExecution(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
 			defer func() { _ = adp.Close() }()
@@ -278,7 +278,7 @@ func TestAdapter_GetTableMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			adp := New()
+			adp := New(nil)
 
 			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
 			defer func() { _ = adp.Close() }()
@@ -307,7 +307,7 @@ func TestAdapter_GetTableMetadata(t *testing.T) {
 
 func TestAdapter_LoadCSV(t *testing.T) {
 	ctx := context.Background()
-	adp := New()
+	adp := New(nil)
 
 	require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
 	defer func() { _ = adp.Close() }()

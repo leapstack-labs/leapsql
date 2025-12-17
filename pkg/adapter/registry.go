@@ -2,25 +2,26 @@ package adapter
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"sync"
 )
 
 var (
 	registryMu sync.RWMutex
-	registry   = make(map[string]func() Adapter)
+	registry   = make(map[string]func(*slog.Logger) Adapter)
 )
 
 // Register adds an adapter factory to the registry.
 // Called by adapter implementations in their init() functions.
-func Register(name string, factory func() Adapter) {
+func Register(name string, factory func(*slog.Logger) Adapter) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 	registry[name] = factory
 }
 
 // Get retrieves an adapter factory by name.
-func Get(name string) (func() Adapter, bool) {
+func Get(name string) (func(*slog.Logger) Adapter, bool) {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
 	f, ok := registry[name]
@@ -28,7 +29,8 @@ func Get(name string) (func() Adapter, bool) {
 }
 
 // NewAdapter creates a new adapter instance based on config type.
-func NewAdapter(cfg Config) (Adapter, error) {
+// The logger parameter is passed to the adapter constructor (nil uses discard logger).
+func NewAdapter(cfg Config, logger *slog.Logger) (Adapter, error) {
 	if cfg.Type == "" {
 		return nil, fmt.Errorf("adapter type not specified")
 	}
@@ -40,7 +42,7 @@ func NewAdapter(cfg Config) (Adapter, error) {
 			Available: ListAdapters(),
 		}
 	}
-	return factory(), nil
+	return factory(logger), nil
 }
 
 // ListAdapters returns all registered adapter names (sorted).

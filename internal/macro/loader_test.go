@@ -5,12 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
 )
 
 func TestLoader_Load(t *testing.T) {
+	logger := testutil.NewTestLogger(t)
+
 	tests := []struct {
 		name           string
 		setupDir       func(t *testing.T) string
@@ -130,7 +133,7 @@ def broken(:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			macrosDir := tt.setupDir(t)
-			loader := NewLoader(macrosDir)
+			loader := NewLoaderWithLogger(macrosDir, logger)
 			modules, err := loader.Load()
 
 			if tt.wantErr {
@@ -193,7 +196,7 @@ def broken(:
 	macroPath := filepath.Join(macrosDir, "broken.star")
 	require.NoError(t, os.WriteFile(macroPath, []byte(badContent), 0600))
 
-	loader := NewLoader(macrosDir)
+	loader := NewLoaderWithLogger(macrosDir, testutil.NewTestLogger(t))
 	_, err := loader.Load()
 	require.Error(t, err)
 
@@ -244,7 +247,7 @@ def double(x):
 	macroPath := filepath.Join(macrosDir, "math.star")
 	require.NoError(t, os.WriteFile(macroPath, []byte(macroContent), 0600))
 
-	loader := NewLoader(macrosDir)
+	loader := NewLoaderWithLogger(macrosDir, testutil.NewTestLogger(t))
 	modules, err := loader.Load()
 	require.NoError(t, err)
 

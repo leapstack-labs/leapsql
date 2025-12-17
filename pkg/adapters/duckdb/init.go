@@ -7,6 +7,8 @@
 package duckdb
 
 import (
+	"log/slog"
+
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 
 	// Import dialect to ensure it's registered
@@ -14,5 +16,5 @@ import (
 )
 
 func init() {
-	adapter.Register("duckdb", func() adapter.Adapter { return New() })
+	adapter.Register("duckdb", func(logger *slog.Logger) adapter.Adapter { return New(logger) })
 }

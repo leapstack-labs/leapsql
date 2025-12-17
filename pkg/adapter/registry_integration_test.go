@@ -61,7 +61,7 @@ func TestNewAdapter_Success(t *testing.T) {
 		Path: ":memory:",
 	}
 
-	adp, err := adapter.NewAdapter(cfg)
+	adp, err := adapter.NewAdapter(cfg, nil)
 	require.NoError(t, err, "NewAdapter(duckdb) failed")
 	require.NotNil(t, adp, "NewAdapter(duckdb) returned nil adapter")
 }
@@ -71,7 +71,7 @@ func TestNewAdapter_UnknownType(t *testing.T) {
 		Type: "unknown_adapter",
 	}
 
-	_, err := adapter.NewAdapter(cfg)
+	_, err := adapter.NewAdapter(cfg, nil)
 	require.Error(t, err, "NewAdapter(unknown_adapter) should fail")
 
 	// Check error type

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -19,8 +20,14 @@ type Adapter struct {
 }
 
 // New creates a new DuckDB adapter instance.
-func New() *Adapter {
-	return &Adapter{}
+// If logger is nil, a discard logger is used.
+func New(logger *slog.Logger) *Adapter {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	return &Adapter{
+		BaseSQLAdapter: adapter.BaseSQLAdapter{Logger: logger},
+	}
 }
 
 // DialectName returns the SQL dialect for this adapter.
@@ -35,6 +42,8 @@ func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 	if path == "" {
 		path = ":memory:"
 	}
+
+	a.Logger.Debug("connecting to duckdb", slog.String("path", path))
 
 	db, err := sql.Open("duckdb", path)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,16 +25,22 @@ type SQLiteStore struct {
 	db      *sql.DB
 	queries *sqlcgen.Queries
 	path    string
+	logger  *slog.Logger
 }
 
 // NewSQLiteStore creates a new SQLite state store instance.
-func NewSQLiteStore() *SQLiteStore {
-	return &SQLiteStore{}
+func NewSQLiteStore(logger *slog.Logger) *SQLiteStore {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	return &SQLiteStore{logger: logger}
 }
 
 // Open opens a connection to the SQLite database.
 // Use ":memory:" for an in-memory database.
 func (s *SQLiteStore) Open(path string) error {
+	s.logger.Debug("opening state database", slog.String("path", path))
+
 	// Enable foreign keys and WAL mode for better performance
 	var dsn string
 	if path != ":memory:" {
@@ -62,6 +69,7 @@ func (s *SQLiteStore) Open(path string) error {
 // Close closes the SQLite database connection.
 func (s *SQLiteStore) Close() error {
 	if s.db != nil {
+		s.logger.Debug("closing state database", slog.String("path", s.path))
 		return s.db.Close()
 	}
 	return nil
@@ -72,6 +80,8 @@ func (s *SQLiteStore) InitSchema() error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
+
+	s.logger.Debug("initializing database schema")
 
 	_, err := s.db.ExecContext(context.Background(), schemaSQL)
 	if err != nil {
@@ -100,6 +110,8 @@ func (s *SQLiteStore) CreateRun(env string) (*Run, error) {
 
 	id := generateID()
 	now := time.Now().UTC()
+
+	s.logger.Debug("creating run", slog.String("id", id), slog.String("environment", env))
 
 	row, err := s.queries.CreateRun(ctx(), sqlcgen.CreateRunParams{
 		ID:          id,

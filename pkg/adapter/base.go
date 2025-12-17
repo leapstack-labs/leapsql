@@ -4,19 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 )
 
 // BaseSQLAdapter provides common database/sql functionality for adapters.
 // Embed this struct in concrete adapter implementations to get standard
 // Close, Exec, and Query implementations.
 type BaseSQLAdapter struct {
-	DB  *sql.DB
-	Cfg Config
+	DB     *sql.DB
+	Cfg    Config
+	Logger *slog.Logger
 }
 
 // Close closes the database connection.
 func (b *BaseSQLAdapter) Close() error {
 	if b.DB != nil {
+		if b.Logger != nil {
+			b.Logger.Debug("closing database connection")
+		}
 		return b.DB.Close()
 	}
 	return nil

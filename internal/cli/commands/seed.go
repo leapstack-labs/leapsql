@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/spf13/cobra"
 )
@@ -43,12 +44,13 @@ Use --output to override: auto, text, markdown, json`,
 
 func runSeed(cmd *cobra.Command) error {
 	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
 
 	// Create renderer based on output format
 	mode := output.Mode(cfg.OutputFormat)
 	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
-	eng, err := createEngine(cfg)
+	eng, err := createEngine(cfg, logger)
 	if err != nil {
 		return err
 	}
