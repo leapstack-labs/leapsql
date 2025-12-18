@@ -149,7 +149,6 @@ func TestBuilderChaining(t *testing.T) {
 	// Test that all builder methods can be chained
 	d := NewDialect("test").
 		Identifiers(`"`, `"`, `""`, NormCaseInsensitive).
-		Operators(true, true).
 		Aggregates("sum", "count").
 		Generators("now").
 		Windows("row_number").
@@ -322,7 +321,6 @@ func TestBuilderWithAllNewMethods(t *testing.T) {
 	// Test that all new builder methods can be chained
 	d := NewDialect("postgres").
 		Identifiers(`"`, `"`, `""`, NormLowercase).
-		Operators(true, false).
 		DefaultSchema("public").
 		PlaceholderStyle(PlaceholderDollar).
 		Aggregates("sum", "count").

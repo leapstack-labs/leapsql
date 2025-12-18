@@ -65,11 +65,30 @@ type SelectCore struct {
 	Where    Expr
 	GroupBy  []Expr
 	Having   Expr
-	Qualify  Expr // DuckDB/Snowflake window function filter
+	Windows  []WindowDef // Named window definitions (WINDOW clause)
+	Qualify  Expr        // DuckDB/Snowflake window function filter
 	OrderBy  []OrderByItem
 	Limit    Expr
 	Offset   Expr
+
+	// Extensions holds rare/custom dialect-specific nodes (e.g., CONNECT BY, SAMPLE).
+	// Use this for dialect features that are too specialized to warrant typed fields.
+	Extensions []Node
 }
+
+// Node is a generic AST node interface for extensions.
+type Node interface {
+	node()
+}
+
+// WindowDef represents a named window definition in the WINDOW clause.
+// Example: WINDOW w AS (PARTITION BY x ORDER BY y)
+type WindowDef struct {
+	Name string
+	Spec *WindowSpec
+}
+
+func (WindowDef) node() {}
 
 // SelectItem represents an item in the SELECT list.
 type SelectItem struct {

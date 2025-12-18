@@ -1,5 +1,11 @@
 package parser
 
+import (
+	"fmt"
+
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
+
 // Statement parsing: WITH clause, CTEs, SELECT body, SELECT list, ORDER BY.
 //
 // Grammar:
@@ -10,16 +16,15 @@ package parser
 //	select_body   → select_core [(UNION|INTERSECT|EXCEPT) [ALL|DISTINCT] select_body]
 //	select_core   → SELECT [DISTINCT|ALL] select_list
 //	                [FROM from_clause]
-//	                [WHERE expr]
-//	                [GROUP BY expr_list]
-//	                [HAVING expr]
-//	                [QUALIFY expr]
-//	                [ORDER BY order_list]
-//	                [LIMIT expr [OFFSET expr]]
+//	                [clauses based on dialect sequence]
 //	select_list   → select_item ("," select_item)*
 //	select_item   → "*" | table "." "*" | expr [AS identifier]
 //	order_list    → order_item ("," order_item)*
 //	order_item    → expr [ASC|DESC] [NULLS FIRST|LAST]
+//
+// The parser uses dialect.ClauseSequence() and dialect.ClauseHandler() to
+// parse clauses in the correct order for the current dialect, and to
+// reject unsupported clauses (like QUALIFY in Postgres).
 
 // parseStatement parses a complete SQL statement.
 func (p *Parser) parseStatement() *SelectStmt {
@@ -138,6 +143,175 @@ func (p *Parser) parseSelectCore() *SelectCore {
 		core.From = p.parseFromClause()
 	}
 
+	// Parse optional clauses using dialect-driven approach
+	p.parseClauses(core)
+
+	return core
+}
+
+// parseClauses parses optional clauses using the dialect's clause sequence and handlers.
+// If no dialect is set, falls back to permissive parsing (accepts all known clauses).
+func (p *Parser) parseClauses(core *SelectCore) {
+	if p.dialect != nil {
+		p.parseClausesWithDialect(core)
+	} else {
+		p.parseClausesPermissive(core)
+	}
+}
+
+// parseClausesWithDialect parses clauses using dialect.ClauseSequence() and ClauseHandler().
+// This is the strict mode - only clauses in the dialect's sequence are accepted.
+func (p *Parser) parseClausesWithDialect(core *SelectCore) {
+	sequence := p.dialect.ClauseSequence()
+	if sequence == nil {
+		// Dialect has no clause sequence defined, fall back to permissive
+		p.parseClausesPermissive(core)
+		return
+	}
+
+	for {
+		matched := false
+
+		// Try to match against any clause in the sequence
+		for _, clauseType := range sequence {
+			if p.check(clauseType) {
+				handler := p.dialect.ClauseHandler(clauseType)
+				if handler == nil {
+					p.addError(fmt.Sprintf("no handler for clause %s in dialect %s", clauseType, p.dialect.Name))
+					p.nextToken()
+					matched = true
+					break
+				}
+
+				p.nextToken() // consume clause keyword
+
+				result, err := handler(p)
+				if err != nil {
+					p.addError(err.Error())
+				}
+
+				p.assignClauseResult(core, clauseType, result)
+				matched = true
+				break
+			}
+		}
+
+		// Check for unsupported clause keyword (not in this dialect's sequence)
+		if !matched && p.isUnknownClauseKeyword(sequence) {
+			p.addError(fmt.Sprintf("%s is not supported in %s dialect", p.token.Literal, p.dialect.Name))
+			p.nextToken()
+			continue
+		}
+
+		if !matched {
+			break
+		}
+	}
+
+	// Handle OFFSET which typically follows LIMIT
+	if p.match(TOKEN_OFFSET) {
+		core.Offset = p.parseExpression()
+	}
+}
+
+// isUnknownClauseKeyword returns true if the current token is a clause keyword
+// that's not in the provided sequence (i.e., unsupported by this dialect).
+func (p *Parser) isUnknownClauseKeyword(sequence []token.TokenType) bool {
+	// Check if current token is a known clause keyword
+	knownClauseKeywords := []TokenType{
+		TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_WINDOW,
+		TOKEN_ORDER, TOKEN_LIMIT, TOKEN_QUALIFY,
+	}
+
+	for _, kw := range knownClauseKeywords {
+		if p.check(kw) {
+			// It's a known clause keyword - check if it's in the sequence
+			for _, seqTok := range sequence {
+				if seqTok == kw {
+					return false // In sequence, not unknown
+				}
+			}
+			return true // Known clause but not in this dialect's sequence
+		}
+	}
+
+	return false
+}
+
+// assignClauseResult assigns the parsed clause result to the appropriate field in SelectCore.
+func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType, result any) {
+	if result == nil {
+		return
+	}
+
+	switch clauseType {
+	case token.WHERE:
+		if expr, ok := result.(Expr); ok {
+			core.Where = expr
+		}
+
+	case token.GROUP:
+		switch v := result.(type) {
+		case []Expr:
+			core.GroupBy = v
+		case []any:
+			// Convert []spi.Expr to []Expr
+			exprs := make([]Expr, len(v))
+			for i, e := range v {
+				if expr, ok := e.(Expr); ok {
+					exprs[i] = expr
+				}
+			}
+			core.GroupBy = exprs
+		}
+
+	case token.HAVING:
+		if expr, ok := result.(Expr); ok {
+			core.Having = expr
+		}
+
+	case token.WINDOW:
+		// Window definitions are complex - handled specially if needed
+		// For now, we don't have full WINDOW clause support
+
+	case token.ORDER:
+		switch v := result.(type) {
+		case []OrderByItem:
+			core.OrderBy = v
+		case []any:
+			// Convert from spi types
+			items := make([]OrderByItem, len(v))
+			for i, item := range v {
+				if obi, ok := item.(OrderByItem); ok {
+					items[i] = obi
+				}
+			}
+			core.OrderBy = items
+		}
+
+	case token.LIMIT:
+		if expr, ok := result.(Expr); ok {
+			core.Limit = expr
+		}
+
+	default:
+		// Check for QUALIFY (dynamic token)
+		if clauseType == TOKEN_QUALIFY {
+			if expr, ok := result.(Expr); ok {
+				core.Qualify = expr
+			}
+		} else {
+			// Unknown clause - add to extensions if it's a Node
+			if node, ok := result.(Node); ok {
+				core.Extensions = append(core.Extensions, node)
+			}
+		}
+	}
+}
+
+// parseClausesPermissive parses clauses without dialect restrictions.
+// This is the backward-compatible mode that accepts all known SQL clauses.
+func (p *Parser) parseClausesPermissive(core *SelectCore) {
 	// WHERE clause
 	if p.match(TOKEN_WHERE) {
 		core.Where = p.parseExpression()
@@ -154,7 +328,7 @@ func (p *Parser) parseSelectCore() *SelectCore {
 		core.Having = p.parseExpression()
 	}
 
-	// QUALIFY clause (DuckDB/Snowflake)
+	// QUALIFY clause (DuckDB/Snowflake) - permissive mode accepts it
 	if p.match(TOKEN_QUALIFY) {
 		core.Qualify = p.parseExpression()
 	}
@@ -174,8 +348,6 @@ func (p *Parser) parseSelectCore() *SelectCore {
 			core.Offset = p.parseExpression()
 		}
 	}
-
-	return core
 }
 
 // parseSelectList parses the list of SELECT items.

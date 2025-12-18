@@ -40,4 +40,9 @@ const (
 	ErrUnknownColumn      = "unknown column %q"
 	ErrUnknownTable       = "unknown table or alias %q"
 	ErrAmbiguousColumn    = "ambiguous column reference %q"
+
+	// Dialect-specific error messages
+	ErrUnsupportedClause   = "%s is not supported in %s dialect"
+	ErrUnsupportedOperator = "operator %s is not supported in %s dialect"
+	ErrNoClauseHandler     = "no handler registered for clause %s"
 )

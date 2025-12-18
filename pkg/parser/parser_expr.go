@@ -1,131 +1,237 @@
 package parser
 
-// Expression precedence parsing: OR, AND, NOT, comparisons, arithmetic operators.
-//
-// Precedence (lowest to highest):
-//
-//  1. OR
-//  2. AND
-//  3. NOT
-//  4. Comparisons: =, !=, <, >, <=, >=, IS [NOT] NULL, IN, BETWEEN, LIKE, ILIKE
-//  5. Addition: +, -, ||
-//  6. Multiplication: *, /, %
-//  7. Unary: -, +
-//  8. Primary: literals, column refs, function calls, parenthesized expressions
-//
-// Grammar:
-//
-//	expression    → or_expr
-//	or_expr       → and_expr (OR and_expr)*
-//	and_expr      → not_expr (AND not_expr)*
-//	not_expr      → NOT not_expr | comparison
-//	comparison    → addition ([NOT] (IN | BETWEEN | LIKE | ILIKE) ... | IS [NOT] NULL | cmp_op addition)?
-//	addition      → multiplication (("+"|"-"|"||") multiplication)*
-//	multiplication→ unary (("*"|"/"|"%") unary)*
-//	unary         → ("-"|"+") unary | primary
+import "github.com/leapstack-labs/leapsql/pkg/spi"
 
-// parseExpression parses an expression.
+// Expression precedence parsing using Pratt parser with dialect-aware precedence.
+//
+// Precedence levels (from spi package):
+//
+//	PrecedenceNone       = 0
+//	PrecedenceOr         = 1
+//	PrecedenceAnd        = 2
+//	PrecedenceNot        = 3
+//	PrecedenceComparison = 4  (=, !=, <, >, <=, >=, IS, IN, BETWEEN, LIKE, ILIKE)
+//	PrecedenceAddition   = 5  (+, -, ||)
+//	PrecedenceMultiply   = 6  (*, /, %)
+//	PrecedenceUnary      = 7  (-, +, NOT)
+//	PrecedencePostfix    = 8  (::, [], ())
+//
+// The parser uses dialect.Precedence() to look up operator precedence dynamically,
+// allowing dialects to add custom operators (like ILIKE for Postgres/DuckDB or :: for DuckDB).
+// When no dialect is set, it falls back to default ANSI precedence.
+
+// parseExpression parses an expression using precedence climbing.
 func (p *Parser) parseExpression() Expr {
-	return p.parseOrExpr()
+	return p.parseExpressionWithPrecedence(spi.PrecedenceNone + 1)
 }
 
-// parseOrExpr parses OR expressions.
-func (p *Parser) parseOrExpr() Expr {
-	left := p.parseAndExpr()
-
-	for p.match(TOKEN_OR) {
-		right := p.parseAndExpr()
-		left = &BinaryExpr{Left: left, Op: "OR", Right: right}
+// parseExpressionWithPrecedence implements Pratt parsing with dialect-aware precedence.
+func (p *Parser) parseExpressionWithPrecedence(minPrecedence int) Expr {
+	// Parse prefix (unary operators and primary expressions)
+	left := p.parsePrefixExpr()
+	if left == nil {
+		return nil
 	}
 
-	return left
-}
-
-// parseAndExpr parses AND expressions.
-func (p *Parser) parseAndExpr() Expr {
-	left := p.parseNotExpr()
-
-	for p.match(TOKEN_AND) {
-		right := p.parseNotExpr()
-		left = &BinaryExpr{Left: left, Op: "AND", Right: right}
-	}
-
-	return left
-}
-
-// parseNotExpr parses NOT expressions.
-func (p *Parser) parseNotExpr() Expr {
-	if p.match(TOKEN_NOT) {
-		expr := p.parseNotExpr()
-		return &UnaryExpr{Op: "NOT", Expr: expr}
-	}
-	return p.parseComparison()
-}
-
-// parseComparison parses comparison expressions.
-func (p *Parser) parseComparison() Expr {
-	left := p.parseAddition()
-
-	// Check for special comparison operators
-	var not bool
-	if p.match(TOKEN_NOT) {
-		not = true
-	}
-
-	switch {
-	case p.match(TOKEN_IN):
-		return p.parseInExpr(left, not)
-
-	case p.match(TOKEN_BETWEEN):
-		return p.parseBetweenExpr(left, not)
-
-	case p.match(TOKEN_LIKE):
-		return p.parseLikeExpr(left, not, false)
-
-	case p.match(TOKEN_ILIKE):
-		return p.parseLikeExpr(left, not, true)
-	}
-
-	// If we consumed NOT but didn't find IN/BETWEEN/LIKE, it was for IS NOT NULL
-	if not {
-		// Put NOT back conceptually - actually this path shouldn't happen
-		// because NOT IS would be parsed differently
-		return &UnaryExpr{Op: "NOT", Expr: left}
-	}
-
-	// IS NULL / IS NOT NULL
-	if p.match(TOKEN_IS) {
-		isNot := p.match(TOKEN_NOT)
-		if p.match(TOKEN_NULL) {
-			return &IsNullExpr{Expr: left, Not: isNot}
+	// Parse infix operators while their precedence is >= minPrecedence
+	for {
+		prec := p.getInfixPrecedence()
+		if prec < minPrecedence {
+			break
 		}
-		// IS TRUE / IS FALSE could be handled here
-		p.addError("expected NULL after IS")
-	}
 
-	// Standard comparison operators
-	switch p.token.Type {
-	case TOKEN_EQ:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: "=", Right: p.parseAddition()}
-	case TOKEN_NE:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: "!=", Right: p.parseAddition()}
-	case TOKEN_LT:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: "<", Right: p.parseAddition()}
-	case TOKEN_GT:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: ">", Right: p.parseAddition()}
-	case TOKEN_LE:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: "<=", Right: p.parseAddition()}
-	case TOKEN_GE:
-		p.nextToken()
-		return &BinaryExpr{Left: left, Op: ">=", Right: p.parseAddition()}
+		left = p.parseInfixExpr(left, prec)
+		if left == nil {
+			break
+		}
 	}
 
 	return left
+}
+
+// parsePrefixExpr parses prefix expressions (unary operators and primary expressions).
+func (p *Parser) parsePrefixExpr() Expr {
+	switch p.token.Type {
+	case TOKEN_NOT:
+		p.nextToken()
+		expr := p.parseExpressionWithPrecedence(spi.PrecedenceNot)
+		return &UnaryExpr{Op: "NOT", Expr: expr}
+
+	case TOKEN_MINUS:
+		p.nextToken()
+		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
+		return &UnaryExpr{Op: "-", Expr: expr}
+
+	case TOKEN_PLUS:
+		p.nextToken()
+		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
+		return &UnaryExpr{Op: "+", Expr: expr}
+
+	default:
+		return p.parsePrimary()
+	}
+}
+
+// getInfixPrecedence returns the precedence of the current token as an infix operator.
+// Returns 0 if the token is not an infix operator.
+func (p *Parser) getInfixPrecedence() int {
+	// Check dialect precedence first (includes ANSI operators if dialect has them)
+	if p.dialect != nil {
+		if prec := p.dialect.Precedence(p.token.Type); prec > 0 {
+			return prec
+		}
+	}
+
+	// Fall back to default ANSI precedence (for permissive parsing without dialect)
+	return p.defaultPrecedence(p.token.Type)
+}
+
+// defaultPrecedence returns the default ANSI precedence for an operator.
+// Used when no dialect is set (permissive parsing mode).
+func (p *Parser) defaultPrecedence(t TokenType) int {
+	switch t {
+	case TOKEN_OR:
+		return spi.PrecedenceOr
+	case TOKEN_AND:
+		return spi.PrecedenceAnd
+	case TOKEN_EQ, TOKEN_NE, TOKEN_LT, TOKEN_GT, TOKEN_LE, TOKEN_GE:
+		return spi.PrecedenceComparison
+	case TOKEN_IS, TOKEN_IN, TOKEN_BETWEEN, TOKEN_LIKE:
+		return spi.PrecedenceComparison
+	case TOKEN_ILIKE: // Include ILIKE for backward compatibility in permissive mode
+		return spi.PrecedenceComparison
+	case TOKEN_PLUS, TOKEN_MINUS, TOKEN_DPIPE:
+		return spi.PrecedenceAddition
+	case TOKEN_STAR, TOKEN_SLASH, TOKEN_PERCENT:
+		return spi.PrecedenceMultiply
+	case TOKEN_NOT:
+		// NOT as infix (for NOT IN, NOT LIKE, etc.) - handled specially
+		return spi.PrecedenceComparison
+	default:
+		return spi.PrecedenceNone
+	}
+}
+
+// parseInfixExpr parses an infix expression given the left operand and current precedence.
+func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
+	// Handle special infix operators first
+	switch p.token.Type {
+	case TOKEN_NOT:
+		// NOT IN, NOT BETWEEN, NOT LIKE, NOT ILIKE
+		return p.parseNotInfixExpr(left)
+
+	case TOKEN_IS:
+		return p.parseIsExpr(left)
+
+	case TOKEN_IN:
+		p.nextToken()
+		return p.parseInExpr(left, false)
+
+	case TOKEN_BETWEEN:
+		p.nextToken()
+		return p.parseBetweenExpr(left, false)
+
+	case TOKEN_LIKE:
+		p.nextToken()
+		return p.parseLikeExpr(left, false, false)
+
+	case TOKEN_ILIKE:
+		// Dialect-specific: only valid if precedence > 0
+		p.nextToken()
+		return p.parseLikeExpr(left, false, true)
+	}
+
+	// Check for custom infix handler (dialect-specific operators like ::)
+	if p.dialect != nil {
+		if handler := p.dialect.InfixHandler(p.token.Type); handler != nil {
+			op := p.token
+			p.nextToken()
+			result, err := handler(p, left)
+			if err != nil {
+				p.addError(err.Error())
+				return left
+			}
+			if result != nil {
+				// Type assert back to Expr
+				if expr, ok := result.(Expr); ok {
+					return expr
+				}
+			}
+			// If handler returned nil, fall through to standard handling
+			// This can happen for operators that need standard binary handling
+			return &BinaryExpr{Left: left, Op: op.Literal, Right: p.parseExpressionWithPrecedence(prec + 1)}
+		}
+	}
+
+	// Standard binary operators
+	op := p.token
+	p.nextToken()
+
+	// Parse right operand with higher precedence (left-associative)
+	right := p.parseExpressionWithPrecedence(prec + 1)
+
+	return &BinaryExpr{Left: left, Op: opString(op.Type), Right: right}
+}
+
+// parseNotInfixExpr handles NOT as an infix modifier (NOT IN, NOT BETWEEN, NOT LIKE).
+func (p *Parser) parseNotInfixExpr(left Expr) Expr {
+	p.nextToken() // consume NOT
+
+	switch p.token.Type {
+	case TOKEN_IN:
+		p.nextToken()
+		return p.parseInExpr(left, true)
+
+	case TOKEN_BETWEEN:
+		p.nextToken()
+		return p.parseBetweenExpr(left, true)
+
+	case TOKEN_LIKE:
+		p.nextToken()
+		return p.parseLikeExpr(left, true, false)
+
+	case TOKEN_ILIKE:
+		p.nextToken()
+		return p.parseLikeExpr(left, true, true)
+
+	default:
+		// NOT without a recognized following keyword - treat as error
+		p.addError("expected IN, BETWEEN, LIKE, or ILIKE after NOT")
+		return left
+	}
+}
+
+// parseIsExpr parses IS [NOT] NULL / IS [NOT] TRUE / IS [NOT] FALSE.
+func (p *Parser) parseIsExpr(left Expr) Expr {
+	p.nextToken() // consume IS
+
+	isNot := p.match(TOKEN_NOT)
+
+	switch p.token.Type {
+	case TOKEN_NULL:
+		p.nextToken()
+		return &IsNullExpr{Expr: left, Not: isNot}
+
+	case TOKEN_TRUE:
+		p.nextToken()
+		op := "IS TRUE"
+		if isNot {
+			op = "IS NOT TRUE"
+		}
+		return &BinaryExpr{Left: left, Op: op, Right: &Literal{Type: LiteralBool, Value: "true"}}
+
+	case TOKEN_FALSE:
+		p.nextToken()
+		op := "IS FALSE"
+		if isNot {
+			op = "IS NOT FALSE"
+		}
+		return &BinaryExpr{Left: left, Op: op, Right: &Literal{Type: LiteralBool, Value: "false"}}
+
+	default:
+		p.addError("expected NULL, TRUE, or FALSE after IS")
+		return left
+	}
 }
 
 // parseInExpr parses an IN expression.
@@ -148,70 +254,54 @@ func (p *Parser) parseInExpr(left Expr, not bool) Expr {
 // parseBetweenExpr parses a BETWEEN expression.
 func (p *Parser) parseBetweenExpr(left Expr, not bool) Expr {
 	between := &BetweenExpr{Expr: left, Not: not}
-	between.Low = p.parseAddition()
+	// Parse low bound at addition precedence to avoid capturing AND
+	between.Low = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	p.expect(TOKEN_AND)
-	between.High = p.parseAddition()
+	// Parse high bound at addition precedence
+	between.High = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	return between
 }
 
-// parseLikeExpr parses a LIKE expression.
+// parseLikeExpr parses a LIKE/ILIKE expression.
 func (p *Parser) parseLikeExpr(left Expr, not bool, ilike bool) Expr {
 	like := &LikeExpr{Expr: left, Not: not, ILike: ilike}
-	like.Pattern = p.parseAddition()
+	// Parse pattern at addition precedence
+	like.Pattern = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	return like
 }
 
-// parseAddition parses addition/subtraction/concatenation expressions.
-func (p *Parser) parseAddition() Expr {
-	left := p.parseMultiplication()
-
-	for {
-		switch p.token.Type {
-		case TOKEN_PLUS:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "+", Right: p.parseMultiplication()}
-		case TOKEN_MINUS:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "-", Right: p.parseMultiplication()}
-		case TOKEN_DPIPE:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "||", Right: p.parseMultiplication()}
-		default:
-			return left
-		}
-	}
-}
-
-// parseMultiplication parses multiplication/division/modulo expressions.
-func (p *Parser) parseMultiplication() Expr {
-	left := p.parseUnary()
-
-	for {
-		switch p.token.Type {
-		case TOKEN_STAR:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "*", Right: p.parseUnary()}
-		case TOKEN_SLASH:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "/", Right: p.parseUnary()}
-		case TOKEN_PERCENT:
-			p.nextToken()
-			left = &BinaryExpr{Left: left, Op: "%", Right: p.parseUnary()}
-		default:
-			return left
-		}
-	}
-}
-
-// parseUnary parses unary expressions.
-func (p *Parser) parseUnary() Expr {
-	switch p.token.Type {
-	case TOKEN_MINUS:
-		p.nextToken()
-		return &UnaryExpr{Op: "-", Expr: p.parseUnary()}
+// opString returns the string representation of an operator token.
+func opString(t TokenType) string {
+	switch t {
+	case TOKEN_OR:
+		return "OR"
+	case TOKEN_AND:
+		return "AND"
+	case TOKEN_EQ:
+		return "="
+	case TOKEN_NE:
+		return "!="
+	case TOKEN_LT:
+		return "<"
+	case TOKEN_GT:
+		return ">"
+	case TOKEN_LE:
+		return "<="
+	case TOKEN_GE:
+		return ">="
 	case TOKEN_PLUS:
-		p.nextToken()
-		return &UnaryExpr{Op: "+", Expr: p.parseUnary()}
+		return "+"
+	case TOKEN_MINUS:
+		return "-"
+	case TOKEN_STAR:
+		return "*"
+	case TOKEN_SLASH:
+		return "/"
+	case TOKEN_PERCENT:
+		return "%"
+	case TOKEN_DPIPE:
+		return "||"
+	default:
+		return t.String()
 	}
-	return p.parsePrimary()
 }

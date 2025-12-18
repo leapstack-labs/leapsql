@@ -8,6 +8,9 @@ package dialect
 import (
 	"strconv"
 	"strings"
+
+	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // NormalizationStrategy defines how unquoted identifiers are normalized.
@@ -40,12 +43,6 @@ type IdentifierConfig struct {
 	QuoteEnd      string                // End quote character (usually same as Quote, ] for [)
 	Escape        string                // Escape sequence: "", ``, ]]
 	Normalization NormalizationStrategy // How to normalize unquoted identifiers
-}
-
-// OperatorConfig defines operator behaviors that vary by dialect.
-type OperatorConfig struct {
-	DPipeIsConcat  bool // || means string concatenation (default: true, false in MySQL)
-	ConcatCoalesce bool // CONCAT treats NULL as empty string (default: false)
 }
 
 // Type classifies how a function affects lineage.
@@ -94,7 +91,6 @@ type FunctionDoc struct {
 type Dialect struct {
 	Name        string
 	Identifiers IdentifierConfig
-	Operators   OperatorConfig
 
 	// Database-specific settings
 	DefaultSchema string           // Default schema name ("main" for DuckDB, "public" for Postgres)
@@ -113,6 +109,15 @@ type Dialect struct {
 	keywords      map[string]struct{} // Reserved keywords for LSP completions
 	reservedWords map[string]struct{} // All keywords that need quoting as identifiers
 	dataTypes     []string
+
+	// Parsing behavior (NEW - for dialect-aware parsing)
+	parent         *Dialect                              // Parent dialect for inheritance
+	clauseSequence []token.TokenType                     // Order of clauses in SELECT statement
+	clauseHandlers map[token.TokenType]spi.ClauseHandler // Handlers for each clause
+	symbols        map[string]token.TokenType            // Custom operators: "::" -> DCOLON
+	dynamicKw      map[string]token.TokenType            // Custom keywords: "QUALIFY" -> QUALIFY
+	precedence     map[token.TokenType]int               // Operator precedence for expressions
+	infixHandlers  map[token.TokenType]spi.InfixHandler  // Optional custom infix parsing
 }
 
 // FunctionLineageType returns the lineage classification for a function.
@@ -264,6 +269,90 @@ func (d *Dialect) QuoteIdentifierIfNeeded(name string) string {
 	return name
 }
 
+// ---------- Parsing Behavior Methods ----------
+
+// ClauseSequence returns the ordered list of clause token types for this dialect.
+func (d *Dialect) ClauseSequence() []token.TokenType {
+	if d.clauseSequence != nil {
+		return d.clauseSequence
+	}
+	if d.parent != nil {
+		return d.parent.ClauseSequence()
+	}
+	return nil
+}
+
+// ClauseHandler returns the handler for a clause token type.
+func (d *Dialect) ClauseHandler(t token.TokenType) spi.ClauseHandler {
+	if d.clauseHandlers != nil {
+		if h, ok := d.clauseHandlers[t]; ok {
+			return h
+		}
+	}
+	if d.parent != nil {
+		return d.parent.ClauseHandler(t)
+	}
+	return nil
+}
+
+// Symbols returns the custom operators map for lexer symbol matching.
+func (d *Dialect) Symbols() map[string]token.TokenType {
+	if d.symbols != nil {
+		return d.symbols
+	}
+	if d.parent != nil {
+		return d.parent.Symbols()
+	}
+	return nil
+}
+
+// LookupKeyword returns the token type for a dynamic keyword.
+// Returns the token type and true if found, or IDENT and false if not.
+func (d *Dialect) LookupKeyword(name string) (token.TokenType, bool) {
+	lowerName := strings.ToLower(name)
+	if d.dynamicKw != nil {
+		if t, ok := d.dynamicKw[lowerName]; ok {
+			return t, true
+		}
+	}
+	if d.parent != nil {
+		return d.parent.LookupKeyword(name)
+	}
+	return token.IDENT, false
+}
+
+// Precedence returns the precedence level for an operator token.
+// Returns 0 (PrecedenceNone) if the operator is not recognized.
+func (d *Dialect) Precedence(t token.TokenType) int {
+	if d.precedence != nil {
+		if p, ok := d.precedence[t]; ok {
+			return p
+		}
+	}
+	if d.parent != nil {
+		return d.parent.Precedence(t)
+	}
+	return spi.PrecedenceNone
+}
+
+// InfixHandler returns the custom infix handler for an operator token.
+func (d *Dialect) InfixHandler(t token.TokenType) spi.InfixHandler {
+	if d.infixHandlers != nil {
+		if h, ok := d.infixHandlers[t]; ok {
+			return h
+		}
+	}
+	if d.parent != nil {
+		return d.parent.InfixHandler(t)
+	}
+	return nil
+}
+
+// Parent returns the parent dialect, if any.
+func (d *Dialect) Parent() *Dialect {
+	return d.parent
+}
+
 // Builder provides a fluent API for constructing dialects.
 type Builder struct {
 	dialect *Dialect
@@ -280,10 +369,6 @@ func NewDialect(name string) *Builder {
 				Escape:        `""`,
 				Normalization: NormLowercase,
 			},
-			Operators: OperatorConfig{
-				DPipeIsConcat:  true,
-				ConcatCoalesce: false,
-			},
 			aggregates:     make(map[string]struct{}),
 			generators:     make(map[string]struct{}),
 			windows:        make(map[string]struct{}),
@@ -292,6 +377,13 @@ func NewDialect(name string) *Builder {
 			keywords:       make(map[string]struct{}),
 			reservedWords:  make(map[string]struct{}),
 			dataTypes:      nil,
+			// Parsing behavior
+			clauseSequence: nil,
+			clauseHandlers: make(map[token.TokenType]spi.ClauseHandler),
+			symbols:        make(map[string]token.TokenType),
+			dynamicKw:      make(map[string]token.TokenType),
+			precedence:     make(map[token.TokenType]int),
+			infixHandlers:  make(map[token.TokenType]spi.InfixHandler),
 		},
 	}
 }
@@ -303,15 +395,6 @@ func (b *Builder) Identifiers(quote, quoteEnd, escape string, norm Normalization
 		QuoteEnd:      quoteEnd,
 		Escape:        escape,
 		Normalization: norm,
-	}
-	return b
-}
-
-// Operators configures operator behaviors.
-func (b *Builder) Operators(dpipeIsConcat, concatCoalesce bool) *Builder {
-	b.dialect.Operators = OperatorConfig{
-		DPipeIsConcat:  dpipeIsConcat,
-		ConcatCoalesce: concatCoalesce,
 	}
 	return b
 }
@@ -396,4 +479,109 @@ func (b *Builder) WithReservedWords(words ...string) *Builder {
 // Build returns the constructed dialect.
 func (b *Builder) Build() *Dialect {
 	return b.dialect
+}
+
+// ---------- Parsing Behavior Builder Methods ----------
+
+// Extends inherits from a parent dialect (deep copy of parsing behavior).
+func (b *Builder) Extends(parent *Dialect) *Builder {
+	b.dialect.parent = parent
+	// Deep copy parent's parsing behavior
+	if parent.clauseSequence != nil {
+		b.dialect.clauseSequence = make([]token.TokenType, len(parent.clauseSequence))
+		copy(b.dialect.clauseSequence, parent.clauseSequence)
+	}
+	if parent.clauseHandlers != nil {
+		for k, v := range parent.clauseHandlers {
+			b.dialect.clauseHandlers[k] = v
+		}
+	}
+	if parent.symbols != nil {
+		for k, v := range parent.symbols {
+			b.dialect.symbols[k] = v
+		}
+	}
+	if parent.dynamicKw != nil {
+		for k, v := range parent.dynamicKw {
+			b.dialect.dynamicKw[k] = v
+		}
+	}
+	if parent.precedence != nil {
+		for k, v := range parent.precedence {
+			b.dialect.precedence[k] = v
+		}
+	}
+	if parent.infixHandlers != nil {
+		for k, v := range parent.infixHandlers {
+			b.dialect.infixHandlers[k] = v
+		}
+	}
+	return b
+}
+
+// AddOperator registers a custom operator symbol for the lexer.
+func (b *Builder) AddOperator(symbol string, t token.TokenType) *Builder {
+	b.dialect.symbols[symbol] = t
+	return b
+}
+
+// AddKeyword registers a dynamic keyword for the lexer.
+func (b *Builder) AddKeyword(name string, t token.TokenType) *Builder {
+	b.dialect.dynamicKw[strings.ToLower(name)] = t
+	return b
+}
+
+// ClauseSequence sets the full clause sequence (for base dialects).
+func (b *Builder) ClauseSequence(tokens ...token.TokenType) *Builder {
+	b.dialect.clauseSequence = tokens
+	return b
+}
+
+// ClauseHandler registers a handler for a clause token.
+func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler) *Builder {
+	b.dialect.clauseHandlers[t] = handler
+	return b
+}
+
+// AddClauseAfter inserts a clause into the sequence after another clause.
+func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler) *Builder {
+	// Find the position of 'after' in the sequence
+	for i, tok := range b.dialect.clauseSequence {
+		if tok == after {
+			// Insert t after position i
+			newSeq := make([]token.TokenType, 0, len(b.dialect.clauseSequence)+1)
+			newSeq = append(newSeq, b.dialect.clauseSequence[:i+1]...)
+			newSeq = append(newSeq, t)
+			newSeq = append(newSeq, b.dialect.clauseSequence[i+1:]...)
+			b.dialect.clauseSequence = newSeq
+			break
+		}
+	}
+	b.dialect.clauseHandlers[t] = handler
+	return b
+}
+
+// RemoveClause removes a clause from the sequence.
+func (b *Builder) RemoveClause(t token.TokenType) *Builder {
+	for i, tok := range b.dialect.clauseSequence {
+		if tok == t {
+			b.dialect.clauseSequence = append(b.dialect.clauseSequence[:i], b.dialect.clauseSequence[i+1:]...)
+			break
+		}
+	}
+	delete(b.dialect.clauseHandlers, t)
+	return b
+}
+
+// AddInfix registers an infix operator with precedence.
+func (b *Builder) AddInfix(t token.TokenType, precedence int) *Builder {
+	b.dialect.precedence[t] = precedence
+	return b
+}
+
+// AddInfixWithHandler registers an infix operator with custom handler.
+func (b *Builder) AddInfixWithHandler(t token.TokenType, precedence int, handler spi.InfixHandler) *Builder {
+	b.dialect.precedence[t] = precedence
+	b.dialect.infixHandlers[t] = handler
+	return b
 }

@@ -52,8 +52,8 @@ func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*Mode
 		return nil, dialect.ErrDialectRequired
 	}
 
-	// Parse the SQL
-	stmt, err := parser.Parse(sqlStr)
+	// Parse the SQL with the specified dialect
+	stmt, err := parser.ParseWithDialect(sqlStr, d)
 	if err != nil {
 		return nil, err
 	}

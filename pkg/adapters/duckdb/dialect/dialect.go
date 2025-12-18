@@ -6,6 +6,9 @@ package dialect
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 //go:generate go run ../../../../scripts/gendialect -dialect=duckdb -gen=all -outdir=.
@@ -14,12 +17,47 @@ func init() {
 	dialect.Register(DuckDB)
 }
 
+// DuckDB-specific tokens (registered dynamically)
+var (
+	// TokenQualify is a DuckDB-specific clause for filtering window functions
+	TokenQualify = token.Register("QUALIFY")
+	// TokenIlike is case-insensitive LIKE (DuckDB and Postgres)
+	TokenIlike = token.Register("ILIKE")
+	// TokenDcolon is the :: cast operator
+	TokenDcolon = token.Register("::")
+	// TokenDslash is the // integer division operator
+	TokenDslash = token.Register("//")
+)
+
+// parseQualify handles the QUALIFY clause (DuckDB-specific).
+// The QUALIFY keyword has already been consumed.
+func parseQualify(p spi.ParserOps) (spi.Node, error) {
+	return p.ParseExpression()
+}
+
 // DuckDB is the DuckDB dialect configuration.
 var DuckDB = dialect.NewDialect("duckdb").
+	// Inherit from ANSI base dialect (includes || operator)
+	Extends(ansi.ANSI).
+	// DuckDB-specific configuration
 	Identifiers(`"`, `"`, `""`, dialect.NormCaseInsensitive).
-	Operators(true, true). // || is concat, CONCAT coalesces NULL
 	DefaultSchema("main").
 	PlaceholderStyle(dialect.PlaceholderQuestion).
+	// Register DuckDB-specific keywords for the lexer
+	AddKeyword("QUALIFY", TokenQualify).
+	AddKeyword("ILIKE", TokenIlike).
+	// Register DuckDB-specific operators for the lexer
+	AddOperator("::", TokenDcolon).
+	AddOperator("//", TokenDslash).
+	// Add QUALIFY clause after HAVING in the clause sequence
+	AddClauseAfter(token.HAVING, TokenQualify, parseQualify).
+	// Add ILIKE operator with same precedence as LIKE
+	AddInfix(TokenIlike, spi.PrecedenceComparison).
+	// Add :: cast operator (postfix precedence)
+	AddInfix(TokenDcolon, spi.PrecedencePostfix).
+	// Add // integer division (same as regular division)
+	AddInfix(TokenDslash, spi.PrecedenceMultiply).
+	// Function classifications
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).
 	Windows(duckDBWindows...).

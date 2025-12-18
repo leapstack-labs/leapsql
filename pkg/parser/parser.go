@@ -32,7 +32,14 @@
 // See each file for detailed grammar rules for that section.
 package parser
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi" // Register ANSI dialect for Parse()
+	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
 
 // Parser parses SQL into an AST.
 type Parser struct {
@@ -42,6 +49,9 @@ type Parser struct {
 	peek2        Token // second lookahead token
 	errors       []error
 	inSelectList bool // true when parsing SELECT columns (to detect scalar subqueries)
+
+	// Dialect support (optional - defaults to permissive parsing)
+	dialect *dialect.Dialect
 }
 
 // NewParser creates a new parser for the given SQL input.
@@ -56,14 +66,56 @@ func NewParser(sql string) *Parser {
 	return p
 }
 
-// Parse parses the SQL and returns the AST.
+// NewParserWithDialect creates a new dialect-aware parser for the given SQL input.
+func NewParserWithDialect(sql string, d *dialect.Dialect) *Parser {
+	p := &Parser{
+		lexer:   NewLexerWithDialect(sql, d),
+		dialect: d,
+	}
+	// Read three tokens to initialize current, peek, and peek2
+	p.nextToken()
+	p.nextToken()
+	p.nextToken()
+	return p
+}
+
+// Parse parses the SQL and returns the AST using the ANSI dialect (strictest).
+// Use ParseWithDialect for dialect-specific parsing, or ParsePermissive for
+// backward-compatible permissive parsing that accepts all dialects.
 func Parse(sql string) (*SelectStmt, error) {
+	ansiDialect, ok := dialect.Get("ansi")
+	if !ok {
+		// Fallback to permissive if ANSI not registered (shouldn't happen)
+		return ParsePermissive(sql)
+	}
+	return ParseWithDialect(sql, ansiDialect)
+}
+
+// ParsePermissive parses the SQL without dialect restrictions.
+// This accepts all known SQL clauses regardless of dialect (backward-compatible mode).
+func ParsePermissive(sql string) (*SelectStmt, error) {
 	p := NewParser(sql)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {
 		return nil, p.errors[0]
 	}
 	return stmt, nil
+}
+
+// ParseWithDialect parses the SQL with a specific dialect and returns the AST.
+// The dialect controls which syntax is allowed/rejected.
+func ParseWithDialect(sql string, d *dialect.Dialect) (*SelectStmt, error) {
+	p := NewParserWithDialect(sql, d)
+	stmt := p.parseStatement()
+	if len(p.errors) > 0 {
+		return nil, p.errors[0]
+	}
+	return stmt, nil
+}
+
+// Dialect returns the parser's dialect, if any.
+func (p *Parser) Dialect() *dialect.Dialect {
+	return p.dialect
 }
 
 // ---------- Token Helpers ----------
@@ -160,4 +212,102 @@ func (p *Parser) isClauseKeyword(tok Token) bool {
 		return true
 	}
 	return false
+}
+
+// ---------- spi.ParserOps Implementation ----------
+// These methods implement the spi.ParserOps interface for dialect clause handlers.
+
+// Token returns the current token (implements spi.ParserOps).
+func (p *Parser) Token() token.Token {
+	return p.token
+}
+
+// Peek returns the lookahead token (implements spi.ParserOps).
+func (p *Parser) Peek() token.Token {
+	return p.peek
+}
+
+// Match consumes the current token if it matches (implements spi.ParserOps).
+func (p *Parser) Match(t token.TokenType) bool {
+	return p.match(t)
+}
+
+// Expect consumes the current token if it matches, otherwise returns an error (implements spi.ParserOps).
+func (p *Parser) Expect(t token.TokenType) error {
+	if p.check(t) {
+		p.nextToken()
+		return nil
+	}
+	return &ParseError{
+		Pos:     p.token.Pos,
+		Message: fmt.Sprintf(ErrUnexpectedToken, p.token.Type, t),
+	}
+}
+
+// NextToken advances to the next token (implements spi.ParserOps).
+func (p *Parser) NextToken() {
+	p.nextToken()
+}
+
+// Check returns true if the current token is of the given type (implements spi.ParserOps).
+func (p *Parser) Check(t token.TokenType) bool {
+	return p.check(t)
+}
+
+// ParseExpression parses an expression (implements spi.ParserOps).
+func (p *Parser) ParseExpression() (spi.Expr, error) {
+	expr := p.parseExpression()
+	if len(p.errors) > 0 {
+		return nil, p.errors[len(p.errors)-1]
+	}
+	return expr, nil
+}
+
+// ParseExpressionList parses a comma-separated list of expressions (implements spi.ParserOps).
+func (p *Parser) ParseExpressionList() ([]spi.Expr, error) {
+	exprs := p.parseExpressionList()
+	result := make([]spi.Expr, len(exprs))
+	for i, e := range exprs {
+		result[i] = e
+	}
+	if len(p.errors) > 0 {
+		return nil, p.errors[len(p.errors)-1]
+	}
+	return result, nil
+}
+
+// ParseOrderByList parses an ORDER BY list (implements spi.ParserOps).
+func (p *Parser) ParseOrderByList() ([]spi.OrderByItem, error) {
+	items := p.parseOrderByList()
+	result := make([]spi.OrderByItem, len(items))
+	for i, item := range items {
+		result[i] = item
+	}
+	if len(p.errors) > 0 {
+		return nil, p.errors[len(p.errors)-1]
+	}
+	return result, nil
+}
+
+// ParseIdentifier parses an identifier (implements spi.ParserOps).
+func (p *Parser) ParseIdentifier() (string, error) {
+	if p.check(TOKEN_IDENT) {
+		name := p.token.Literal
+		p.nextToken()
+		return name, nil
+	}
+	return "", &ParseError{
+		Pos:     p.token.Pos,
+		Message: fmt.Sprintf(ErrUnexpectedToken, p.token.Type, TOKEN_IDENT),
+	}
+}
+
+// AddError adds a parse error (implements spi.ParserOps).
+func (p *Parser) AddError(msg string) {
+	p.addError(msg)
+}
+
+// Position returns the current token's position (implements spi.ParserOps).
+func (p *Parser) Position() token.Position {
+	return p.token.Pos
 }

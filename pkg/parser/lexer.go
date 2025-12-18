@@ -1,8 +1,11 @@
 package parser
 
 import (
+	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Lexer tokenizes SQL input.
@@ -13,6 +16,9 @@ type Lexer struct {
 	ch      byte // current char under examination
 	line    int  // current line number (1-based)
 	col     int  // current column number (1-based)
+
+	// Dialect support (optional)
+	dialect *dialect.Dialect
 }
 
 // NewLexer creates a new Lexer for the given input.
@@ -21,6 +27,18 @@ func NewLexer(input string) *Lexer {
 		input: input,
 		line:  1,
 		col:   0,
+	}
+	l.readChar()
+	return l
+}
+
+// NewLexerWithDialect creates a new dialect-aware Lexer for the given input.
+func NewLexerWithDialect(input string, d *dialect.Dialect) *Lexer {
+	l := &Lexer{
+		input:   input,
+		line:    1,
+		col:     0,
+		dialect: d,
 	}
 	l.readChar()
 	return l
@@ -66,6 +84,11 @@ func (l *Lexer) NextToken() Token {
 	l.skipWhitespaceAndComments()
 
 	pos := l.currentPos()
+
+	// Check dialect-specific symbols first (longest match)
+	if tok, ok := l.matchDialectSymbol(pos); ok {
+		return tok
+	}
 
 	var tok Token
 	tok.Pos = pos
@@ -146,7 +169,21 @@ func (l *Lexer) NextToken() Token {
 		switch {
 		case isLetter(l.ch) || l.ch == '_':
 			tok.Literal = l.readIdentifier()
-			tok.Type = LookupIdent(strings.ToLower(tok.Literal))
+			lowerIdent := strings.ToLower(tok.Literal)
+			// Check builtin keywords first
+			tok.Type = LookupIdent(lowerIdent)
+			// If not a builtin keyword, check dialect keywords
+			if tok.Type == TOKEN_IDENT && l.dialect != nil {
+				if dynTok, ok := l.dialect.LookupKeyword(lowerIdent); ok {
+					tok.Type = dynTok
+				}
+			}
+			// Fallback to dynamically registered keywords (for backward compatibility)
+			if tok.Type == TOKEN_IDENT {
+				if dynTok, ok := lookupDynamicKeyword(lowerIdent); ok {
+					tok.Type = dynTok
+				}
+			}
 			tok.Pos = pos
 			return tok
 		case isDigit(l.ch):
@@ -161,6 +198,53 @@ func (l *Lexer) NextToken() Token {
 
 	l.readChar()
 	return tok
+}
+
+// matchDialectSymbol checks if the current position matches a dialect-specific symbol.
+// Returns the longest matching symbol (e.g., "::" before ":").
+func (l *Lexer) matchDialectSymbol(pos Position) (Token, bool) {
+	if l.dialect == nil {
+		return Token{}, false
+	}
+
+	symbols := l.dialect.Symbols()
+	if len(symbols) == 0 {
+		return Token{}, false
+	}
+
+	// Safety check: don't try to match if we're at or past end of input
+	if l.pos >= len(l.input) {
+		return Token{}, false
+	}
+
+	remaining := l.input[l.pos:]
+
+	// Find all matching symbols
+	var matches []string
+	for sym := range symbols {
+		if strings.HasPrefix(remaining, sym) {
+			matches = append(matches, sym)
+		}
+	}
+
+	if len(matches) == 0 {
+		return Token{}, false
+	}
+
+	// Sort by length descending (longest match first)
+	sort.Slice(matches, func(i, j int) bool {
+		return len(matches[i]) > len(matches[j])
+	})
+
+	symbol := matches[0]
+	tokenType := symbols[symbol]
+
+	// Consume the symbol characters
+	for range symbol {
+		l.readChar()
+	}
+
+	return Token{Type: tokenType, Literal: symbol, Pos: pos}, true
 }
 
 // newToken creates a new token.
