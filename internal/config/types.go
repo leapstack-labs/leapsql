@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
@@ -47,6 +48,16 @@ func DefaultSchemaForType(dbType string) string {
 	}
 	// Fallback for unknown types or dialects without a default schema
 	return "main"
+}
+
+// ToTargetInfo converts TargetConfig to a starlark.TargetInfo for template rendering.
+// This extracts only the fields that should be exposed to templates (not credentials).
+func (t *TargetConfig) ToTargetInfo() *starctx.TargetInfo {
+	return &starctx.TargetInfo{
+		Type:     t.Type,
+		Schema:   t.Schema,
+		Database: t.Database,
+	}
 }
 
 // Validate checks if the target configuration is valid.

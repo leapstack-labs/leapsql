@@ -115,15 +115,12 @@ func New(cfg Config) (*Engine, error) {
 		env = "dev"
 	}
 
-	// Set default target
-	target := cfg.Target
-	if target == nil {
-		target = &starctx.TargetInfo{
-			Type:     "duckdb",
-			Schema:   "main",
-			Database: "",
-		}
+	// Require explicit target or adapter configuration
+	if cfg.Target == nil && cfg.AdapterConfig == nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("target configuration required: set 'target' in leapsql.yaml or provide AdapterConfig")
 	}
+	target := cfg.Target
 
 	// Build adapter config
 	var dbConfig adapter.Config
@@ -143,16 +140,17 @@ func New(cfg Config) (*Engine, error) {
 		}
 	}
 
-	// Ensure adapter type is set
+	// Require adapter type to be set
 	if dbConfig.Type == "" {
-		dbConfig.Type = "duckdb"
+		_ = store.Close()
+		return nil, fmt.Errorf("adapter type required: specify target.type in leapsql.yaml (e.g., 'duckdb', 'postgres')")
 	}
 
-	// Get dialect from registry based on target type (no DB connection needed)
-	// This allows lineage extraction during discovery without requiring DB connection
-	var d *dialect.Dialect
-	if resolvedDialect, ok := dialect.Get(dbConfig.Type); ok {
-		d = resolvedDialect
+	// Require valid dialect for the adapter type
+	d, ok := dialect.Get(dbConfig.Type)
+	if !ok {
+		_ = store.Close()
+		return nil, fmt.Errorf("unknown adapter type %q: supported types are 'duckdb', 'postgres'", dbConfig.Type)
 	}
 
 	return &Engine{

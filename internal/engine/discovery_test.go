@@ -24,6 +24,7 @@ func TestShouldParseFile_NewFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -53,6 +54,7 @@ func TestShouldParseFile_UnchangedFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -86,6 +88,7 @@ func TestShouldParseFile_ChangedFile(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -120,6 +123,7 @@ func TestShouldParseFile_ForceRefresh(t *testing.T) {
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -158,6 +162,7 @@ SELECT 2`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -200,6 +205,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -250,6 +256,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -286,6 +293,7 @@ def hello(name):
 	cfg := Config{
 		MacrosDir: macrosDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -324,6 +332,7 @@ SELECT 1`), 0600)
 	cfg := Config{
 		ModelsDir: modelsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 
@@ -366,6 +375,7 @@ SELECT * FROM raw_data`), 0600)
 		ModelsDir: modelsDir,
 		SeedsDir:  seedsDir,
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 		Logger:    testutil.NewTestLogger(t),
 	}
 

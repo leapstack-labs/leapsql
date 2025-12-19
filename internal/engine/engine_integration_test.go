@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/internal/testutil"
+
 	// Import adapter packages to ensure adapters are registered via init()
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
@@ -26,6 +28,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 		MacrosDir:    filepath.Join(tmpDir, "macros"),
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -150,6 +153,7 @@ SELECT id, name, email FROM users
 		SeedsDir:     seedsDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -276,6 +280,7 @@ WHERE status = 'active'
 		DatabasePath: "",
 		StatePath:    statePath,
 		Environment:  "prod",
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -387,6 +392,7 @@ FROM sales
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -474,6 +480,7 @@ func TestIntegration_RunSelected(t *testing.T) {
 		MacrosDir:    filepath.Join(tmpDir, "macros"),
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
+	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,14 @@ import (
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres"
 )
+
+// defaultTestTarget returns the default DuckDB target for tests.
+func defaultTestTarget() *starctx.TargetInfo {
+	return &starctx.TargetInfo{
+		Type:   "duckdb",
+		Schema: "main",
+	}
+}
 
 // createTestProject creates a minimal test project in a temp directory.
 // Returns the temp dir path. Use t.TempDir() for automatic cleanup.
@@ -63,6 +72,7 @@ func TestNew(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "", // in-memory DuckDB
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -87,6 +97,7 @@ func TestNew_InvalidStatePath(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    "/nonexistent/path/state.db",
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -105,6 +116,7 @@ func TestLoadSeeds_EmptySeedsDir(t *testing.T) {
 		SeedsDir:     "", // No seeds dir
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -127,6 +139,7 @@ func TestLoadSeeds_NonexistentSeedsDir(t *testing.T) {
 		SeedsDir:     filepath.Join(tmpDir, "nonexistent"),
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -165,6 +178,7 @@ func TestBuildSQL(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -210,6 +224,7 @@ func TestEngine_Close(t *testing.T) {
 		MacrosDir:    macrosDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -249,6 +264,7 @@ SELECT id, name FROM users
 		SeedsDir:     seedsDir,
 		DatabasePath: "",
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 		Logger:       testutil.NewTestLogger(t),
 	}
 
@@ -284,4 +300,65 @@ SELECT id, name FROM users
 	_ = rows.Close()
 
 	assert.Equal(t, 2, count, "active_users should have 2 rows")
+}
+
+func TestNew_MissingTargetConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.db")
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
+
+	cfg := Config{
+		ModelsDir: modelsDir,
+		StatePath: statePath,
+		// No Target or AdapterConfig
+		Logger: testutil.NewTestLogger(t),
+	}
+
+	_, err := New(cfg)
+	require.Error(t, err, "New() should fail without target config")
+	assert.Contains(t, err.Error(), "target configuration required")
+}
+
+func TestNew_EmptyAdapterType(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.db")
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
+
+	cfg := Config{
+		ModelsDir: modelsDir,
+		StatePath: statePath,
+		Target: &starctx.TargetInfo{
+			Type:   "", // Empty type
+			Schema: "main",
+		},
+		Logger: testutil.NewTestLogger(t),
+	}
+
+	_, err := New(cfg)
+	require.Error(t, err, "New() should fail with empty adapter type")
+	assert.Contains(t, err.Error(), "adapter type required")
+}
+
+func TestNew_UnknownAdapterType(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.db")
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.MkdirAll(modelsDir, 0750))
+
+	cfg := Config{
+		ModelsDir: modelsDir,
+		StatePath: statePath,
+		Target: &starctx.TargetInfo{
+			Type:   "unknown_db",
+			Schema: "main",
+		},
+		Logger: testutil.NewTestLogger(t),
+	}
+
+	_, err := New(cfg)
+	require.Error(t, err, "New() should fail with unknown adapter type")
+	assert.Contains(t, err.Error(), "unknown adapter type")
+	assert.Contains(t, err.Error(), "unknown_db")
 }

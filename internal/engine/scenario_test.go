@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 )
 
 // scenarioTest defines a test case for a testdata scenario.
@@ -140,6 +142,7 @@ func TestIntegration_Scenarios(t *testing.T) {
 				SeedsDir:  filepath.Join(tmpDir, "seeds"),
 				MacrosDir: filepath.Join(tmpDir, "macros"),
 				StatePath: filepath.Join(tmpDir, "state.db"),
+				Target:    defaultTestTarget(),
 			}
 
 			eng, err := New(cfg)
@@ -295,6 +298,7 @@ func TestIntegration_Execution(t *testing.T) {
 				MacrosDir:    filepath.Join(tmpDir, "macros"),
 				DatabasePath: "", // in-memory
 				StatePath:    filepath.Join(tmpDir, "state.db"),
+				Target:       defaultTestTarget(),
 			}
 
 			eng, err := New(cfg)
@@ -362,6 +366,7 @@ func TestIntegration_IncrementalUpsert(t *testing.T) {
 		MacrosDir:    filepath.Join(tmpDir, "macros"),
 		DatabasePath: dbPath,
 		StatePath:    filepath.Join(tmpDir, "state.db"),
+		Target:       defaultTestTarget(),
 	}
 
 	eng, err := New(cfg)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/internal/testutil"
 
 	// Import adapter packages to ensure adapters are registered via init()
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
@@ -101,6 +102,7 @@ func TestIntegration_FullDiscoveryCycle(t *testing.T) {
 		SeedsDir:  filepath.Join(tmpDir, "seeds"),
 		MacrosDir: filepath.Join(tmpDir, "macros"),
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -285,6 +287,7 @@ func TestIntegration_DiscoveryThenRun(t *testing.T) {
 		MacrosDir:    filepath.Join(tmpDir, "macros"),
 		DatabasePath: "", // in-memory DuckDB
 		StatePath:    statePath,
+		Target:       defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -395,6 +398,7 @@ func TestIntegration_DiscoveryStateConsistency(t *testing.T) {
 		SeedsDir:  filepath.Join(tmpDir, "seeds"),
 		MacrosDir: filepath.Join(tmpDir, "macros"),
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -482,6 +486,7 @@ func TestIntegration_DiscoveryWithMacroChanges(t *testing.T) {
 		SeedsDir:  filepath.Join(tmpDir, "seeds"),
 		MacrosDir: filepath.Join(tmpDir, "macros"),
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -602,6 +607,7 @@ func TestIntegration_DAGDependencies(t *testing.T) {
 		SeedsDir:  filepath.Join(tmpDir, "seeds"),
 		MacrosDir: filepath.Join(tmpDir, "macros"),
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
@@ -670,6 +676,7 @@ func TestIntegration_LineageExtraction(t *testing.T) {
 		SeedsDir:  filepath.Join(tmpDir, "seeds"),
 		MacrosDir: filepath.Join(tmpDir, "macros"),
 		StatePath: statePath,
+		Target:    defaultTestTarget(),
 	}
 
 	engine, err := New(cfg)
