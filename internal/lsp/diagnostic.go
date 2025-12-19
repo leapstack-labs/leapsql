@@ -135,7 +135,7 @@ func (s *Server) validateTemplate(doc *Document) []Diagnostic {
 	return diagnostics
 }
 
-// validateSQL checks SQL syntax using the lineage parser.
+// validateSQL checks SQL syntax using the dialect-aware parser.
 func (s *Server) validateSQL(doc *Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -145,10 +145,8 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 		return diagnostics
 	}
 
-	// Parse with lineage parser in permissive mode (accepts all dialect extensions)
-	// This is intentional - the LSP doesn't know the project's target dialect,
-	// so it accepts QUALIFY, ILIKE, etc. from any dialect.
-	_, err := pkgparser.ParsePermissive(sqlContent)
+	// Always use dialect-aware parsing (s.dialect is never nil after initialization)
+	_, err := pkgparser.ParseWithDialect(sqlContent, s.dialect)
 	if err != nil {
 		var pe *pkgparser.ParseError
 		if errors.As(err, &pe) {

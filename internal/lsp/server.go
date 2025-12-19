@@ -19,6 +19,7 @@ import (
 
 	// Import dialect implementations so they register themselves
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 )
 
 // Server implements the Language Server Protocol for LeapSQL.
@@ -38,8 +39,9 @@ type Server struct {
 	modelNameCache      map[string]bool
 	cacheMu             sync.RWMutex
 
-	// SQL dialect for validation
-	dialect *dialect.Dialect
+	// SQL dialect for validation (never nil after initialization)
+	dialect           *dialect.Dialect
+	dialectFromConfig bool // true if dialect was loaded from config, false if ANSI default
 
 	// I/O
 	reader  *bufio.Reader
@@ -311,11 +313,11 @@ func (s *Server) handleInitialized(_ *JSONRPCMessage) error {
 		})
 	}
 
-	// Show warning if dialect not available
-	if s.dialect == nil {
+	// Show info if using default ANSI dialect
+	if !s.dialectFromConfig {
 		s.sendNotification("window/showMessage", &ShowMessageParams{
-			Type:    MessageTypeWarning,
-			Message: "No target configured in leapsql.yaml. Some features may be limited.",
+			Type:    MessageTypeInfo,
+			Message: "Using ANSI SQL dialect. Configure 'target' in leapsql.yaml for dialect-specific features.",
 		})
 	}
 
@@ -483,37 +485,24 @@ func (s *Server) reindexMacroFile(path string) {
 }
 
 // loadDialectFromConfig loads the dialect from the project's leapsql.yaml config.
-// If no config file is found or target is not specified, dialect will be nil.
+// Defaults to ANSI if no config or target is specified.
 func (s *Server) loadDialectFromConfig() {
-	if s.projectRoot == "" {
-		s.logger.Info("No project root set, cannot load dialect from config")
-		return
+	// Try to load from config
+	if s.projectRoot != "" {
+		cfg, err := config.LoadFromDir(s.projectRoot)
+		if err == nil && cfg != nil && cfg.Target != nil && cfg.Target.Type != "" {
+			if d, ok := dialect.Get(cfg.Target.Type); ok {
+				s.dialect = d
+				s.dialectFromConfig = true
+				s.logger.Info("Loaded dialect from project config", "dialect", cfg.Target.Type)
+				return
+			}
+			s.logger.Warn("Unknown dialect type in project config", "type", cfg.Target.Type)
+		}
 	}
 
-	// Load project config
-	cfg, err := config.LoadFromDir(s.projectRoot)
-	if err != nil {
-		s.logger.Error("Failed to load project config", "error", err)
-		return
-	}
-
-	if cfg == nil {
-		s.logger.Info("No project config found, dialect will be nil")
-		return
-	}
-
-	if cfg.Target == nil || cfg.Target.Type == "" {
-		s.logger.Info("No target specified in project config, dialect will be nil")
-		return
-	}
-
-	// Get dialect from registry
-	d, ok := dialect.Get(cfg.Target.Type)
-	if !ok {
-		s.logger.Warn("Unknown dialect type in project config", "type", cfg.Target.Type)
-		return
-	}
-
-	s.dialect = d
-	s.logger.Info("Loaded dialect from project config", "dialect", cfg.Target.Type)
+	// Default to ANSI
+	s.dialect, _ = dialect.Get("ansi")
+	s.dialectFromConfig = false
+	s.logger.Info("No target configured, defaulting to ANSI dialect")
 }

@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi" // Register ANSI dialect
 )
 
 func TestExtractSQL(t *testing.T) {
@@ -236,8 +239,11 @@ func TestServer_ValidateTemplate(t *testing.T) {
 }
 
 func TestServer_ValidateSQL(t *testing.T) {
+	// Get ANSI dialect for testing
+	ansiDialect, _ := dialect.Get("ansi")
 	server := &Server{
 		documents: NewDocumentStore(),
+		dialect:   ansiDialect,
 	}
 
 	tests := []struct {

@@ -174,7 +174,7 @@ func TestErrorIncludesPosition(t *testing.T) {
 FROM users
 WHERE (x = 1`
 
-	_, err := parser.ParsePermissive(sql)
+	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
 	require.Error(t, err)
 
 	// The error should be a ParseError with position info
@@ -198,46 +198,43 @@ QUALIFY rn = 1`
 	assert.Contains(t, err.Error(), "QUALIFY")
 }
 
-// ---------- Permissive Mode Tests ----------
+// ---------- Dialect-Specific Feature Tests ----------
 
-func TestPermissiveModeAcceptsAll(t *testing.T) {
+func TestDialectSpecificFeatures(t *testing.T) {
 	testCases := []struct {
-		name string
-		sql  string
+		name    string
+		sql     string
+		dialect *dialect.Dialect
 	}{
 		{
-			name: "QUALIFY",
-			sql:  "SELECT * FROM t QUALIFY row_number() OVER () = 1",
+			name:    "DuckDB QUALIFY",
+			sql:     "SELECT * FROM t QUALIFY row_number() OVER () = 1",
+			dialect: duckdbDialect.DuckDB,
 		},
 		{
-			name: "ILIKE",
-			sql:  "SELECT * FROM t WHERE name ILIKE '%test%'",
+			name:    "DuckDB ILIKE",
+			sql:     "SELECT * FROM t WHERE name ILIKE '%test%'",
+			dialect: duckdbDialect.DuckDB,
 		},
 		{
-			name: "Both",
-			sql:  "SELECT * FROM t WHERE name ILIKE '%x%' QUALIFY row_number() OVER () = 1",
+			name:    "Postgres ILIKE",
+			sql:     "SELECT * FROM t WHERE name ILIKE '%test%'",
+			dialect: postgresDialect.Postgres,
+		},
+		{
+			name:    "DuckDB QUALIFY with ILIKE",
+			sql:     "SELECT * FROM t WHERE name ILIKE '%x%' QUALIFY row_number() OVER () = 1",
+			dialect: duckdbDialect.DuckDB,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			stmt, err := parser.ParsePermissive(tc.sql)
-			require.NoError(t, err, "ParsePermissive should accept %s", tc.name)
+			stmt, err := parser.ParseWithDialect(tc.sql, tc.dialect)
+			require.NoError(t, err, "%s should be accepted by %s", tc.name, tc.dialect.Name)
 			assert.NotNil(t, stmt)
 		})
 	}
-}
-
-func TestParseDefaultsToANSI(t *testing.T) {
-	// Parse() should use ANSI dialect by default
-	// Test with a query that works in ANSI
-	sql := `SELECT a, SUM(b) as total FROM t GROUP BY a HAVING SUM(b) > 100`
-
-	stmt, err := parser.Parse(sql)
-	require.NoError(t, err)
-	assert.NotNil(t, stmt)
-	assert.NotNil(t, stmt.Body.Left.GroupBy)
-	assert.NotNil(t, stmt.Body.Left.Having)
 }
 
 // ---------- Clause Sequence Tests ----------
@@ -252,7 +249,7 @@ func TestClauseOrderEnforced(t *testing.T) {
 		ORDER BY cnt DESC
 		LIMIT 10`
 
-	stmt, err := parser.Parse(sql)
+	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
 	require.NoError(t, err)
 	require.NotNil(t, stmt.Body.Left)
 

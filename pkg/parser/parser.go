@@ -1,23 +1,17 @@
-// Package parser provides SQL parsing and column-level lineage extraction.
-//
-// # Parser Architecture
-//
-// The parser is split across multiple files for maintainability:
-//
-//   - parser.go (this file): Public API, Parser struct, token helpers
-//   - parser_stmt.go: Statement parsing (WITH, SELECT body, ORDER BY)
-//   - parser_from.go: FROM clause parsing (table refs, JOINs)
-//   - parser_expr.go: Expression precedence parsing (OR, AND, comparisons, arithmetic)
-//   - parser_primary.go: Primary expressions (literals, column refs, function calls)
-//   - parser_window.go: Window specifications and frame specs
-//   - parser_special.go: Special expressions (CASE, CAST, EXISTS, subqueries)
+// Package parser provides SQL parsing with dialect-aware syntax validation.
 //
 // # Usage
 //
-//	stmt, err := parser.Parse("SELECT a, b FROM t")
+//	stmt, err := parser.ParseWithDialect("SELECT a, b FROM t", myDialect)
 //	if err != nil {
 //	    // handle error
 //	}
+//
+// The parser requires a dialect to be specified. Use the dialect registry
+// to get a dialect by name:
+//
+//	d, ok := dialect.Get("duckdb")
+//	stmt, err := parser.ParseWithDialect(sql, d)
 //
 // # Grammar Overview
 //
@@ -36,7 +30,6 @@ import (
 	"fmt"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi" // Register ANSI dialect for Parse()
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -50,24 +43,12 @@ type Parser struct {
 	errors       []error
 	inSelectList bool // true when parsing SELECT columns (to detect scalar subqueries)
 
-	// Dialect support (optional - defaults to permissive parsing)
+	// Dialect support (required)
 	dialect *dialect.Dialect
 }
 
-// NewParser creates a new parser for the given SQL input.
-func NewParser(sql string) *Parser {
-	p := &Parser{
-		lexer: NewLexer(sql),
-	}
-	// Read three tokens to initialize current, peek, and peek2
-	p.nextToken()
-	p.nextToken()
-	p.nextToken()
-	return p
-}
-
-// NewParserWithDialect creates a new dialect-aware parser for the given SQL input.
-func NewParserWithDialect(sql string, d *dialect.Dialect) *Parser {
+// NewParser creates a new parser for the given SQL input with dialect support.
+func NewParser(sql string, d *dialect.Dialect) *Parser {
 	p := &Parser{
 		lexer:   NewLexerWithDialect(sql, d),
 		dialect: d,
@@ -79,33 +60,9 @@ func NewParserWithDialect(sql string, d *dialect.Dialect) *Parser {
 	return p
 }
 
-// Parse parses the SQL and returns the AST using the ANSI dialect (strictest).
-// Use ParseWithDialect for dialect-specific parsing, or ParsePermissive for
-// backward-compatible permissive parsing that accepts all dialects.
-func Parse(sql string) (*SelectStmt, error) {
-	ansiDialect, ok := dialect.Get("ansi")
-	if !ok {
-		// Fallback to permissive if ANSI not registered (shouldn't happen)
-		return ParsePermissive(sql)
-	}
-	return ParseWithDialect(sql, ansiDialect)
-}
-
-// ParsePermissive parses the SQL without dialect restrictions.
-// This accepts all known SQL clauses regardless of dialect (backward-compatible mode).
-func ParsePermissive(sql string) (*SelectStmt, error) {
-	p := NewParser(sql)
-	stmt := p.parseStatement()
-	if len(p.errors) > 0 {
-		return nil, p.errors[0]
-	}
-	return stmt, nil
-}
-
 // ParseWithDialect parses the SQL with a specific dialect and returns the AST.
-// The dialect controls which syntax is allowed/rejected.
 func ParseWithDialect(sql string, d *dialect.Dialect) (*SelectStmt, error) {
-	p := NewParserWithDialect(sql, d)
+	p := NewParser(sql, d)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {
 		return nil, p.errors[0]

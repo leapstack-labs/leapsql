@@ -151,13 +151,8 @@ func (p *Parser) parseSelectCore() *SelectCore {
 }
 
 // parseClauses parses optional clauses using the dialect's clause sequence and handlers.
-// If no dialect is set, falls back to permissive parsing (accepts all known clauses).
 func (p *Parser) parseClauses(core *SelectCore) {
-	if p.dialect != nil {
-		p.parseClausesWithDialect(core)
-	} else {
-		p.parseClausesPermissive(core)
-	}
+	p.parseClausesWithDialect(core)
 }
 
 // parseClausesWithDialect parses clauses using dialect.ClauseSequence() and ClauseHandler().
@@ -165,9 +160,7 @@ func (p *Parser) parseClauses(core *SelectCore) {
 func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 	sequence := p.dialect.ClauseSequence()
 	if sequence == nil {
-		// Dialect has no clause sequence defined, fall back to permissive
-		p.parseClausesPermissive(core)
-		return
+		return // No clauses to parse for this dialect
 	}
 
 	for {
@@ -328,47 +321,6 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 			if node, ok := result.(Node); ok {
 				core.Extensions = append(core.Extensions, node)
 			}
-		}
-	}
-}
-
-// parseClausesPermissive parses clauses without dialect restrictions.
-// This is the backward-compatible mode that accepts all known SQL clauses.
-func (p *Parser) parseClausesPermissive(core *SelectCore) {
-	// WHERE clause
-	if p.match(TOKEN_WHERE) {
-		core.Where = p.parseExpression()
-	}
-
-	// GROUP BY clause
-	if p.match(TOKEN_GROUP) {
-		p.expect(TOKEN_BY)
-		core.GroupBy = p.parseExpressionList()
-	}
-
-	// HAVING clause
-	if p.match(TOKEN_HAVING) {
-		core.Having = p.parseExpression()
-	}
-
-	// QUALIFY clause (DuckDB/Snowflake) - permissive mode accepts it if registered
-	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && p.match(qualify) {
-		core.Qualify = p.parseExpression()
-	}
-
-	// ORDER BY clause
-	if p.match(TOKEN_ORDER) {
-		p.expect(TOKEN_BY)
-		core.OrderBy = p.parseOrderByList()
-	}
-
-	// LIMIT clause
-	if p.match(TOKEN_LIMIT) {
-		core.Limit = p.parseExpression()
-
-		// OFFSET clause
-		if p.match(TOKEN_OFFSET) {
-			core.Offset = p.parseExpression()
 		}
 	}
 }
