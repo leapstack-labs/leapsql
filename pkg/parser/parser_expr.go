@@ -134,9 +134,10 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 	case TOKEN_LIKE:
 		p.nextToken()
 		return p.parseLikeExpr(left, false, false)
+	}
 
-	case TOKEN_ILIKE:
-		// Dialect-specific: only valid if precedence > 0
+	// Check for ILIKE (dialect-specific token - compare by name since dialects may register their own)
+	if p.token.Type.String() == "ILIKE" {
 		p.nextToken()
 		return p.parseLikeExpr(left, false, true)
 	}
@@ -190,11 +191,13 @@ func (p *Parser) parseNotInfixExpr(left Expr) Expr {
 		p.nextToken()
 		return p.parseLikeExpr(left, true, false)
 
-	case TOKEN_ILIKE:
-		p.nextToken()
-		return p.parseLikeExpr(left, true, true)
-
 	default:
+		// Check for ILIKE (dialect-specific token - compare by name)
+		if p.token.Type.String() == "ILIKE" {
+			p.nextToken()
+			return p.parseLikeExpr(left, true, true)
+		}
+
 		// NOT without a recognized following keyword - treat as error
 		p.addError("expected IN, BETWEEN, LIKE, or ILIKE after NOT")
 		return left

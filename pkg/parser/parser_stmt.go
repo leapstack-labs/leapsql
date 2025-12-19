@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -254,8 +255,17 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 		switch v := result.(type) {
 		case []Expr:
 			core.GroupBy = v
-		case []any:
+		case []spi.Expr:
 			// Convert []spi.Expr to []Expr
+			exprs := make([]Expr, len(v))
+			for i, e := range v {
+				if expr, ok := e.(Expr); ok {
+					exprs[i] = expr
+				}
+			}
+			core.GroupBy = exprs
+		case []any:
+			// Convert generic slice to []Expr
 			exprs := make([]Expr, len(v))
 			for i, e := range v {
 				if expr, ok := e.(Expr); ok {
@@ -278,8 +288,17 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 		switch v := result.(type) {
 		case []OrderByItem:
 			core.OrderBy = v
-		case []any:
+		case []spi.OrderByItem:
 			// Convert from spi types
+			items := make([]OrderByItem, len(v))
+			for i, item := range v {
+				if obi, ok := item.(OrderByItem); ok {
+					items[i] = obi
+				}
+			}
+			core.OrderBy = items
+		case []any:
+			// Convert from generic slice
 			items := make([]OrderByItem, len(v))
 			for i, item := range v {
 				if obi, ok := item.(OrderByItem); ok {
@@ -295,8 +314,8 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 		}
 
 	default:
-		// Check for QUALIFY (dynamic token)
-		if clauseType == TOKEN_QUALIFY {
+		// Check for QUALIFY (dynamic token) - compare by name since dialects may register their own
+		if clauseType.String() == "QUALIFY" {
 			if expr, ok := result.(Expr); ok {
 				core.Qualify = expr
 			}
