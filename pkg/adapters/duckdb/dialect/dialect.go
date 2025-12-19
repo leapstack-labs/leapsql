@@ -49,8 +49,8 @@ var DuckDB = dialect.NewDialect("duckdb").
 	// Register DuckDB-specific operators for the lexer
 	AddOperator("::", TokenDcolon).
 	AddOperator("//", TokenDslash).
-	// Add QUALIFY clause after HAVING in the clause sequence
-	AddClauseAfter(token.HAVING, TokenQualify, parseQualify).
+	// Add QUALIFY clause after HAVING in the clause sequence with slot
+	AddClauseAfter(token.HAVING, TokenQualify, parseQualify, spi.SlotQualify).
 	// Add ILIKE operator with same precedence as LIKE
 	AddInfix(TokenIlike, spi.PrecedenceComparison).
 	// Add :: cast operator (postfix precedence)

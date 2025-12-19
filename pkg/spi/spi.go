@@ -64,3 +64,46 @@ const (
 	PrecedenceUnary      = 7 // -, +, NOT
 	PrecedencePostfix    = 8 // ::, [], ()
 )
+
+// ClauseSlot specifies where a parsed clause result should be stored in SelectCore.
+// This enables dialects to declaratively specify storage locations for their clauses.
+type ClauseSlot int
+
+// ClauseSlot constants define where parsed clause results are stored in SelectCore.
+const (
+	SlotWhere ClauseSlot = iota
+	SlotGroupBy
+	SlotHaving
+	SlotWindow
+	SlotOrderBy
+	SlotLimit
+	SlotOffset
+	SlotQualify
+	SlotExtensions // Default for custom/dialect-specific clauses
+)
+
+// String returns the slot name for debugging.
+func (s ClauseSlot) String() string {
+	switch s {
+	case SlotWhere:
+		return "WHERE"
+	case SlotGroupBy:
+		return "GROUP BY"
+	case SlotHaving:
+		return "HAVING"
+	case SlotWindow:
+		return "WINDOW"
+	case SlotOrderBy:
+		return "ORDER BY"
+	case SlotLimit:
+		return "LIMIT"
+	case SlotOffset:
+		return "OFFSET"
+	case SlotQualify:
+		return "QUALIFY"
+	case SlotExtensions:
+		return "EXTENSIONS"
+	default:
+		return "UNKNOWN"
+	}
+}

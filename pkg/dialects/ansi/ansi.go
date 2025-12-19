@@ -27,13 +27,13 @@ var ANSI = dialect.NewDialect("ansi").
 		token.ORDER,  // ORDER BY
 		token.LIMIT,
 	).
-	// Standard clause handlers (these are placeholders - the parser will provide real implementations)
-	ClauseHandler(token.WHERE, parseWhere).
-	ClauseHandler(token.GROUP, parseGroupBy).
-	ClauseHandler(token.HAVING, parseHaving).
-	ClauseHandler(token.WINDOW, parseWindow).
-	ClauseHandler(token.ORDER, parseOrderBy).
-	ClauseHandler(token.LIMIT, parseLimit).
+	// Standard clause handlers with slot assignments
+	ClauseHandler(token.WHERE, parseWhere, spi.SlotWhere).
+	ClauseHandler(token.GROUP, parseGroupBy, spi.SlotGroupBy).
+	ClauseHandler(token.HAVING, parseHaving, spi.SlotHaving).
+	ClauseHandler(token.WINDOW, parseWindow, spi.SlotWindow).
+	ClauseHandler(token.ORDER, parseOrderBy, spi.SlotOrderBy).
+	ClauseHandler(token.LIMIT, parseLimit, spi.SlotLimit).
 	// Standard operator precedence
 	AddInfix(token.OR, spi.PrecedenceOr).
 	AddInfix(token.AND, spi.PrecedenceAnd).

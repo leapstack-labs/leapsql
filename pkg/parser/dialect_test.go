@@ -334,3 +334,90 @@ func TestDialectInheritance(t *testing.T) {
 		}
 	}
 }
+
+// ---------- ClauseSlot and Declarative Binder Tests ----------
+
+func TestClauseSlotAssignment(t *testing.T) {
+	// Test that QUALIFY goes to core.Qualify with SlotQualify
+	sql := "SELECT row_number() OVER () AS rn FROM t QUALIFY rn = 1"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+	require.NotNil(t, stmt.Body.Left.Qualify, "QUALIFY should be assigned to Qualify field")
+}
+
+func TestGlobalClauseRegistry(t *testing.T) {
+	// After loading dialects, QUALIFY should be in the global registry
+	name, ok := dialect.IsKnownClause(duckdbDialect.TokenQualify)
+	assert.True(t, ok, "QUALIFY should be in global clause registry")
+	assert.Equal(t, "QUALIFY", name)
+}
+
+func TestAllKnownClauses(t *testing.T) {
+	// Verify all standard clauses are registered
+	allClauses := dialect.AllKnownClauses()
+
+	// Should contain standard ANSI clauses
+	require.NotEmpty(t, allClauses, "Should have registered clauses")
+
+	// QUALIFY should be registered (from DuckDB dialect)
+	_, hasQualify := allClauses[duckdbDialect.TokenQualify]
+	assert.True(t, hasQualify, "QUALIFY should be in AllKnownClauses")
+}
+
+func TestUnsupportedClauseErrorMessage(t *testing.T) {
+	// Postgres should give helpful error for QUALIFY
+	sql := "SELECT * FROM t QUALIFY x = 1"
+	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "QUALIFY")
+	assert.Contains(t, err.Error(), "not supported")
+	assert.Contains(t, err.Error(), "postgres")
+}
+
+func TestDialectIsClauseToken(t *testing.T) {
+	// DuckDB should report QUALIFY as a clause token
+	assert.True(t, duckdbDialect.DuckDB.IsClauseToken(duckdbDialect.TokenQualify),
+		"DuckDB should report QUALIFY as a clause token")
+
+	// Postgres should NOT report QUALIFY as a clause token
+	assert.False(t, postgresDialect.Postgres.IsClauseToken(duckdbDialect.TokenQualify),
+		"Postgres should NOT report QUALIFY as a clause token")
+
+	// Both should report WHERE as a clause token
+	assert.True(t, duckdbDialect.DuckDB.IsClauseToken(parser.TOKEN_WHERE),
+		"DuckDB should report WHERE as a clause token")
+	assert.True(t, postgresDialect.Postgres.IsClauseToken(parser.TOKEN_WHERE),
+		"Postgres should report WHERE as a clause token")
+}
+
+func TestDialectClauseDef(t *testing.T) {
+	// DuckDB should have a ClauseDef for QUALIFY
+	def, ok := duckdbDialect.DuckDB.ClauseDef(duckdbDialect.TokenQualify)
+	require.True(t, ok, "DuckDB should have ClauseDef for QUALIFY")
+	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
+
+	// ANSI should have ClauseDef for WHERE
+	def, ok = ansi.ANSI.ClauseDef(parser.TOKEN_WHERE)
+	require.True(t, ok, "ANSI should have ClauseDef for WHERE")
+	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
+}
+
+func TestAllClauseTokens(t *testing.T) {
+	// DuckDB should return all clause tokens including QUALIFY
+	duckdbTokens := duckdbDialect.DuckDB.AllClauseTokens()
+	require.NotEmpty(t, duckdbTokens)
+
+	// Should include standard clauses
+	hasWhere := false
+	hasQualify := false
+	for _, tok := range duckdbTokens {
+		if tok == parser.TOKEN_WHERE {
+			hasWhere = true
+		}
+		if tok == duckdbDialect.TokenQualify {
+			hasQualify = true
+		}
+	}
+	assert.True(t, hasWhere, "DuckDB should include WHERE in AllClauseTokens")
+	assert.True(t, hasQualify, "DuckDB should include QUALIFY in AllClauseTokens")
+}

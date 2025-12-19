@@ -3,8 +3,8 @@ package parser
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
-	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // Statement parsing: WITH clause, CTEs, SELECT body, SELECT list, ORDER BY.
@@ -155,8 +155,9 @@ func (p *Parser) parseClauses(core *SelectCore) {
 	p.parseClausesWithDialect(core)
 }
 
-// parseClausesWithDialect parses clauses using dialect.ClauseSequence() and ClauseHandler().
-// This is the strict mode - only clauses in the dialect's sequence are accepted.
+// parseClausesWithDialect parses clauses using dialect.ClauseDef() for both
+// parsing logic and slot-based assignment. This is fully declarative -
+// no hardcoded clause knowledge in the parser.
 func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 	sequence := p.dialect.ClauseSequence()
 	if sequence == nil {
@@ -169,9 +170,9 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 		// Try to match against any clause in the sequence
 		for _, clauseType := range sequence {
 			if p.check(clauseType) {
-				handler := p.dialect.ClauseHandler(clauseType)
-				if handler == nil {
-					p.addError(fmt.Sprintf("no handler for clause %s in dialect %s", clauseType, p.dialect.Name))
+				def, ok := p.dialect.ClauseDef(clauseType)
+				if !ok {
+					p.addError(fmt.Sprintf("no definition for clause %s in dialect %s", clauseType, p.dialect.Name))
 					p.nextToken()
 					matched = true
 					break
@@ -179,22 +180,35 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 
 				p.nextToken() // consume clause keyword
 
-				result, err := handler(p)
+				result, err := def.Handler(p)
 				if err != nil {
 					p.addError(err.Error())
 				}
 
-				p.assignClauseResult(core, clauseType, result)
+				// Use slot-based assignment (declarative)
+				p.assignToSlot(core, def.Slot, result)
 				matched = true
 				break
 			}
 		}
 
-		// Check for unsupported clause keyword (not in this dialect's sequence)
-		if !matched && p.isUnknownClauseKeyword(sequence) {
-			p.addError(fmt.Sprintf("%s is not supported in %s dialect", p.token.Literal, p.dialect.Name))
-			p.nextToken()
-			continue
+		// Check for unsupported clause (known globally but not in this dialect)
+		if !matched {
+			if name, isKnown := dialect.IsKnownClause(p.token.Type); isKnown {
+				// Check if it's in this dialect's sequence
+				inSequence := false
+				for _, tok := range sequence {
+					if tok == p.token.Type {
+						inSequence = true
+						break
+					}
+				}
+				if !inSequence {
+					p.addError(fmt.Sprintf("%s is not supported in %s dialect", name, p.dialect.Name))
+					p.nextToken()
+					continue
+				}
+			}
 		}
 
 		if !matched {
@@ -208,52 +222,24 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 	}
 }
 
-// isUnknownClauseKeyword returns true if the current token is a clause keyword
-// that's not in the provided sequence (i.e., unsupported by this dialect).
-func (p *Parser) isUnknownClauseKeyword(sequence []token.TokenType) bool {
-	// Check if current token is a known clause keyword
-	knownClauseKeywords := []TokenType{
-		TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_WINDOW,
-		TOKEN_ORDER, TOKEN_LIMIT,
-	}
-	// Add QUALIFY if registered by a dialect
-	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL {
-		knownClauseKeywords = append(knownClauseKeywords, qualify)
-	}
-
-	for _, kw := range knownClauseKeywords {
-		if p.check(kw) {
-			// It's a known clause keyword - check if it's in the sequence
-			for _, seqTok := range sequence {
-				if seqTok == kw {
-					return false // In sequence, not unknown
-				}
-			}
-			return true // Known clause but not in this dialect's sequence
-		}
-	}
-
-	return false
-}
-
-// assignClauseResult assigns the parsed clause result to the appropriate field in SelectCore.
-func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType, result any) {
+// assignToSlot stores the parsed clause result in the appropriate SelectCore field.
+// This uses the declarative ClauseSlot enum to determine where to store data.
+func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any) {
 	if result == nil {
 		return
 	}
 
-	switch clauseType {
-	case token.WHERE:
+	switch slot {
+	case spi.SlotWhere:
 		if expr, ok := result.(Expr); ok {
 			core.Where = expr
 		}
 
-	case token.GROUP:
+	case spi.SlotGroupBy:
 		switch v := result.(type) {
 		case []Expr:
 			core.GroupBy = v
 		case []spi.Expr:
-			// Convert []spi.Expr to []Expr
 			exprs := make([]Expr, len(v))
 			for i, e := range v {
 				if expr, ok := e.(Expr); ok {
@@ -262,7 +248,6 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 			}
 			core.GroupBy = exprs
 		case []any:
-			// Convert generic slice to []Expr
 			exprs := make([]Expr, len(v))
 			for i, e := range v {
 				if expr, ok := e.(Expr); ok {
@@ -272,21 +257,20 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 			core.GroupBy = exprs
 		}
 
-	case token.HAVING:
+	case spi.SlotHaving:
 		if expr, ok := result.(Expr); ok {
 			core.Having = expr
 		}
 
-	case token.WINDOW:
-		// Window definitions are complex - handled specially if needed
-		// For now, we don't have full WINDOW clause support
+	case spi.SlotWindow:
+		// Window definitions are complex - for now skip
+		// TODO: Add window definitions support
 
-	case token.ORDER:
+	case spi.SlotOrderBy:
 		switch v := result.(type) {
 		case []OrderByItem:
 			core.OrderBy = v
 		case []spi.OrderByItem:
-			// Convert from spi types
 			items := make([]OrderByItem, len(v))
 			for i, item := range v {
 				if obi, ok := item.(OrderByItem); ok {
@@ -295,7 +279,6 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 			}
 			core.OrderBy = items
 		case []any:
-			// Convert from generic slice
 			items := make([]OrderByItem, len(v))
 			for i, item := range v {
 				if obi, ok := item.(OrderByItem); ok {
@@ -305,22 +288,24 @@ func (p *Parser) assignClauseResult(core *SelectCore, clauseType token.TokenType
 			core.OrderBy = items
 		}
 
-	case token.LIMIT:
+	case spi.SlotLimit:
 		if expr, ok := result.(Expr); ok {
 			core.Limit = expr
 		}
 
-	default:
-		// Check for QUALIFY (dynamic token) - compare by name since dialects may register their own
-		if clauseType.String() == "QUALIFY" {
-			if expr, ok := result.(Expr); ok {
-				core.Qualify = expr
-			}
-		} else {
-			// Unknown clause - add to extensions if it's a Node
-			if node, ok := result.(Node); ok {
-				core.Extensions = append(core.Extensions, node)
-			}
+	case spi.SlotOffset:
+		if expr, ok := result.(Expr); ok {
+			core.Offset = expr
+		}
+
+	case spi.SlotQualify:
+		if expr, ok := result.(Expr); ok {
+			core.Qualify = expr
+		}
+
+	case spi.SlotExtensions:
+		if node, ok := result.(Node); ok {
+			core.Extensions = append(core.Extensions, node)
 		}
 	}
 }

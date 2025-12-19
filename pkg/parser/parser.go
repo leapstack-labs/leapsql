@@ -141,15 +141,19 @@ func (p *Parser) addError(msg string) {
 
 // isKeyword returns true if the token is a reserved keyword that can't be used as alias.
 func (p *Parser) isKeyword(tok Token) bool {
+	// Core SQL keywords that are always reserved (non-clause)
 	switch tok.Type {
-	case TOKEN_FROM, TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_ORDER,
-		TOKEN_LIMIT, TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT,
+	case TOKEN_FROM, TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT,
 		TOKEN_LEFT, TOKEN_RIGHT, TOKEN_INNER, TOKEN_OUTER, TOKEN_FULL,
-		TOKEN_CROSS, TOKEN_JOIN, TOKEN_ON:
+		TOKEN_CROSS, TOKEN_JOIN, TOKEN_ON, TOKEN_LATERAL:
 		return true
 	}
-	// Also check dynamically registered QUALIFY
-	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && tok.Type == qualify {
+	// Dialect clause keywords
+	if p.dialect != nil && p.dialect.IsClauseToken(tok.Type) {
+		return true
+	}
+	// Check global registry (for keywords from other dialects)
+	if _, isKnown := dialect.IsKnownClause(tok.Type); isKnown {
 		return true
 	}
 	return false
@@ -167,13 +171,17 @@ func (p *Parser) isJoinKeyword(tok Token) bool {
 
 // isClauseKeyword returns true if token starts a new clause.
 func (p *Parser) isClauseKeyword(tok Token) bool {
+	// Set operation keywords (always clause-like)
 	switch tok.Type {
-	case TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_ORDER, TOKEN_LIMIT,
-		TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT:
+	case TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT:
 		return true
 	}
-	// Also check dynamically registered QUALIFY
-	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && tok.Type == qualify {
+	// Dialect clause keywords
+	if p.dialect != nil && p.dialect.IsClauseToken(tok.Type) {
+		return true
+	}
+	// Check global registry
+	if _, isKnown := dialect.IsKnownClause(tok.Type); isKnown {
 		return true
 	}
 	return false

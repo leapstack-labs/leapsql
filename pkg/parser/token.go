@@ -119,11 +119,6 @@ func getDynamicToken(name string) TokenType {
 	return TOKEN_ILLEGAL
 }
 
-// tokenQualify returns the QUALIFY token if registered by a dialect.
-func tokenQualify() TokenType {
-	return getDynamicToken("QUALIFY")
-}
-
 // tokenIlike returns the ILIKE token if registered by a dialect.
 func tokenIlike() TokenType {
 	return getDynamicToken("ILIKE")

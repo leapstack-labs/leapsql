@@ -61,6 +61,12 @@ const (
 	LineageTable
 )
 
+// ClauseDef bundles clause parsing logic with storage destination.
+type ClauseDef struct {
+	Handler spi.ClauseHandler
+	Slot    spi.ClauseSlot
+}
+
 // String returns the string representation of Type.
 func (t Type) String() string {
 	switch t {
@@ -111,13 +117,13 @@ type Dialect struct {
 	dataTypes     []string
 
 	// Parsing behavior (NEW - for dialect-aware parsing)
-	parent         *Dialect                              // Parent dialect for inheritance
-	clauseSequence []token.TokenType                     // Order of clauses in SELECT statement
-	clauseHandlers map[token.TokenType]spi.ClauseHandler // Handlers for each clause
-	symbols        map[string]token.TokenType            // Custom operators: "::" -> DCOLON
-	dynamicKw      map[string]token.TokenType            // Custom keywords: "QUALIFY" -> QUALIFY
-	precedence     map[token.TokenType]int               // Operator precedence for expressions
-	infixHandlers  map[token.TokenType]spi.InfixHandler  // Optional custom infix parsing
+	parent         *Dialect                             // Parent dialect for inheritance
+	clauseSequence []token.TokenType                    // Order of clauses in SELECT statement
+	clauseDefs     map[token.TokenType]ClauseDef        // Handler + Slot per clause
+	symbols        map[string]token.TokenType           // Custom operators: "::" -> DCOLON
+	dynamicKw      map[string]token.TokenType           // Custom keywords: "QUALIFY" -> QUALIFY
+	precedence     map[token.TokenType]int              // Operator precedence for expressions
+	infixHandlers  map[token.TokenType]spi.InfixHandler // Optional custom infix parsing
 }
 
 // FunctionLineageType returns the lineage classification for a function.
@@ -284,15 +290,56 @@ func (d *Dialect) ClauseSequence() []token.TokenType {
 
 // ClauseHandler returns the handler for a clause token type.
 func (d *Dialect) ClauseHandler(t token.TokenType) spi.ClauseHandler {
-	if d.clauseHandlers != nil {
-		if h, ok := d.clauseHandlers[t]; ok {
-			return h
+	if d.clauseDefs != nil {
+		if def, ok := d.clauseDefs[t]; ok {
+			return def.Handler
 		}
 	}
 	if d.parent != nil {
 		return d.parent.ClauseHandler(t)
 	}
 	return nil
+}
+
+// ClauseDef returns the definition (handler + slot) for a clause token type.
+func (d *Dialect) ClauseDef(t token.TokenType) (ClauseDef, bool) {
+	if d.clauseDefs != nil {
+		if def, ok := d.clauseDefs[t]; ok {
+			return def, true
+		}
+	}
+	if d.parent != nil {
+		return d.parent.ClauseDef(t)
+	}
+	return ClauseDef{}, false
+}
+
+// IsClauseToken returns true if this dialect supports the given clause token.
+func (d *Dialect) IsClauseToken(t token.TokenType) bool {
+	_, ok := d.ClauseDef(t)
+	return ok
+}
+
+// AllClauseTokens returns all clause tokens registered in this dialect.
+func (d *Dialect) AllClauseTokens() []token.TokenType {
+	seen := make(map[token.TokenType]bool)
+	var tokens []token.TokenType
+
+	for t := range d.clauseDefs {
+		if !seen[t] {
+			seen[t] = true
+			tokens = append(tokens, t)
+		}
+	}
+	if d.parent != nil {
+		for _, t := range d.parent.AllClauseTokens() {
+			if !seen[t] {
+				seen[t] = true
+				tokens = append(tokens, t)
+			}
+		}
+	}
+	return tokens
 }
 
 // Symbols returns the custom operators map for lexer symbol matching.
@@ -379,7 +426,7 @@ func NewDialect(name string) *Builder {
 			dataTypes:      nil,
 			// Parsing behavior
 			clauseSequence: nil,
-			clauseHandlers: make(map[token.TokenType]spi.ClauseHandler),
+			clauseDefs:     make(map[token.TokenType]ClauseDef),
 			symbols:        make(map[string]token.TokenType),
 			dynamicKw:      make(map[string]token.TokenType),
 			precedence:     make(map[token.TokenType]int),
@@ -491,9 +538,9 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 		b.dialect.clauseSequence = make([]token.TokenType, len(parent.clauseSequence))
 		copy(b.dialect.clauseSequence, parent.clauseSequence)
 	}
-	if parent.clauseHandlers != nil {
-		for k, v := range parent.clauseHandlers {
-			b.dialect.clauseHandlers[k] = v
+	if parent.clauseDefs != nil {
+		for k, v := range parent.clauseDefs {
+			b.dialect.clauseDefs[k] = v
 		}
 	}
 	if parent.symbols != nil {
@@ -537,14 +584,16 @@ func (b *Builder) ClauseSequence(tokens ...token.TokenType) *Builder {
 	return b
 }
 
-// ClauseHandler registers a handler for a clause token.
-func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler) *Builder {
-	b.dialect.clauseHandlers[t] = handler
+// ClauseHandler registers a handler for a clause token with storage slot.
+func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot) *Builder {
+	b.dialect.clauseDefs[t] = ClauseDef{Handler: handler, Slot: slot}
+	// Register globally for error messages
+	recordClause(t, t.String())
 	return b
 }
 
 // AddClauseAfter inserts a clause into the sequence after another clause.
-func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler) *Builder {
+func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot) *Builder {
 	// Find the position of 'after' in the sequence
 	for i, tok := range b.dialect.clauseSequence {
 		if tok == after {
@@ -557,7 +606,9 @@ func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHan
 			break
 		}
 	}
-	b.dialect.clauseHandlers[t] = handler
+	b.dialect.clauseDefs[t] = ClauseDef{Handler: handler, Slot: slot}
+	// Register globally for error messages
+	recordClause(t, t.String())
 	return b
 }
 
@@ -569,7 +620,7 @@ func (b *Builder) RemoveClause(t token.TokenType) *Builder {
 			break
 		}
 	}
-	delete(b.dialect.clauseHandlers, t)
+	delete(b.dialect.clauseDefs, t)
 	return b
 }
 
