@@ -98,8 +98,6 @@ func (p *Parser) defaultPrecedence(t TokenType) int {
 		return spi.PrecedenceComparison
 	case TOKEN_IS, TOKEN_IN, TOKEN_BETWEEN, TOKEN_LIKE:
 		return spi.PrecedenceComparison
-	case TOKEN_ILIKE: // Include ILIKE for backward compatibility in permissive mode
-		return spi.PrecedenceComparison
 	case TOKEN_PLUS, TOKEN_MINUS, TOKEN_DPIPE:
 		return spi.PrecedenceAddition
 	case TOKEN_STAR, TOKEN_SLASH, TOKEN_PERCENT:
@@ -108,6 +106,10 @@ func (p *Parser) defaultPrecedence(t TokenType) int {
 		// NOT as infix (for NOT IN, NOT LIKE, etc.) - handled specially
 		return spi.PrecedenceComparison
 	default:
+		// Check dynamically registered ILIKE
+		if ilike := tokenIlike(); ilike != TOKEN_ILLEGAL && t == ilike {
+			return spi.PrecedenceComparison
+		}
 		return spi.PrecedenceNone
 	}
 }

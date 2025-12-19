@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // Lexer tokenizes SQL input.
@@ -178,9 +179,9 @@ func (l *Lexer) NextToken() Token {
 					tok.Type = dynTok
 				}
 			}
-			// Fallback to dynamically registered keywords (for backward compatibility)
+			// Fallback to dynamically registered keywords (from dialect packages)
 			if tok.Type == TOKEN_IDENT {
-				if dynTok, ok := lookupDynamicKeyword(lowerIdent); ok {
+				if dynTok, ok := token.LookupDynamicKeyword(lowerIdent); ok {
 					tok.Type = dynTok
 				}
 			}

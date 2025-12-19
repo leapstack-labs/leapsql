@@ -221,7 +221,11 @@ func (p *Parser) isUnknownClauseKeyword(sequence []token.TokenType) bool {
 	// Check if current token is a known clause keyword
 	knownClauseKeywords := []TokenType{
 		TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_WINDOW,
-		TOKEN_ORDER, TOKEN_LIMIT, TOKEN_QUALIFY,
+		TOKEN_ORDER, TOKEN_LIMIT,
+	}
+	// Add QUALIFY if registered by a dialect
+	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL {
+		knownClauseKeywords = append(knownClauseKeywords, qualify)
 	}
 
 	for _, kw := range knownClauseKeywords {
@@ -347,8 +351,8 @@ func (p *Parser) parseClausesPermissive(core *SelectCore) {
 		core.Having = p.parseExpression()
 	}
 
-	// QUALIFY clause (DuckDB/Snowflake) - permissive mode accepts it
-	if p.match(TOKEN_QUALIFY) {
+	// QUALIFY clause (DuckDB/Snowflake) - permissive mode accepts it if registered
+	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && p.match(qualify) {
 		core.Qualify = p.parseExpression()
 	}
 

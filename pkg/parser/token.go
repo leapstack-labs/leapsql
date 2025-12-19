@@ -1,16 +1,16 @@
 // Package parser provides SQL parsing and column-level lineage extraction.
-// This file provides backward-compatible token type aliases.
+// This file provides token type aliases for convenience.
 package parser
 
 import "github.com/leapstack-labs/leapsql/pkg/token"
 
-// TokenType is an alias for token.TokenType for backward compatibility.
+// TokenType is an alias for token.TokenType.
 type TokenType = token.TokenType
 
-// Token is an alias for token.Token for backward compatibility.
+// Token is an alias for token.Token.
 type Token = token.Token
 
-// Position is an alias for token.Position for backward compatibility.
+// Position is an alias for token.Position.
 type Position = token.Position
 
 // LookupIdent is re-exported from token package.
@@ -110,36 +110,21 @@ const (
 	TOKEN_WITHIN    = token.WITHIN
 )
 
-// Dialect-specific tokens - these will be registered dynamically by dialects.
-// We keep them as package-level variables for backward compatibility.
-// Dialects should call token.Register() to get proper IDs.
-var (
-	// TokenQualify is registered by DuckDB/Snowflake/BigQuery/Teradata dialects.
-	//nolint:revive // Keep old name pattern for backward compatibility
-	TOKEN_QUALIFY = token.Register("QUALIFY")
-	// TokenIlike is registered by Postgres/DuckDB dialects.
-	//nolint:revive // Keep old name pattern for backward compatibility
-	TOKEN_ILIKE = token.Register("ILIKE")
-)
-
-// init registers the dialect-specific keywords with the token package
-// so the lexer can recognize them.
-func init() {
-	// Register with lowercase for lexer lookup
-	registerKeyword("qualify", TOKEN_QUALIFY)
-	registerKeyword("ilike", TOKEN_ILIKE)
+// getDynamicToken returns the token type for a dynamically registered keyword.
+// Returns TOKEN_ILLEGAL if not registered.
+func getDynamicToken(name string) TokenType {
+	if tok, ok := token.LookupDynamicKeyword(name); ok {
+		return tok
+	}
+	return TOKEN_ILLEGAL
 }
 
-// registeredKeywords stores dynamically registered keywords for lexer lookup.
-var registeredKeywords = make(map[string]TokenType)
-
-// registerKeyword registers a keyword for lexer lookup.
-func registerKeyword(name string, t TokenType) {
-	registeredKeywords[name] = t
+// tokenQualify returns the QUALIFY token if registered by a dialect.
+func tokenQualify() TokenType {
+	return getDynamicToken("QUALIFY")
 }
 
-// lookupDynamicKeyword checks if an identifier is a dynamically registered keyword.
-func lookupDynamicKeyword(ident string) (TokenType, bool) {
-	t, ok := registeredKeywords[ident]
-	return t, ok
+// tokenIlike returns the ILIKE token if registered by a dialect.
+func tokenIlike() TokenType {
+	return getDynamicToken("ILIKE")
 }

@@ -188,7 +188,11 @@ func (p *Parser) isKeyword(tok Token) bool {
 	case TOKEN_FROM, TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_ORDER,
 		TOKEN_LIMIT, TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT,
 		TOKEN_LEFT, TOKEN_RIGHT, TOKEN_INNER, TOKEN_OUTER, TOKEN_FULL,
-		TOKEN_CROSS, TOKEN_JOIN, TOKEN_ON, TOKEN_QUALIFY:
+		TOKEN_CROSS, TOKEN_JOIN, TOKEN_ON:
+		return true
+	}
+	// Also check dynamically registered QUALIFY
+	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && tok.Type == qualify {
 		return true
 	}
 	return false
@@ -208,7 +212,11 @@ func (p *Parser) isJoinKeyword(tok Token) bool {
 func (p *Parser) isClauseKeyword(tok Token) bool {
 	switch tok.Type {
 	case TOKEN_WHERE, TOKEN_GROUP, TOKEN_HAVING, TOKEN_ORDER, TOKEN_LIMIT,
-		TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT, TOKEN_QUALIFY:
+		TOKEN_UNION, TOKEN_INTERSECT, TOKEN_EXCEPT:
+		return true
+	}
+	// Also check dynamically registered QUALIFY
+	if qualify := tokenQualify(); qualify != TOKEN_ILLEGAL && tok.Type == qualify {
 		return true
 	}
 	return false
