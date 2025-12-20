@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"strings"
+
+	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // Primary expression parsing: literals, column refs, function calls.
@@ -47,19 +49,18 @@ func (p *Parser) parsePrimary() Expr {
 
 	case TOKEN_NOT:
 		// EXISTS check
-		if p.checkPeek(TOKEN_IDENT) && strings.ToLower(p.peek.Literal) == "exists" {
+		if p.checkPeek(TOKEN_EXISTS) {
 			p.nextToken() // consume NOT
 			return p.parseExistsExpr(true)
 		}
 		// Regular NOT expression
 		p.nextToken()
-		return &UnaryExpr{Op: "NOT", Expr: p.parsePrimary()}
+		return &UnaryExpr{Op: token.NOT, Expr: p.parsePrimary()}
+
+	case TOKEN_EXISTS:
+		return p.parseExistsExpr(false)
 
 	case TOKEN_IDENT:
-		// Check for EXISTS
-		if strings.ToLower(p.token.Literal) == "exists" {
-			return p.parseExistsExpr(false)
-		}
 		return p.parseIdentifierExpr()
 
 	case TOKEN_LPAREN:
@@ -69,6 +70,17 @@ func (p *Parser) parsePrimary() Expr {
 		// SELECT * context
 		p.nextToken()
 		return &StarExpr{}
+
+	case TOKEN_MACRO:
+		macro := &MacroExpr{
+			Content: p.token.Literal,
+		}
+		macro.Span = token.Span{
+			Start: p.token.Pos,
+			End:   p.tokenEnd(),
+		}
+		p.nextToken()
+		return macro
 
 	default:
 		p.addError(fmt.Sprintf("unexpected token in expression: %s", p.token.Type))

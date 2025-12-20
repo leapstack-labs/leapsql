@@ -1,5 +1,7 @@
 package parser
 
+import "github.com/leapstack-labs/leapsql/pkg/token"
+
 // Statement represents a SQL statement.
 type Statement interface {
 	stmtNode()
@@ -15,10 +17,34 @@ type TableRef interface {
 	tableRefNode()
 }
 
+// NodeInfo provides common fields for all AST nodes.
+// Embed this in node types that need position/comment tracking.
+type NodeInfo struct {
+	Span             token.Span
+	LeadingComments  []*token.Comment
+	TrailingComments []*token.Comment
+}
+
+// GetSpan returns the node's source span.
+func (n *NodeInfo) GetSpan() token.Span {
+	return n.Span
+}
+
+// AddLeadingComment adds a leading comment to the node.
+func (n *NodeInfo) AddLeadingComment(c *token.Comment) {
+	n.LeadingComments = append(n.LeadingComments, c)
+}
+
+// AddTrailingComment adds a trailing comment to the node.
+func (n *NodeInfo) AddTrailingComment(c *token.Comment) {
+	n.TrailingComments = append(n.TrailingComments, c)
+}
+
 // ---------- Statement Types ----------
 
 // SelectStmt represents a complete SELECT statement with optional WITH clause.
 type SelectStmt struct {
+	NodeInfo
 	With *WithClause
 	Body *SelectBody
 }
@@ -27,18 +53,21 @@ func (*SelectStmt) stmtNode() {}
 
 // WithClause represents a WITH clause with CTEs.
 type WithClause struct {
+	NodeInfo
 	Recursive bool
 	CTEs      []*CTE
 }
 
 // CTE represents a Common Table Expression.
 type CTE struct {
+	NodeInfo
 	Name   string
 	Select *SelectStmt
 }
 
 // SelectBody represents the body of a SELECT with possible set operations.
 type SelectBody struct {
+	NodeInfo
 	Left  *SelectCore
 	Op    SetOpType   // UNION, INTERSECT, EXCEPT, or empty
 	All   bool        // UNION ALL
@@ -59,6 +88,7 @@ const (
 
 // SelectCore represents the core SELECT clause.
 type SelectCore struct {
+	NodeInfo
 	Distinct bool
 	Columns  []SelectItem
 	From     *FromClause
@@ -100,12 +130,14 @@ type SelectItem struct {
 
 // FromClause represents the FROM clause.
 type FromClause struct {
+	NodeInfo
 	Source TableRef
 	Joins  []*Join
 }
 
 // Join represents a JOIN clause.
 type Join struct {
+	NodeInfo
 	Type      JoinType
 	Right     TableRef
 	Condition Expr
@@ -135,6 +167,7 @@ type OrderByItem struct {
 
 // TableName represents a table name reference.
 type TableName struct {
+	NodeInfo
 	Catalog string
 	Schema  string
 	Name    string
@@ -145,6 +178,7 @@ func (*TableName) tableRefNode() {}
 
 // DerivedTable represents a subquery in FROM clause.
 type DerivedTable struct {
+	NodeInfo
 	Select *SelectStmt
 	Alias  string
 }
@@ -153,11 +187,21 @@ func (*DerivedTable) tableRefNode() {}
 
 // LateralTable represents a LATERAL subquery.
 type LateralTable struct {
+	NodeInfo
 	Select *SelectStmt
 	Alias  string
 }
 
 func (*LateralTable) tableRefNode() {}
+
+// MacroTable represents a macro used as a table reference (e.g., {{ ref('table') }}).
+type MacroTable struct {
+	NodeInfo
+	Content string // raw {{ ... }} content including delimiters
+	Alias   string
+}
+
+func (*MacroTable) tableRefNode() {}
 
 // ---------- Expression Types ----------
 
@@ -191,7 +235,7 @@ const (
 // BinaryExpr represents a binary expression.
 type BinaryExpr struct {
 	Left  Expr
-	Op    string
+	Op    token.TokenType
 	Right Expr
 }
 
@@ -199,7 +243,7 @@ func (*BinaryExpr) exprNode() {}
 
 // UnaryExpr represents a unary expression.
 type UnaryExpr struct {
-	Op   string // -, +, NOT
+	Op   token.TokenType
 	Expr Expr
 }
 
@@ -311,12 +355,21 @@ type IsNullExpr struct {
 
 func (*IsNullExpr) exprNode() {}
 
+// IsBoolExpr represents an IS [NOT] TRUE/FALSE expression.
+type IsBoolExpr struct {
+	Expr  Expr
+	Not   bool
+	Value bool // true for IS TRUE, false for IS FALSE
+}
+
+func (*IsBoolExpr) exprNode() {}
+
 // LikeExpr represents a LIKE expression.
 type LikeExpr struct {
 	Expr    Expr
 	Not     bool
 	Pattern Expr
-	ILike   bool // case-insensitive LIKE
+	Op      token.TokenType // token.LIKE or dialect-registered ILIKE
 }
 
 func (*LikeExpr) exprNode() {}
@@ -349,3 +402,11 @@ type ExistsExpr struct {
 }
 
 func (*ExistsExpr) exprNode() {}
+
+// MacroExpr represents a template macro expression (e.g., {{ ref('table') }}).
+type MacroExpr struct {
+	NodeInfo
+	Content string // raw {{ ... }} content including delimiters
+}
+
+func (*MacroExpr) exprNode() {}

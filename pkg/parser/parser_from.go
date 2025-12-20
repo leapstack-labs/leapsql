@@ -41,6 +41,11 @@ func (p *Parser) parseTableRef() TableRef {
 		return p.parseDerivedTable()
 	}
 
+	// Macro table reference (e.g., {{ ref('table') }})
+	if p.check(TOKEN_MACRO) {
+		return p.parseMacroTable()
+	}
+
 	// Simple table name
 	return p.parseTableName()
 }
@@ -131,6 +136,28 @@ func (p *Parser) parseLateralTable() *LateralTable {
 	}
 
 	return lateral
+}
+
+// parseMacroTable parses a macro used as a table reference.
+func (p *Parser) parseMacroTable() *MacroTable {
+	macro := &MacroTable{
+		Content: p.token.Literal,
+	}
+	macro.Span = p.makeSpan(p.token.Pos)
+	p.nextToken()
+
+	// Optional alias
+	if p.match(TOKEN_AS) {
+		if p.check(TOKEN_IDENT) {
+			macro.Alias = p.token.Literal
+			p.nextToken()
+		}
+	} else if p.check(TOKEN_IDENT) && !p.isJoinKeyword(p.token) && !p.isClauseKeyword(p.token) {
+		macro.Alias = p.token.Literal
+		p.nextToken()
+	}
+
+	return macro
 }
 
 // parseJoin parses a JOIN clause.

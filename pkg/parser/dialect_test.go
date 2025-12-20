@@ -7,6 +7,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/token"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -67,7 +68,7 @@ func TestQualifyWithComplexExpression(t *testing.T) {
 	qualify := stmt.Body.Left.Qualify
 	binaryExpr, ok := qualify.(*parser.BinaryExpr)
 	require.True(t, ok, "QUALIFY should contain binary expression")
-	assert.Equal(t, "AND", binaryExpr.Op)
+	assert.Equal(t, token.AND, binaryExpr.Op)
 }
 
 // ---------- ILIKE Operator Tests ----------
@@ -98,10 +99,10 @@ func TestDuckDBAcceptsILIKE(t *testing.T) {
 	require.NotNil(t, stmt)
 	require.NotNil(t, stmt.Body.Left.Where)
 
-	// Verify the WHERE clause contains a LIKE expression with ILike=true
+	// Verify the WHERE clause contains a LIKE expression with ILIKE op
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.True(t, likeExpr.ILike, "Should be case-insensitive ILIKE")
+	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
 
 func TestPostgresAcceptsILIKE(t *testing.T) {
@@ -113,7 +114,7 @@ func TestPostgresAcceptsILIKE(t *testing.T) {
 
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.True(t, likeExpr.ILike, "Should be case-insensitive ILIKE")
+	assert.Equal(t, postgresDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
 
 func TestILIKEWithNOT(t *testing.T) {
@@ -124,7 +125,7 @@ func TestILIKEWithNOT(t *testing.T) {
 
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.True(t, likeExpr.ILike, "Should be case-insensitive ILIKE")
+	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
 	assert.True(t, likeExpr.Not, "Should be negated with NOT")
 }
 
@@ -141,17 +142,17 @@ func TestILIKEPrecedence(t *testing.T) {
 	// Not: a ILIKE ('%x%' AND b > 5)
 	binExpr, ok := stmt.Body.Left.Where.(*parser.BinaryExpr)
 	require.True(t, ok, "WHERE should be a binary AND expression")
-	assert.Equal(t, "AND", binExpr.Op)
+	assert.Equal(t, token.AND, binExpr.Op)
 
 	// Left side should be ILIKE
 	likeExpr, ok := binExpr.Left.(*parser.LikeExpr)
 	require.True(t, ok, "Left of AND should be ILIKE")
-	assert.True(t, likeExpr.ILike)
+	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op)
 
 	// Right side should be comparison
 	rightExpr, ok := binExpr.Right.(*parser.BinaryExpr)
 	require.True(t, ok, "Right of AND should be comparison")
-	assert.Equal(t, ">", rightExpr.Op)
+	assert.Equal(t, token.GT, rightExpr.Op)
 }
 
 func TestLIKEPrecedenceWithOR(t *testing.T) {
@@ -163,7 +164,7 @@ func TestLIKEPrecedenceWithOR(t *testing.T) {
 	// Should be: (a LIKE '%x%') OR (b LIKE '%y%')
 	binExpr, ok := stmt.Body.Left.Where.(*parser.BinaryExpr)
 	require.True(t, ok)
-	assert.Equal(t, "OR", binExpr.Op)
+	assert.Equal(t, token.OR, binExpr.Op)
 }
 
 // ---------- Error Position Tests ----------

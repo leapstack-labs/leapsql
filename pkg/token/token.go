@@ -59,6 +59,7 @@ const (
 	DISTINCT
 	ELSE
 	END
+	EXISTS
 	EXCEPT
 	FALSE
 	FILTER
@@ -105,6 +106,9 @@ const (
 	WINDOW // Named window definitions
 	WITH
 	WITHIN
+
+	// Template tokens
+	MACRO // {{ ... }} content
 
 	// Sentinel - dynamic tokens start after this
 	maxBuiltin TokenType = 999
@@ -165,6 +169,7 @@ var tokenNames = map[TokenType]string{
 	DISTINCT:  "DISTINCT",
 	ELSE:      "ELSE",
 	END:       "END",
+	EXISTS:    "EXISTS",
 	EXCEPT:    "EXCEPT",
 	FALSE:     "FALSE",
 	FILTER:    "FILTER",
@@ -211,6 +216,7 @@ var tokenNames = map[TokenType]string{
 	WINDOW:    "WINDOW",
 	WITH:      "WITH",
 	WITHIN:    "WITHIN",
+	MACRO:     "MACRO",
 }
 
 // keywords maps lowercase keyword strings to their token types.
@@ -229,6 +235,7 @@ var keywords = map[string]TokenType{
 	"distinct":  DISTINCT,
 	"else":      ELSE,
 	"end":       END,
+	"exists":    EXISTS,
 	"except":    EXCEPT,
 	"false":     FALSE,
 	"filter":    FILTER,

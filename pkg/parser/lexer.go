@@ -20,6 +20,9 @@ type Lexer struct {
 
 	// Dialect support (optional)
 	dialect *dialect.Dialect
+
+	// Comments collected during lexing (for formatter)
+	Comments []*token.Comment
 }
 
 // NewLexer creates a new Lexer for the given input.
@@ -85,6 +88,11 @@ func (l *Lexer) NextToken() Token {
 	l.skipWhitespaceAndComments()
 
 	pos := l.currentPos()
+
+	// Check for macro start {{ before other processing
+	if l.ch == '{' && l.peekChar() == '{' {
+		return l.readMacro(pos)
+	}
 
 	// Check dialect-specific symbols first (longest match)
 	if tok, ok := l.matchDialectSymbol(pos); ok {
@@ -253,7 +261,7 @@ func (l *Lexer) newToken(tokenType TokenType, literal string) Token {
 	return Token{Type: tokenType, Literal: literal, Pos: l.currentPos()}
 }
 
-// skipWhitespaceAndComments skips whitespace and comments.
+// skipWhitespaceAndComments skips whitespace and collects comments.
 func (l *Lexer) skipWhitespaceAndComments() {
 	for {
 		// Skip whitespace
@@ -261,15 +269,15 @@ func (l *Lexer) skipWhitespaceAndComments() {
 			l.readChar()
 		}
 
-		// Skip line comment (-- ...)
+		// Collect line comment (-- ...)
 		if l.ch == '-' && l.peekChar() == '-' {
-			l.skipLineComment()
+			l.collectLineComment()
 			continue
 		}
 
-		// Skip block comment (/* ... */)
+		// Collect block comment (/* ... */)
 		if l.ch == '/' && l.peekChar() == '*' {
-			l.skipBlockComment()
+			l.collectBlockComment()
 			continue
 		}
 
@@ -277,29 +285,45 @@ func (l *Lexer) skipWhitespaceAndComments() {
 	}
 }
 
-// skipLineComment skips a line comment.
-func (l *Lexer) skipLineComment() {
+// collectLineComment collects a line comment.
+func (l *Lexer) collectLineComment() {
+	startPos := l.currentPos()
+	startOffset := l.pos
+
+	// Consume until end of line
 	for l.ch != '\n' && l.ch != 0 {
 		l.readChar()
 	}
+
+	l.Comments = append(l.Comments, &token.Comment{
+		Kind: token.LineComment,
+		Text: l.input[startOffset:l.pos],
+		Span: token.Span{Start: startPos, End: l.currentPos()},
+	})
 }
 
-// skipBlockComment skips a block comment.
-func (l *Lexer) skipBlockComment() {
+// collectBlockComment collects a block comment.
+func (l *Lexer) collectBlockComment() {
+	startPos := l.currentPos()
+	startOffset := l.pos
+
 	l.readChar() // skip '/'
 	l.readChar() // skip '*'
 
-	for {
-		if l.ch == 0 {
-			return // Unterminated block comment
-		}
+	for l.ch != 0 {
 		if l.ch == '*' && l.peekChar() == '/' {
 			l.readChar() // skip '*'
 			l.readChar() // skip '/'
-			return
+			break
 		}
 		l.readChar()
 	}
+
+	l.Comments = append(l.Comments, &token.Comment{
+		Kind: token.BlockComment,
+		Text: l.input[startOffset:l.pos],
+		Span: token.Span{Start: startPos, End: l.currentPos()},
+	})
 }
 
 // readString reads a single-quoted string literal.
@@ -416,4 +440,61 @@ func Tokenize(input string) []Token {
 		}
 	}
 	return tokens
+}
+
+// readMacro scans a {{ ... }} macro token.
+// Handles nested braces and skips over quoted strings to avoid
+// miscounting braces inside string literals.
+func (l *Lexer) readMacro(startPos Position) Token {
+	startOffset := l.pos
+	l.readChar() // skip first {
+	l.readChar() // skip second {
+
+	depth := 1
+	for l.ch != 0 && depth > 0 {
+		switch l.ch {
+		case '\'', '"':
+			// Skip quoted strings to avoid counting braces inside them
+			l.skipQuotedInMacro(l.ch)
+		case '{':
+			if l.peekChar() == '{' {
+				depth++
+				l.readChar()
+			}
+			l.readChar()
+		case '}':
+			if l.peekChar() == '}' {
+				depth--
+				l.readChar()
+				if depth == 0 {
+					l.readChar() // consume final }
+				}
+			} else {
+				l.readChar()
+			}
+		default:
+			l.readChar()
+		}
+	}
+
+	return Token{
+		Type:    TOKEN_MACRO,
+		Literal: l.input[startOffset:l.pos],
+		Pos:     startPos,
+	}
+}
+
+// skipQuotedInMacro skips over a quoted string inside a macro.
+func (l *Lexer) skipQuotedInMacro(quote byte) {
+	l.readChar() // skip opening quote
+	for l.ch != 0 {
+		if l.ch == quote {
+			l.readChar() // skip closing quote
+			return
+		}
+		if l.ch == '\\' && l.peekChar() != 0 {
+			l.readChar() // skip escape
+		}
+		l.readChar()
+	}
 }

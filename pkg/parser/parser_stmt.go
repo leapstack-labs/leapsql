@@ -213,11 +213,6 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 			break
 		}
 	}
-
-	// Handle OFFSET which typically follows LIMIT
-	if p.match(TOKEN_OFFSET) {
-		core.Offset = p.parseExpression()
-	}
 }
 
 // assignToSlot stores the parsed clause result in the appropriate SelectCore field.

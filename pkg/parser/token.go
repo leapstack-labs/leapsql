@@ -62,6 +62,7 @@ const (
 	TOKEN_DISTINCT  = token.DISTINCT
 	TOKEN_ELSE      = token.ELSE
 	TOKEN_END       = token.END
+	TOKEN_EXISTS    = token.EXISTS
 	TOKEN_EXCEPT    = token.EXCEPT
 	TOKEN_FALSE     = token.FALSE
 	TOKEN_FILTER    = token.FILTER
@@ -108,6 +109,9 @@ const (
 	TOKEN_WINDOW    = token.WINDOW
 	TOKEN_WITH      = token.WITH
 	TOKEN_WITHIN    = token.WITHIN
+
+	// Template tokens
+	TOKEN_MACRO = token.MACRO
 )
 
 // getDynamicToken returns the token type for a dynamically registered keyword.

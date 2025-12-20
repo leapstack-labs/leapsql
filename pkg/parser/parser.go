@@ -281,3 +281,33 @@ func (p *Parser) AddError(msg string) {
 func (p *Parser) Position() token.Position {
 	return p.token.Pos
 }
+
+// tokenEnd returns the end position of the current token.
+func (p *Parser) tokenEnd() token.Position {
+	return token.Position{
+		Line:   p.token.Pos.Line,
+		Column: p.token.Pos.Column + len(p.token.Literal),
+		Offset: p.token.Pos.Offset + len(p.token.Literal),
+	}
+}
+
+// makeSpan creates a span from start position to current token end.
+func (p *Parser) makeSpan(start token.Position) token.Span {
+	return token.Span{Start: start, End: p.tokenEnd()}
+}
+
+// Comments returns the comments collected during lexing.
+// Call this after parsing to get all comments for the formatter.
+func (p *Parser) Comments() []*token.Comment {
+	return p.lexer.Comments
+}
+
+// ParseWithDialectAndComments parses SQL and returns both AST and comments.
+func ParseWithDialectAndComments(sql string, d *dialect.Dialect) (*SelectStmt, []*token.Comment, error) {
+	p := NewParser(sql, d)
+	stmt := p.parseStatement()
+	if len(p.errors) > 0 {
+		return nil, nil, p.errors[0]
+	}
+	return stmt, p.Comments(), nil
+}

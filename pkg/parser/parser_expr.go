@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/leapstack-labs/leapsql/pkg/spi"
+import (
+	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
 
 // Expression precedence parsing using Pratt parser with dialect-aware precedence.
 //
@@ -55,17 +58,17 @@ func (p *Parser) parsePrefixExpr() Expr {
 	case TOKEN_NOT:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceNot)
-		return &UnaryExpr{Op: "NOT", Expr: expr}
+		return &UnaryExpr{Op: token.NOT, Expr: expr}
 
 	case TOKEN_MINUS:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
-		return &UnaryExpr{Op: "-", Expr: expr}
+		return &UnaryExpr{Op: token.MINUS, Expr: expr}
 
 	case TOKEN_PLUS:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
-		return &UnaryExpr{Op: "+", Expr: expr}
+		return &UnaryExpr{Op: token.PLUS, Expr: expr}
 
 	default:
 		return p.parsePrimary()
@@ -134,14 +137,16 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 		return p.parseBetweenExpr(left, false)
 
 	case TOKEN_LIKE:
+		op := p.token.Type
 		p.nextToken()
-		return p.parseLikeExpr(left, false, false)
+		return p.parseLikeExpr(left, false, op)
 	}
 
 	// Check for ILIKE (dialect-specific token - compare by name since dialects may register their own)
 	if p.token.Type.String() == "ILIKE" {
+		op := p.token.Type
 		p.nextToken()
-		return p.parseLikeExpr(left, false, true)
+		return p.parseLikeExpr(left, false, op)
 	}
 
 	// Check for custom infix handler (dialect-specific operators like ::)
@@ -162,7 +167,7 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 			}
 			// If handler returned nil, fall through to standard handling
 			// This can happen for operators that need standard binary handling
-			return &BinaryExpr{Left: left, Op: op.Literal, Right: p.parseExpressionWithPrecedence(prec + 1)}
+			return &BinaryExpr{Left: left, Op: op.Type, Right: p.parseExpressionWithPrecedence(prec + 1)}
 		}
 	}
 
@@ -173,7 +178,7 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 	// Parse right operand with higher precedence (left-associative)
 	right := p.parseExpressionWithPrecedence(prec + 1)
 
-	return &BinaryExpr{Left: left, Op: opString(op.Type), Right: right}
+	return &BinaryExpr{Left: left, Op: op.Type, Right: right}
 }
 
 // parseNotInfixExpr handles NOT as an infix modifier (NOT IN, NOT BETWEEN, NOT LIKE).
@@ -190,14 +195,16 @@ func (p *Parser) parseNotInfixExpr(left Expr) Expr {
 		return p.parseBetweenExpr(left, true)
 
 	case TOKEN_LIKE:
+		op := p.token.Type
 		p.nextToken()
-		return p.parseLikeExpr(left, true, false)
+		return p.parseLikeExpr(left, true, op)
 
 	default:
 		// Check for ILIKE (dialect-specific token - compare by name)
 		if p.token.Type.String() == "ILIKE" {
+			op := p.token.Type
 			p.nextToken()
-			return p.parseLikeExpr(left, true, true)
+			return p.parseLikeExpr(left, true, op)
 		}
 
 		// NOT without a recognized following keyword - treat as error
@@ -219,19 +226,11 @@ func (p *Parser) parseIsExpr(left Expr) Expr {
 
 	case TOKEN_TRUE:
 		p.nextToken()
-		op := "IS TRUE"
-		if isNot {
-			op = "IS NOT TRUE"
-		}
-		return &BinaryExpr{Left: left, Op: op, Right: &Literal{Type: LiteralBool, Value: "true"}}
+		return &IsBoolExpr{Expr: left, Not: isNot, Value: true}
 
 	case TOKEN_FALSE:
 		p.nextToken()
-		op := "IS FALSE"
-		if isNot {
-			op = "IS NOT FALSE"
-		}
-		return &BinaryExpr{Left: left, Op: op, Right: &Literal{Type: LiteralBool, Value: "false"}}
+		return &IsBoolExpr{Expr: left, Not: isNot, Value: false}
 
 	default:
 		p.addError("expected NULL, TRUE, or FALSE after IS")
@@ -268,45 +267,9 @@ func (p *Parser) parseBetweenExpr(left Expr, not bool) Expr {
 }
 
 // parseLikeExpr parses a LIKE/ILIKE expression.
-func (p *Parser) parseLikeExpr(left Expr, not bool, ilike bool) Expr {
-	like := &LikeExpr{Expr: left, Not: not, ILike: ilike}
+func (p *Parser) parseLikeExpr(left Expr, not bool, op token.TokenType) Expr {
+	like := &LikeExpr{Expr: left, Not: not, Op: op}
 	// Parse pattern at addition precedence
 	like.Pattern = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	return like
-}
-
-// opString returns the string representation of an operator token.
-func opString(t TokenType) string {
-	switch t {
-	case TOKEN_OR:
-		return "OR"
-	case TOKEN_AND:
-		return "AND"
-	case TOKEN_EQ:
-		return "="
-	case TOKEN_NE:
-		return "!="
-	case TOKEN_LT:
-		return "<"
-	case TOKEN_GT:
-		return ">"
-	case TOKEN_LE:
-		return "<="
-	case TOKEN_GE:
-		return ">="
-	case TOKEN_PLUS:
-		return "+"
-	case TOKEN_MINUS:
-		return "-"
-	case TOKEN_STAR:
-		return "*"
-	case TOKEN_SLASH:
-		return "/"
-	case TOKEN_PERCENT:
-		return "%"
-	case TOKEN_DPIPE:
-		return "||"
-	default:
-		return t.String()
-	}
 }
