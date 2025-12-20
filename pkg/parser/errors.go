@@ -33,7 +33,6 @@ func (e *ResolutionError) Error() string {
 
 // Common error messages
 const (
-	ErrScalarSubquery     = "Scalar subqueries in SELECT columns are not supported. Rewrite using a CTE and JOIN."
 	ErrUnexpectedToken    = "unexpected token %s, expected %s"
 	ErrUnterminatedString = "unterminated string literal"
 	ErrInvalidNumber      = "invalid number literal"

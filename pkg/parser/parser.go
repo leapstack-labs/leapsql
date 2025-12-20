@@ -36,15 +36,12 @@ import (
 
 // Parser parses SQL into an AST.
 type Parser struct {
-	lexer        *Lexer
-	token        Token // current token
-	peek         Token // lookahead token
-	peek2        Token // second lookahead token
-	errors       []error
-	inSelectList bool // true when parsing SELECT columns (to detect scalar subqueries)
-
-	// Dialect support (required)
-	dialect *dialect.Dialect
+	lexer   *Lexer
+	token   Token // current token
+	peek    Token // lookahead token
+	peek2   Token // second lookahead token
+	errors  []error
+	dialect *dialect.Dialect // required
 }
 
 // NewParser creates a new parser for the given SQL input with dialect support.

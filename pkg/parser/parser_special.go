@@ -95,24 +95,7 @@ func (p *Parser) parseParenExpr() Expr {
 
 	// Check if this is a subquery
 	if p.check(TOKEN_SELECT) || p.check(TOKEN_WITH) {
-		// Disallow scalar subqueries in SELECT list
-		if p.inSelectList {
-			p.addError(ErrScalarSubquery)
-			// Skip to matching paren
-			depth := 1
-			for depth > 0 && p.token.Type != TOKEN_EOF {
-				switch p.token.Type {
-				case TOKEN_LPAREN:
-					depth++
-				case TOKEN_RPAREN:
-					depth--
-				}
-				p.nextToken()
-			}
-			return nil
-		}
-
-		// Subquery expression (allowed in WHERE/HAVING context for IN/EXISTS)
+		// Subquery expression (scalar subquery in SELECT, or in WHERE/HAVING for IN/EXISTS)
 		subquery := &SubqueryExpr{Select: p.parseStatement()}
 		p.expect(TOKEN_RPAREN)
 		return subquery

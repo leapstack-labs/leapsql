@@ -314,18 +314,47 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		lineage.Transform = TransformExpression
 
 	case *parser.BinaryExpr:
-		// Collect sources from both sides
-		sources := e.collectExprSources(scope, colResolver, expr)
-		lineage.Sources = sources
+		// Recursively extract lineage from both sides (handles subqueries)
+		leftLineage := e.extractExprLineage(scope, colResolver, ex.Left)
+		rightLineage := e.extractExprLineage(scope, colResolver, ex.Right)
+		lineage.Sources = e.mergeSources(leftLineage.Sources, rightLineage.Sources)
 		lineage.Transform = TransformExpression
 
 	case *parser.UnaryExpr:
-		sources := e.collectExprSources(scope, colResolver, expr)
-		lineage.Sources = sources
+		innerLineage := e.extractExprLineage(scope, colResolver, ex.Expr)
+		lineage.Sources = innerLineage.Sources
 		lineage.Transform = TransformExpression
 
 	case *parser.ParenExpr:
 		return e.extractExprLineage(scope, colResolver, ex.Expr)
+
+	case *parser.SubqueryExpr:
+		// Scalar subquery: extract lineage from the subquery's SELECT list only
+		// We use "tunnel vision" - ignore WHERE/HAVING to avoid correlation issues
+		if ex.Select != nil && ex.Select.Body != nil && ex.Select.Body.Left != nil {
+			core := ex.Select.Body.Left
+
+			// Create a child scope for the subquery
+			subScope := scope.Child()
+
+			// Resolve ONLY the FROM clause (not WHERE - avoids correlation issues)
+			if core.From != nil {
+				e.resolveSubqueryFrom(subScope, ex.Select, core.From)
+			}
+
+			// Create column resolver for the subquery scope
+			subColResolver, err := parser.NewColumnResolver(subScope, e.dialect)
+			if err == nil {
+				// Extract lineage from the subquery's SELECT columns only
+				for _, item := range core.Columns {
+					if item.Expr != nil {
+						itemLineage := e.extractExprLineage(subScope, subColResolver, item.Expr)
+						lineage.Sources = append(lineage.Sources, itemLineage.Sources...)
+					}
+				}
+			}
+		}
+		lineage.Transform = TransformExpression
 
 	default:
 		// For other expression types, collect all column references
@@ -559,4 +588,123 @@ func (e *lineageExtractor) inferColumnName(expr parser.Expr, index int) string {
 // generateColumnName generates a default column name.
 func (e *lineageExtractor) generateColumnName(index int) string {
 	return "column" + string(rune('0'+index))
+}
+
+// resolveSubqueryFrom resolves the FROM clause for a subquery into the given scope.
+// This is a lightweight resolution that handles:
+// - Physical tables
+// - CTEs (from the subquery's WITH clause)
+// - Derived tables (recursively)
+// It does NOT resolve WHERE/HAVING to avoid issues with correlated subqueries.
+func (e *lineageExtractor) resolveSubqueryFrom(scope *parser.Scope, stmt *parser.SelectStmt, from *parser.FromClause) {
+	// First, handle any CTEs in the subquery
+	if stmt.With != nil {
+		for _, cte := range stmt.With.CTEs {
+			if cte.Select != nil && cte.Select.Body != nil && cte.Select.Body.Left != nil {
+				cteCore := cte.Select.Body.Left
+
+				// Create a child scope for the CTE
+				cteScope := scope.Child()
+
+				// Recursively resolve the CTE's FROM clause
+				if cteCore.From != nil {
+					e.resolveSubqueryFrom(cteScope, cte.Select, cteCore.From)
+				}
+
+				// Extract column names from CTE
+				var columns []string
+				for _, item := range cteCore.Columns {
+					if item.Alias != "" {
+						columns = append(columns, item.Alias)
+					} else if item.Expr != nil {
+						if col, ok := item.Expr.(*parser.ColumnRef); ok {
+							columns = append(columns, col.Column)
+						}
+					}
+				}
+				scope.RegisterCTE(cte.Name, columns)
+			}
+		}
+	}
+
+	// Register tables from FROM clause
+	e.resolveTableRefForSubquery(scope, from.Source)
+	for _, join := range from.Joins {
+		e.resolveTableRefForSubquery(scope, join.Right)
+	}
+}
+
+// resolveTableRefForSubquery registers a table reference in the subquery scope.
+func (e *lineageExtractor) resolveTableRefForSubquery(scope *parser.Scope, ref parser.TableRef) {
+	if ref == nil {
+		return
+	}
+
+	switch t := ref.(type) {
+	case *parser.TableName:
+		// Check if it references a CTE first
+		if _, ok := scope.LookupCTE(t.Name); ok {
+			// CTE reference - already registered, no external source
+			return
+		}
+		// Physical table - register in scope and record as source
+		scope.RegisterTable(t)
+
+		// Build fully qualified name and record as source
+		var parts []string
+		if t.Catalog != "" {
+			parts = append(parts, t.Catalog)
+		}
+		if t.Schema != "" {
+			parts = append(parts, t.Schema)
+		}
+		parts = append(parts, t.Name)
+		e.sources[strings.Join(parts, ".")] = struct{}{}
+
+	case *parser.DerivedTable:
+		// Nested derived table - extract columns and register
+		if t.Select != nil && t.Select.Body != nil && t.Select.Body.Left != nil {
+			derivedCore := t.Select.Body.Left
+
+			// Create a child scope for the derived table
+			derivedScope := scope.Child()
+
+			// Recursively resolve the derived table's FROM clause
+			if derivedCore.From != nil {
+				e.resolveSubqueryFrom(derivedScope, t.Select, derivedCore.From)
+			}
+
+			var columns []string
+			for _, item := range derivedCore.Columns {
+				if item.Alias != "" {
+					columns = append(columns, item.Alias)
+				} else if item.Expr != nil {
+					if col, ok := item.Expr.(*parser.ColumnRef); ok {
+						columns = append(columns, col.Column)
+					}
+				}
+			}
+			scope.RegisterDerived(t.Alias, columns)
+		}
+
+	case *parser.LateralTable:
+		// Similar to DerivedTable
+		if t.Select != nil && t.Select.Body != nil && t.Select.Body.Left != nil {
+			lateralCore := t.Select.Body.Left
+
+			// Recursively resolve the lateral table's FROM clause
+			// Note: LATERAL can see outer scope, so we use the same scope
+			if lateralCore.From != nil {
+				e.resolveSubqueryFrom(scope, t.Select, lateralCore.From)
+			}
+
+			var columns []string
+			for _, item := range lateralCore.Columns {
+				if item.Alias != "" {
+					columns = append(columns, item.Alias)
+				}
+			}
+			scope.RegisterDerived(t.Alias, columns)
+		}
+	}
 }

@@ -1385,6 +1385,79 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 	})
 }
 
+func TestExtractLineage_ScalarSubqueries(t *testing.T) {
+	runLineageTests(t, []testCase{
+		{
+			name:    "basic scalar subquery",
+			sql:     `SELECT (SELECT name FROM users LIMIT 1) AS user_name FROM orders`,
+			sources: []string{"orders", "users"},
+			cols: []colSpec{
+				{name: "user_name", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "correlated scalar subquery",
+			sql:     `SELECT o.id, (SELECT p.amount FROM payments p WHERE p.order_id = o.id) AS paid FROM orders o`,
+			sources: []string{"orders", "payments"},
+			cols: []colSpec{
+				{name: "id", transform: TransformDirect, srcTable: "orders"},
+				{name: "paid", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "scalar subquery with aggregate",
+			sql:     `SELECT (SELECT COUNT(*) FROM items) AS item_count FROM dual`,
+			sources: []string{"dual", "items"},
+			cols: []colSpec{
+				{name: "item_count", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "nested scalar subquery",
+			sql:     `SELECT (SELECT (SELECT x FROM t3) FROM t2) AS val FROM t1`,
+			sources: []string{"t1", "t2", "t3"},
+			cols: []colSpec{
+				{name: "val", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "scalar subquery with CTE",
+			sql:     `SELECT (WITH x AS (SELECT a FROM source) SELECT a FROM x) AS val FROM main`,
+			sources: []string{"main", "source"},
+			cols: []colSpec{
+				{name: "val", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "scalar subquery with expression",
+			sql:     `SELECT id, (SELECT u.fname || ' ' || u.lname FROM users u WHERE u.id = o.user_id) AS full_name FROM orders o`,
+			sources: []string{"orders", "users"},
+			cols: []colSpec{
+				{name: "id", transform: TransformDirect},
+				{name: "full_name", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "multiple scalar subqueries",
+			sql:     `SELECT (SELECT a FROM t1) AS col1, (SELECT b FROM t2) AS col2 FROM t3`,
+			sources: []string{"t1", "t2", "t3"},
+			cols: []colSpec{
+				{name: "col1", transform: TransformExpression},
+				{name: "col2", transform: TransformExpression},
+			},
+		},
+		{
+			name:    "scalar subquery as expression in calculation",
+			sql:     `SELECT id, (SELECT rate FROM rates WHERE type = 'default') * amount AS total FROM orders`,
+			sources: []string{"orders", "rates"},
+			cols: []colSpec{
+				{name: "id", transform: TransformDirect},
+				{name: "total", transform: TransformExpression},
+			},
+		},
+	})
+}
+
 // =============================================================================
 // Error Cases
 // =============================================================================

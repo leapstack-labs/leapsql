@@ -346,7 +346,6 @@ for _, col := range result.Columns {
 
 Current column lineage analysis has some limitations:
 
-- **Scalar subqueries in SELECT**: Not traced (intentionally excluded)
 - **Dynamic SQL**: Cannot be analyzed statically
 - **UDFs**: User-defined functions are treated as passthrough
 - **Complex type operations**: Array/JSON access has limited support

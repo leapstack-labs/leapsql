@@ -135,9 +135,7 @@ func (p *Parser) parseSelectCore() *SelectCore {
 	}
 
 	// SELECT list
-	p.inSelectList = true
 	core.Columns = p.parseSelectList()
-	p.inSelectList = false
 
 	// FROM clause (required for our use case)
 	if p.match(TOKEN_FROM) {
