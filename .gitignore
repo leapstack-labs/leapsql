@@ -2,6 +2,7 @@
 docs-site/
 .leapsql-docs/
 session-ses*.md
+gendocs
 
 # Binaries
 /leapsql

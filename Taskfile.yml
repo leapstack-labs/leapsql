@@ -73,11 +73,38 @@ tasks:
     cmds:
       - go run ./scripts/gendialect -dialect=duckdb -gen=all -outdir=pkg/adapters/duckdb/dialect
 
+  generate:docs:
+    desc: Generate documentation from code
+    cmds:
+      - go run ./scripts/gendocs -gen=all
+
+  generate:docs:cli:
+    desc: Generate CLI reference documentation
+    cmds:
+      - go run ./scripts/gendocs -gen=cli
+
+  generate:docs:schema:
+    desc: Generate schema documentation (frontmatter, config)
+    cmds:
+      - go run ./scripts/gendocs -gen=schema
+
+  generate:docs:globals:
+    desc: Generate template globals documentation
+    cmds:
+      - go run ./scripts/gendocs -gen=globals
+
+  docs:check:
+    desc: Verify generated docs are up-to-date
+    cmds:
+      - task: generate:docs
+      - git diff --exit-code docs/
+
   generate:all:
-    desc: Run all code generation (sqlc + dialect)
+    desc: Run all code generation (sqlc + dialect + docs)
     cmds:
       - task: generate
       - task: generate:dialect
+      - task: generate:docs
 
   run:
     desc: Run all models
