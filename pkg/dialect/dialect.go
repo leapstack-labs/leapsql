@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -143,6 +144,9 @@ type Dialect struct {
 	dynamicKw      map[string]token.TokenType           // Custom keywords: "QUALIFY" -> QUALIFY
 	precedence     map[token.TokenType]int              // Operator precedence for expressions
 	infixHandlers  map[token.TokenType]spi.InfixHandler // Optional custom infix parsing
+
+	// Lint rules for this dialect
+	lintRules []lint.RuleDef
 }
 
 // FunctionLineageType returns the lineage classification for a function.
@@ -196,6 +200,12 @@ func (d *Dialect) IsWindow(name string) bool {
 // IsTableFunction returns true if the function acts as a table source.
 func (d *Dialect) IsTableFunction(name string) bool {
 	return d.FunctionLineageType(name) == LineageTable
+}
+
+// GetName returns the dialect name.
+// This method allows Dialect to satisfy interfaces that require Name() string.
+func (d *Dialect) GetName() string {
+	return d.Name
 }
 
 // GetDoc returns documentation for a function.
@@ -419,6 +429,21 @@ func (d *Dialect) Parent() *Dialect {
 	return d.parent
 }
 
+// LintRules returns all lint rules including inherited from parent.
+func (d *Dialect) LintRules() []lint.RuleDef {
+	var rules []lint.RuleDef
+
+	// Get parent rules first (inheritance)
+	if d.parent != nil {
+		rules = append(rules, d.parent.LintRules()...)
+	}
+
+	// Add this dialect's rules
+	rules = append(rules, d.lintRules...)
+
+	return rules
+}
+
 // Builder provides a fluent API for constructing dialects.
 type Builder struct {
 	dialect *Dialect
@@ -582,6 +607,11 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 			b.dialect.infixHandlers[k] = v
 		}
 	}
+	// Copy lint rules from parent
+	if parent.lintRules != nil {
+		b.dialect.lintRules = make([]lint.RuleDef, len(parent.lintRules))
+		copy(b.dialect.lintRules, parent.lintRules)
+	}
 	return b
 }
 
@@ -661,5 +691,19 @@ func (b *Builder) AddInfix(t token.TokenType, precedence int) *Builder {
 func (b *Builder) AddInfixWithHandler(t token.TokenType, precedence int, handler spi.InfixHandler) *Builder {
 	b.dialect.precedence[t] = precedence
 	b.dialect.infixHandlers[t] = handler
+	return b
+}
+
+// ---------- Lint Rule Builder Methods ----------
+
+// LintRule adds a lint rule to the dialect.
+func (b *Builder) LintRule(rule lint.RuleDef) *Builder {
+	b.dialect.lintRules = append(b.dialect.lintRules, rule)
+	return b
+}
+
+// LintRulesAdd adds multiple lint rules to the dialect.
+func (b *Builder) LintRulesAdd(rules ...lint.RuleDef) *Builder {
+	b.dialect.lintRules = append(b.dialect.lintRules, rules...)
 	return b
 }

@@ -253,7 +253,7 @@ func TestServer_ValidateSQL(t *testing.T) {
 	}{
 		{
 			name:         "valid SELECT",
-			content:      "SELECT * FROM users",
+			content:      "SELECT id, name FROM users", // Use explicit columns to avoid lint warning
 			expectErrors: false,
 		},
 		{

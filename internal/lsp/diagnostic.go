@@ -8,6 +8,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/template"
+	"github.com/leapstack-labs/leapsql/pkg/lint"
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
@@ -146,7 +147,7 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 	}
 
 	// Always use dialect-aware parsing (s.dialect is never nil after initialization)
-	_, err := pkgparser.ParseWithDialect(sqlContent, s.dialect)
+	stmt, err := pkgparser.ParseWithDialect(sqlContent, s.dialect)
 	if err != nil {
 		var pe *pkgparser.ParseError
 		if errors.As(err, &pe) {
@@ -172,6 +173,12 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 				Message:  "SQL error: " + err.Error(),
 			})
 		}
+	}
+
+	// Run lint rules if statement parsed successfully (even if there were parser warnings)
+	if stmt != nil {
+		lintDiags := s.runLinter(stmt)
+		diagnostics = append(diagnostics, lintDiags...)
 	}
 
 	return diagnostics
@@ -329,4 +336,49 @@ func levenshtein(s1, s2 string) int {
 	}
 
 	return matrix[len(s1)][len(s2)]
+}
+
+// runLinter runs lint rules against a parsed SQL statement.
+func (s *Server) runLinter(stmt *pkgparser.SelectStmt) []Diagnostic {
+	analyzer := lint.NewAnalyzer(lint.NewConfig())
+	lintDiags := analyzer.Analyze(stmt, s.dialect)
+
+	// Convert lint.Diagnostic to LSP Diagnostic
+	var result []Diagnostic
+	for _, d := range lintDiags {
+		result = append(result, Diagnostic{
+			Range: Range{
+				Start: Position{
+					Line:      uint32(max(0, d.Pos.Line-1)),   //nolint:gosec // G115: line is always non-negative
+					Character: uint32(max(0, d.Pos.Column-1)), //nolint:gosec // G115: column is always non-negative
+				},
+				End: Position{
+					Line:      uint32(max(0, d.Pos.Line-1)),      //nolint:gosec // G115: line is always non-negative
+					Character: uint32(max(0, d.Pos.Column+10-1)), //nolint:gosec // G115: column is always non-negative
+				},
+			},
+			Severity: toLSPSeverity(d.Severity),
+			Code:     d.RuleID,
+			Source:   "leapsql-lint",
+			Message:  d.Message,
+		})
+	}
+
+	return result
+}
+
+// toLSPSeverity converts lint.Severity to LSP DiagnosticSeverity.
+func toLSPSeverity(s lint.Severity) DiagnosticSeverity {
+	switch s {
+	case lint.SeverityError:
+		return DiagnosticSeverityError
+	case lint.SeverityWarning:
+		return DiagnosticSeverityWarning
+	case lint.SeverityInfo:
+		return DiagnosticSeverityInformation
+	case lint.SeverityHint:
+		return DiagnosticSeverityHint
+	default:
+		return DiagnosticSeverityWarning
+	}
 }

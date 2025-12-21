@@ -55,6 +55,8 @@ var ANSI = dialect.NewDialect("ansi").
 	AddInfix(token.STAR, spi.PrecedenceMultiply).
 	AddInfix(token.SLASH, spi.PrecedenceMultiply).
 	AddInfix(token.PERCENT, spi.PrecedenceMultiply).
+	// Lint rules
+	LintRulesAdd(AllRules...).
 	// Config
 	Identifiers(`"`, `"`, `""`, dialect.NormLowercase).
 	PlaceholderStyle(dialect.PlaceholderQuestion).
