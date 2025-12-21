@@ -116,7 +116,7 @@ func (l *Lexer) NextToken() Token {
 	case '/':
 		tok = l.newToken(TOKEN_SLASH, "/")
 	case '%':
-		tok = l.newToken(TOKEN_PERCENT, "%")
+		tok = l.newToken(TOKEN_MOD, "%")
 	case '=':
 		tok = l.newToken(TOKEN_EQ, "=")
 	case '<':

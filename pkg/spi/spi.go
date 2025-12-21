@@ -79,6 +79,7 @@ const (
 	SlotLimit
 	SlotOffset
 	SlotQualify
+	SlotFetch      // FETCH FIRST/NEXT clause
 	SlotExtensions // Default for custom/dialect-specific clauses
 )
 
@@ -101,6 +102,8 @@ func (s ClauseSlot) String() string {
 		return "OFFSET"
 	case SlotQualify:
 		return "QUALIFY"
+	case SlotFetch:
+		return "FETCH"
 	case SlotExtensions:
 		return "EXTENSIONS"
 	default:

@@ -296,11 +296,42 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 			core.Qualify = expr
 		}
 
+	case spi.SlotFetch:
+		// Handle both parser.FetchClause and dialect-defined FetchClause types
+		if fetch, ok := result.(*FetchClause); ok {
+			core.Fetch = fetch
+		} else if result != nil {
+			// Handle dialect-defined FetchClause by extracting fields via reflection-free interface
+			core.Fetch = convertToFetchClause(result)
+		}
+
 	case spi.SlotExtensions:
 		if node, ok := result.(Node); ok {
 			core.Extensions = append(core.Extensions, node)
 		}
 	}
+}
+
+// FetchClauseData is an interface for extracting data from dialect-defined FetchClause types.
+type FetchClauseData interface {
+	GetFirst() bool
+	GetCount() spi.Expr
+	GetPercent() bool
+	GetWithTies() bool
+}
+
+// convertToFetchClause converts a dialect-defined FetchClause to parser.FetchClause.
+func convertToFetchClause(result any) *FetchClause {
+	if data, ok := result.(FetchClauseData); ok {
+		count, _ := data.GetCount().(Expr)
+		return &FetchClause{
+			First:    data.GetFirst(),
+			Count:    count,
+			Percent:  data.GetPercent(),
+			WithTies: data.GetWithTies(),
+		}
+	}
+	return nil
 }
 
 // parseSelectList parses the list of SELECT items.

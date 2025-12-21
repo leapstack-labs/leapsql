@@ -103,7 +103,7 @@ func (p *Parser) defaultPrecedence(t TokenType) int {
 		return spi.PrecedenceComparison
 	case TOKEN_PLUS, TOKEN_MINUS, TOKEN_DPIPE:
 		return spi.PrecedenceAddition
-	case TOKEN_STAR, TOKEN_SLASH, TOKEN_PERCENT:
+	case TOKEN_STAR, TOKEN_SLASH, TOKEN_MOD:
 		return spi.PrecedenceMultiply
 	case TOKEN_NOT:
 		// NOT as infix (for NOT IN, NOT LIKE, etc.) - handled specially

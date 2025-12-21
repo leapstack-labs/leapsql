@@ -100,6 +100,7 @@ type SelectCore struct {
 	OrderBy  []OrderByItem
 	Limit    Expr
 	Offset   Expr
+	Fetch    *FetchClause // FETCH FIRST/NEXT support (SQL:2008)
 
 	// Extensions holds rare/custom dialect-specific nodes (e.g., CONNECT BY, SAMPLE).
 	// Use this for dialect features that are too specialized to warrant typed fields.
@@ -110,6 +111,16 @@ type SelectCore struct {
 type Node interface {
 	node()
 }
+
+// FetchClause represents FETCH FIRST/NEXT n ROWS ONLY/WITH TIES (SQL:2008).
+type FetchClause struct {
+	First    bool // true = FIRST, false = NEXT (semantically identical)
+	Count    Expr // Number of rows (nil = 1 row implied)
+	Percent  bool // FETCH FIRST n PERCENT ROWS
+	WithTies bool // true = WITH TIES, false = ONLY
+}
+
+func (*FetchClause) node() {}
 
 // WindowDef represents a named window definition in the WINDOW clause.
 // Example: WINDOW w AS (PARTITION BY x ORDER BY y)
@@ -139,8 +150,10 @@ type FromClause struct {
 type Join struct {
 	NodeInfo
 	Type      JoinType
+	Natural   bool // NATURAL JOIN modifier
 	Right     TableRef
-	Condition Expr
+	Condition Expr     // ON clause (mutually exclusive with Using)
+	Using     []string // USING (col1, col2) columns
 }
 
 // JoinType represents the type of join.

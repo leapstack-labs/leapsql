@@ -468,6 +468,14 @@ func (e *lineageExtractor) registerFromClause(scope *parser.Scope, from *parser.
 
 	for _, join := range from.Joins {
 		e.registerTableRef(scope, join.Right)
+
+		// Note: NATURAL JOIN column lineage requires schema introspection.
+		// Table lineage still works, but we can't determine which columns are joined
+		// without knowing the schema. This is handled gracefully - column lineage
+		// will work for explicit column references.
+		//
+		// For USING clause, the join columns are explicit in the AST (join.Using).
+		// Column lineage will work through normal column resolution.
 	}
 }
 

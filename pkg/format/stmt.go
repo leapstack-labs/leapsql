@@ -156,6 +156,8 @@ func hasValue(val any) bool {
 		return len(v) > 0
 	case []parser.OrderByItem:
 		return len(v) > 0
+	case *parser.FetchClause:
+		return v != nil
 	}
 	return true
 }
@@ -178,6 +180,8 @@ func (p *Printer) getClauseValue(core *parser.SelectCore, slot spi.ClauseSlot) a
 		return core.Offset
 	case spi.SlotQualify:
 		return core.Qualify
+	case spi.SlotFetch:
+		return core.Fetch
 	}
 	return nil
 }
@@ -195,6 +199,10 @@ func (p *Printer) formatSlotValue(slot spi.ClauseSlot, val any) {
 	case spi.SlotOrderBy:
 		if items, ok := val.([]parser.OrderByItem); ok {
 			p.formatList(len(items), func(i int) { p.formatOrderByItem(items[i]) }, ",", true)
+		}
+	case spi.SlotFetch:
+		if fetch, ok := val.(*parser.FetchClause); ok {
+			p.formatFetchClause(fetch)
 		}
 	}
 }
@@ -306,6 +314,12 @@ func (p *Printer) formatJoin(join *parser.Join) {
 		return
 	}
 
+	// NATURAL modifier
+	if join.Natural {
+		p.kw(token.NATURAL)
+		p.space()
+	}
+
 	// Join type
 	switch join.Type {
 	case parser.JoinInner:
@@ -325,8 +339,22 @@ func (p *Printer) formatJoin(join *parser.Join) {
 
 	p.formatTableRef(join.Right)
 
-	// ON condition (indented)
-	if join.Condition != nil {
+	// USING clause (alternative to ON)
+	if len(join.Using) > 0 {
+		p.writeln()
+		p.indent()
+		p.kw(token.USING)
+		p.write(" (")
+		for i, col := range join.Using {
+			if i > 0 {
+				p.write(", ")
+			}
+			p.write(col)
+		}
+		p.write(")")
+		p.dedent()
+	} else if join.Condition != nil {
+		// ON condition (indented)
 		p.writeln()
 		p.indent()
 		p.kw(token.ON)
@@ -334,6 +362,7 @@ func (p *Printer) formatJoin(join *parser.Join) {
 		p.formatExpr(join.Condition)
 		p.dedent()
 	}
+	// NATURAL JOIN has neither ON nor USING - nothing to add
 }
 
 func (p *Printer) formatOrderByItem(item parser.OrderByItem) {
@@ -351,5 +380,40 @@ func (p *Printer) formatOrderByItem(item parser.OrderByItem) {
 		} else {
 			p.kw(token.LAST)
 		}
+	}
+}
+
+func (p *Printer) formatFetchClause(fetch *parser.FetchClause) {
+	if fetch == nil {
+		return
+	}
+
+	p.kw(token.FETCH)
+	p.space()
+
+	if fetch.First {
+		p.kw(token.FIRST)
+	} else {
+		p.kw(token.NEXT)
+	}
+
+	if fetch.Count != nil {
+		p.space()
+		p.formatExpr(fetch.Count)
+		if fetch.Percent {
+			p.write(" PERCENT")
+		}
+	}
+
+	p.space()
+	p.kw(token.ROWS)
+	p.space()
+
+	if fetch.WithTies {
+		p.kw(token.WITH)
+		p.space()
+		p.kw(token.TIES)
+	} else {
+		p.kw(token.ONLY)
 	}
 }

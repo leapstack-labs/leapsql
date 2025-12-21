@@ -171,12 +171,18 @@ func (p *Parser) parseJoin() *Join {
 		return join
 	}
 
+	// Check for NATURAL modifier first
+	if p.match(TOKEN_NATURAL) {
+		join.Natural = true
+	}
+
 	// Determine join type
 	switch {
 	case p.match(TOKEN_CROSS):
 		join.Type = JoinCross
 		p.expect(TOKEN_JOIN)
 		join.Right = p.parseTableRef()
+		// CROSS JOIN has no ON/USING
 		return join
 
 	case p.match(TOKEN_LEFT):
@@ -198,7 +204,12 @@ func (p *Parser) parseJoin() *Join {
 		join.Type = JoinInner // default
 
 	default:
-		return nil // no join
+		// Handle NATURAL without explicit type (NATURAL JOIN = NATURAL INNER JOIN)
+		if join.Natural && p.check(TOKEN_JOIN) {
+			join.Type = JoinInner
+		} else if !join.Natural {
+			return nil // no join
+		}
 	}
 
 	if !p.expect(TOKEN_JOIN) {
@@ -207,10 +218,40 @@ func (p *Parser) parseJoin() *Join {
 
 	join.Right = p.parseTableRef()
 
-	// ON clause
-	if p.match(TOKEN_ON) {
+	// Handle ON vs USING vs NATURAL (mutually exclusive)
+	switch {
+	case join.Natural:
+		// NATURAL JOIN cannot have ON or USING
+		if p.check(TOKEN_ON) {
+			p.addError("NATURAL JOIN cannot have ON clause")
+		}
+		if p.check(TOKEN_USING) {
+			p.addError("NATURAL JOIN cannot have USING clause")
+		}
+	case p.match(TOKEN_ON):
 		join.Condition = p.parseExpression()
+	case p.match(TOKEN_USING):
+		join.Using = p.parseUsingColumns()
 	}
 
 	return join
+}
+
+// parseUsingColumns parses the column list in USING (col1, col2, ...).
+func (p *Parser) parseUsingColumns() []string {
+	p.expect(TOKEN_LPAREN)
+	var cols []string
+	for {
+		if !p.check(TOKEN_IDENT) {
+			p.addError("expected column name in USING clause")
+			break
+		}
+		cols = append(cols, p.token.Literal)
+		p.nextToken()
+		if !p.match(TOKEN_COMMA) {
+			break
+		}
+	}
+	p.expect(TOKEN_RPAREN)
+	return cols
 }

@@ -160,7 +160,8 @@ func (p *Parser) isKeyword(tok Token) bool {
 func (p *Parser) isJoinKeyword(tok Token) bool {
 	switch tok.Type {
 	case TOKEN_JOIN, TOKEN_LEFT, TOKEN_RIGHT, TOKEN_INNER, TOKEN_OUTER,
-		TOKEN_FULL, TOKEN_CROSS, TOKEN_ON, TOKEN_LATERAL:
+		TOKEN_FULL, TOKEN_CROSS, TOKEN_ON, TOKEN_LATERAL,
+		TOKEN_NATURAL, TOKEN_USING:
 		return true
 	}
 	return false

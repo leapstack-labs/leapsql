@@ -29,7 +29,7 @@ const (
 	MINUS    // -
 	STAR     // *
 	SLASH    // /
-	PERCENT  // %
+	MOD      // %
 	DPIPE    // ||
 	EQ       // =
 	NE       // != or <>
@@ -62,6 +62,7 @@ const (
 	EXISTS
 	EXCEPT
 	FALSE
+	FETCH
 	FILTER
 	FIRST
 	FOLLOWING
@@ -80,16 +81,20 @@ const (
 	LEFT
 	LIKE
 	LIMIT
+	NATURAL
+	NEXT
 	NOT
 	NULL
 	NULLS
 	OFFSET
 	ON
+	ONLY
 	OR
 	ORDER
 	OUTER
 	OVER
 	PARTITION
+	PERCENT
 	PRECEDING
 	RANGE
 	RECURSIVE
@@ -98,9 +103,11 @@ const (
 	ROWS
 	SELECT
 	THEN
+	TIES
 	TRUE
 	UNBOUNDED
 	UNION
+	USING
 	WHEN
 	WHERE
 	WINDOW // Named window definitions
@@ -140,7 +147,7 @@ var tokenNames = map[TokenType]string{
 	MINUS:    "-",
 	STAR:     "*",
 	SLASH:    "/",
-	PERCENT:  "%",
+	MOD:      "%",
 	DPIPE:    "||",
 	EQ:       "=",
 	NE:       "!=",
@@ -172,6 +179,7 @@ var tokenNames = map[TokenType]string{
 	EXISTS:    "EXISTS",
 	EXCEPT:    "EXCEPT",
 	FALSE:     "FALSE",
+	FETCH:     "FETCH",
 	FILTER:    "FILTER",
 	FIRST:     "FIRST",
 	FOLLOWING: "FOLLOWING",
@@ -190,16 +198,20 @@ var tokenNames = map[TokenType]string{
 	LEFT:      "LEFT",
 	LIKE:      "LIKE",
 	LIMIT:     "LIMIT",
+	NATURAL:   "NATURAL",
+	NEXT:      "NEXT",
 	NOT:       "NOT",
 	NULL:      "NULL",
 	NULLS:     "NULLS",
 	OFFSET:    "OFFSET",
 	ON:        "ON",
+	ONLY:      "ONLY",
 	OR:        "OR",
 	ORDER:     "ORDER",
 	OUTER:     "OUTER",
 	OVER:      "OVER",
 	PARTITION: "PARTITION",
+	PERCENT:   "PERCENT",
 	PRECEDING: "PRECEDING",
 	RANGE:     "RANGE",
 	RECURSIVE: "RECURSIVE",
@@ -208,9 +220,11 @@ var tokenNames = map[TokenType]string{
 	ROWS:      "ROWS",
 	SELECT:    "SELECT",
 	THEN:      "THEN",
+	TIES:      "TIES",
 	TRUE:      "TRUE",
 	UNBOUNDED: "UNBOUNDED",
 	UNION:     "UNION",
+	USING:     "USING",
 	WHEN:      "WHEN",
 	WHERE:     "WHERE",
 	WINDOW:    "WINDOW",
@@ -238,6 +252,7 @@ var keywords = map[string]TokenType{
 	"exists":    EXISTS,
 	"except":    EXCEPT,
 	"false":     FALSE,
+	"fetch":     FETCH,
 	"filter":    FILTER,
 	"first":     FIRST,
 	"following": FOLLOWING,
@@ -256,16 +271,20 @@ var keywords = map[string]TokenType{
 	"left":      LEFT,
 	"like":      LIKE,
 	"limit":     LIMIT,
+	"natural":   NATURAL,
+	"next":      NEXT,
 	"not":       NOT,
 	"null":      NULL,
 	"nulls":     NULLS,
 	"offset":    OFFSET,
 	"on":        ON,
+	"only":      ONLY,
 	"or":        OR,
 	"order":     ORDER,
 	"outer":     OUTER,
 	"over":      OVER,
 	"partition": PARTITION,
+	"percent":   PERCENT,
 	"preceding": PRECEDING,
 	"range":     RANGE,
 	"recursive": RECURSIVE,
@@ -274,9 +293,11 @@ var keywords = map[string]TokenType{
 	"rows":      ROWS,
 	"select":    SELECT,
 	"then":      THEN,
+	"ties":      TIES,
 	"true":      TRUE,
 	"unbounded": UNBOUNDED,
 	"union":     UNION,
+	"using":     USING,
 	"when":      WHEN,
 	"where":     WHERE,
 	"window":    WINDOW,
