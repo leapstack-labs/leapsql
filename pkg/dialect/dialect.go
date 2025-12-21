@@ -66,6 +66,24 @@ type ClauseDef struct {
 	Handler  spi.ClauseHandler
 	Slot     spi.ClauseSlot
 	Keywords []string // Keywords to print for this clause (e.g. "GROUP", "BY")
+	Inline   bool     // true for same-line clauses (LIMIT, OFFSET)
+}
+
+// ClauseOption configures a ClauseDef.
+type ClauseOption func(*ClauseDef)
+
+// WithInline marks a clause as inline (keyword and value on same line).
+func WithInline() ClauseOption {
+	return func(c *ClauseDef) {
+		c.Inline = true
+	}
+}
+
+// WithKeywords sets the display keywords for a clause.
+func WithKeywords(keywords ...string) ClauseOption {
+	return func(c *ClauseDef) {
+		c.Keywords = keywords
+	}
 }
 
 // String returns the string representation of Type.
@@ -586,15 +604,19 @@ func (b *Builder) ClauseSequence(tokens ...token.TokenType) *Builder {
 }
 
 // ClauseHandler registers a handler for a clause token with storage slot.
-func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, keywords ...string) *Builder {
-	b.dialect.clauseDefs[t] = ClauseDef{Handler: handler, Slot: slot, Keywords: keywords}
+func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, opts ...ClauseOption) *Builder {
+	def := ClauseDef{Handler: handler, Slot: slot}
+	for _, opt := range opts {
+		opt(&def)
+	}
+	b.dialect.clauseDefs[t] = def
 	// Register globally for error messages
 	recordClause(t, t.String())
 	return b
 }
 
 // AddClauseAfter inserts a clause into the sequence after another clause.
-func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, keywords ...string) *Builder {
+func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, opts ...ClauseOption) *Builder {
 	// Find the position of 'after' in the sequence
 	for i, tok := range b.dialect.clauseSequence {
 		if tok == after {
@@ -607,7 +629,11 @@ func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHan
 			break
 		}
 	}
-	b.dialect.clauseDefs[t] = ClauseDef{Handler: handler, Slot: slot, Keywords: keywords}
+	def := ClauseDef{Handler: handler, Slot: slot}
+	for _, opt := range opts {
+		opt(&def)
+	}
+	b.dialect.clauseDefs[t] = def
 	// Register globally for error messages
 	recordClause(t, t.String())
 	return b

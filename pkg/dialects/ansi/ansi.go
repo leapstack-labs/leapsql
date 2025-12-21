@@ -30,12 +30,12 @@ var ANSI = dialect.NewDialect("ansi").
 	).
 	// Standard clause handlers with slot assignments
 	ClauseHandler(token.WHERE, parseWhere, spi.SlotWhere).
-	ClauseHandler(token.GROUP, parseGroupBy, spi.SlotGroupBy, "GROUP", "BY").
+	ClauseHandler(token.GROUP, parseGroupBy, spi.SlotGroupBy, dialect.WithKeywords("GROUP", "BY")).
 	ClauseHandler(token.HAVING, parseHaving, spi.SlotHaving).
 	ClauseHandler(token.WINDOW, parseWindow, spi.SlotWindow).
-	ClauseHandler(token.ORDER, parseOrderBy, spi.SlotOrderBy, "ORDER", "BY").
-	ClauseHandler(token.LIMIT, parseLimit, spi.SlotLimit).
-	ClauseHandler(token.OFFSET, parseOffset, spi.SlotOffset).
+	ClauseHandler(token.ORDER, parseOrderBy, spi.SlotOrderBy, dialect.WithKeywords("ORDER", "BY")).
+	ClauseHandler(token.LIMIT, parseLimit, spi.SlotLimit, dialect.WithInline()).
+	ClauseHandler(token.OFFSET, parseOffset, spi.SlotOffset, dialect.WithInline()).
 	// Standard operator precedence
 	AddInfix(token.OR, spi.PrecedenceOr).
 	AddInfix(token.AND, spi.PrecedenceAnd).

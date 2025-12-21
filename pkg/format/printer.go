@@ -88,13 +88,24 @@ func (p *Printer) formatComments(comments []*token.Comment) {
 	}
 }
 
-func (p *Printer) formatLeadingComments(comments []*token.Comment) {
-	p.formatComments(comments)
-}
-
 func (p *Printer) formatTrailingComments(comments []*token.Comment) {
 	for _, c := range comments {
 		p.space()
 		p.write(c.Text)
+	}
+}
+
+// formatList prints a list of items with separators.
+// count is the number of items, format is called for each index,
+// sep is the separator string, multiline adds newlines after separators.
+func (p *Printer) formatList(count int, format func(i int), sep string, multiline bool) {
+	for i := 0; i < count; i++ {
+		format(i)
+		if i < count-1 {
+			p.write(sep)
+			if multiline {
+				p.writeln()
+			}
+		}
 	}
 }

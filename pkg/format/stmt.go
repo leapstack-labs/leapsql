@@ -12,7 +12,7 @@ func (p *Printer) formatSelectStmt(stmt *parser.SelectStmt) {
 		return
 	}
 
-	p.formatLeadingComments(stmt.LeadingComments)
+	p.formatComments(stmt.LeadingComments)
 
 	if stmt.With != nil {
 		p.formatWithClause(stmt.With)
@@ -34,7 +34,8 @@ func (p *Printer) formatWithClause(with *parser.WithClause) {
 	p.writeln()
 
 	p.indent()
-	for i, cte := range with.CTEs {
+	p.formatList(len(with.CTEs), func(i int) {
+		cte := with.CTEs[i]
 		p.write(cte.Name)
 		p.space()
 		p.kw(token.AS)
@@ -46,11 +47,8 @@ func (p *Printer) formatWithClause(with *parser.WithClause) {
 		p.dedent()
 
 		p.write(")")
-		if i < len(with.CTEs)-1 {
-			p.write(",")
-		}
-		p.writeln()
-	}
+	}, ",", true)
+	p.writeln()
 	p.dedent()
 }
 
@@ -95,13 +93,8 @@ func (p *Printer) formatSelectCore(core *parser.SelectCore) {
 
 	// Columns
 	p.indent()
-	for i, col := range core.Columns {
-		p.formatSelectItem(col)
-		if i < len(core.Columns)-1 {
-			p.write(",")
-		}
-		p.writeln()
-	}
+	p.formatList(len(core.Columns), func(i int) { p.formatSelectItem(core.Columns[i]) }, ",", true)
+	p.writeln()
 	p.dedent()
 
 	// FROM
@@ -126,7 +119,6 @@ func (p *Printer) formatSelectCore(core *parser.SelectCore) {
 
 func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *parser.SelectCore) {
 	val := p.getClauseValue(core, def.Slot)
-	// Only print if the value is non-nil/non-empty
 	if !hasValue(val) {
 		return
 	}
@@ -137,26 +129,22 @@ func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *p
 			if i > 0 {
 				p.space()
 			}
-			p.keyword(kw) // Keep keyword() here as def.Keywords are strings from Dialect
+			p.keyword(kw)
 		}
 	} else {
 		p.kw(t)
 	}
 
-	// Inline clauses (LIMIT, OFFSET)
-	if def.Slot == spi.SlotLimit || def.Slot == spi.SlotOffset {
+	if def.Inline {
 		p.space()
 		p.formatSlotValue(def.Slot, val)
+	} else {
 		p.writeln()
-		return
+		p.indent()
+		p.formatSlotValue(def.Slot, val)
+		p.dedent()
 	}
-
-	// Block clauses (WHERE, GROUP BY, etc.)
 	p.writeln()
-	p.indent()
-	p.formatSlotValue(def.Slot, val)
-	p.writeln()
-	p.dedent()
 }
 
 func hasValue(val any) bool {
@@ -202,23 +190,11 @@ func (p *Printer) formatSlotValue(slot spi.ClauseSlot, val any) {
 		}
 	case spi.SlotGroupBy:
 		if exprs, ok := val.([]parser.Expr); ok {
-			for i, expr := range exprs {
-				p.formatExpr(expr)
-				if i < len(exprs)-1 {
-					p.write(",")
-					p.writeln() // Add newline after comma for GROUP BY
-				}
-			}
+			p.formatList(len(exprs), func(i int) { p.formatExpr(exprs[i]) }, ",", true)
 		}
 	case spi.SlotOrderBy:
 		if items, ok := val.([]parser.OrderByItem); ok {
-			for i, item := range items {
-				p.formatOrderByItem(item)
-				if i < len(items)-1 {
-					p.write(",")
-					p.writeln() // Add newline after comma for ORDER BY
-				}
-			}
+			p.formatList(len(items), func(i int) { p.formatOrderByItem(items[i]) }, ",", true)
 		}
 	}
 }

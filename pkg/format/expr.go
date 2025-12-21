@@ -150,12 +150,7 @@ func (p *Printer) formatFuncCall(fn *parser.FuncCall) {
 	if fn.Star {
 		p.write("*")
 	} else {
-		for i, arg := range fn.Args {
-			p.formatExpr(arg)
-			if i < len(fn.Args)-1 {
-				p.write(", ")
-			}
-		}
+		p.formatList(len(fn.Args), func(i int) { p.formatExpr(fn.Args[i]) }, ", ", false)
 	}
 
 	p.write(")")
@@ -182,31 +177,19 @@ func (p *Printer) formatWindowSpec(w *parser.WindowSpec) {
 	p.kw(token.OVER)
 	p.write(" (")
 
-	hasContent := false
-
 	if w.Name != "" {
 		p.write(w.Name)
-		hasContent = true
 	}
 
 	if len(w.PartitionBy) > 0 {
-		if hasContent {
-			p.space()
-		}
 		p.writeln()
 		p.indent()
 		p.kw(token.PARTITION)
 		p.space()
 		p.kw(token.BY)
 		p.space()
-		for i, expr := range w.PartitionBy {
-			p.formatExpr(expr)
-			if i < len(w.PartitionBy)-1 {
-				p.write(", ")
-			}
-		}
+		p.formatList(len(w.PartitionBy), func(i int) { p.formatExpr(w.PartitionBy[i]) }, ", ", false)
 		p.dedent()
-		hasContent = true
 	}
 
 	if len(w.OrderBy) > 0 {
@@ -216,14 +199,8 @@ func (p *Printer) formatWindowSpec(w *parser.WindowSpec) {
 		p.space()
 		p.kw(token.BY)
 		p.space()
-		for i, item := range w.OrderBy {
-			p.formatOrderByItem(item)
-			if i < len(w.OrderBy)-1 {
-				p.write(", ")
-			}
-		}
+		p.formatList(len(w.OrderBy), func(i int) { p.formatOrderByItem(w.OrderBy[i]) }, ", ", false)
 		p.dedent()
-		hasContent = true
 	}
 
 	if w.Frame != nil {
@@ -233,7 +210,6 @@ func (p *Printer) formatWindowSpec(w *parser.WindowSpec) {
 		p.dedent()
 	}
 
-	_ = hasContent // suppress unused warning
 	p.write(")")
 }
 
@@ -337,12 +313,7 @@ func (p *Printer) formatInExpr(in *parser.InExpr) {
 		p.formatSelectStmt(in.Query)
 		p.dedent()
 	} else {
-		for i, val := range in.Values {
-			p.formatExpr(val)
-			if i < len(in.Values)-1 {
-				p.write(", ")
-			}
-		}
+		p.formatList(len(in.Values), func(i int) { p.formatExpr(in.Values[i]) }, ", ", false)
 	}
 
 	p.write(")")
