@@ -73,6 +73,19 @@ const (
 	PrecedencePostfix    = 8 // ::, [], ()
 )
 
+// GroupByAllMarker is an interface to identify GROUP BY ALL markers from dialect handlers.
+// Implement this interface in dialect-specific marker types.
+type GroupByAllMarker interface {
+	IsGroupByAll() bool
+}
+
+// OrderByAllMarker is an interface to identify ORDER BY ALL markers from dialect handlers.
+// Implement this interface in dialect-specific marker types.
+type OrderByAllMarker interface {
+	IsOrderByAll() bool
+	IsDesc() bool
+}
+
 // ClauseSlot specifies where a parsed clause result should be stored in SelectCore.
 // This enables dialects to declaratively specify storage locations for their clauses.
 type ClauseSlot int

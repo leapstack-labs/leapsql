@@ -89,18 +89,21 @@ const (
 // SelectCore represents the core SELECT clause.
 type SelectCore struct {
 	NodeInfo
-	Distinct bool
-	Columns  []SelectItem
-	From     *FromClause
-	Where    Expr
-	GroupBy  []Expr
-	Having   Expr
-	Windows  []WindowDef // Named window definitions (WINDOW clause)
-	Qualify  Expr        // DuckDB/Snowflake window function filter
-	OrderBy  []OrderByItem
-	Limit    Expr
-	Offset   Expr
-	Fetch    *FetchClause // FETCH FIRST/NEXT support (SQL:2008)
+	Distinct       bool
+	Columns        []SelectItem
+	From           *FromClause
+	Where          Expr
+	GroupBy        []Expr
+	GroupByAll     bool // DuckDB: GROUP BY ALL (auto-group by non-aggregate columns)
+	Having         Expr
+	Windows        []WindowDef // Named window definitions (WINDOW clause)
+	Qualify        Expr        // DuckDB/Snowflake window function filter
+	OrderBy        []OrderByItem
+	OrderByAll     bool // DuckDB: ORDER BY ALL (order by all select columns)
+	OrderByAllDesc bool // DuckDB: Direction for ORDER BY ALL (true = DESC)
+	Limit          Expr
+	Offset         Expr
+	Fetch          *FetchClause // FETCH FIRST/NEXT support (SQL:2008)
 
 	// Extensions holds rare/custom dialect-specific nodes (e.g., CONNECT BY, SAMPLE).
 	// Use this for dialect features that are too specialized to warrant typed fields.

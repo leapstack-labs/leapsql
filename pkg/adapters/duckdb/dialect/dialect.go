@@ -59,6 +59,10 @@ var DuckDB = dialect.NewDialect("duckdb").
 	// Register DuckDB-specific operators for the lexer
 	AddOperator("::", TokenDcolon).
 	AddOperator("//", TokenDslash).
+	// Override GROUP BY handler to support GROUP BY ALL
+	ClauseHandler(token.GROUP, parseGroupByWithAll, spi.SlotGroupBy, dialect.WithKeywords("GROUP", "BY")).
+	// Override ORDER BY handler to support ORDER BY ALL
+	ClauseHandler(token.ORDER, parseOrderByWithAll, spi.SlotOrderBy, dialect.WithKeywords("ORDER", "BY")).
 	// Add QUALIFY clause after HAVING in the clause sequence with slot
 	AddClauseAfter(token.HAVING, TokenQualify, parseQualify, spi.SlotQualify).
 	// Add ILIKE operator with same precedence as LIKE

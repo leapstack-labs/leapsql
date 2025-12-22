@@ -229,6 +229,11 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 		}
 
 	case spi.SlotGroupBy:
+		// Check for GROUP BY ALL marker (DuckDB extension)
+		if marker, ok := result.(spi.GroupByAllMarker); ok && marker.IsGroupByAll() {
+			core.GroupByAll = true
+			return
+		}
 		switch v := result.(type) {
 		case []Expr:
 			core.GroupBy = v
@@ -260,6 +265,12 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 		// TODO: Add window definitions support
 
 	case spi.SlotOrderBy:
+		// Check for ORDER BY ALL marker (DuckDB extension)
+		if marker, ok := result.(spi.OrderByAllMarker); ok && marker.IsOrderByAll() {
+			core.OrderByAll = true
+			core.OrderByAllDesc = marker.IsDesc()
+			return
+		}
 		switch v := result.(type) {
 		case []OrderByItem:
 			core.OrderBy = v

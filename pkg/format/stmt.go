@@ -122,6 +122,32 @@ func (p *Printer) formatSelectCore(core *parser.SelectCore) {
 }
 
 func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *parser.SelectCore) {
+	// Handle GROUP BY ALL (DuckDB extension)
+	if def.Slot == spi.SlotGroupBy && core.GroupByAll {
+		p.kw(token.GROUP)
+		p.space()
+		p.kw(token.BY)
+		p.space()
+		p.kw(token.ALL)
+		p.writeln()
+		return
+	}
+
+	// Handle ORDER BY ALL (DuckDB extension)
+	if def.Slot == spi.SlotOrderBy && core.OrderByAll {
+		p.kw(token.ORDER)
+		p.space()
+		p.kw(token.BY)
+		p.space()
+		p.kw(token.ALL)
+		if core.OrderByAllDesc {
+			p.space()
+			p.kw(token.DESC)
+		}
+		p.writeln()
+		return
+	}
+
 	val := p.getClauseValue(core, def.Slot)
 	if !hasValue(val) {
 		return
