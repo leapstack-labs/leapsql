@@ -145,14 +145,15 @@ type Dialect struct {
 	dataTypes     []string
 
 	// Parsing behavior (NEW - for dialect-aware parsing)
-	parent         *Dialect                             // Parent dialect for inheritance
-	clauseSequence []token.TokenType                    // Order of clauses in SELECT statement
-	clauseDefs     map[token.TokenType]ClauseDef        // Handler + Slot per clause
-	symbols        map[string]token.TokenType           // Custom operators: "::" -> DCOLON
-	dynamicKw      map[string]token.TokenType           // Custom keywords: "QUALIFY" -> QUALIFY
-	precedence     map[token.TokenType]int              // Operator precedence for expressions
-	infixHandlers  map[token.TokenType]spi.InfixHandler // Optional custom infix parsing
-	joinTypes      map[token.TokenType]JoinTypeDef      // Dialect-specific join types
+	parent         *Dialect                                    // Parent dialect for inheritance
+	clauseSequence []token.TokenType                           // Order of clauses in SELECT statement
+	clauseDefs     map[token.TokenType]ClauseDef               // Handler + Slot per clause
+	symbols        map[string]token.TokenType                  // Custom operators: "::" -> DCOLON
+	dynamicKw      map[string]token.TokenType                  // Custom keywords: "QUALIFY" -> QUALIFY
+	precedence     map[token.TokenType]int                     // Operator precedence for expressions
+	infixHandlers  map[token.TokenType]spi.InfixHandler        // Optional custom infix parsing
+	joinTypes      map[token.TokenType]JoinTypeDef             // Dialect-specific join types
+	starModifiers  map[token.TokenType]spi.StarModifierHandler // Star expression modifiers (EXCLUDE, REPLACE, RENAME)
 
 	// Lint rules for this dialect
 	lintRules []lint.RuleDef
@@ -474,6 +475,24 @@ func (d *Dialect) AllJoinTypeTokens() []token.TokenType {
 	return tokens
 }
 
+// StarModifierHandler returns the handler for a star modifier token type.
+func (d *Dialect) StarModifierHandler(t token.TokenType) spi.StarModifierHandler {
+	if d.starModifiers != nil {
+		if h, ok := d.starModifiers[t]; ok {
+			return h
+		}
+	}
+	if d.parent != nil {
+		return d.parent.StarModifierHandler(t)
+	}
+	return nil
+}
+
+// IsStarModifierToken returns true if the token is a star modifier.
+func (d *Dialect) IsStarModifierToken(t token.TokenType) bool {
+	return d.StarModifierHandler(t) != nil
+}
+
 // Parent returns the parent dialect, if any.
 func (d *Dialect) Parent() *Dialect {
 	return d.parent
@@ -526,6 +545,7 @@ func NewDialect(name string) *Builder {
 			precedence:     make(map[token.TokenType]int),
 			infixHandlers:  make(map[token.TokenType]spi.InfixHandler),
 			joinTypes:      make(map[token.TokenType]JoinTypeDef),
+			starModifiers:  make(map[token.TokenType]spi.StarModifierHandler),
 		},
 	}
 }
@@ -663,6 +683,11 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 			b.dialect.joinTypes[k] = v
 		}
 	}
+	if parent.starModifiers != nil {
+		for k, v := range parent.starModifiers {
+			b.dialect.starModifiers[k] = v
+		}
+	}
 	// Copy lint rules from parent
 	if parent.lintRules != nil {
 		b.dialect.lintRules = make([]lint.RuleDef, len(parent.lintRules))
@@ -753,6 +778,12 @@ func (b *Builder) AddInfixWithHandler(t token.TokenType, precedence int, handler
 // AddJoinType registers a dialect-specific join type.
 func (b *Builder) AddJoinType(t token.TokenType, def JoinTypeDef) *Builder {
 	b.dialect.joinTypes[t] = def
+	return b
+}
+
+// AddStarModifier registers a star expression modifier handler (e.g., EXCLUDE, REPLACE, RENAME).
+func (b *Builder) AddStarModifier(t token.TokenType, handler spi.StarModifierHandler) *Builder {
+	b.dialect.starModifiers[t] = handler
 	return b
 }
 

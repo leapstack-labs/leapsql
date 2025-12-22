@@ -6,6 +6,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 	"github.com/stretchr/testify/assert"
@@ -421,4 +422,212 @@ func TestAllClauseTokens(t *testing.T) {
 	}
 	assert.True(t, hasWhere, "DuckDB should include WHERE in AllClauseTokens")
 	assert.True(t, hasQualify, "DuckDB should include QUALIFY in AllClauseTokens")
+}
+
+// ---------- Star Modifier Tests ----------
+
+func TestStarExclude(t *testing.T) {
+	tests := []struct {
+		name     string
+		sql      string
+		wantCols []string
+	}{
+		{
+			name:     "single column",
+			sql:      "SELECT * EXCLUDE (id) FROM users",
+			wantCols: []string{"id"},
+		},
+		{
+			name:     "multiple columns",
+			sql:      "SELECT * EXCLUDE (created_at, updated_at, deleted_at) FROM users",
+			wantCols: []string{"created_at", "updated_at", "deleted_at"},
+		},
+		{
+			name:     "with table qualifier",
+			sql:      "SELECT users.* EXCLUDE (password) FROM users",
+			wantCols: []string{"password"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+			require.NotNil(t, stmt.Body)
+			require.NotNil(t, stmt.Body.Left)
+			require.Len(t, stmt.Body.Left.Columns, 1)
+
+			item := stmt.Body.Left.Columns[0]
+			require.Len(t, item.Modifiers, 1)
+
+			exclude, ok := item.Modifiers[0].(*parser.ExcludeModifier)
+			require.True(t, ok, "Expected ExcludeModifier")
+			assert.Equal(t, tt.wantCols, exclude.Columns)
+		})
+	}
+}
+
+func TestStarReplace(t *testing.T) {
+	sql := "SELECT * REPLACE (UPPER(name) AS name, age + 1 AS age) FROM users"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	item := stmt.Body.Left.Columns[0]
+	require.True(t, item.Star)
+	require.Len(t, item.Modifiers, 1)
+
+	replace, ok := item.Modifiers[0].(*parser.ReplaceModifier)
+	require.True(t, ok, "Expected ReplaceModifier")
+	require.Len(t, replace.Items, 2)
+
+	assert.Equal(t, "name", replace.Items[0].Alias)
+	assert.Equal(t, "age", replace.Items[1].Alias)
+}
+
+func TestStarRename(t *testing.T) {
+	sql := "SELECT * RENAME (customer_id AS id, customer_name AS name) FROM orders"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	item := stmt.Body.Left.Columns[0]
+	require.True(t, item.Star)
+	require.Len(t, item.Modifiers, 1)
+
+	rename, ok := item.Modifiers[0].(*parser.RenameModifier)
+	require.True(t, ok, "Expected RenameModifier")
+	require.Len(t, rename.Items, 2)
+
+	assert.Equal(t, "customer_id", rename.Items[0].OldName)
+	assert.Equal(t, "id", rename.Items[0].NewName)
+	assert.Equal(t, "customer_name", rename.Items[1].OldName)
+	assert.Equal(t, "name", rename.Items[1].NewName)
+}
+
+func TestCombinedModifiers(t *testing.T) {
+	sql := "SELECT * EXCLUDE (internal_id) REPLACE (UPPER(name) AS name) FROM users"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	item := stmt.Body.Left.Columns[0]
+	require.True(t, item.Star)
+	require.Len(t, item.Modifiers, 2)
+
+	_, isExclude := item.Modifiers[0].(*parser.ExcludeModifier)
+	assert.True(t, isExclude, "First modifier should be ExcludeModifier")
+
+	_, isReplace := item.Modifiers[1].(*parser.ReplaceModifier)
+	assert.True(t, isReplace, "Second modifier should be ReplaceModifier")
+}
+
+func TestStarModifiersNotInAnsi(t *testing.T) {
+	// Star modifiers should not parse in ANSI dialect
+	sql := "SELECT * EXCLUDE (id) FROM users"
+	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	require.NoError(t, err) // Parser is lenient
+
+	// But no modifiers should be parsed
+	item := stmt.Body.Left.Columns[0]
+	assert.Empty(t, item.Modifiers, "ANSI should not parse star modifiers")
+}
+
+func TestTableStarWithModifiers(t *testing.T) {
+	sql := "SELECT u.* EXCLUDE (password) RENAME (email AS contact_email) FROM users u"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	item := stmt.Body.Left.Columns[0]
+	assert.Equal(t, "u", item.TableStar)
+	require.Len(t, item.Modifiers, 2)
+
+	_, isExclude := item.Modifiers[0].(*parser.ExcludeModifier)
+	assert.True(t, isExclude)
+
+	_, isRename := item.Modifiers[1].(*parser.RenameModifier)
+	assert.True(t, isRename)
+}
+
+func TestStarModifiersWithJoin(t *testing.T) {
+	sql := `SELECT 
+		orders.* EXCLUDE (internal_notes),
+		customers.* EXCLUDE (password_hash, secret_key)
+	FROM orders
+	JOIN customers ON orders.customer_id = customers.id`
+
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+	require.Len(t, stmt.Body.Left.Columns, 2)
+
+	// First select item: orders.* EXCLUDE (internal_notes)
+	item1 := stmt.Body.Left.Columns[0]
+	assert.Equal(t, "orders", item1.TableStar)
+	require.Len(t, item1.Modifiers, 1)
+	exclude1, ok := item1.Modifiers[0].(*parser.ExcludeModifier)
+	require.True(t, ok)
+	assert.Equal(t, []string{"internal_notes"}, exclude1.Columns)
+
+	// Second select item: customers.* EXCLUDE (password_hash, secret_key)
+	item2 := stmt.Body.Left.Columns[1]
+	assert.Equal(t, "customers", item2.TableStar)
+	require.Len(t, item2.Modifiers, 1)
+	exclude2, ok := item2.Modifiers[0].(*parser.ExcludeModifier)
+	require.True(t, ok)
+	assert.Equal(t, []string{"password_hash", "secret_key"}, exclude2.Columns)
+}
+
+func TestStarModifierRoundTrip(t *testing.T) {
+	tests := []struct {
+		name string
+		sql  string
+	}{
+		{
+			name: "exclude single column",
+			sql:  "SELECT * EXCLUDE (id) FROM users",
+		},
+		{
+			name: "exclude multiple columns",
+			sql:  "SELECT * EXCLUDE (a, b, c) FROM t",
+		},
+		{
+			name: "replace expression",
+			sql:  "SELECT * REPLACE (UPPER(name) AS name) FROM users",
+		},
+		{
+			name: "rename column",
+			sql:  "SELECT * RENAME (old_col AS new_col) FROM t",
+		},
+		{
+			name: "combined modifiers",
+			sql:  "SELECT * EXCLUDE (id) REPLACE (UPPER(name) AS name) FROM users",
+		},
+		{
+			name: "table star with exclude",
+			sql:  "SELECT t.* EXCLUDE (secret) FROM t",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse original
+			stmt1, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+
+			// Format
+			formatted := format.Format(stmt1, duckdbDialect.DuckDB)
+			require.NotEmpty(t, formatted)
+
+			// Parse again
+			stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+
+			// Compare key properties
+			require.Len(t, stmt2.Body.Left.Columns, len(stmt1.Body.Left.Columns))
+
+			for i, col1 := range stmt1.Body.Left.Columns {
+				col2 := stmt2.Body.Left.Columns[i]
+				assert.Equal(t, col1.Star, col2.Star)
+				assert.Equal(t, col1.TableStar, col2.TableStar)
+				assert.Len(t, col2.Modifiers, len(col1.Modifiers))
+			}
+		})
+	}
 }

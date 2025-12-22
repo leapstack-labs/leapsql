@@ -214,11 +214,13 @@ func (p *Printer) formatSlotValue(slot spi.ClauseSlot, val any) {
 func (p *Printer) formatSelectItem(item parser.SelectItem) {
 	if item.Star {
 		p.write("*")
+		p.formatStarModifiers(item.Modifiers)
 		return
 	}
 	if item.TableStar != "" {
 		p.write(item.TableStar)
 		p.write(".*")
+		p.formatStarModifiers(item.Modifiers)
 		return
 	}
 
@@ -228,6 +230,55 @@ func (p *Printer) formatSelectItem(item parser.SelectItem) {
 		p.kw(token.AS)
 		p.space()
 		p.write(item.Alias)
+	}
+}
+
+// formatStarModifiers formats EXCLUDE/REPLACE/RENAME modifiers for star expressions.
+func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
+	for _, mod := range mods {
+		p.space()
+		switch m := mod.(type) {
+		case *parser.ExcludeModifier:
+			p.keyword("EXCLUDE")
+			p.write(" (")
+			for i, col := range m.Columns {
+				if i > 0 {
+					p.write(", ")
+				}
+				p.write(col)
+			}
+			p.write(")")
+
+		case *parser.ReplaceModifier:
+			p.keyword("REPLACE")
+			p.write(" (")
+			for i, item := range m.Items {
+				if i > 0 {
+					p.write(", ")
+				}
+				p.formatExpr(item.Expr)
+				p.space()
+				p.kw(token.AS)
+				p.space()
+				p.write(item.Alias)
+			}
+			p.write(")")
+
+		case *parser.RenameModifier:
+			p.keyword("RENAME")
+			p.write(" (")
+			for i, item := range m.Items {
+				if i > 0 {
+					p.write(", ")
+				}
+				p.write(item.OldName)
+				p.space()
+				p.kw(token.AS)
+				p.space()
+				p.write(item.NewName)
+			}
+			p.write(")")
+		}
 	}
 }
 

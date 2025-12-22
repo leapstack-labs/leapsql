@@ -43,6 +43,14 @@ type InfixHandler func(p ParserOps, left Expr) (Expr, error)
 // Called AFTER the operator has been consumed.
 type PrefixHandler func(p ParserOps) (Expr, error)
 
+// StarModifierHandler parses a dialect-specific star modifier (e.g., EXCLUDE, REPLACE, RENAME).
+// Called AFTER the modifier keyword has been consumed.
+// Returns the parsed modifier or an error.
+type StarModifierHandler func(p ParserOps) (StarModifier, error)
+
+// StarModifier is the parsed result for star expression modifiers.
+type StarModifier interface{}
+
 // Node is the parsed result (opaque to avoid circular deps).
 type Node interface{}
 

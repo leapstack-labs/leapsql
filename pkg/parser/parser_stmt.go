@@ -358,6 +358,8 @@ func (p *Parser) parseSelectItem() SelectItem {
 	if p.check(TOKEN_STAR) {
 		item.Star = true
 		p.nextToken()
+		// Parse optional star modifiers (DuckDB: EXCLUDE, REPLACE, RENAME)
+		item.Modifiers = p.parseStarModifiers()
 		return item
 	}
 
@@ -368,6 +370,8 @@ func (p *Parser) parseSelectItem() SelectItem {
 		p.nextToken() // consume DOT
 		p.nextToken() // consume STAR
 		item.TableStar = tableName
+		// Parse optional star modifiers (DuckDB: EXCLUDE, REPLACE, RENAME)
+		item.Modifiers = p.parseStarModifiers()
 		return item
 	}
 
@@ -389,6 +393,32 @@ func (p *Parser) parseSelectItem() SelectItem {
 	}
 
 	return item
+}
+
+// parseStarModifiers parses optional EXCLUDE/REPLACE/RENAME modifiers after * or table.*.
+func (p *Parser) parseStarModifiers() []StarModifier {
+	var modifiers []StarModifier
+
+	for {
+		handler := p.dialect.StarModifierHandler(p.token.Type)
+		if handler == nil {
+			break
+		}
+
+		p.nextToken() // consume modifier keyword
+
+		mod, err := handler(p)
+		if err != nil {
+			p.addError(err.Error())
+			break
+		}
+
+		if mod != nil {
+			modifiers = append(modifiers, mod.(StarModifier))
+		}
+	}
+
+	return modifiers
 }
 
 // parseOrderByList parses a list of ORDER BY items.

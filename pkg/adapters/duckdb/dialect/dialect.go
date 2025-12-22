@@ -88,6 +88,14 @@ var DuckDB = dialect.NewDialect("duckdb").
 		RequiresOn:  false, // No condition for positional join
 		AllowsUsing: false,
 	}).
+	// Register DuckDB-specific star modifier keywords
+	AddKeyword("EXCLUDE", TokenExclude).
+	AddKeyword("REPLACE", TokenReplace).
+	AddKeyword("RENAME", TokenRename).
+	// Register star modifier handlers
+	AddStarModifier(TokenExclude, parseExclude).
+	AddStarModifier(TokenReplace, parseReplace).
+	AddStarModifier(TokenRename, parseRename).
 	// Function classifications
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).

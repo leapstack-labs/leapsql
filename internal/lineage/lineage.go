@@ -175,12 +175,14 @@ func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.
 func (e *lineageExtractor) extractSelectItemLineage(scope *parser.Scope, colResolver *parser.ColumnResolver, item parser.SelectItem, index int) []*ColumnLineage {
 	// Handle SELECT *
 	if item.Star {
-		return e.expandStar(scope, "", index)
+		lineages := e.expandStar(scope, "", index)
+		return e.applyStarModifiers(scope, colResolver, lineages, item.Modifiers)
 	}
 
 	// Handle SELECT table.*
 	if item.TableStar != "" {
-		return e.expandStar(scope, item.TableStar, index)
+		lineages := e.expandStar(scope, item.TableStar, index)
+		return e.applyStarModifiers(scope, colResolver, lineages, item.Modifiers)
 	}
 
 	// Regular expression
@@ -194,6 +196,61 @@ func (e *lineageExtractor) extractSelectItemLineage(scope *parser.Scope, colReso
 	lineage.Name = name
 
 	return []*ColumnLineage{lineage}
+}
+
+// applyStarModifiers applies EXCLUDE, REPLACE, and RENAME modifiers to star-expanded columns.
+func (e *lineageExtractor) applyStarModifiers(scope *parser.Scope, colResolver *parser.ColumnResolver, lineages []*ColumnLineage, modifiers []parser.StarModifier) []*ColumnLineage {
+	if len(modifiers) == 0 {
+		return lineages
+	}
+
+	for _, mod := range modifiers {
+		switch m := mod.(type) {
+		case *parser.ExcludeModifier:
+			// Remove excluded columns
+			excludeSet := make(map[string]bool)
+			for _, col := range m.Columns {
+				excludeSet[e.dialect.NormalizeName(col)] = true
+			}
+			var filtered []*ColumnLineage
+			for _, l := range lineages {
+				if !excludeSet[e.dialect.NormalizeName(l.Name)] {
+					filtered = append(filtered, l)
+				}
+			}
+			lineages = filtered
+
+		case *parser.ReplaceModifier:
+			// Replace columns with expressions
+			replaceMap := make(map[string]*parser.ReplaceItem)
+			for i := range m.Items {
+				replaceMap[e.dialect.NormalizeName(m.Items[i].Alias)] = &m.Items[i]
+			}
+			for _, l := range lineages {
+				if repl, ok := replaceMap[e.dialect.NormalizeName(l.Name)]; ok {
+					// Extract lineage from the replacement expression
+					exprLineage := e.extractExprLineage(scope, colResolver, repl.Expr)
+					l.Sources = exprLineage.Sources
+					l.Transform = TransformExpression
+					l.Function = exprLineage.Function
+				}
+			}
+
+		case *parser.RenameModifier:
+			// Rename columns
+			renameMap := make(map[string]string)
+			for _, item := range m.Items {
+				renameMap[e.dialect.NormalizeName(item.OldName)] = item.NewName
+			}
+			for _, l := range lineages {
+				if newName, ok := renameMap[e.dialect.NormalizeName(l.Name)]; ok {
+					l.Name = newName
+				}
+			}
+		}
+	}
+
+	return lineages
 }
 
 // expandStar expands a SELECT * or table.* into individual column lineages.
