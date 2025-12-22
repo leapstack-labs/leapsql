@@ -55,10 +55,14 @@ type DialectInfo interface {
 // The Check function receives an `any` type that should be *parser.SelectStmt.
 // This avoids import cycles between lint -> parser -> dialect -> lint.
 type RuleDef struct {
-	ID          string    // Unique identifier, e.g., "ansi/fetch-limit-conflict"
+	ID          string    // Unique identifier, e.g., "AM01" or "ansi/select-star"
+	Name        string    // Human-readable name, e.g., "ambiguous.distinct"
+	Group       string    // Category, e.g., "ambiguous", "structure", "convention"
 	Description string    // Human-readable description
 	Severity    Severity  // Default severity
 	Check       CheckFunc // The check function
+	ConfigKeys  []string  // Configuration keys this rule accepts (for rule-specific options)
+	Dialects    []string  // Restrict to specific dialects; nil/empty means all dialects
 }
 
 // CheckFunc analyzes a statement and returns diagnostics.

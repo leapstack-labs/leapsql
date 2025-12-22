@@ -78,6 +78,21 @@ func (t *TargetConfig) Validate() error {
 	return nil
 }
 
+// LintConfig holds lint rule configuration.
+type LintConfig struct {
+	// Disabled contains rule IDs to disable
+	Disabled []string `koanf:"disabled"`
+
+	// Severity maps rule ID to severity override (error, warning, info, hint)
+	Severity map[string]string `koanf:"severity"`
+
+	// Rules contains rule-specific options
+	Rules map[string]RuleOptions `koanf:"rules"`
+}
+
+// RuleOptions holds rule-specific configuration options.
+type RuleOptions map[string]any
+
 // ProjectConfig holds the minimal project configuration needed by tools like the LSP.
 // This is a subset of the full CLI Config.
 type ProjectConfig struct {
@@ -85,4 +100,5 @@ type ProjectConfig struct {
 	SeedsDir  string        `koanf:"seeds_dir"`
 	MacrosDir string        `koanf:"macros_dir"`
 	Target    *TargetConfig `koanf:"target"`
+	Lint      *LintConfig   `koanf:"lint"`
 }

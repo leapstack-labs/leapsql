@@ -9,6 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules" // Register SQLFluff-style lint rules
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
@@ -340,7 +341,8 @@ func levenshtein(s1, s2 string) int {
 
 // runLinter runs lint rules against a parsed SQL statement.
 func (s *Server) runLinter(stmt *pkgparser.SelectStmt) []Diagnostic {
-	analyzer := lint.NewAnalyzer(lint.NewConfig())
+	// Use analyzer with registry to get SQLFluff-style rules in addition to dialect rules
+	analyzer := lint.NewAnalyzerWithRegistry(lint.NewConfig(), s.dialect.GetName())
 	lintDiags := analyzer.Analyze(stmt, s.dialect)
 
 	// Convert lint.Diagnostic to LSP Diagnostic
