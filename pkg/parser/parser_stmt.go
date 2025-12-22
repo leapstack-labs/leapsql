@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
@@ -119,11 +118,8 @@ func (p *Parser) parseSelectBody() *SelectBody {
 		// DuckDB extension: BY NAME (match columns by name, not position)
 		if p.check(TOKEN_BY) {
 			p.nextToken() // consume BY
-			// Check for NAME keyword (case-insensitive, may be lexed as IDENT or NAME token)
-			isName := p.check(TOKEN_NAME) || (p.check(TOKEN_IDENT) && strings.EqualFold(p.token.Literal, "NAME"))
-			if isName {
+			if p.matchSoftKeyword(SoftKeywordName) {
 				body.ByName = true
-				p.nextToken() // consume NAME
 			} else {
 				p.addError("expected NAME after BY in set operation")
 			}

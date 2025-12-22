@@ -83,7 +83,7 @@ func (p *Printer) formatSelectBody(body *parser.SelectBody) {
 			p.space()
 			p.kw(token.BY)
 			p.space()
-			p.kw(token.NAME)
+			p.keyword("NAME") // Soft keyword - styled like keyword
 		}
 
 		p.writeln()

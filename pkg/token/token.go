@@ -85,7 +85,6 @@ const (
 	LEFT
 	LIKE
 	LIMIT
-	NAME
 	NATURAL
 	NEXT
 	NOT
@@ -207,7 +206,6 @@ var tokenNames = map[TokenType]string{
 	LEFT:      "LEFT",
 	LIKE:      "LIKE",
 	LIMIT:     "LIMIT",
-	NAME:      "NAME",
 	NATURAL:   "NATURAL",
 	NEXT:      "NEXT",
 	NOT:       "NOT",

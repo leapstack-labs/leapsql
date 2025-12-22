@@ -811,3 +811,28 @@ func TestUnionByNameInAnsi(t *testing.T) {
 	assert.True(t, stmt.Body.ByName,
 		"BY NAME should parse in ANSI (parser is lenient)")
 }
+
+// ---------- Soft Keyword Tests ----------
+
+func TestSelectNameAsIdentifier(t *testing.T) {
+	// Verify that 'name' is parsed as a regular identifier, not a keyword.
+	// This is a regression test to ensure removing token.NAME didn't break anything.
+	tests := []struct {
+		name string
+		sql  string
+	}{
+		{"select name column", "SELECT name FROM users"},
+		{"name in where", "SELECT * FROM users WHERE name = 'alice'"},
+		{"name as alias", "SELECT id AS name FROM users"},
+		{"name as table alias", "SELECT * FROM users name"},
+	}
+
+	d, _ := dialect.Get("duckdb")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt, err := parser.ParseWithDialect(tt.sql, d)
+			require.NoError(t, err)
+			require.NotNil(t, stmt)
+		})
+	}
+}

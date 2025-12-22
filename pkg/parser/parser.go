@@ -28,6 +28,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
@@ -112,6 +113,16 @@ func (p *Parser) matchAny(types ...TokenType) bool { //nolint:unused // Reserved
 			p.nextToken()
 			return true
 		}
+	}
+	return false
+}
+
+// matchSoftKeyword consumes the current token if it's an identifier matching
+// the given soft keyword (case-insensitive). Returns true if matched.
+func (p *Parser) matchSoftKeyword(keyword string) bool {
+	if p.check(TOKEN_IDENT) && strings.EqualFold(p.token.Literal, keyword) {
+		p.nextToken()
+		return true
 	}
 	return false
 }
