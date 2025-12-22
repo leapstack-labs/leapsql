@@ -157,23 +157,16 @@ type Join struct {
 }
 
 // JoinType represents the type of join.
+// The value is the SQL keyword (e.g., "LEFT", "INNER", "SEMI").
+// Join type constants are defined in their respective dialect packages:
+//   - ANSI joins (INNER, LEFT, RIGHT, FULL, CROSS): pkg/dialects/ansi/join_types.go
+//   - DuckDB joins (SEMI, ANTI, ASOF, POSITIONAL): pkg/adapters/duckdb/dialect/join_types.go
 type JoinType string
 
-// JoinType constants for SQL join types.
-const (
-	JoinInner JoinType = "INNER"
-	JoinLeft  JoinType = "LEFT"
-	JoinRight JoinType = "RIGHT"
-	JoinFull  JoinType = "FULL"
-	JoinCross JoinType = "CROSS"
-	JoinComma JoinType = "," // implicit cross join
-
-	// DuckDB extensions
-	JoinSemi       JoinType = "SEMI"       // Returns rows from left that have matches in right
-	JoinAnti       JoinType = "ANTI"       // Returns rows from left that have NO matches in right
-	JoinAsof       JoinType = "ASOF"       // Temporal join matching closest value
-	JoinPositional JoinType = "POSITIONAL" // Joins by row position (no condition needed)
-)
+// JoinComma represents an implicit cross join using comma syntax.
+// This is kept in the parser package because it's syntactically unique
+// (not a TYPE JOIN keyword pattern) and universal across all SQL dialects.
+const JoinComma JoinType = ","
 
 // OrderByItem represents an item in ORDER BY clause.
 type OrderByItem struct {

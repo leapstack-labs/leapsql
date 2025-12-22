@@ -12,6 +12,11 @@ package parser
 //	join          → join_type JOIN table_ref [ON expr] | "," table_ref
 //	join_type     → [INNER] | LEFT [OUTER] | RIGHT [OUTER] | FULL [OUTER] | CROSS
 
+// joinInner is the default join type for "plain JOIN" syntax.
+// This is defined locally to avoid import cycles with dialect packages.
+// The value matches what ANSI dialect registers for token.INNER.
+const joinInner JoinType = "INNER"
+
 // parseFromClause parses the FROM clause.
 func (p *Parser) parseFromClause() *FromClause {
 	from := &FromClause{}
@@ -206,10 +211,10 @@ func (p *Parser) parseJoin() *Join {
 	// Plain JOIN (no type keyword) = INNER JOIN
 	switch {
 	case p.check(TOKEN_JOIN):
-		join.Type = JoinInner
+		join.Type = joinInner
 	case join.Natural && p.check(TOKEN_JOIN):
 		// NATURAL JOIN = NATURAL INNER JOIN
-		join.Type = JoinInner
+		join.Type = joinInner
 	case !join.Natural:
 		return nil // no join
 	}

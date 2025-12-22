@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	// Import DuckDB dialect for side effects (dialect registration)
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	// Import DuckDB dialect for side effects (dialect registration) and constants
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/format"
@@ -26,31 +26,31 @@ func TestNaturalJoin(t *testing.T) {
 		{
 			name:     "natural inner join",
 			sql:      "SELECT * FROM t1 NATURAL JOIN t2",
-			wantType: parser.JoinInner,
+			wantType: parser.JoinType(ansi.JoinInner),
 			natural:  true,
 		},
 		{
 			name:     "natural left join",
 			sql:      "SELECT * FROM t1 NATURAL LEFT JOIN t2",
-			wantType: parser.JoinLeft,
+			wantType: parser.JoinType(ansi.JoinLeft),
 			natural:  true,
 		},
 		{
 			name:     "natural right join",
 			sql:      "SELECT * FROM t1 NATURAL RIGHT JOIN t2",
-			wantType: parser.JoinRight,
+			wantType: parser.JoinType(ansi.JoinRight),
 			natural:  true,
 		},
 		{
 			name:     "natural full join",
 			sql:      "SELECT * FROM t1 NATURAL FULL JOIN t2",
-			wantType: parser.JoinFull,
+			wantType: parser.JoinType(ansi.JoinFull),
 			natural:  true,
 		},
 		{
 			name:     "natural left outer join",
 			sql:      "SELECT * FROM t1 NATURAL LEFT OUTER JOIN t2",
-			wantType: parser.JoinLeft,
+			wantType: parser.JoinType(ansi.JoinLeft),
 			natural:  true,
 		},
 	}
@@ -100,31 +100,31 @@ func TestJoinUsing(t *testing.T) {
 			name:     "single column",
 			sql:      "SELECT * FROM t1 JOIN t2 USING (id)",
 			wantCols: []string{"id"},
-			joinType: parser.JoinInner,
+			joinType: parser.JoinType(ansi.JoinInner),
 		},
 		{
 			name:     "multiple columns",
 			sql:      "SELECT * FROM t1 JOIN t2 USING (id, name, region)",
 			wantCols: []string{"id", "name", "region"},
-			joinType: parser.JoinInner,
+			joinType: parser.JoinType(ansi.JoinInner),
 		},
 		{
 			name:     "left join using",
 			sql:      "SELECT * FROM t1 LEFT JOIN t2 USING (customer_id)",
 			wantCols: []string{"customer_id"},
-			joinType: parser.JoinLeft,
+			joinType: parser.JoinType(ansi.JoinLeft),
 		},
 		{
 			name:     "right join using",
 			sql:      "SELECT * FROM t1 RIGHT JOIN t2 USING (order_id)",
 			wantCols: []string{"order_id"},
-			joinType: parser.JoinRight,
+			joinType: parser.JoinType(ansi.JoinRight),
 		},
 		{
 			name:     "full join using",
 			sql:      "SELECT * FROM t1 FULL JOIN t2 USING (key)",
 			wantCols: []string{"key"},
-			joinType: parser.JoinFull,
+			joinType: parser.JoinType(ansi.JoinFull),
 		},
 	}
 
@@ -319,14 +319,14 @@ func TestMultipleJoinsWithDifferentStyles(t *testing.T) {
 
 	// First join: regular ON
 	join1 := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinInner, join1.Type)
+	assert.Equal(t, parser.JoinType(ansi.JoinInner), join1.Type)
 	assert.False(t, join1.Natural)
 	assert.NotNil(t, join1.Condition)
 	assert.Empty(t, join1.Using)
 
 	// Second join: NATURAL LEFT
 	join2 := stmt.Body.Left.From.Joins[1]
-	assert.Equal(t, parser.JoinLeft, join2.Type)
+	assert.Equal(t, parser.JoinType(ansi.JoinLeft), join2.Type)
 	assert.True(t, join2.Natural)
 	assert.Nil(t, join2.Condition)
 	assert.Empty(t, join2.Using)
@@ -365,32 +365,32 @@ func TestDuckDBJoinTypes(t *testing.T) {
 		{
 			name:     "semi join",
 			sql:      "SELECT * FROM t1 SEMI JOIN t2 ON t1.id = t2.id",
-			wantType: parser.JoinSemi,
+			wantType: parser.JoinType(duckdbdialect.JoinSemi),
 		},
 		{
 			name:     "anti join",
 			sql:      "SELECT * FROM t1 ANTI JOIN t2 ON t1.id = t2.id",
-			wantType: parser.JoinAnti,
+			wantType: parser.JoinType(duckdbdialect.JoinAnti),
 		},
 		{
 			name:     "asof join",
 			sql:      "SELECT * FROM trades ASOF JOIN quotes ON trades.sym = quotes.sym AND trades.ts >= quotes.ts",
-			wantType: parser.JoinAsof,
+			wantType: parser.JoinType(duckdbdialect.JoinAsof),
 		},
 		{
 			name:     "positional join",
 			sql:      "SELECT * FROM t1 POSITIONAL JOIN t2",
-			wantType: parser.JoinPositional,
+			wantType: parser.JoinType(duckdbdialect.JoinPositional),
 		},
 		{
 			name:     "left semi join",
 			sql:      "SELECT * FROM t1 LEFT SEMI JOIN t2 ON t1.id = t2.id",
-			wantType: parser.JoinSemi, // LEFT SEMI is same as SEMI
+			wantType: parser.JoinType(duckdbdialect.JoinSemi), // LEFT SEMI is same as SEMI
 		},
 		{
 			name:     "left anti join",
 			sql:      "SELECT * FROM t1 LEFT ANTI JOIN t2 ON t1.id = t2.id",
-			wantType: parser.JoinAnti, // LEFT ANTI is same as ANTI
+			wantType: parser.JoinType(duckdbdialect.JoinAnti), // LEFT ANTI is same as ANTI
 		},
 	}
 
@@ -416,7 +416,7 @@ func TestPositionalJoinNoCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	join := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinPositional, join.Type)
+	assert.Equal(t, parser.JoinType(duckdbdialect.JoinPositional), join.Type)
 	assert.Nil(t, join.Condition, "POSITIONAL JOIN should not have ON")
 	assert.Empty(t, join.Using, "POSITIONAL JOIN should not have USING")
 }
@@ -428,7 +428,7 @@ func TestSemiJoinWithUsing(t *testing.T) {
 	require.NoError(t, err)
 
 	join := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinSemi, join.Type)
+	assert.Equal(t, parser.JoinType(duckdbdialect.JoinSemi), join.Type)
 	assert.Equal(t, []string{"id"}, join.Using)
 }
 
@@ -439,7 +439,7 @@ func TestAntiJoinWithCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	join := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinAnti, join.Type)
+	assert.Equal(t, parser.JoinType(duckdbdialect.JoinAnti), join.Type)
 	assert.NotNil(t, join.Condition)
 }
 
@@ -450,7 +450,7 @@ func TestAsofJoinWithComplexCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	join := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinAsof, join.Type)
+	assert.Equal(t, parser.JoinType(duckdbdialect.JoinAsof), join.Type)
 	assert.NotNil(t, join.Condition)
 
 	// Right table should have alias
@@ -518,11 +518,11 @@ func TestDuckDBJoinWithStandardJoins(t *testing.T) {
 
 	// First join: standard INNER JOIN
 	join1 := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, parser.JoinInner, join1.Type)
+	assert.Equal(t, parser.JoinType(ansi.JoinInner), join1.Type)
 
 	// Second join: SEMI JOIN
 	join2 := stmt.Body.Left.From.Joins[1]
-	assert.Equal(t, parser.JoinSemi, join2.Type)
+	assert.Equal(t, parser.JoinType(duckdbdialect.JoinSemi), join2.Type)
 }
 
 // getDuckDBDialect loads the DuckDB dialect for testing

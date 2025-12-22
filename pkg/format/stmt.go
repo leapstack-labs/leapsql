@@ -7,6 +7,10 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
+// joinInner is the JoinType value for plain INNER join.
+// Defined locally to avoid import cycle with dialect packages.
+const joinInner parser.JoinType = "INNER"
+
 func (p *Printer) formatSelectStmt(stmt *parser.SelectStmt) {
 	if stmt == nil {
 		return
@@ -322,7 +326,7 @@ func (p *Printer) formatJoin(join *parser.Join) {
 
 	// Join type
 	switch join.Type {
-	case parser.JoinInner:
+	case joinInner:
 		// Plain "JOIN" for inner (most common, cleaner output)
 		p.kw(token.JOIN)
 	case parser.JoinComma:
