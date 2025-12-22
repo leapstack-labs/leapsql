@@ -512,3 +512,52 @@ type IndexExpr struct {
 }
 
 func (*IndexExpr) exprNode() {}
+
+// ---------- DuckDB PIVOT/UNPIVOT Table References ----------
+
+// PivotTable represents a PIVOT operation in FROM clause.
+// SELECT * FROM table PIVOT (agg FOR col IN (values))
+type PivotTable struct {
+	NodeInfo
+	Source     TableRef         // The source table/subquery
+	Aggregates []PivotAggregate // Aggregate functions to compute
+	ForColumn  string           // Column to pivot on
+	InValues   []PivotInValue   // Values to pivot (or InStar=true for *)
+	InStar     bool             // true if IN *
+	Alias      string           // Optional alias
+}
+
+func (*PivotTable) tableRefNode() {}
+
+// PivotAggregate represents an aggregate in PIVOT.
+type PivotAggregate struct {
+	Func  *FuncCall // The aggregate function
+	Alias string    // Optional alias for the result columns
+}
+
+// PivotInValue represents a value in PIVOT ... IN (...).
+type PivotInValue struct {
+	Value Expr   // The value (literal, identifier, or expression)
+	Alias string // Optional column name alias
+}
+
+// UnpivotTable represents an UNPIVOT operation in FROM clause.
+// SELECT * FROM table UNPIVOT (value FOR name IN (columns))
+type UnpivotTable struct {
+	NodeInfo
+	Source       TableRef         // The source table/subquery
+	ValueColumns []string         // Output column(s) for values
+	NameColumn   string           // Output column for names
+	InColumns    []UnpivotInGroup // Source columns to unpivot
+	Alias        string           // Optional alias
+}
+
+func (*UnpivotTable) tableRefNode() {}
+
+// UnpivotInGroup represents a group of columns in UNPIVOT ... IN (...).
+// For simple UNPIVOT: single column per group.
+// For multi-column UNPIVOT: multiple columns per group.
+type UnpivotInGroup struct {
+	Columns []string // Column name(s) in this group
+	Alias   string   // Optional row value alias
+}

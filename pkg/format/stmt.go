@@ -344,6 +344,10 @@ func (p *Printer) formatTableRef(ref parser.TableRef) {
 		p.formatLateralTable(t)
 	case *parser.MacroTable:
 		p.formatMacroTable(t)
+	case *parser.PivotTable:
+		p.formatPivotTable(t)
+	case *parser.UnpivotTable:
+		p.formatUnpivotTable(t)
 	}
 }
 
@@ -393,6 +397,136 @@ func (p *Printer) formatLateralTable(t *parser.LateralTable) {
 func (p *Printer) formatMacroTable(t *parser.MacroTable) {
 	// Macros are preserved exactly as written
 	p.write(t.Content)
+	if t.Alias != "" {
+		p.space()
+		p.write(t.Alias)
+	}
+}
+
+func (p *Printer) formatPivotTable(t *parser.PivotTable) {
+	// Format source table
+	p.formatTableRef(t.Source)
+	p.writeln()
+
+	p.keyword("PIVOT")
+	p.write(" (")
+	p.indent()
+
+	// Aggregates
+	for i, agg := range t.Aggregates {
+		if i > 0 {
+			p.write(",")
+		}
+		p.writeln()
+		p.formatExpr(agg.Func)
+		if agg.Alias != "" {
+			p.space()
+			p.kw(token.AS)
+			p.space()
+			p.write(agg.Alias)
+		}
+	}
+
+	// FOR column
+	p.writeln()
+	p.keyword("FOR")
+	p.space()
+	p.write(t.ForColumn)
+	p.space()
+	p.kw(token.IN)
+	p.space()
+
+	if t.InStar {
+		p.write("*")
+	} else {
+		p.write("(")
+		for i, val := range t.InValues {
+			if i > 0 {
+				p.write(", ")
+			}
+			p.formatExpr(val.Value)
+			if val.Alias != "" {
+				p.space()
+				p.kw(token.AS)
+				p.space()
+				p.write(val.Alias)
+			}
+		}
+		p.write(")")
+	}
+
+	p.dedent()
+	p.writeln()
+	p.write(")")
+
+	if t.Alias != "" {
+		p.space()
+		p.write(t.Alias)
+	}
+}
+
+func (p *Printer) formatUnpivotTable(t *parser.UnpivotTable) {
+	// Format source table
+	p.formatTableRef(t.Source)
+	p.writeln()
+
+	p.keyword("UNPIVOT")
+	p.write(" (")
+	p.indent()
+
+	// Value columns
+	p.writeln()
+	if len(t.ValueColumns) > 1 {
+		p.write("(")
+		for i, col := range t.ValueColumns {
+			if i > 0 {
+				p.write(", ")
+			}
+			p.write(col)
+		}
+		p.write(")")
+	} else if len(t.ValueColumns) == 1 {
+		p.write(t.ValueColumns[0])
+	}
+
+	// FOR name_column
+	p.space()
+	p.keyword("FOR")
+	p.space()
+	p.write(t.NameColumn)
+	p.space()
+	p.kw(token.IN)
+	p.write(" (")
+
+	for i, group := range t.InColumns {
+		if i > 0 {
+			p.write(", ")
+		}
+		if len(group.Columns) > 1 {
+			p.write("(")
+			for j, col := range group.Columns {
+				if j > 0 {
+					p.write(", ")
+				}
+				p.write(col)
+			}
+			p.write(")")
+		} else if len(group.Columns) == 1 {
+			p.write(group.Columns[0])
+		}
+		if group.Alias != "" {
+			p.space()
+			p.kw(token.AS)
+			p.space()
+			p.write(group.Alias)
+		}
+	}
+	p.write(")")
+
+	p.dedent()
+	p.writeln()
+	p.write(")")
+
 	if t.Alias != "" {
 		p.space()
 		p.write(t.Alias)

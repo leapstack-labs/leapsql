@@ -619,6 +619,16 @@ func (e *lineageExtractor) registerTableRef(scope *parser.Scope, ref parser.Tabl
 
 	case *parser.LateralTable:
 		// Same as derived tables
+
+	case *parser.PivotTable:
+		// PIVOT: register the source table and collect lineage from aggregates
+		e.registerTableRef(scope, t.Source)
+		// ForColumn is used for pivoting - its lineage is from the source table
+
+	case *parser.UnpivotTable:
+		// UNPIVOT: register the source table
+		e.registerTableRef(scope, t.Source)
+		// InColumns are being unpivoted - their lineage is from the source table
 	}
 }
 
@@ -823,5 +833,13 @@ func (e *lineageExtractor) resolveTableRefForSubquery(scope *parser.Scope, ref p
 			}
 			scope.RegisterDerived(t.Alias, columns)
 		}
+
+	case *parser.PivotTable:
+		// PIVOT: resolve the source table recursively
+		e.resolveTableRefForSubquery(scope, t.Source)
+
+	case *parser.UnpivotTable:
+		// UNPIVOT: resolve the source table recursively
+		e.resolveTableRefForSubquery(scope, t.Source)
 	}
 }

@@ -22,6 +22,9 @@ func (p *Parser) parseFromClause() *FromClause {
 	from := &FromClause{}
 	from.Source = p.parseTableRef()
 
+	// Check for PIVOT/UNPIVOT extensions (transforms the source)
+	from.Source = p.parseFromItemExtensions(from.Source)
+
 	// Parse JOINs
 	for {
 		join := p.parseJoin()
@@ -32,6 +35,32 @@ func (p *Parser) parseFromClause() *FromClause {
 	}
 
 	return from
+}
+
+// parseFromItemExtensions checks for dialect-specific FROM extensions (e.g., PIVOT, UNPIVOT).
+func (p *Parser) parseFromItemExtensions(source TableRef) TableRef {
+	if p.dialect == nil {
+		return source
+	}
+
+	for {
+		handler := p.dialect.FromItemHandler(p.token.Type)
+		if handler == nil {
+			break
+		}
+
+		p.nextToken() // consume the keyword (PIVOT, UNPIVOT, etc.)
+
+		result, err := handler(p, source)
+		if err != nil {
+			p.addError(err.Error())
+			break
+		}
+
+		source = result.(TableRef)
+	}
+
+	return source
 }
 
 // parseTableRef parses a table reference.

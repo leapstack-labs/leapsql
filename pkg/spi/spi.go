@@ -48,6 +48,14 @@ type PrefixHandler func(p ParserOps) (Expr, error)
 // Returns the parsed modifier or an error.
 type StarModifierHandler func(p ParserOps) (StarModifier, error)
 
+// FromItemHandler parses a dialect-specific FROM clause item (e.g., PIVOT, UNPIVOT).
+// Called AFTER the keyword has been consumed.
+// The sourceTable parameter is the already-parsed left-hand table.
+type FromItemHandler func(p ParserOps, sourceTable TableRef) (TableRef, error)
+
+// TableRef is a table reference node (opaque to avoid circular deps).
+type TableRef interface{}
+
 // StarModifier is the parsed result for star expression modifiers.
 type StarModifier interface{}
 

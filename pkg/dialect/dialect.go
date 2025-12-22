@@ -155,6 +155,7 @@ type Dialect struct {
 	prefixHandlers map[token.TokenType]spi.PrefixHandler       // Prefix expression handlers (e.g., [ for list literals)
 	joinTypes      map[token.TokenType]JoinTypeDef             // Dialect-specific join types
 	starModifiers  map[token.TokenType]spi.StarModifierHandler // Star expression modifiers (EXCLUDE, REPLACE, RENAME)
+	fromItems      map[token.TokenType]spi.FromItemHandler     // FROM clause extensions (PIVOT, UNPIVOT, etc.)
 
 	// Lint rules for this dialect
 	lintRules []lint.RuleDef
@@ -507,6 +508,24 @@ func (d *Dialect) IsStarModifierToken(t token.TokenType) bool {
 	return d.StarModifierHandler(t) != nil
 }
 
+// FromItemHandler returns the handler for a FROM item token type.
+func (d *Dialect) FromItemHandler(t token.TokenType) spi.FromItemHandler {
+	if d.fromItems != nil {
+		if h, ok := d.fromItems[t]; ok {
+			return h
+		}
+	}
+	if d.parent != nil {
+		return d.parent.FromItemHandler(t)
+	}
+	return nil
+}
+
+// IsFromItemToken returns true if the token is a FROM item extension (e.g., PIVOT, UNPIVOT).
+func (d *Dialect) IsFromItemToken(t token.TokenType) bool {
+	return d.FromItemHandler(t) != nil
+}
+
 // Parent returns the parent dialect, if any.
 func (d *Dialect) Parent() *Dialect {
 	return d.parent
@@ -561,6 +580,7 @@ func NewDialect(name string) *Builder {
 			prefixHandlers: make(map[token.TokenType]spi.PrefixHandler),
 			joinTypes:      make(map[token.TokenType]JoinTypeDef),
 			starModifiers:  make(map[token.TokenType]spi.StarModifierHandler),
+			fromItems:      make(map[token.TokenType]spi.FromItemHandler),
 		},
 	}
 }
@@ -708,6 +728,11 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 			b.dialect.starModifiers[k] = v
 		}
 	}
+	if parent.fromItems != nil {
+		for k, v := range parent.fromItems {
+			b.dialect.fromItems[k] = v
+		}
+	}
 	// Copy lint rules from parent
 	if parent.lintRules != nil {
 		b.dialect.lintRules = make([]lint.RuleDef, len(parent.lintRules))
@@ -810,6 +835,12 @@ func (b *Builder) AddJoinType(t token.TokenType, def JoinTypeDef) *Builder {
 // AddStarModifier registers a star expression modifier handler (e.g., EXCLUDE, REPLACE, RENAME).
 func (b *Builder) AddStarModifier(t token.TokenType, handler spi.StarModifierHandler) *Builder {
 	b.dialect.starModifiers[t] = handler
+	return b
+}
+
+// AddFromItem registers a FROM clause item handler (e.g., PIVOT, UNPIVOT).
+func (b *Builder) AddFromItem(t token.TokenType, handler spi.FromItemHandler) *Builder {
+	b.dialect.fromItems[t] = handler
 	return b
 }
 

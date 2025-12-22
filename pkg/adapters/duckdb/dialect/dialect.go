@@ -33,6 +33,11 @@ var (
 	TokenAnti       = token.Register("ANTI")
 	TokenAsof       = token.Register("ASOF")
 	TokenPositional = token.Register("POSITIONAL")
+
+	// DuckDB-specific PIVOT/UNPIVOT tokens
+	TokenPivot   = token.Register("PIVOT")
+	TokenUnpivot = token.Register("UNPIVOT")
+	TokenFor     = token.Register("FOR")
 )
 
 // parseQualify handles the QUALIFY clause (DuckDB-specific).
@@ -110,6 +115,13 @@ var DuckDB = dialect.NewDialect("duckdb").
 	// Lambda expressions: x -> x * 2
 	// Use PrecedenceOr (lowest positive precedence) to allow x -> x + y to work
 	AddInfixWithHandler(token.ARROW, spi.PrecedenceOr, parseLambdaBody).
+	// Register PIVOT/UNPIVOT keywords for the lexer
+	AddKeyword("PIVOT", TokenPivot).
+	AddKeyword("UNPIVOT", TokenUnpivot).
+	AddKeyword("FOR", TokenFor).
+	// Register PIVOT/UNPIVOT FROM item handlers
+	AddFromItem(TokenPivot, parsePivot).
+	AddFromItem(TokenUnpivot, parseUnpivot).
 	// Function classifications
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).
