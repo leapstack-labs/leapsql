@@ -158,10 +158,13 @@ func (p *Parser) isKeyword(tok Token) bool {
 
 // isJoinKeyword returns true if token is a JOIN-related keyword.
 func (p *Parser) isJoinKeyword(tok Token) bool {
+	// Structural join keywords (always join-related)
 	switch tok.Type {
-	case TOKEN_JOIN, TOKEN_LEFT, TOKEN_RIGHT, TOKEN_INNER, TOKEN_OUTER,
-		TOKEN_FULL, TOKEN_CROSS, TOKEN_ON, TOKEN_LATERAL,
-		TOKEN_NATURAL, TOKEN_USING:
+	case TOKEN_JOIN, TOKEN_ON, TOKEN_USING, TOKEN_NATURAL, TOKEN_LATERAL, TOKEN_OUTER:
+		return true
+	}
+	// Dialect-registered join types (INNER, LEFT, RIGHT, FULL, CROSS, SEMI, etc.)
+	if p.dialect != nil && p.dialect.IsJoinTypeToken(tok.Type) {
 		return true
 	}
 	return false

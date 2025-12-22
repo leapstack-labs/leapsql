@@ -57,6 +57,35 @@ var ANSI = dialect.NewDialect("ansi").
 	AddInfix(token.STAR, spi.PrecedenceMultiply).
 	AddInfix(token.SLASH, spi.PrecedenceMultiply).
 	AddInfix(token.MOD, spi.PrecedenceMultiply).
+	// Standard join types
+	AddJoinType(token.INNER, dialect.JoinTypeDef{
+		Type:        "INNER",
+		RequiresOn:  true,
+		AllowsUsing: true,
+	}).
+	AddJoinType(token.LEFT, dialect.JoinTypeDef{
+		Type:          "LEFT",
+		OptionalToken: token.OUTER,
+		RequiresOn:    true,
+		AllowsUsing:   true,
+	}).
+	AddJoinType(token.RIGHT, dialect.JoinTypeDef{
+		Type:          "RIGHT",
+		OptionalToken: token.OUTER,
+		RequiresOn:    true,
+		AllowsUsing:   true,
+	}).
+	AddJoinType(token.FULL, dialect.JoinTypeDef{
+		Type:          "FULL",
+		OptionalToken: token.OUTER,
+		RequiresOn:    true,
+		AllowsUsing:   true,
+	}).
+	AddJoinType(token.CROSS, dialect.JoinTypeDef{
+		Type:        "CROSS",
+		RequiresOn:  false,
+		AllowsUsing: false,
+	}).
 	// Lint rules
 	LintRulesAdd(AllRules...).
 	// Config

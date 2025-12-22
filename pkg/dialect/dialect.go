@@ -62,6 +62,14 @@ const (
 	LineageTable
 )
 
+// JoinTypeDef defines a dialect-specific join type.
+type JoinTypeDef struct {
+	Type          string          // JoinType value (e.g., "LEFT", "SEMI")
+	OptionalToken token.TokenType // Optional modifier token (OUTER) - 0 means none
+	RequiresOn    bool            // true if ON clause is required
+	AllowsUsing   bool            // true if USING clause is allowed
+}
+
 // ClauseDef bundles clause parsing logic with storage destination.
 type ClauseDef struct {
 	Handler  spi.ClauseHandler
@@ -144,6 +152,7 @@ type Dialect struct {
 	dynamicKw      map[string]token.TokenType           // Custom keywords: "QUALIFY" -> QUALIFY
 	precedence     map[token.TokenType]int              // Operator precedence for expressions
 	infixHandlers  map[token.TokenType]spi.InfixHandler // Optional custom infix parsing
+	joinTypes      map[token.TokenType]JoinTypeDef      // Dialect-specific join types
 
 	// Lint rules for this dialect
 	lintRules []lint.RuleDef
@@ -424,6 +433,47 @@ func (d *Dialect) InfixHandler(t token.TokenType) spi.InfixHandler {
 	return nil
 }
 
+// JoinTypeDef returns the definition for a dialect-specific join type.
+func (d *Dialect) JoinTypeDef(t token.TokenType) (JoinTypeDef, bool) {
+	if d.joinTypes != nil {
+		if def, ok := d.joinTypes[t]; ok {
+			return def, true
+		}
+	}
+	if d.parent != nil {
+		return d.parent.JoinTypeDef(t)
+	}
+	return JoinTypeDef{}, false
+}
+
+// IsJoinTypeToken returns true if the token is a dialect-specific join type.
+func (d *Dialect) IsJoinTypeToken(t token.TokenType) bool {
+	_, ok := d.JoinTypeDef(t)
+	return ok
+}
+
+// AllJoinTypeTokens returns all join type tokens registered in this dialect.
+func (d *Dialect) AllJoinTypeTokens() []token.TokenType {
+	seen := make(map[token.TokenType]bool)
+	var tokens []token.TokenType
+
+	for t := range d.joinTypes {
+		if !seen[t] {
+			seen[t] = true
+			tokens = append(tokens, t)
+		}
+	}
+	if d.parent != nil {
+		for _, t := range d.parent.AllJoinTypeTokens() {
+			if !seen[t] {
+				seen[t] = true
+				tokens = append(tokens, t)
+			}
+		}
+	}
+	return tokens
+}
+
 // Parent returns the parent dialect, if any.
 func (d *Dialect) Parent() *Dialect {
 	return d.parent
@@ -475,6 +525,7 @@ func NewDialect(name string) *Builder {
 			dynamicKw:      make(map[string]token.TokenType),
 			precedence:     make(map[token.TokenType]int),
 			infixHandlers:  make(map[token.TokenType]spi.InfixHandler),
+			joinTypes:      make(map[token.TokenType]JoinTypeDef),
 		},
 	}
 }
@@ -607,6 +658,11 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 			b.dialect.infixHandlers[k] = v
 		}
 	}
+	if parent.joinTypes != nil {
+		for k, v := range parent.joinTypes {
+			b.dialect.joinTypes[k] = v
+		}
+	}
 	// Copy lint rules from parent
 	if parent.lintRules != nil {
 		b.dialect.lintRules = make([]lint.RuleDef, len(parent.lintRules))
@@ -691,6 +747,12 @@ func (b *Builder) AddInfix(t token.TokenType, precedence int) *Builder {
 func (b *Builder) AddInfixWithHandler(t token.TokenType, precedence int, handler spi.InfixHandler) *Builder {
 	b.dialect.precedence[t] = precedence
 	b.dialect.infixHandlers[t] = handler
+	return b
+}
+
+// AddJoinType registers a dialect-specific join type.
+func (b *Builder) AddJoinType(t token.TokenType, def JoinTypeDef) *Builder {
+	b.dialect.joinTypes[t] = def
 	return b
 }
 

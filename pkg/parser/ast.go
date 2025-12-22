@@ -167,6 +167,12 @@ const (
 	JoinFull  JoinType = "FULL"
 	JoinCross JoinType = "CROSS"
 	JoinComma JoinType = "," // implicit cross join
+
+	// DuckDB extensions
+	JoinSemi       JoinType = "SEMI"       // Returns rows from left that have matches in right
+	JoinAnti       JoinType = "ANTI"       // Returns rows from left that have NO matches in right
+	JoinAsof       JoinType = "ASOF"       // Temporal join matching closest value
+	JoinPositional JoinType = "POSITIONAL" // Joins by row position (no condition needed)
 )
 
 // OrderByItem represents an item in ORDER BY clause.

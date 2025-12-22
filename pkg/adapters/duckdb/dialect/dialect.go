@@ -27,6 +27,12 @@ var (
 	TokenDcolon = token.Register("::")
 	// TokenDslash is the // integer division operator
 	TokenDslash = token.Register("//")
+
+	// DuckDB-specific join type tokens
+	TokenSemi       = token.Register("SEMI")
+	TokenAnti       = token.Register("ANTI")
+	TokenAsof       = token.Register("ASOF")
+	TokenPositional = token.Register("POSITIONAL")
 )
 
 // parseQualify handles the QUALIFY clause (DuckDB-specific).
@@ -46,6 +52,10 @@ var DuckDB = dialect.NewDialect("duckdb").
 	// Register DuckDB-specific keywords for the lexer
 	AddKeyword("QUALIFY", TokenQualify).
 	AddKeyword("ILIKE", TokenIlike).
+	AddKeyword("SEMI", TokenSemi).
+	AddKeyword("ANTI", TokenAnti).
+	AddKeyword("ASOF", TokenAsof).
+	AddKeyword("POSITIONAL", TokenPositional).
 	// Register DuckDB-specific operators for the lexer
 	AddOperator("::", TokenDcolon).
 	AddOperator("//", TokenDslash).
@@ -57,6 +67,27 @@ var DuckDB = dialect.NewDialect("duckdb").
 	AddInfix(TokenDcolon, spi.PrecedencePostfix).
 	// Add // integer division (same as regular division)
 	AddInfix(TokenDslash, spi.PrecedenceMultiply).
+	// Register DuckDB-specific join types
+	AddJoinType(TokenSemi, dialect.JoinTypeDef{
+		Type:        "SEMI",
+		RequiresOn:  true,
+		AllowsUsing: true,
+	}).
+	AddJoinType(TokenAnti, dialect.JoinTypeDef{
+		Type:        "ANTI",
+		RequiresOn:  true,
+		AllowsUsing: true,
+	}).
+	AddJoinType(TokenAsof, dialect.JoinTypeDef{
+		Type:        "ASOF",
+		RequiresOn:  true,
+		AllowsUsing: false, // ASOF requires inequality conditions
+	}).
+	AddJoinType(TokenPositional, dialect.JoinTypeDef{
+		Type:        "POSITIONAL",
+		RequiresOn:  false, // No condition for positional join
+		AllowsUsing: false,
+	}).
 	// Function classifications
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).

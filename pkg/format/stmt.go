@@ -323,17 +323,15 @@ func (p *Printer) formatJoin(join *parser.Join) {
 	// Join type
 	switch join.Type {
 	case parser.JoinInner:
+		// Plain "JOIN" for inner (most common, cleaner output)
 		p.kw(token.JOIN)
-	case parser.JoinLeft:
-		p.kw(token.LEFT, token.JOIN)
-	case parser.JoinRight:
-		p.kw(token.RIGHT, token.JOIN)
-	case parser.JoinFull:
-		p.kw(token.FULL, token.JOIN)
-	case parser.JoinCross:
-		p.kw(token.CROSS, token.JOIN)
 	case parser.JoinComma:
 		p.write(",")
+	default:
+		// Data-driven: JoinType string IS the keyword
+		p.keyword(string(join.Type))
+		p.space()
+		p.kw(token.JOIN)
 	}
 	p.space()
 

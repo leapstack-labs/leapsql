@@ -164,7 +164,7 @@ func (p *Parser) parseMacroTable() *MacroTable {
 func (p *Parser) parseJoin() *Join {
 	join := &Join{}
 
-	// Comma join (implicit cross join)
+	// Comma join (implicit cross join) - hardcoded special case
 	if p.match(TOKEN_COMMA) {
 		join.Type = JoinComma
 		join.Right = p.parseTableRef()
@@ -176,40 +176,42 @@ func (p *Parser) parseJoin() *Join {
 		join.Natural = true
 	}
 
-	// Determine join type
-	switch {
-	case p.match(TOKEN_CROSS):
-		join.Type = JoinCross
-		p.expect(TOKEN_JOIN)
-		join.Right = p.parseTableRef()
-		// CROSS JOIN has no ON/USING
-		return join
+	// Try dialect join type lookup (covers standard + extensions)
+	if p.dialect != nil {
+		if def, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
+			join.Type = JoinType(def.Type)
+			p.nextToken()
 
-	case p.match(TOKEN_LEFT):
-		join.Type = JoinLeft
-		p.match(TOKEN_OUTER) // optional
+			// Handle optional modifier (OUTER for LEFT/RIGHT/FULL)
+			if def.OptionalToken != 0 {
+				p.match(def.OptionalToken)
+			}
 
-	case p.match(TOKEN_RIGHT):
-		join.Type = JoinRight
-		p.match(TOKEN_OUTER) // optional
+			// Check for compound syntax (LEFT SEMI, LEFT ANTI)
+			if subDef, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
+				join.Type = JoinType(subDef.Type)
+				p.nextToken()
+			}
 
-	case p.match(TOKEN_FULL):
-		join.Type = JoinFull
-		p.match(TOKEN_OUTER) // optional
+			if !p.expect(TOKEN_JOIN) {
+				return nil
+			}
 
-	case p.match(TOKEN_INNER):
-		join.Type = JoinInner
-
-	case p.check(TOKEN_JOIN):
-		join.Type = JoinInner // default
-
-	default:
-		// Handle NATURAL without explicit type (NATURAL JOIN = NATURAL INNER JOIN)
-		if join.Natural && p.check(TOKEN_JOIN) {
-			join.Type = JoinInner
-		} else if !join.Natural {
-			return nil // no join
+			join.Right = p.parseTableRef()
+			p.parseJoinCondition(join)
+			return join
 		}
+	}
+
+	// Plain JOIN (no type keyword) = INNER JOIN
+	switch {
+	case p.check(TOKEN_JOIN):
+		join.Type = JoinInner
+	case join.Natural && p.check(TOKEN_JOIN):
+		// NATURAL JOIN = NATURAL INNER JOIN
+		join.Type = JoinInner
+	case !join.Natural:
+		return nil // no join
 	}
 
 	if !p.expect(TOKEN_JOIN) {
@@ -217,8 +219,12 @@ func (p *Parser) parseJoin() *Join {
 	}
 
 	join.Right = p.parseTableRef()
+	p.parseJoinCondition(join)
+	return join
+}
 
-	// Handle ON vs USING vs NATURAL (mutually exclusive)
+// parseJoinCondition handles ON/USING/NATURAL validation.
+func (p *Parser) parseJoinCondition(join *Join) {
 	switch {
 	case join.Natural:
 		// NATURAL JOIN cannot have ON or USING
@@ -233,8 +239,6 @@ func (p *Parser) parseJoin() *Join {
 	case p.match(TOKEN_USING):
 		join.Using = p.parseUsingColumns()
 	}
-
-	return join
 }
 
 // parseUsingColumns parses the column list in USING (col1, col2, ...).

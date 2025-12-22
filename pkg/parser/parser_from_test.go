@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	// Import DuckDB dialect for side effects (dialect registration)
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -346,4 +349,187 @@ func TestMultipleJoinsWithUsing(t *testing.T) {
 	// Second join
 	join2 := stmt.Body.Left.From.Joins[1]
 	assert.Equal(t, []string{"product_id"}, join2.Using)
+}
+
+// ---------- DuckDB Join Type Tests ----------
+
+func TestDuckDBJoinTypes(t *testing.T) {
+	// Import DuckDB dialect - need to use import side effect
+	duckdbDialect := getDuckDBDialect(t)
+
+	tests := []struct {
+		name     string
+		sql      string
+		wantType parser.JoinType
+	}{
+		{
+			name:     "semi join",
+			sql:      "SELECT * FROM t1 SEMI JOIN t2 ON t1.id = t2.id",
+			wantType: parser.JoinSemi,
+		},
+		{
+			name:     "anti join",
+			sql:      "SELECT * FROM t1 ANTI JOIN t2 ON t1.id = t2.id",
+			wantType: parser.JoinAnti,
+		},
+		{
+			name:     "asof join",
+			sql:      "SELECT * FROM trades ASOF JOIN quotes ON trades.sym = quotes.sym AND trades.ts >= quotes.ts",
+			wantType: parser.JoinAsof,
+		},
+		{
+			name:     "positional join",
+			sql:      "SELECT * FROM t1 POSITIONAL JOIN t2",
+			wantType: parser.JoinPositional,
+		},
+		{
+			name:     "left semi join",
+			sql:      "SELECT * FROM t1 LEFT SEMI JOIN t2 ON t1.id = t2.id",
+			wantType: parser.JoinSemi, // LEFT SEMI is same as SEMI
+		},
+		{
+			name:     "left anti join",
+			sql:      "SELECT * FROM t1 LEFT ANTI JOIN t2 ON t1.id = t2.id",
+			wantType: parser.JoinAnti, // LEFT ANTI is same as ANTI
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect)
+			require.NoError(t, err)
+			require.NotNil(t, stmt.Body)
+			require.NotNil(t, stmt.Body.Left)
+			require.NotNil(t, stmt.Body.Left.From)
+			require.Len(t, stmt.Body.Left.From.Joins, 1)
+
+			join := stmt.Body.Left.From.Joins[0]
+			assert.Equal(t, tt.wantType, join.Type)
+		})
+	}
+}
+
+func TestPositionalJoinNoCondition(t *testing.T) {
+	duckdbDialect := getDuckDBDialect(t)
+	sql := "SELECT * FROM t1 POSITIONAL JOIN t2"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect)
+	require.NoError(t, err)
+
+	join := stmt.Body.Left.From.Joins[0]
+	assert.Equal(t, parser.JoinPositional, join.Type)
+	assert.Nil(t, join.Condition, "POSITIONAL JOIN should not have ON")
+	assert.Empty(t, join.Using, "POSITIONAL JOIN should not have USING")
+}
+
+func TestSemiJoinWithUsing(t *testing.T) {
+	duckdbDialect := getDuckDBDialect(t)
+	sql := "SELECT * FROM t1 SEMI JOIN t2 USING (id)"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect)
+	require.NoError(t, err)
+
+	join := stmt.Body.Left.From.Joins[0]
+	assert.Equal(t, parser.JoinSemi, join.Type)
+	assert.Equal(t, []string{"id"}, join.Using)
+}
+
+func TestAntiJoinWithCondition(t *testing.T) {
+	duckdbDialect := getDuckDBDialect(t)
+	sql := "SELECT * FROM orders ANTI JOIN customers ON orders.customer_id = customers.id"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect)
+	require.NoError(t, err)
+
+	join := stmt.Body.Left.From.Joins[0]
+	assert.Equal(t, parser.JoinAnti, join.Type)
+	assert.NotNil(t, join.Condition)
+}
+
+func TestAsofJoinWithComplexCondition(t *testing.T) {
+	duckdbDialect := getDuckDBDialect(t)
+	sql := "SELECT t.symbol, t.timestamp, q.bid FROM trades t ASOF JOIN quotes q ON t.symbol = q.symbol AND t.timestamp >= q.timestamp"
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect)
+	require.NoError(t, err)
+
+	join := stmt.Body.Left.From.Joins[0]
+	assert.Equal(t, parser.JoinAsof, join.Type)
+	assert.NotNil(t, join.Condition)
+
+	// Right table should have alias
+	tableName, ok := join.Right.(*parser.TableName)
+	require.True(t, ok)
+	assert.Equal(t, "quotes", tableName.Name)
+	assert.Equal(t, "q", tableName.Alias)
+}
+
+func TestFormatDuckDBJoins(t *testing.T) {
+	duckdbDialect := getDuckDBDialect(t)
+
+	tests := []struct {
+		name   string
+		input  string
+		expect []string
+	}{
+		{
+			name:   "semi join format",
+			input:  "SELECT * FROM t1 SEMI JOIN t2 ON t1.id = t2.id",
+			expect: []string{"SEMI", "JOIN", "ON"},
+		},
+		{
+			name:   "anti join format",
+			input:  "SELECT * FROM t1 ANTI JOIN t2 ON t1.id = t2.id",
+			expect: []string{"ANTI", "JOIN", "ON"},
+		},
+		{
+			name:   "asof join format",
+			input:  "SELECT * FROM t1 ASOF JOIN t2 ON t1.ts >= t2.ts",
+			expect: []string{"ASOF", "JOIN", "ON"},
+		},
+		{
+			name:   "positional join format",
+			input:  "SELECT * FROM t1 POSITIONAL JOIN t2",
+			expect: []string{"POSITIONAL", "JOIN"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt, err := parser.ParseWithDialect(tt.input, duckdbDialect)
+			require.NoError(t, err)
+
+			output := format.Format(stmt, duckdbDialect)
+			for _, expected := range tt.expect {
+				assert.Contains(t, strings.ToUpper(output), expected,
+					"Output should contain %s", expected)
+			}
+		})
+	}
+}
+
+func TestDuckDBJoinWithStandardJoins(t *testing.T) {
+	// Ensure DuckDB joins work alongside standard joins
+	duckdbDialect := getDuckDBDialect(t)
+	sql := `SELECT *
+		FROM orders o
+		JOIN customers c ON o.customer_id = c.id
+		SEMI JOIN active_users u ON c.user_id = u.id`
+
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect)
+	require.NoError(t, err)
+	require.Len(t, stmt.Body.Left.From.Joins, 2)
+
+	// First join: standard INNER JOIN
+	join1 := stmt.Body.Left.From.Joins[0]
+	assert.Equal(t, parser.JoinInner, join1.Type)
+
+	// Second join: SEMI JOIN
+	join2 := stmt.Body.Left.From.Joins[1]
+	assert.Equal(t, parser.JoinSemi, join2.Type)
+}
+
+// getDuckDBDialect loads the DuckDB dialect for testing
+func getDuckDBDialect(t *testing.T) *dialect.Dialect {
+	t.Helper()
+	// Trigger dialect registration by importing
+	d, ok := dialect.Get("duckdb")
+	require.True(t, ok, "DuckDB dialect should be registered")
+	return d
 }
