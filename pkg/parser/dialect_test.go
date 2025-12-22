@@ -631,3 +631,183 @@ func TestStarModifierRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// ---------- UNION BY NAME Tests (DuckDB Extension) ----------
+
+func TestUnionByName(t *testing.T) {
+	tests := []struct {
+		name   string
+		sql    string
+		op     parser.SetOpType
+		all    bool
+		byName bool
+	}{
+		{
+			name:   "union by name",
+			sql:    "SELECT id, name FROM t1 UNION BY NAME SELECT name, id FROM t2",
+			op:     parser.SetOpUnion,
+			all:    false,
+			byName: true,
+		},
+		{
+			name:   "union all by name",
+			sql:    "SELECT id, name FROM t1 UNION ALL BY NAME SELECT name, id FROM t2",
+			op:     parser.SetOpUnionAll,
+			all:    true,
+			byName: true,
+		},
+		{
+			name:   "intersect by name",
+			sql:    "SELECT id, name FROM t1 INTERSECT BY NAME SELECT name, id FROM t2",
+			op:     parser.SetOpIntersect,
+			all:    false,
+			byName: true,
+		},
+		{
+			name:   "except by name",
+			sql:    "SELECT id, name FROM t1 EXCEPT BY NAME SELECT name, id FROM t2",
+			op:     parser.SetOpExcept,
+			all:    false,
+			byName: true,
+		},
+		{
+			name:   "standard union (no by name)",
+			sql:    "SELECT id, name FROM t1 UNION SELECT name, id FROM t2",
+			op:     parser.SetOpUnion,
+			all:    false,
+			byName: false,
+		},
+		{
+			name:   "standard union all (no by name)",
+			sql:    "SELECT id FROM t1 UNION ALL SELECT id FROM t2",
+			op:     parser.SetOpUnionAll,
+			all:    true,
+			byName: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+			require.NotNil(t, stmt.Body)
+
+			body := stmt.Body
+			assert.Equal(t, tt.op, body.Op)
+			assert.Equal(t, tt.all, body.All)
+			assert.Equal(t, tt.byName, body.ByName)
+			assert.NotNil(t, body.Right)
+		})
+	}
+}
+
+func TestChainedUnionByName(t *testing.T) {
+	sql := `
+		SELECT id, name FROM t1
+		UNION BY NAME
+		SELECT name, id FROM t2
+		UNION ALL BY NAME
+		SELECT id, name FROM t3
+	`
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	// First UNION BY NAME
+	assert.Equal(t, parser.SetOpUnion, stmt.Body.Op)
+	assert.True(t, stmt.Body.ByName)
+	assert.False(t, stmt.Body.All)
+
+	// Second UNION ALL BY NAME
+	require.NotNil(t, stmt.Body.Right)
+	assert.Equal(t, parser.SetOpUnionAll, stmt.Body.Right.Op)
+	assert.True(t, stmt.Body.Right.ByName)
+	assert.True(t, stmt.Body.Right.All)
+}
+
+func TestMixedByNameAndPositional(t *testing.T) {
+	sql := `
+		SELECT id, name FROM t1
+		UNION BY NAME
+		SELECT name, id FROM t2
+		UNION
+		SELECT a, b FROM t3
+	`
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	require.NoError(t, err)
+
+	// First: UNION BY NAME
+	assert.Equal(t, parser.SetOpUnion, stmt.Body.Op)
+	assert.True(t, stmt.Body.ByName)
+
+	// Second: plain UNION (positional)
+	require.NotNil(t, stmt.Body.Right)
+	assert.Equal(t, parser.SetOpUnion, stmt.Body.Right.Op)
+	assert.False(t, stmt.Body.Right.ByName)
+}
+
+func TestUnionByNameRoundTrip(t *testing.T) {
+	tests := []struct {
+		name     string
+		sql      string
+		contains []string
+	}{
+		{
+			name:     "union by name",
+			sql:      "SELECT id, name FROM t1 UNION BY NAME SELECT name, id FROM t2",
+			contains: []string{"UNION", "BY", "NAME"},
+		},
+		{
+			name:     "union all by name",
+			sql:      "SELECT id FROM t1 UNION ALL BY NAME SELECT id FROM t2",
+			contains: []string{"UNION", "ALL", "BY", "NAME"},
+		},
+		{
+			name:     "intersect by name",
+			sql:      "SELECT a, b FROM t1 INTERSECT BY NAME SELECT b, a FROM t2",
+			contains: []string{"INTERSECT", "BY", "NAME"},
+		},
+		{
+			name:     "except by name",
+			sql:      "SELECT x, y FROM t1 EXCEPT BY NAME SELECT y, x FROM t2",
+			contains: []string{"EXCEPT", "BY", "NAME"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse original
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+
+			// Format
+			output := format.Format(stmt, duckdbDialect.DuckDB)
+			require.NotEmpty(t, output)
+
+			// Verify output contains expected keywords
+			for _, s := range tt.contains {
+				assert.Contains(t, output, s)
+			}
+
+			// Parse again to verify round-trip
+			stmt2, err := parser.ParseWithDialect(output, duckdbDialect.DuckDB)
+			require.NoError(t, err)
+
+			// Verify ByName flag is preserved
+			assert.Equal(t, stmt.Body.ByName, stmt2.Body.ByName)
+			assert.Equal(t, stmt.Body.Op, stmt2.Body.Op)
+			assert.Equal(t, stmt.Body.All, stmt2.Body.All)
+		})
+	}
+}
+
+func TestUnionByNameInAnsi(t *testing.T) {
+	// BY NAME should also work in ANSI since NAME is now a keyword
+	// The parser is lenient and doesn't restrict this to DuckDB
+	sql := "SELECT id FROM t1 UNION BY NAME SELECT id FROM t2"
+	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	require.NoError(t, err)
+
+	// The ByName flag should be set
+	assert.True(t, stmt.Body.ByName,
+		"BY NAME should parse in ANSI (parser is lenient)")
+}

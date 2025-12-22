@@ -88,6 +88,7 @@ const (
 	TOKEN_LEFT      = token.LEFT
 	TOKEN_LIKE      = token.LIKE
 	TOKEN_LIMIT     = token.LIMIT
+	TOKEN_NAME      = token.NAME
 	TOKEN_NATURAL   = token.NATURAL
 	TOKEN_NEXT      = token.NEXT
 	TOKEN_NOT       = token.NOT

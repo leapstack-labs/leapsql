@@ -68,10 +68,11 @@ type CTE struct {
 // SelectBody represents the body of a SELECT with possible set operations.
 type SelectBody struct {
 	NodeInfo
-	Left  *SelectCore
-	Op    SetOpType   // UNION, INTERSECT, EXCEPT, or empty
-	All   bool        // UNION ALL
-	Right *SelectBody // For chained set operations
+	Left   *SelectCore
+	Op     SetOpType   // UNION, INTERSECT, EXCEPT, or empty
+	All    bool        // UNION ALL
+	ByName bool        // DuckDB: BY NAME (match columns by name, not position)
+	Right  *SelectBody // For chained set operations
 }
 
 // SetOpType represents the type of set operation.

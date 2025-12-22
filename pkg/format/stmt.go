@@ -77,6 +77,15 @@ func (p *Printer) formatSelectBody(body *parser.SelectBody) {
 		case parser.SetOpExcept:
 			p.kw(token.EXCEPT)
 		}
+
+		// DuckDB extension: BY NAME (match columns by name, not position)
+		if body.ByName {
+			p.space()
+			p.kw(token.BY)
+			p.space()
+			p.kw(token.NAME)
+		}
+
 		p.writeln()
 		p.formatSelectBody(body.Right)
 	}
