@@ -109,8 +109,13 @@ func (l *Lexer) NextToken() Token {
 	case '+':
 		tok = l.newToken(TOKEN_PLUS, "+")
 	case '-':
-		// Could be negative number or minus operator
-		tok = l.newToken(TOKEN_MINUS, "-")
+		if l.peekChar() == '>' {
+			l.readChar()
+			tok = Token{Type: TOKEN_ARROW, Literal: "->", Pos: pos}
+		} else {
+			// Could be negative number or minus operator
+			tok = l.newToken(TOKEN_MINUS, "-")
+		}
 	case '*':
 		tok = l.newToken(TOKEN_STAR, "*")
 	case '/':
@@ -163,6 +168,12 @@ func (l *Lexer) NextToken() Token {
 		tok = l.newToken(TOKEN_LBRACKET, "[")
 	case ']':
 		tok = l.newToken(TOKEN_RBRACKET, "]")
+	case '{':
+		tok = l.newToken(TOKEN_LBRACE, "{")
+	case '}':
+		tok = l.newToken(TOKEN_RBRACE, "}")
+	case ':':
+		tok = l.newToken(TOKEN_COLON, ":")
 	case '\'':
 		tok.Type = TOKEN_STRING
 		tok.Literal = l.readString()

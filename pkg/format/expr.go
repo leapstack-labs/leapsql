@@ -47,6 +47,15 @@ func (p *Printer) formatExpr(e parser.Expr) {
 		p.formatStarExpr(expr)
 	case *parser.MacroExpr:
 		p.formatMacroExpr(expr)
+	// DuckDB expression extensions (Phase 3)
+	case *parser.LambdaExpr:
+		p.formatLambdaExpr(expr)
+	case *parser.StructLiteral:
+		p.formatStructLiteral(expr)
+	case *parser.ListLiteral:
+		p.formatListLiteral(expr)
+	case *parser.IndexExpr:
+		p.formatIndexExpr(expr)
 	}
 }
 
@@ -74,6 +83,32 @@ func (p *Printer) exprComplexity(e parser.Expr) int {
 		score := 2
 		for _, w := range expr.Whens {
 			score += p.exprComplexity(w.Condition) + p.exprComplexity(w.Result)
+		}
+		return score
+	case *parser.LambdaExpr:
+		return 1 + p.exprComplexity(expr.Body)
+	case *parser.StructLiteral:
+		score := 1
+		for _, f := range expr.Fields {
+			score += p.exprComplexity(f.Value)
+		}
+		return score
+	case *parser.ListLiteral:
+		score := 1
+		for _, elem := range expr.Elements {
+			score += p.exprComplexity(elem)
+		}
+		return score
+	case *parser.IndexExpr:
+		score := 1 + p.exprComplexity(expr.Expr)
+		if expr.Index != nil {
+			score += p.exprComplexity(expr.Index)
+		}
+		if expr.Start != nil {
+			score += p.exprComplexity(expr.Start)
+		}
+		if expr.End != nil {
+			score += p.exprComplexity(expr.End)
 		}
 		return score
 	default:
@@ -415,4 +450,67 @@ func (p *Printer) formatStarExpr(star *parser.StarExpr) {
 func (p *Printer) formatMacroExpr(m *parser.MacroExpr) {
 	// Macros are preserved exactly as written
 	p.write(m.Content)
+}
+
+// ---------- DuckDB Expression Extensions (Phase 3) ----------
+
+func (p *Printer) formatLambdaExpr(lambda *parser.LambdaExpr) {
+	if len(lambda.Params) == 1 {
+		p.write(lambda.Params[0])
+	} else {
+		p.write("(")
+		for i, param := range lambda.Params {
+			if i > 0 {
+				p.write(", ")
+			}
+			p.write(param)
+		}
+		p.write(")")
+	}
+	p.write(" -> ")
+	p.formatExpr(lambda.Body)
+}
+
+func (p *Printer) formatStructLiteral(s *parser.StructLiteral) {
+	p.write("{")
+	for i, field := range s.Fields {
+		if i > 0 {
+			p.write(", ")
+		}
+		// In DuckDB struct literals, keys are always single-quoted strings
+		p.write("'")
+		p.write(field.Key)
+		p.write("'")
+		p.write(": ")
+		p.formatExpr(field.Value)
+	}
+	p.write("}")
+}
+
+func (p *Printer) formatListLiteral(list *parser.ListLiteral) {
+	p.write("[")
+	for i, elem := range list.Elements {
+		if i > 0 {
+			p.write(", ")
+		}
+		p.formatExpr(elem)
+	}
+	p.write("]")
+}
+
+func (p *Printer) formatIndexExpr(idx *parser.IndexExpr) {
+	p.formatExpr(idx.Expr)
+	p.write("[")
+	if idx.IsSlice {
+		if idx.Start != nil {
+			p.formatExpr(idx.Start)
+		}
+		p.write(":")
+		if idx.End != nil {
+			p.formatExpr(idx.End)
+		}
+	} else {
+		p.formatExpr(idx.Index)
+	}
+	p.write("]")
 }

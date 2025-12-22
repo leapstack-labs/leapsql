@@ -18,6 +18,22 @@ import (
 
 // parsePrimary parses primary expressions.
 func (p *Parser) parsePrimary() Expr {
+	// Check for dialect-specific prefix handlers first
+	if p.dialect != nil {
+		if handler := p.dialect.PrefixHandler(p.token.Type); handler != nil {
+			p.nextToken() // consume the prefix token
+			expr, err := handler(p)
+			if err != nil {
+				p.addError(err.Error())
+				return nil
+			}
+			if expr != nil {
+				return expr.(Expr)
+			}
+			return nil
+		}
+	}
+
 	switch p.token.Type {
 	case TOKEN_NUMBER:
 		lit := &Literal{Type: LiteralNumber, Value: p.token.Literal}

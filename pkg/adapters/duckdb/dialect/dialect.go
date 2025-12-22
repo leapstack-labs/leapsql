@@ -96,6 +96,16 @@ var DuckDB = dialect.NewDialect("duckdb").
 	AddStarModifier(TokenExclude, parseExclude).
 	AddStarModifier(TokenReplace, parseReplace).
 	AddStarModifier(TokenRename, parseRename).
+	// Register DuckDB expression extensions (Phase 3)
+	// List literals: [1, 2, 3]
+	AddPrefix(token.LBRACKET, parseListLiteral).
+	// Struct literals: {'name': 'Alice', 'age': 30}
+	AddPrefix(token.LBRACE, parseStructLiteral).
+	// Array indexing/slicing: arr[1], arr[1:3]
+	AddInfixWithHandler(token.LBRACKET, spi.PrecedencePostfix, parseIndexOrSlice).
+	// Lambda expressions: x -> x * 2
+	// Use PrecedenceOr (lowest positive precedence) to allow x -> x + y to work
+	AddInfixWithHandler(token.ARROW, spi.PrecedenceOr, parseLambdaBody).
 	// Function classifications
 	Aggregates(duckDBAggregates...).
 	Generators(duckDBGenerators...).

@@ -46,6 +46,10 @@ const (
 	TOKEN_RPAREN   = token.RPAREN
 	TOKEN_LBRACKET = token.LBRACKET
 	TOKEN_RBRACKET = token.RBRACKET
+	TOKEN_LBRACE   = token.LBRACE
+	TOKEN_RBRACE   = token.RBRACE
+	TOKEN_COLON    = token.COLON
+	TOKEN_ARROW    = token.ARROW
 
 	// Keywords (alphabetical)
 	TOKEN_ALL       = token.ALL

@@ -152,6 +152,7 @@ type Dialect struct {
 	dynamicKw      map[string]token.TokenType                  // Custom keywords: "QUALIFY" -> QUALIFY
 	precedence     map[token.TokenType]int                     // Operator precedence for expressions
 	infixHandlers  map[token.TokenType]spi.InfixHandler        // Optional custom infix parsing
+	prefixHandlers map[token.TokenType]spi.PrefixHandler       // Prefix expression handlers (e.g., [ for list literals)
 	joinTypes      map[token.TokenType]JoinTypeDef             // Dialect-specific join types
 	starModifiers  map[token.TokenType]spi.StarModifierHandler // Star expression modifiers (EXCLUDE, REPLACE, RENAME)
 
@@ -434,6 +435,19 @@ func (d *Dialect) InfixHandler(t token.TokenType) spi.InfixHandler {
 	return nil
 }
 
+// PrefixHandler returns the custom prefix handler for an operator token.
+func (d *Dialect) PrefixHandler(t token.TokenType) spi.PrefixHandler {
+	if d.prefixHandlers != nil {
+		if h, ok := d.prefixHandlers[t]; ok {
+			return h
+		}
+	}
+	if d.parent != nil {
+		return d.parent.PrefixHandler(t)
+	}
+	return nil
+}
+
 // JoinTypeDef returns the definition for a dialect-specific join type.
 func (d *Dialect) JoinTypeDef(t token.TokenType) (JoinTypeDef, bool) {
 	if d.joinTypes != nil {
@@ -544,6 +558,7 @@ func NewDialect(name string) *Builder {
 			dynamicKw:      make(map[string]token.TokenType),
 			precedence:     make(map[token.TokenType]int),
 			infixHandlers:  make(map[token.TokenType]spi.InfixHandler),
+			prefixHandlers: make(map[token.TokenType]spi.PrefixHandler),
 			joinTypes:      make(map[token.TokenType]JoinTypeDef),
 			starModifiers:  make(map[token.TokenType]spi.StarModifierHandler),
 		},
@@ -678,6 +693,11 @@ func (b *Builder) Extends(parent *Dialect) *Builder {
 			b.dialect.infixHandlers[k] = v
 		}
 	}
+	if parent.prefixHandlers != nil {
+		for k, v := range parent.prefixHandlers {
+			b.dialect.prefixHandlers[k] = v
+		}
+	}
 	if parent.joinTypes != nil {
 		for k, v := range parent.joinTypes {
 			b.dialect.joinTypes[k] = v
@@ -772,6 +792,12 @@ func (b *Builder) AddInfix(t token.TokenType, precedence int) *Builder {
 func (b *Builder) AddInfixWithHandler(t token.TokenType, precedence int, handler spi.InfixHandler) *Builder {
 	b.dialect.precedence[t] = precedence
 	b.dialect.infixHandlers[t] = handler
+	return b
+}
+
+// AddPrefix registers a prefix expression handler (e.g., [ for list literals, { for struct literals).
+func (b *Builder) AddPrefix(t token.TokenType, handler spi.PrefixHandler) *Builder {
+	b.dialect.prefixHandlers[t] = handler
 	return b
 }
 

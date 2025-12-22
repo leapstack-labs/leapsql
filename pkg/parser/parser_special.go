@@ -89,7 +89,7 @@ func (p *Parser) parseTypeName() string {
 	return typeName
 }
 
-// parseParenExpr parses a parenthesized expression or subquery.
+// parseParenExpr parses a parenthesized expression, subquery, or lambda parameter list.
 func (p *Parser) parseParenExpr() Expr {
 	p.expect(TOKEN_LPAREN)
 
@@ -101,8 +101,19 @@ func (p *Parser) parseParenExpr() Expr {
 		return subquery
 	}
 
-	// Regular parenthesized expression
+	// Parse the first expression
 	expr := p.parseExpression()
+
+	// Check for comma-separated list (for lambda parameters like (x, y) -> ...)
+	if p.check(TOKEN_COMMA) {
+		// This might be a lambda parameter list - parse all comma-separated identifiers
+		// and wrap in a binary comma expression for the lambda handler to extract
+		for p.match(TOKEN_COMMA) {
+			right := p.parseExpression()
+			expr = &BinaryExpr{Left: expr, Op: TOKEN_COMMA, Right: right}
+		}
+	}
+
 	p.expect(TOKEN_RPAREN)
 	return &ParenExpr{Expr: expr}
 }

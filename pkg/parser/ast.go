@@ -462,3 +462,49 @@ type MacroExpr struct {
 }
 
 func (*MacroExpr) exprNode() {}
+
+// ---------- DuckDB Expression Extensions ----------
+
+// LambdaExpr represents a lambda expression: x -> expr or (x, y) -> expr.
+// Used with list functions like list_transform, list_filter, list_reduce.
+type LambdaExpr struct {
+	Params []string // Parameter names
+	Body   Expr     // Lambda body expression
+}
+
+func (*LambdaExpr) exprNode() {}
+
+// StructLiteral represents a struct literal: {'key': value, ...}.
+// DuckDB syntax for creating anonymous structs/records.
+type StructLiteral struct {
+	Fields []StructField
+}
+
+func (*StructLiteral) exprNode() {}
+
+// StructField represents a field in a struct literal.
+type StructField struct {
+	Key   string // Field name (can be identifier or string)
+	Value Expr   // Field value
+}
+
+// ListLiteral represents a list/array literal: [expr, expr, ...].
+// DuckDB syntax for creating array values.
+type ListLiteral struct {
+	Elements []Expr
+}
+
+func (*ListLiteral) exprNode() {}
+
+// IndexExpr represents array indexing or slicing: arr[i] or arr[start:end].
+// Supports DuckDB array subscript and slice syntax.
+type IndexExpr struct {
+	Expr  Expr // The expression being indexed
+	Index Expr // Simple index (non-nil if not a slice)
+	// For slicing (arr[start:end])
+	IsSlice bool
+	Start   Expr // nil means from beginning
+	End     Expr // nil means to end
+}
+
+func (*IndexExpr) exprNode() {}

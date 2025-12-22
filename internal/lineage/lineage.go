@@ -413,6 +413,58 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		}
 		lineage.Transform = TransformExpression
 
+	case *parser.LambdaExpr:
+		// Lambda expressions: extract lineage from body only
+		// Lambda parameters are local bindings, not column references
+		// e.g., list_transform([1,2,3], x -> x * 2) - 'x' is a parameter, not a column
+		if ex.Body != nil {
+			bodyLineage := e.extractExprLineage(scope, colResolver, ex.Body)
+			lineage.Sources = bodyLineage.Sources
+		}
+		lineage.Transform = TransformExpression
+
+	case *parser.StructLiteral:
+		// Struct literals: collect lineage from all field values
+		// e.g., {'name': first_name, 'full': first_name || last_name}
+		for _, field := range ex.Fields {
+			if field.Value != nil {
+				fieldLineage := e.extractExprLineage(scope, colResolver, field.Value)
+				lineage.Sources = e.mergeSources(lineage.Sources, fieldLineage.Sources)
+			}
+		}
+		lineage.Transform = TransformExpression
+
+	case *parser.ListLiteral:
+		// List literals: collect lineage from all elements
+		// e.g., [a, b, c] or [col1, col2 * 2]
+		for _, elem := range ex.Elements {
+			elemLineage := e.extractExprLineage(scope, colResolver, elem)
+			lineage.Sources = e.mergeSources(lineage.Sources, elemLineage.Sources)
+		}
+		lineage.Transform = TransformExpression
+
+	case *parser.IndexExpr:
+		// Index expressions: collect lineage from the indexed expression and indices
+		// e.g., arr[1], arr[i], arr[start:end]
+		if ex.Expr != nil {
+			exprLineage := e.extractExprLineage(scope, colResolver, ex.Expr)
+			lineage.Sources = e.mergeSources(lineage.Sources, exprLineage.Sources)
+		}
+		if ex.Index != nil {
+			indexLineage := e.extractExprLineage(scope, colResolver, ex.Index)
+			lineage.Sources = e.mergeSources(lineage.Sources, indexLineage.Sources)
+		}
+		// For slice expressions, also check Start and End
+		if ex.Start != nil {
+			startLineage := e.extractExprLineage(scope, colResolver, ex.Start)
+			lineage.Sources = e.mergeSources(lineage.Sources, startLineage.Sources)
+		}
+		if ex.End != nil {
+			endLineage := e.extractExprLineage(scope, colResolver, ex.End)
+			lineage.Sources = e.mergeSources(lineage.Sources, endLineage.Sources)
+		}
+		lineage.Transform = TransformExpression
+
 	default:
 		// For other expression types, collect all column references
 		sources := e.collectExprSources(scope, colResolver, expr)

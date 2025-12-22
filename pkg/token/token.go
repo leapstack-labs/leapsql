@@ -43,6 +43,10 @@ const (
 	RPAREN   // )
 	LBRACKET // [
 	RBRACKET // ]
+	LBRACE   // {
+	RBRACE   // }
+	COLON    // :
+	ARROW    // ->
 
 	// ANSI Keywords (alphabetical)
 	ALL
@@ -161,6 +165,10 @@ var tokenNames = map[TokenType]string{
 	RPAREN:   ")",
 	LBRACKET: "[",
 	RBRACKET: "]",
+	LBRACE:   "{",
+	RBRACE:   "}",
+	COLON:    ":",
+	ARROW:    "->",
 
 	ALL:       "ALL",
 	AND:       "AND",
