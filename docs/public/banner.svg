@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 220">
+  <style>
+    .bg { fill: #1e1e1e; }
+    .box { fill: none; stroke: #e0e0e0; stroke-width: 2; }
+    .mono { 
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'Monaco', monospace; 
+      fill: #e0e0e0; 
+      font-size: 9px;
+      line-height: 1;
+    }
+    .tagline { 
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'Monaco', monospace; 
+      fill: #e0e0e0; 
+      font-size: 12px; 
+    }
+    @media (prefers-color-scheme: light) {
+      .bg { fill: #ffffff; }
+      .box { stroke: #1e1e1e; }
+      .mono { fill: #1e1e1e; }
+      .tagline { fill: #1e1e1e; }
+    }
+  </style>
+  
+  <!-- Background -->
+  <rect class="bg" width="620" height="220" rx="4"/>
+  
+  <!-- Box border -->
+  <rect class="box" x="10" y="10" width="600" height="200" rx="2"/>
+  
+  <!-- LEAPSQL block text -->
+  <text class="mono" text-anchor="middle" xml:space="preserve">
+    <tspan x="310" y="45">██╗     ███████╗ █████╗ ██████╗ ███████╗ ██████╗ ██╗     </tspan>
+    <tspan x="310" y="57">██║     ██╔════╝██╔══██╗██╔══██╗██╔════╝██╔═══██╗██║     </tspan>
+    <tspan x="310" y="69">██║     █████╗  ███████║██████╔╝███████╗██║   ██║██║     </tspan>
+    <tspan x="310" y="81">██║     ██╔══╝  ██╔══██║██╔═══╝ ╚════██║██║▄▄ ██║██║     </tspan>
+    <tspan x="310" y="93">███████╗███████╗██║  ██║██║     ███████║╚██████╔╝███████╗</tspan>
+    <tspan x="310" y="105">╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝ ╚══▀▀═╝ ╚══════╝</tspan>
+  </text>
+  
+  <!-- Taglines -->
+  <text class="tagline" x="310" y="145" text-anchor="middle">Modern SQL Transformation Framework</text>
+  <text class="tagline" x="310" y="170" text-anchor="middle" style="font-size: 10px; opacity: 0.7;">leapstack-labs.github.io/leapsql</text>
+</svg>

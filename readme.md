@@ -1,117 +1,157 @@
-# Project Overview: LeapSQL
+<p align="center">
+  <img src="docs/public/banner.svg" alt="LeapSQL Banner">
+</p>
 
-**The Compiled, Database-State Data Transformation Engine**
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/leapstack-labs/leapsql">
+    <img src="https://goreportcard.com/badge/github.com/leapstack-labs/leapsql" alt="Go Report Card">
+  </a>
+  <a href="https://github.com/leapstack-labs/leapsql/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/leapstack-labs/leapsql" alt="License">
+  </a>
+  <a href="https://github.com/leapstack-labs/leapsql/releases">
+    <img src="https://img.shields.io/github/v/release/leapstack-labs/leapsql" alt="Latest Release">
+  </a>
+</p>
 
-### 1\. The Core Philosophy
+# LeapSQL
 
-**LeapSQL** is a modern data transformation tool written in **Go**. Unlike existing tools that rely on runtime interpretation (Python/Jinja) and file-based state (JSON artifacts), LeapSQL treats data models as **compiled software** and manages state in a **live database**.
+A SQL transformation framework that automatically detects dependencies from your queries. Write pure SQL, get dependency graphs, column-level lineage, and incremental builds - no `ref()` functions or boilerplate required.
 
-**The Goal:** To provide the developer experience of a modern compiler (instant feedback, type safety, single binary) with the deployment power of a database-backed state engine (virtual environments, zero-copy staging).
+## Why LeapSQL?
 
------
+- **Automatic Dependency Detection** - Write standard SQL. LeapSQL parses your queries to build the DAG automatically from `FROM`, `JOIN`, subqueries, and CTEs.
+- **Column-Level Lineage** - Track exactly how each field flows through your transformations, not just table-level dependencies.
+- **Starlark Templating** - Use a Python-like language for safe, deterministic SQL generation. No more Jinja recursion errors.
+- **Single Binary** - Distributed as a standalone Go binary. No Python environments or dependency management.
+- **Database-Backed State** - Run history and metadata stored in SQLite, not scattered JSON artifacts.
 
-### 2\. Architecture & The "Unlock"
-
-#### A. State Management: Database \> Files
-
-Instead of generating a static `manifest.json`, LeapSQL stores the entire project graph and execution history in a backend database (Postgres or embedded SQLite).
-
-  * **Virtual Environments:** "Staging" is just a metadata pointer to a specific commit hash in the DB. We can create ephemeral environments in milliseconds without copying data.
-  * **Concurrency Control:** The DB acts as a mutex. Two CI jobs cannot overwrite the same table simultaneously.
-  * **Drift Detection:** The tool queries the State DB to know *exactly* what is running in production, preventing "stale artifact" errors.
-
-#### B. The Compilation Step: SQL $\to$ Go $\to$ Binary
-
-We do not interpret SQL at runtime. We parse `.sql` files and generate Go source code, which is compiled into a project-specific binary.
-
-  * **Type Safety:** If Model A changes a column name, Model B (downstream) fails to compile immediately.
-  * **Performance:** Parsing 5,000 models happens in milliseconds via concurrent Go routines.
-  * **Distribution:** The output is a single binary. No Python, no `pip`, no `venv` hell.
-
------
-
-### 3\. The Syntax Specification
-
-We use standard `.sql` files augmented with "Magic Comments" (Pragmas) for imports and configuration, and C-style Preprocessor directives for logic.
-
-**Example Model:** `models/finance/revenue.sql`
+## Quick Example
 
 ```sql
--- @config: materialized='incremental'
--- @config: unique_key='transaction_id'
+/*---
+name: customers
+materialized: table
+---*/
 
--- 1. Explicit Imports (Top of file = Fast Parsing)
--- @import: orders = models.staging.stg_orders
--- @import: rates  = models.seeds.exchange_rates
-
-SELECT 
-    o.transaction_id,
-    o.amount * r.rate as usd_amount
-FROM :orders as o              -- 2. Variable Usage (':' prefix)
-LEFT JOIN :rates as r 
-    ON o.currency = r.currency
-    
--- 3. Logic Control (Preprocessor Style)
-#if is_incremental
-  WHERE o.updated_at > (SELECT max(updated_at) FROM :this)
-#endif
+SELECT
+    c.id,
+    c.name,
+    c.email,
+    COUNT(o.id) as order_count,
+    SUM(o.amount) as total_spent
+FROM raw_customers c
+LEFT JOIN raw_orders o ON c.id = o.customer_id
+GROUP BY c.id, c.name, c.email
 ```
 
------
+LeapSQL automatically detects that this model depends on `raw_customers` and `raw_orders`, tracks that `order_count` derives from `orders.id`, and ensures models build in the correct order.
 
-### 4\. Technical Implementation Plan
+## Installation
 
-#### The Parser & Code Generator
+### From Source
 
-  * **Input:** User writes `.sql` files.
-  * **Parser:** Scans only the header comments (`-- @import`) to build the DAG. This makes graph generation instant ($O(1)$ lookup vs dbt's $O(N)$ regex scan).
-  * **Generator:** Creates a Go struct for every model.
-      * `stg_orders` $\to$ `type StgOrders struct { ... }`
-      * Validation logic is embedded into the struct methods.
+Requires Go 1.21+:
 
-#### The Adapter Interface (Repository Pattern)
-
-We define a strict Go Interface that new database adapters must implement. This makes adding Databricks/DuckDB/Clickhouse trivial and strictly typed.
-
-```go
-type Adapter interface {
-    // Core connectivity
-    Connect(ctx context.Context, cfg Config) (Connection, error)
-    
-    // Execution
-    Exec(ctx context.Context, sql string) error
-    Query(ctx context.Context, sql string) (*Rows, error)
-    
-    // Catalog & State
-    GetTableMetadata(ctx context.Context, table string) (Metadata, error)
-}
+```bash
+go install github.com/leapstack-labs/leapsql/cmd/leapsql@latest
 ```
 
-#### The Developer Experience (The "Watcher")
+### Pre-built Binaries
 
-Similar to modern frontend tools (Vite/Tailwind):
+Download from the [Releases Page](https://github.com/leapstack-labs/leapsql/releases), or:
 
-1.  User runs `leapsql dev`.
-2.  User saves a `.sql` file.
-3.  `leapsql` detects change $\to$ Generates Go Code $\to$ Recompiles Memory Binary $\to$ Runs Model.
-4.  Total loop time: \< 500ms.
+```bash
+# macOS / Linux
+curl -L https://github.com/leapstack-labs/leapsql/releases/latest/download/leapsql-$(uname -s)-$(uname -m) -o leapsql
+chmod +x leapsql
+sudo mv leapsql /usr/local/bin/
+```
 
------
+## Quickstart
 
-### 5\. Competitive Comparison
+```bash
+# Create a new project
+mkdir my-project && cd my-project
+leapsql init --example
 
-| Feature | dbt Core | LeapSQL (This Project) |
-| :--- | :--- | :--- |
-| **Language** | Python | Go (Golang) |
-| **Parsing Strategy** | Runtime Regex (Slow) | Compile-time Headers (Instant) |
-| **Templating** | Jinja2 (Complex, Fragile) | Native SQL + Preprocessor (`#if`) |
-| **Dependency Mgmt** | `ref('string')` | Explicit Import / Go Structs |
-| **State Storage** | `manifest.json` (File) | PostgreSQL / SQLite (Database) |
-| **Deployment** | Python Environment | Single Static Binary |
-| **Environments** | Physical Schemas | Virtual Pointers |
+# Load seed data
+leapsql seed
 
-### 6\. Immediate Next Steps
+# View the dependency graph
+leapsql dag
 
-1.  **Define the Grammar:** Finalize the "Magic Comment" syntax specs.
-2.  **Build the Parser:** Write a Go tool that scans a directory of `.sql` files and outputs a simple DOT graph based on `@import` tags.
-3.  **Prototype State DB:** Define the schema for the Postgres table that will hold the state (Run ID, Model Hash, Materialization Status).
+# Run all models
+leapsql run
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `init` | Initialize a new project |
+| `run` | Execute models in dependency order |
+| `list` | List all discovered models |
+| `dag` | Display the dependency graph |
+| `lineage` | Show upstream/downstream dependencies for a model |
+| `render` | Output compiled SQL with templates expanded |
+| `seed` | Load CSV files into the database |
+| `docs` | Generate or serve documentation |
+| `lsp` | Start the language server for IDE integration |
+
+Run `leapsql <command> --help` for detailed usage.
+
+## Supported Databases
+
+| Database | Status | Notes |
+|----------|--------|-------|
+| **DuckDB** | Stable | Embedded, great for local development |
+| **PostgreSQL** | Stable | Production-ready with pgx driver |
+
+Configure your adapter in `leapsql.yaml`:
+
+```yaml
+adapter:
+  type: duckdb
+  path: ./warehouse.db
+```
+
+## IDE Support
+
+LeapSQL includes a Language Server Protocol (LSP) implementation providing:
+
+- Autocomplete for models and macros
+- Hover documentation
+- Go-to-definition
+
+A VS Code extension is available in the `vscode-leapsql/` directory.
+
+## Documentation
+
+Full documentation: [leapstack-labs.github.io/leapsql](https://leapstack-labs.github.io/leapsql/)
+
+- [Installation Guide](https://leapstack-labs.github.io/leapsql/installation)
+- [Core Concepts](https://leapstack-labs.github.io/leapsql/concepts/models)
+- [CLI Reference](https://leapstack-labs.github.io/leapsql/cli/)
+- [Templating](https://leapstack-labs.github.io/leapsql/templating/overview)
+
+## Contributing
+
+Contributions are welcome. To get started:
+
+```bash
+# Run tests
+task test
+
+# Run linter
+task lint
+
+# Run both
+task check
+```
+
+See the [Taskfile.yml](./Taskfile.yml) for all available commands.
+
+## License
+
+MIT License. See [LICENSE](./LICENSE) for details.
