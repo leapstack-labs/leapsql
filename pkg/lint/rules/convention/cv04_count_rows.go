@@ -38,9 +38,12 @@ func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 			if lit, ok := fn.Args[0].(*parser.Literal); ok {
 				if lit.Type == parser.LiteralNumber && lit.Value == "1" {
 					diagnostics = append(diagnostics, lint.Diagnostic{
-						RuleID:   "CV04",
-						Severity: lint.SeverityHint,
-						Message:  "Prefer COUNT(*) over COUNT(1) for counting rows",
+						RuleID:           "CV04",
+						Severity:         lint.SeverityHint,
+						Message:          "Prefer COUNT(*) over COUNT(1) for counting rows",
+						DocumentationURL: lint.BuildDocURL("CV04"),
+						ImpactScore:      lint.ImpactLow.Int(),
+						AutoFixable:      false,
 					})
 				}
 			}

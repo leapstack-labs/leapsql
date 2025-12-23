@@ -81,10 +81,9 @@ func (s *Server) getCodeActions(params CodeActionParams) []CodeAction {
 		}
 
 		for _, fix := range fixes {
-			// Skip if not a quickfix and only quickfix was requested
-			if onlyQuickFix {
-				// All our fixes are quickfixes for now
-			}
+			// All our fixes are quickfixes for now, so no filtering needed
+			// when onlyQuickFix is true
+			_ = onlyQuickFix
 
 			// Convert lint.Fix to LSP CodeAction
 			action := CodeAction{

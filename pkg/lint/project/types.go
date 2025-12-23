@@ -12,6 +12,13 @@ type Context struct {
 	parents  map[string][]string   // model -> upstream models
 	children map[string][]string   // model -> downstream models
 	config   lint.ProjectHealthConfig
+	store    SnapshotStore // optional: for schema drift detection
+}
+
+// SnapshotStore provides access to column snapshots for schema drift detection.
+// This is a subset of the full state.Store interface.
+type SnapshotStore interface {
+	GetColumnSnapshot(modelPath string, sourceTable string) (columns []string, runID string, err error)
 }
 
 // ModelInfo holds all metadata about a model for project-level analysis.
@@ -36,6 +43,24 @@ func NewContext(models map[string]*ModelInfo, parents, children map[string][]str
 		children: children,
 		config:   config,
 	}
+}
+
+// NewContextWithStore creates a new project context with access to snapshot storage.
+// This enables schema drift detection (PL05).
+func NewContextWithStore(models map[string]*ModelInfo, parents, children map[string][]string, config lint.ProjectHealthConfig, store SnapshotStore) *Context {
+	return &Context{
+		models:   models,
+		parents:  parents,
+		children: children,
+		config:   config,
+		store:    store,
+	}
+}
+
+// Store returns the snapshot store, if available.
+// This is used by PL05 for schema drift detection.
+func (c *Context) Store() SnapshotStore {
+	return c.store
 }
 
 // GetModels implements lint.ProjectContext.

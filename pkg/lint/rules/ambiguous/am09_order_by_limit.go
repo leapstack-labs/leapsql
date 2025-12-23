@@ -50,18 +50,24 @@ func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) 
 	// ORDER BY without parentheses applies to entire set operation
 	if len(core.OrderBy) > 0 {
 		diagnostics = append(diagnostics, lint.Diagnostic{
-			RuleID:   "AM09",
-			Severity: lint.SeverityWarning,
-			Message:  "ORDER BY in set operation applies to the entire result; use parentheses if you intend to order individual queries",
+			RuleID:           "AM09",
+			Severity:         lint.SeverityWarning,
+			Message:          "ORDER BY in set operation applies to the entire result; use parentheses if you intend to order individual queries",
+			DocumentationURL: lint.BuildDocURL("AM09"),
+			ImpactScore:      lint.ImpactMedium.Int(),
+			AutoFixable:      false,
 		})
 	}
 
 	// LIMIT without parentheses applies to entire set operation
 	if core.Limit != nil {
 		diagnostics = append(diagnostics, lint.Diagnostic{
-			RuleID:   "AM09",
-			Severity: lint.SeverityWarning,
-			Message:  "LIMIT in set operation applies to the entire result; use parentheses if you intend to limit individual queries",
+			RuleID:           "AM09",
+			Severity:         lint.SeverityWarning,
+			Message:          "LIMIT in set operation applies to the entire result; use parentheses if you intend to limit individual queries",
+			DocumentationURL: lint.BuildDocURL("AM09"),
+			ImpactScore:      lint.ImpactMedium.Int(),
+			AutoFixable:      false,
 		})
 	}
 

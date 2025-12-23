@@ -34,10 +34,13 @@ func checkUnionDistinct(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.D
 		// Check for UNION without ALL
 		if body.Op == parser.SetOpUnion && !body.All {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM02",
-				Severity: lint.SeverityInfo,
-				Message:  "UNION without ALL performs implicit DISTINCT; use UNION ALL if duplicates are acceptable",
-				Pos:      body.Span.Start,
+				RuleID:           "AM02",
+				Severity:         lint.SeverityInfo,
+				Message:          "UNION without ALL performs implicit DISTINCT; use UNION ALL if duplicates are acceptable",
+				Pos:              body.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AM02"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

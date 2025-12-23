@@ -48,10 +48,13 @@ func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagn
 	for _, cte := range selectStmt.With.CTEs {
 		if !usedTables[strings.ToLower(cte.Name)] {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST03",
-				Severity: lint.SeverityWarning,
-				Message:  "CTE '" + cte.Name + "' is defined but never referenced",
-				Pos:      cte.Span.Start,
+				RuleID:           "ST03",
+				Severity:         lint.SeverityWarning,
+				Message:          "CTE '" + cte.Name + "' is defined but never referenced",
+				Pos:              cte.Span.Start,
+				DocumentationURL: lint.BuildDocURL("ST03"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

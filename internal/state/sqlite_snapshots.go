@@ -1,7 +1,9 @@
 package state
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -12,14 +14,15 @@ func (s *SQLiteStore) SaveColumnSnapshot(runID string, modelPath string, sourceT
 		return fmt.Errorf("database not open")
 	}
 
-	tx, err := s.db.Begin()
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	// Insert each column
-	stmt, err := tx.Prepare(`
+	stmt, err := tx.PrepareContext(ctx, `
 		INSERT OR REPLACE INTO column_snapshots 
 		(model_path, source_table, column_name, column_index, run_id)
 		VALUES (?, ?, ?, ?, ?)
@@ -27,10 +30,10 @@ func (s *SQLiteStore) SaveColumnSnapshot(runID string, modelPath string, sourceT
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for i, col := range columns {
-		if _, err := stmt.Exec(modelPath, sourceTable, col, i, runID); err != nil {
+		if _, err := stmt.ExecContext(ctx, modelPath, sourceTable, col, i, runID); err != nil {
 			return fmt.Errorf("insert snapshot for column %s: %w", col, err)
 		}
 	}
@@ -49,16 +52,18 @@ func (s *SQLiteStore) GetColumnSnapshot(modelPath string, sourceTable string) ([
 		return nil, "", fmt.Errorf("database not open")
 	}
 
+	ctx := context.Background()
+
 	// Get the most recent run ID for this model/source combination
 	var runID string
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT run_id FROM column_snapshots
 		WHERE model_path = ? AND source_table = ?
 		ORDER BY snapshot_at DESC
 		LIMIT 1
 	`, modelPath, sourceTable).Scan(&runID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", nil // No snapshot exists
 	}
 	if err != nil {
@@ -66,7 +71,7 @@ func (s *SQLiteStore) GetColumnSnapshot(modelPath string, sourceTable string) ([
 	}
 
 	// Get all columns for this run
-	rows, err := s.db.Query(`
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT column_name FROM column_snapshots
 		WHERE model_path = ? AND source_table = ? AND run_id = ?
 		ORDER BY column_index
@@ -74,7 +79,7 @@ func (s *SQLiteStore) GetColumnSnapshot(modelPath string, sourceTable string) ([
 	if err != nil {
 		return nil, "", fmt.Errorf("query snapshots: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []string
 	for rows.Next() {
@@ -99,8 +104,9 @@ func (s *SQLiteStore) DeleteOldSnapshots(keepRuns int) error {
 		return fmt.Errorf("database not open")
 	}
 
+	ctx := context.Background()
 	// Delete snapshots from runs not in the most recent N
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		DELETE FROM column_snapshots
 		WHERE run_id NOT IN (
 			SELECT DISTINCT run_id FROM column_snapshots

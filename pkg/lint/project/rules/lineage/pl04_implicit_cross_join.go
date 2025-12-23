@@ -15,7 +15,7 @@ func init() {
 		Name:        "implicit-cross-join",
 		Group:       "lineage",
 		Description: "JOINs with no visible join keys in column lineage",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkImplicitCrossJoin,
 	})
 }
@@ -67,12 +67,15 @@ func checkImplicitCrossJoin(ctx *project.Context) []project.Diagnostic {
 
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PL04",
-				Severity: project.SeverityWarning,
+				Severity: lint.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Model '%s' may have implicit cross-join: no columns bridge sources %s; verify JOIN conditions",
 					model.Name, strings.Join(pairStrs, ", ")),
-				Model:    model.Path,
-				FilePath: model.FilePath,
+				Model:            model.Path,
+				FilePath:         model.FilePath,
+				DocumentationURL: lint.BuildDocURL("PL04"),
+				ImpactScore:      lint.ImpactHigh.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

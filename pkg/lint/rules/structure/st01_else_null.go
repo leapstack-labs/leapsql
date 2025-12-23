@@ -34,9 +34,12 @@ func checkElseNull(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagno
 		// Check if ELSE is NULL literal
 		if lit, ok := caseExpr.Else.(*parser.Literal); ok && lit.Type == parser.LiteralNull {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST01",
-				Severity: lint.SeverityHint,
-				Message:  "ELSE NULL is redundant; CASE expressions return NULL by default when no ELSE is specified",
+				RuleID:           "ST01",
+				Severity:         lint.SeverityHint,
+				Message:          "ELSE NULL is redundant; CASE expressions return NULL by default when no ELSE is specified",
+				DocumentationURL: lint.BuildDocURL("ST01"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

@@ -49,10 +49,13 @@ func checkSelectColumnOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 		col := core.Columns[i]
 		if !col.Star && col.TableStar == "" {
 			return []lint.Diagnostic{{
-				RuleID:   "ST06",
-				Severity: lint.SeverityHint,
-				Message:  "Wildcards should appear last in SELECT clause for better readability",
-				Pos:      core.Span.Start,
+				RuleID:           "ST06",
+				Severity:         lint.SeverityHint,
+				Message:          "Wildcards should appear last in SELECT clause for better readability",
+				Pos:              core.Span.Start,
+				DocumentationURL: lint.BuildDocURL("ST06"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			}}
 		}
 	}

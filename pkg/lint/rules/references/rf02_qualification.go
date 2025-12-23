@@ -45,9 +45,12 @@ func checkQualifyColumns(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 	for _, colRef := range ast.CollectColumnRefs(selectStmt) {
 		if colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "RF02",
-				Severity: lint.SeverityWarning,
-				Message:  "Column '" + colRef.Column + "' should be qualified with table name in multi-table query",
+				RuleID:           "RF02",
+				Severity:         lint.SeverityWarning,
+				Message:          "Column '" + colRef.Column + "' should be qualified with table name in multi-table query",
+				DocumentationURL: lint.BuildDocURL("RF02"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

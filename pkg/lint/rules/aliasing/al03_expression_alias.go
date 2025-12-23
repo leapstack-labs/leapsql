@@ -46,10 +46,13 @@ func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint
 		case *parser.FuncCall, *parser.CaseExpr, *parser.BinaryExpr, *parser.CastExpr:
 			// Complex expressions should have aliases
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AL03",
-				Severity: lint.SeverityInfo,
-				Message:  "Expression column should have an explicit alias for clarity",
-				Pos:      core.Span.Start,
+				RuleID:           "AL03",
+				Severity:         lint.SeverityInfo,
+				Message:          "Expression column should have an explicit alias for clarity",
+				Pos:              core.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AL03"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

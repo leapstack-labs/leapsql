@@ -41,11 +41,11 @@ func TestAnalyzer_DisableRule(t *testing.T) {
 		ID:       "TEST01",
 		Name:     "test-rule",
 		Group:    "test",
-		Severity: SeverityWarning,
+		Severity: lint.SeverityWarning,
 		Check: func(_ *Context) []Diagnostic {
 			return []Diagnostic{{
 				RuleID:   "TEST01",
-				Severity: SeverityWarning,
+				Severity: lint.SeverityWarning,
 				Message:  "test message",
 			}}
 		},
@@ -82,11 +82,11 @@ func TestAnalyzer_SeverityOverride(t *testing.T) {
 		ID:       "TEST02",
 		Name:     "test-rule-2",
 		Group:    "test",
-		Severity: SeverityWarning,
+		Severity: lint.SeverityWarning,
 		Check: func(_ *Context) []Diagnostic {
 			return []Diagnostic{{
 				RuleID:   "TEST02",
-				Severity: SeverityWarning,
+				Severity: lint.SeverityWarning,
 				Message:  "test message",
 			}}
 		},
@@ -102,10 +102,10 @@ func TestAnalyzer_SeverityOverride(t *testing.T) {
 
 	// Override severity to Error
 	cfg := NewAnalyzerConfig()
-	cfg.SeverityOverrides["TEST02"] = SeverityError
+	cfg.SeverityOverrides["TEST02"] = lint.SeverityError
 	analyzer := NewAnalyzer(cfg)
 	diags := analyzer.Analyze(ctx)
 
 	require.Len(t, diags, 1)
-	assert.Equal(t, SeverityError, diags[0].Severity)
+	assert.Equal(t, lint.SeverityError, diags[0].Severity)
 }

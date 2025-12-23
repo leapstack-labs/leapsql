@@ -28,19 +28,6 @@ type RuleDef struct {
 	ConfigKeys  []string      // Configuration keys this rule accepts
 }
 
-// Severity is an alias for lint.Severity for backward compatibility.
-// Deprecated: Use lint.Severity directly.
-type Severity = lint.Severity
-
-// Severity constants are aliases for lint severity constants.
-// Deprecated: Use lint.SeverityError, etc. directly.
-const (
-	SeverityError   = lint.SeverityError
-	SeverityWarning = lint.SeverityWarning
-	SeverityInfo    = lint.SeverityInfo
-	SeverityHint    = lint.SeverityHint
-)
-
 // Check is the function signature for project-level rule checks.
 type Check func(ctx *Context) []Diagnostic
 
@@ -51,6 +38,11 @@ type Diagnostic struct {
 	Message  string
 	Model    string // Model path that triggered this diagnostic
 	FilePath string // File path for LSP integration
+
+	// Remediation metadata
+	DocumentationURL string // URL to rule documentation
+	ImpactScore      int    // 0-100, used for health score weighting
+	AutoFixable      bool   // true if fixes can be auto-applied
 }
 
 // Register adds a rule to the global registry.
@@ -142,9 +134,12 @@ func (w *wrappedProjectRule) CheckProject(ctx lint.ProjectContext) []lint.Diagno
 	result := make([]lint.Diagnostic, len(diags))
 	for i, d := range diags {
 		result[i] = lint.Diagnostic{
-			RuleID:   d.RuleID,
-			Severity: d.Severity,
-			Message:  d.Message,
+			RuleID:           d.RuleID,
+			Severity:         d.Severity,
+			Message:          d.Message,
+			DocumentationURL: d.DocumentationURL,
+			ImpactScore:      d.ImpactScore,
+			AutoFixable:      d.AutoFixable,
 		}
 	}
 	return result

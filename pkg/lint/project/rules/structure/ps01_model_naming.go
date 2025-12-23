@@ -14,7 +14,7 @@ func init() {
 		Name:        "model-naming",
 		Group:       "structure",
 		Description: "Model naming convention mismatch",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkModelNaming,
 	})
 }
@@ -37,13 +37,14 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 		if strings.Contains(pathLower, "/staging/") {
 			if !strings.HasPrefix(nameLower, "stg_") {
 				diagnostics = append(diagnostics, project.Diagnostic{
-					RuleID:   "PS01",
-					Severity: project.SeverityWarning,
-					Message: fmt.Sprintf(
-						"Model '%s' is in staging directory but doesn't have 'stg_' prefix",
-						model.Name),
-					Model:    model.Path,
-					FilePath: model.FilePath,
+					RuleID:           "PS01",
+					Severity:         lint.SeverityWarning,
+					Message:          fmt.Sprintf("Model '%s' is in staging directory but doesn't have 'stg_' prefix", model.Name),
+					Model:            model.Path,
+					FilePath:         model.FilePath,
+					DocumentationURL: lint.BuildDocURL("PS01"),
+					ImpactScore:      lint.ImpactLow.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}
@@ -52,13 +53,14 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 		if strings.Contains(pathLower, "/intermediate/") {
 			if !strings.HasPrefix(nameLower, "int_") {
 				diagnostics = append(diagnostics, project.Diagnostic{
-					RuleID:   "PS01",
-					Severity: project.SeverityWarning,
-					Message: fmt.Sprintf(
-						"Model '%s' is in intermediate directory but doesn't have 'int_' prefix",
-						model.Name),
-					Model:    model.Path,
-					FilePath: model.FilePath,
+					RuleID:           "PS01",
+					Severity:         lint.SeverityWarning,
+					Message:          fmt.Sprintf("Model '%s' is in intermediate directory but doesn't have 'int_' prefix", model.Name),
+					Model:            model.Path,
+					FilePath:         model.FilePath,
+					DocumentationURL: lint.BuildDocURL("PS01"),
+					ImpactScore:      lint.ImpactLow.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}
@@ -74,13 +76,14 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 				// Only warn if the model type is marts (inferred)
 				if model.Type == lint.ModelTypeMarts {
 					diagnostics = append(diagnostics, project.Diagnostic{
-						RuleID:   "PS01",
-						Severity: project.SeverityWarning,
-						Message: fmt.Sprintf(
-							"Model '%s' is in marts directory but doesn't have 'fct_' or 'dim_' prefix",
-							model.Name),
-						Model:    model.Path,
-						FilePath: model.FilePath,
+						RuleID:           "PS01",
+						Severity:         lint.SeverityWarning,
+						Message:          fmt.Sprintf("Model '%s' is in marts directory but doesn't have 'fct_' or 'dim_' prefix", model.Name),
+						Model:            model.Path,
+						FilePath:         model.FilePath,
+						DocumentationURL: lint.BuildDocURL("PS01"),
+						ImpactScore:      lint.ImpactLow.Int(),
+						AutoFixable:      false,
 					})
 				}
 			}

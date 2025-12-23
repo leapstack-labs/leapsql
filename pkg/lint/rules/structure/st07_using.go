@@ -37,10 +37,13 @@ func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Dia
 		// Check if condition is a simple equality on same-named columns
 		if canUseUsing(join.Condition) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST07",
-				Severity: lint.SeverityHint,
-				Message:  "Consider using USING clause for join on same-named columns",
-				Pos:      join.Span.Start,
+				RuleID:           "ST07",
+				Severity:         lint.SeverityHint,
+				Message:          "Consider using USING clause for join on same-named columns",
+				Pos:              join.Span.Start,
+				DocumentationURL: lint.BuildDocURL("ST07"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

@@ -36,9 +36,12 @@ func checkSimpleCaseConversion(stmt any, _ lint.DialectInfo, _ map[string]any) [
 		// Check if all WHEN conditions compare the same column to a literal
 		if canConvertToSimpleCase(caseExpr) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST02",
-				Severity: lint.SeverityHint,
-				Message:  "Searched CASE expression can be converted to simple CASE for better readability",
+				RuleID:           "ST02",
+				Severity:         lint.SeverityHint,
+				Message:          "Searched CASE expression can be converted to simple CASE for better readability",
+				DocumentationURL: lint.BuildDocURL("ST02"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

@@ -38,10 +38,13 @@ func checkSelfAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagn
 		// Check if alias equals table name (case-insensitive)
 		if strings.EqualFold(tn.Name, tn.Alias) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AL09",
-				Severity: lint.SeverityHint,
-				Message:  "Table '" + tn.Name + "' is aliased to its own name; this is redundant",
-				Pos:      tn.Span.Start,
+				RuleID:           "AL09",
+				Severity:         lint.SeverityHint,
+				Message:          "Table '" + tn.Name + "' is aliased to its own name; this is redundant",
+				Pos:              tn.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AL09"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

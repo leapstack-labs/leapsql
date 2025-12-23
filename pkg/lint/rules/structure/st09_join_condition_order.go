@@ -123,10 +123,13 @@ func checkConditionOrder(condition parser.Expr, leftTables, rightTables []string
 	// Good: a.id = b.id (left table first)
 	if rightSet[leftCol.Table] && leftSet[rightCol.Table] {
 		return &lint.Diagnostic{
-			RuleID:   "ST09",
-			Severity: lint.SeverityHint,
-			Message:  "Join condition should reference left table first; consider rewriting as '" + rightCol.Table + "." + rightCol.Column + " = " + leftCol.Table + "." + leftCol.Column + "'",
-			Pos:      pos,
+			RuleID:           "ST09",
+			Severity:         lint.SeverityHint,
+			Message:          "Join condition should reference left table first; consider rewriting as '" + rightCol.Table + "." + rightCol.Column + " = " + leftCol.Table + "." + leftCol.Column + "'",
+			Pos:              pos,
+			DocumentationURL: lint.BuildDocURL("ST09"),
+			ImpactScore:      lint.ImpactLow.Int(),
+			AutoFixable:      false,
 		}
 	}
 

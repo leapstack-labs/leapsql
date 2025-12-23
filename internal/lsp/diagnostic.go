@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/provider"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
@@ -15,6 +16,7 @@ import (
 )
 
 // publishDiagnostics parses the document and publishes any errors.
+// Uses the shared provider for caching to avoid redundant parsing.
 func (s *Server) publishDiagnostics(uri string) {
 	doc := s.documents.Get(uri)
 	if doc == nil {
@@ -32,20 +34,16 @@ func (s *Server) publishDiagnostics(uri string) {
 		return
 	}
 
-	// 1. Check frontmatter
-	frontmatterDiags := s.validateFrontmatter(doc)
-	diagnostics = append(diagnostics, frontmatterDiags...)
+	// Use provider for cached parsing (single parse instead of 3x)
+	if s.provider != nil {
+		parsed := s.provider.GetOrParse(uri, doc.Content, doc.Version)
+		diagnostics = s.getDiagnosticsFromParsed(uri, parsed, doc)
+	} else {
+		// Fallback to direct parsing if provider not initialized
+		diagnostics = s.getDiagnosticsLegacy(doc)
+	}
 
-	// 2. Check template syntax
-	templateDiags := s.validateTemplate(doc)
-	diagnostics = append(diagnostics, templateDiags...)
-
-	// 3. Check SQL syntax (extract SQL from template first)
-	// Note: Basic SQL parsing doesn't require dialect - it's purely syntax checking
-	sqlDiags := s.validateSQL(doc)
-	diagnostics = append(diagnostics, sqlDiags...)
-
-	// 4. Validate macro references (if store available)
+	// Validate macro references (if store available)
 	if s.store != nil {
 		macroDiags := s.validateMacroReferences(doc)
 		diagnostics = append(diagnostics, macroDiags...)
@@ -55,6 +53,139 @@ func (s *Server) publishDiagnostics(uri string) {
 		URI:         uri,
 		Diagnostics: diagnostics,
 	})
+}
+
+// getDiagnosticsFromParsed extracts diagnostics from a cached ParsedDocument.
+func (s *Server) getDiagnosticsFromParsed(uri string, parsed *provider.ParsedDocument, _ *Document) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// 1. Frontmatter errors
+	if parsed.FrontmatterError != nil {
+		diagnostics = append(diagnostics, s.frontmatterErrorToDiagnostic(parsed.FrontmatterError)...)
+	}
+
+	// 2. Template errors
+	if parsed.TemplateError != nil {
+		diagnostics = append(diagnostics, s.templateErrorToDiagnostic(parsed.TemplateError)...)
+	}
+
+	// 3. SQL parse errors
+	if parsed.SQLError != nil {
+		diagnostics = append(diagnostics, s.sqlErrorToDiagnostic(parsed.SQLError)...)
+	}
+
+	// 4. Run lint rules if SQL parsed successfully
+	if parsed.SQL != nil {
+		lintDiags := s.runLinter(uri, parsed.SQL)
+		diagnostics = append(diagnostics, lintDiags...)
+	}
+
+	return diagnostics
+}
+
+// getDiagnosticsLegacy performs direct parsing without caching (fallback).
+func (s *Server) getDiagnosticsLegacy(doc *Document) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// 1. Check frontmatter
+	frontmatterDiags := s.validateFrontmatter(doc)
+	diagnostics = append(diagnostics, frontmatterDiags...)
+
+	// 2. Check template syntax
+	templateDiags := s.validateTemplate(doc)
+	diagnostics = append(diagnostics, templateDiags...)
+
+	// 3. Check SQL syntax
+	sqlDiags := s.validateSQL(doc)
+	diagnostics = append(diagnostics, sqlDiags...)
+
+	return diagnostics
+}
+
+// frontmatterErrorToDiagnostic converts a frontmatter error to LSP diagnostic.
+func (s *Server) frontmatterErrorToDiagnostic(err error) []Diagnostic {
+	var pos Position
+	var msg string
+
+	var parseErr *parser.FrontmatterParseError
+	var unknownErr *parser.UnknownFieldError
+
+	switch {
+	case errors.As(err, &parseErr):
+		pos = Position{Line: uint32(parseErr.Line), Character: 0} //nolint:gosec // G115: line is always non-negative from parser
+		msg = parseErr.Message
+	case errors.As(err, &unknownErr):
+		msg = fmt.Sprintf("Unknown frontmatter field: %s", unknownErr.Field)
+		pos = Position{Line: 0, Character: 0}
+	default:
+		msg = err.Error()
+		pos = Position{Line: 0, Character: 0}
+	}
+
+	return []Diagnostic{{
+		Range: Range{
+			Start: pos,
+			End:   Position{Line: pos.Line, Character: 1000},
+		},
+		Severity: DiagnosticSeverityError,
+		Code:     "E001",
+		Source:   "leapsql",
+		Message:  msg,
+	}}
+}
+
+// templateErrorToDiagnostic converts a template error to LSP diagnostic.
+func (s *Server) templateErrorToDiagnostic(err error) []Diagnostic {
+	var pos Position
+	var msg string
+
+	var te template.Error
+	if errors.As(err, &te) {
+		tpos := te.Position()
+		pos = Position{Line: uint32(tpos.Line - 1), Character: uint32(tpos.Column - 1)} //nolint:gosec // G115: line/column are always non-negative
+		msg = err.Error()
+	} else {
+		msg = err.Error()
+	}
+
+	return []Diagnostic{{
+		Range: Range{
+			Start: pos,
+			End:   Position{Line: pos.Line, Character: pos.Character + 10},
+		},
+		Severity: DiagnosticSeverityError,
+		Code:     "E002",
+		Source:   "leapsql",
+		Message:  "Template error: " + msg,
+	}}
+}
+
+// sqlErrorToDiagnostic converts a SQL parse error to LSP diagnostic.
+func (s *Server) sqlErrorToDiagnostic(err error) []Diagnostic {
+	var pe *pkgparser.ParseError
+	if errors.As(err, &pe) {
+		return []Diagnostic{{
+			Range: Range{
+				Start: Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column - 1)},  //nolint:gosec // G115: line/column are always non-negative
+				End:   Position{Line: uint32(pe.Pos.Line - 1), Character: uint32(pe.Pos.Column + 10)}, //nolint:gosec // G115: line/column are always non-negative
+			},
+			Severity: DiagnosticSeverityError,
+			Code:     "E003",
+			Source:   "leapsql",
+			Message:  pe.Message,
+		}}
+	}
+
+	return []Diagnostic{{
+		Range: Range{
+			Start: Position{Line: 0, Character: 0},
+			End:   Position{Line: 0, Character: 10},
+		},
+		Severity: DiagnosticSeverityError,
+		Code:     "E003",
+		Source:   "leapsql",
+		Message:  "SQL error: " + err.Error(),
+	}}
 }
 
 // validateFrontmatter checks YAML frontmatter syntax.
@@ -179,7 +310,7 @@ func (s *Server) validateSQL(doc *Document) []Diagnostic {
 
 	// Run lint rules if statement parsed successfully (even if there were parser warnings)
 	if stmt != nil {
-		lintDiags := s.runLinter(stmt)
+		lintDiags := s.runLinter(doc.URI, stmt)
 		diagnostics = append(diagnostics, lintDiags...)
 	}
 
@@ -341,7 +472,7 @@ func levenshtein(s1, s2 string) int {
 }
 
 // runLinter runs lint rules against a parsed SQL statement.
-func (s *Server) runLinter(stmt *pkgparser.SelectStmt) []Diagnostic {
+func (s *Server) runLinter(uri string, stmt *pkgparser.SelectStmt) []Diagnostic {
 	// Use analyzer with registry to get SQLFluff-style rules in addition to dialect rules
 	analyzer := lint.NewAnalyzerWithRegistry(lint.NewConfig(), s.dialect.GetName())
 	lintDiags := analyzer.Analyze(stmt, s.dialect)
@@ -349,23 +480,45 @@ func (s *Server) runLinter(stmt *pkgparser.SelectStmt) []Diagnostic {
 	// Convert lint.Diagnostic to LSP Diagnostic
 	var result []Diagnostic
 	for _, d := range lintDiags {
-		result = append(result, Diagnostic{
+		// Determine end position - use EndPos if available, otherwise estimate
+		endLine := d.EndPos.Line
+		endCol := d.EndPos.Column
+		if endLine == 0 && endCol == 0 {
+			// Fallback: estimate end position
+			endLine = d.Pos.Line
+			endCol = d.Pos.Column + 10
+		}
+
+		diag := Diagnostic{
 			Range: Range{
 				Start: Position{
 					Line:      uint32(max(0, d.Pos.Line-1)),   //nolint:gosec // G115: line is always non-negative
 					Character: uint32(max(0, d.Pos.Column-1)), //nolint:gosec // G115: column is always non-negative
 				},
 				End: Position{
-					Line:      uint32(max(0, d.Pos.Line-1)),      //nolint:gosec // G115: line is always non-negative
-					Character: uint32(max(0, d.Pos.Column+10-1)), //nolint:gosec // G115: column is always non-negative
+					Line:      uint32(max(0, endLine-1)), //nolint:gosec // G115: line is always non-negative
+					Character: uint32(max(0, endCol-1)),  //nolint:gosec // G115: column is always non-negative
 				},
 			},
 			Severity: toLSPSeverity(d.Severity),
 			Code:     d.RuleID,
 			Source:   "leapsql-lint",
 			Message:  d.Message,
-		})
+		}
+
+		// Add documentation URL if available
+		if d.DocumentationURL != "" {
+			diag.CodeDescription = &CodeDescription{Href: d.DocumentationURL}
+		} else {
+			// Generate default documentation URL
+			diag.CodeDescription = &CodeDescription{Href: lint.BuildDocURL(d.RuleID)}
+		}
+
+		result = append(result, diag)
 	}
+
+	// Cache fixes for code actions
+	s.cacheDiagnosticFixes(uri, lintDiags)
 
 	return result
 }
@@ -388,7 +541,13 @@ func toLSPSeverity(s lint.Severity) DiagnosticSeverity {
 
 // runProjectHealthDiagnostics runs project-level lint rules and returns diagnostics grouped by file.
 func (s *Server) runProjectHealthDiagnostics() map[string][]Diagnostic {
-	ctx := s.buildProjectContext()
+	// Use provider's cached project context if available
+	var ctx *project.Context
+	if s.provider != nil {
+		ctx = s.provider.GetProjectContext()
+	} else {
+		ctx = s.buildProjectContext()
+	}
 	if ctx == nil {
 		return nil
 	}
@@ -423,16 +582,16 @@ func (s *Server) runProjectHealthDiagnostics() map[string][]Diagnostic {
 	return byFile
 }
 
-// projectSeverityToLSP converts project.Severity to LSP DiagnosticSeverity.
-func projectSeverityToLSP(s project.Severity) DiagnosticSeverity {
+// projectSeverityToLSP converts lint.Severity to LSP DiagnosticSeverity.
+func projectSeverityToLSP(s lint.Severity) DiagnosticSeverity {
 	switch s {
-	case project.SeverityError:
+	case lint.SeverityError:
 		return DiagnosticSeverityError
-	case project.SeverityWarning:
+	case lint.SeverityWarning:
 		return DiagnosticSeverityWarning
-	case project.SeverityInfo:
+	case lint.SeverityInfo:
 		return DiagnosticSeverityInformation
-	case project.SeverityHint:
+	case lint.SeverityHint:
 		return DiagnosticSeverityHint
 	default:
 		return DiagnosticSeverityWarning
@@ -476,26 +635,22 @@ func (s *Server) publishDiagnosticsWithProjectHealth(uri string, projectDiags []
 
 	// Only process SQL files for file-level diagnostics
 	if strings.HasSuffix(uri, ".sql") {
-		// 1. Check frontmatter
-		frontmatterDiags := s.validateFrontmatter(doc)
-		diagnostics = append(diagnostics, frontmatterDiags...)
+		// Use provider for cached parsing (single parse instead of 3x)
+		if s.provider != nil {
+			parsed := s.provider.GetOrParse(uri, doc.Content, doc.Version)
+			diagnostics = s.getDiagnosticsFromParsed(uri, parsed, doc)
+		} else {
+			diagnostics = s.getDiagnosticsLegacy(doc)
+		}
 
-		// 2. Check template syntax
-		templateDiags := s.validateTemplate(doc)
-		diagnostics = append(diagnostics, templateDiags...)
-
-		// 3. Check SQL syntax
-		sqlDiags := s.validateSQL(doc)
-		diagnostics = append(diagnostics, sqlDiags...)
-
-		// 4. Validate macro references
+		// Validate macro references
 		if s.store != nil {
 			macroDiags := s.validateMacroReferences(doc)
 			diagnostics = append(diagnostics, macroDiags...)
 		}
 	}
 
-	// 5. Add project health diagnostics
+	// Add project health diagnostics
 	diagnostics = append(diagnostics, projectDiags...)
 
 	s.sendNotification("textDocument/publishDiagnostics", &PublishDiagnosticsParams{

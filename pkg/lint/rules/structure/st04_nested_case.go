@@ -30,9 +30,12 @@ func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 	for _, caseExpr := range ast.CollectCaseExprs(selectStmt) {
 		if hasNestedCase(caseExpr) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST04",
-				Severity: lint.SeverityInfo,
-				Message:  "Nested CASE expressions reduce readability; consider refactoring",
+				RuleID:           "ST04",
+				Severity:         lint.SeverityInfo,
+				Message:          "Nested CASE expressions reduce readability; consider refactoring",
+				DocumentationURL: lint.BuildDocURL("ST04"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

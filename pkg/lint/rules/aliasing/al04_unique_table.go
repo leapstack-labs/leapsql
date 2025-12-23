@@ -56,9 +56,12 @@ func checkUniqueTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	for alias, count := range aliases {
 		if count > 1 {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AL04",
-				Severity: lint.SeverityError,
-				Message:  "Table alias '" + alias + "' is used " + string(rune('0'+count)) + " times; aliases must be unique",
+				RuleID:           "AL04",
+				Severity:         lint.SeverityError,
+				Message:          "Table alias '" + alias + "' is used " + string(rune('0'+count)) + " times; aliases must be unique",
+				DocumentationURL: lint.BuildDocURL("AL04"),
+				ImpactScore:      lint.ImpactCritical.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

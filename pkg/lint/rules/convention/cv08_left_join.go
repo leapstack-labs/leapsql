@@ -32,10 +32,13 @@ func checkPreferLeftJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 	for _, join := range ast.CollectJoins(selectStmt) {
 		if strings.ToUpper(string(join.Type)) == "RIGHT" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "CV08",
-				Severity: lint.SeverityHint,
-				Message:  "Consider using LEFT JOIN instead of RIGHT JOIN for better readability",
-				Pos:      join.Span.Start,
+				RuleID:           "CV08",
+				Severity:         lint.SeverityHint,
+				Message:          "Consider using LEFT JOIN instead of RIGHT JOIN for better readability",
+				Pos:              join.Span.Start,
+				DocumentationURL: lint.BuildDocURL("CV08"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

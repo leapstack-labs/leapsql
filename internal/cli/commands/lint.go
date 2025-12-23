@@ -437,7 +437,9 @@ func buildProjectContext(eng *engine.Engine, cfg *config.Config) *project.Contex
 	// Build config
 	projectCfg := buildProjectHealthConfig(cfg)
 
-	return project.NewContext(models, parents, children, projectCfg)
+	// Use NewContextWithStore to enable schema drift detection (PL05)
+	store := eng.GetStateStore()
+	return project.NewContextWithStore(models, parents, children, projectCfg, store)
 }
 
 // convertColumns converts parser.ColumnInfo to lint.ColumnInfo.
@@ -504,13 +506,13 @@ func buildProjectAnalyzerConfig(cfg *config.Config, opts *LintOptions) *project.
 				// Parse severity override
 				switch strings.ToLower(sev) {
 				case "error":
-					analyzerCfg.SeverityOverrides[id] = project.SeverityError
+					analyzerCfg.SeverityOverrides[id] = lint.SeverityError
 				case "warning":
-					analyzerCfg.SeverityOverrides[id] = project.SeverityWarning
+					analyzerCfg.SeverityOverrides[id] = lint.SeverityWarning
 				case "info":
-					analyzerCfg.SeverityOverrides[id] = project.SeverityInfo
+					analyzerCfg.SeverityOverrides[id] = lint.SeverityInfo
 				case "hint":
-					analyzerCfg.SeverityOverrides[id] = project.SeverityHint
+					analyzerCfg.SeverityOverrides[id] = lint.SeverityHint
 				}
 			}
 		}
@@ -532,19 +534,19 @@ func filterProjectBySeverity(diags []project.Diagnostic, severityThreshold strin
 	return filtered
 }
 
-// parseSeverityThreshold converts a severity string to project.Severity.
-func parseSeverityThreshold(s string) project.Severity {
+// parseSeverityThreshold converts a severity string to lint.Severity.
+func parseSeverityThreshold(s string) lint.Severity {
 	switch strings.ToLower(s) {
 	case "error":
-		return project.SeverityError
+		return lint.SeverityError
 	case "warning":
-		return project.SeverityWarning
+		return lint.SeverityWarning
 	case "info":
-		return project.SeverityInfo
+		return lint.SeverityInfo
 	case "hint":
-		return project.SeverityHint
+		return lint.SeverityHint
 	default:
-		return project.SeverityWarning
+		return lint.SeverityWarning
 	}
 }
 
@@ -571,15 +573,15 @@ func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic) 
 }
 
 // projectSeverityStyle returns the styled severity string for project diagnostics.
-func projectSeverityStyle(r *output.Renderer, sev project.Severity) string {
+func projectSeverityStyle(r *output.Renderer, sev lint.Severity) string {
 	switch sev {
-	case project.SeverityError:
+	case lint.SeverityError:
 		return r.Styles().Error.Render("error  ")
-	case project.SeverityWarning:
+	case lint.SeverityWarning:
 		return r.Styles().Warning.Render("warning")
-	case project.SeverityInfo:
+	case lint.SeverityInfo:
 		return r.Styles().Info.Render("info   ")
-	case project.SeverityHint:
+	case lint.SeverityHint:
 		return r.Styles().Muted.Render("hint   ")
 	default:
 		return r.Styles().Muted.Render("unknown")

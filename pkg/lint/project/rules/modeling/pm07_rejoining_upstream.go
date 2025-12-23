@@ -3,6 +3,7 @@ package modeling
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
 
@@ -12,7 +13,7 @@ func init() {
 		Name:        "rejoining-upstream",
 		Group:       "modeling",
 		Description: "Unnecessary intermediate model in a fan-in pattern (A→B, A→C, B→C where B has no other consumers)",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkRejoiningUpstream,
 	})
 }
@@ -77,12 +78,15 @@ func checkRejoiningUpstream(ctx *project.Context) []project.Diagnostic {
 
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:   "PM07",
-					Severity: project.SeverityWarning,
+					Severity: lint.SeverityWarning,
 					Message: fmt.Sprintf(
 						"Model '%s' is an unnecessary intermediate: '%s' → '%s' → '%s', but '%s' also depends directly on '%s'; consider inlining '%s' into '%s'",
 						modelB.Name, aName, modelB.Name, modelC.Name, modelC.Name, aName, modelB.Name, modelC.Name),
-					Model:    modelB.Path,
-					FilePath: modelB.FilePath,
+					Model:            modelB.Path,
+					FilePath:         modelB.FilePath,
+					DocumentationURL: lint.BuildDocURL("PM07"),
+					ImpactScore:      lint.ImpactMedium.Int(),
+					AutoFixable:      false,
 				})
 				break // One finding per model is enough
 			}

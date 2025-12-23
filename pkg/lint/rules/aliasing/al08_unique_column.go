@@ -46,10 +46,13 @@ func checkUniqueColumnAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 	for alias, count := range aliases {
 		if count > 1 {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AL08",
-				Severity: lint.SeverityWarning,
-				Message:  "Column alias '" + alias + "' is used multiple times in SELECT clause",
-				Pos:      core.Span.Start,
+				RuleID:           "AL08",
+				Severity:         lint.SeverityWarning,
+				Message:          "Column alias '" + alias + "' is used multiple times in SELECT clause",
+				Pos:              core.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AL08"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

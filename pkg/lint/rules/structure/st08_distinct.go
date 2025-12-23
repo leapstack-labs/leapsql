@@ -57,10 +57,13 @@ func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 
 	if allSimpleColumns && len(core.Columns) > 0 {
 		return []lint.Diagnostic{{
-			RuleID:   "ST08",
-			Severity: lint.SeverityInfo,
-			Message:  "DISTINCT on simple columns could be expressed as GROUP BY for clarity",
-			Pos:      core.Span.Start,
+			RuleID:           "ST08",
+			Severity:         lint.SeverityInfo,
+			Message:          "DISTINCT on simple columns could be expressed as GROUP BY for clarity",
+			Pos:              core.Span.Start,
+			DocumentationURL: lint.BuildDocURL("ST08"),
+			ImpactScore:      lint.ImpactLow.Int(),
+			AutoFixable:      false,
 		}}
 	}
 

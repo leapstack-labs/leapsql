@@ -50,9 +50,12 @@ func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 		// If ORDER BY uses a column reference without table qualifier, it's ambiguous
 		if colRef, ok := item.Expr.(*parser.ColumnRef); ok && colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM03",
-				Severity: lint.SeverityWarning,
-				Message:  "ORDER BY column '" + colRef.Column + "' may be ambiguous in set operation; consider using column position",
+				RuleID:           "AM03",
+				Severity:         lint.SeverityWarning,
+				Message:          "ORDER BY column '" + colRef.Column + "' may be ambiguous in set operation; consider using column position",
+				DocumentationURL: lint.BuildDocURL("AM03"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

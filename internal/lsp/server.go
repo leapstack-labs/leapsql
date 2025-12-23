@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/leapstack-labs/leapsql/internal/config"
+	"github.com/leapstack-labs/leapsql/internal/provider"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
@@ -29,6 +30,9 @@ import (
 type Server struct {
 	// Document management
 	documents *DocumentStore
+
+	// Shared provider for all parsing and context (eliminates redundant parsing)
+	provider *provider.Provider
 
 	// Project context
 	projectRoot string
@@ -291,6 +295,9 @@ func (s *Server) handleInitialize(msg *JSONRPCMessage) error {
 	// Load dialect from project config
 	s.loadDialectFromConfig()
 
+	// Initialize the shared provider for parsing and context
+	s.provider = provider.New(s.store, s.dialect, s.projectConfig, s.logger)
+
 	result := InitializeResult{
 		Capabilities: ServerCapabilities{
 			TextDocumentSync: &TextDocumentSyncOptions{
@@ -530,127 +537,12 @@ func (s *Server) loadDialectFromConfig() {
 	s.logger.Info("No target configured, defaulting to ANSI dialect")
 }
 
-// buildProjectContext creates a project.Context from the store's model data.
-// Returns nil if the store is unavailable or has no models.
-// Uses batch queries for performance (~5 queries instead of ~500 for 100 models).
+// buildProjectContext delegates to the provider for project context.
+// Falls back to building directly from store if provider is not available.
 func (s *Server) buildProjectContext() *project.Context {
-	if s.store == nil {
-		return nil
+	if s.provider != nil {
+		return s.provider.GetProjectContext()
 	}
-
-	// Get all models from store
-	storeModels, err := s.store.ListModels()
-	if err != nil || len(storeModels) == 0 {
-		return nil
-	}
-
-	// Build model ID to path mapping for dependency resolution
-	modelIDToPath := make(map[string]string, len(storeModels))
-	for _, m := range storeModels {
-		modelIDToPath[m.ID] = m.Path
-	}
-
-	// Batch fetch all columns (1 query instead of N)
-	allColumns, err := s.store.BatchGetAllColumns()
-	if err != nil {
-		s.logger.Warn("Failed to batch get columns, falling back to per-model queries", "error", err)
-		allColumns = nil
-	}
-
-	// Batch fetch all dependencies (1 query instead of N)
-	allDeps, err := s.store.BatchGetAllDependencies()
-	if err != nil {
-		s.logger.Warn("Failed to batch get dependencies", "error", err)
-		allDeps = make(map[string][]string)
-	}
-
-	// Batch fetch all dependents (1 query instead of N)
-	allDependents, err := s.store.BatchGetAllDependents()
-	if err != nil {
-		s.logger.Warn("Failed to batch get dependents", "error", err)
-		allDependents = make(map[string][]string)
-	}
-
-	// Convert store models to project models
-	models := make(map[string]*project.ModelInfo)
-	parents := make(map[string][]string)
-	children := make(map[string][]string)
-
-	for _, m := range storeModels {
-		// Get columns from batch result or fallback to individual query
-		var columns []lint.ColumnInfo
-		if allColumns != nil {
-			cols := allColumns[m.Path]
-			columns = make([]lint.ColumnInfo, len(cols))
-			for i, c := range cols {
-				sources := make([]lint.SourceRef, len(c.Sources))
-				for j, src := range c.Sources {
-					sources[j] = lint.SourceRef{
-						Table:  src.Table,
-						Column: src.Column,
-					}
-				}
-				columns[i] = lint.ColumnInfo{
-					Name:          c.Name,
-					TransformType: c.TransformType,
-					Function:      c.Function,
-					Sources:       sources,
-				}
-			}
-		} else {
-			// Fallback to individual query
-			cols, _ := s.store.GetModelColumns(m.Path)
-			columns = make([]lint.ColumnInfo, len(cols))
-			for i, c := range cols {
-				sources := make([]lint.SourceRef, len(c.Sources))
-				for j, src := range c.Sources {
-					sources[j] = lint.SourceRef{
-						Table:  src.Table,
-						Column: src.Column,
-					}
-				}
-				columns[i] = lint.ColumnInfo{
-					Name:          c.Name,
-					TransformType: c.TransformType,
-					Function:      c.Function,
-					Sources:       sources,
-				}
-			}
-		}
-
-		// Get dependencies from batch result (convert IDs to paths)
-		deps := allDeps[m.ID]
-		var parentPaths []string
-		for _, depID := range deps {
-			if path, ok := modelIDToPath[depID]; ok {
-				parentPaths = append(parentPaths, path)
-			}
-		}
-
-		// Get dependents from batch result (convert IDs to paths)
-		dependents := allDependents[m.ID]
-		var childPaths []string
-		for _, depID := range dependents {
-			if path, ok := modelIDToPath[depID]; ok {
-				childPaths = append(childPaths, path)
-			}
-		}
-
-		models[m.Path] = &project.ModelInfo{
-			Path:         m.Path,
-			Name:         m.Name,
-			FilePath:     m.FilePath,
-			Columns:      columns,
-			Materialized: m.Materialized,
-			Tags:         m.Tags,
-			Meta:         m.Meta,
-		}
-		parents[m.Path] = parentPaths
-		children[m.Path] = childPaths
-	}
-
-	// Infer model types
-	project.InferAndSetTypes(models)
-
-	return project.NewContext(models, parents, children, s.projectConfig)
+	// Fallback: should not happen after initialization
+	return nil
 }

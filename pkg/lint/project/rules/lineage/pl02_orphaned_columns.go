@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
 
@@ -14,7 +15,7 @@ func init() {
 		Name:        "orphaned-columns",
 		Group:       "lineage",
 		Description: "Columns not used by any downstream model",
-		Severity:    project.SeverityInfo,
+		Severity:    lint.SeverityInfo,
 		Check:       checkOrphanedColumns,
 	})
 }
@@ -85,12 +86,15 @@ func checkOrphanedColumns(ctx *project.Context) []project.Diagnostic {
 
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PL02",
-				Severity: project.SeverityInfo,
+				Severity: lint.SeverityInfo,
 				Message: fmt.Sprintf(
 					"Model '%s' has %d columns not used by downstream models: %s%s; consider removing them",
 					model.Name, len(orphaned), strings.Join(displayColumns, ", "), suffix),
-				Model:    model.Path,
-				FilePath: model.FilePath,
+				Model:            model.Path,
+				FilePath:         model.FilePath,
+				DocumentationURL: lint.BuildDocURL("PL02"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

@@ -33,9 +33,12 @@ func checkPreferCoalesce(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 		name := strings.ToUpper(fn.Name)
 		if name == "IFNULL" || name == "NVL" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "CV02",
-				Severity: lint.SeverityHint,
-				Message:  "Prefer COALESCE over " + name + " for better SQL portability",
+				RuleID:           "CV02",
+				Severity:         lint.SeverityHint,
+				Message:          "Prefer COALESCE over " + name + " for better SQL portability",
+				DocumentationURL: lint.BuildDocURL("CV02"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

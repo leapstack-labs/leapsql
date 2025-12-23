@@ -13,7 +13,7 @@ func init() {
 		Name:        "staging-depends-staging",
 		Group:       "modeling",
 		Description: "Staging model references another staging model",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkStagingDependsStaging,
 	})
 }
@@ -43,12 +43,15 @@ func checkStagingDependsStaging(ctx *project.Context) []project.Diagnostic {
 			if sourceModel.Type == lint.ModelTypeStaging {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:   "PM03",
-					Severity: project.SeverityWarning,
+					Severity: lint.SeverityWarning,
 					Message: fmt.Sprintf(
 						"Staging model '%s' depends on staging model '%s'; staging should only reference raw sources",
 						model.Name, sourceModel.Name),
-					Model:    model.Path,
-					FilePath: model.FilePath,
+					Model:            model.Path,
+					FilePath:         model.FilePath,
+					DocumentationURL: lint.BuildDocURL("PM03"),
+					ImpactScore:      lint.ImpactMedium.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}

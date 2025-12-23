@@ -102,10 +102,13 @@ func checkAlias(alias, aliasType string, patterns []*regexp.Regexp, forbiddenSet
 	// Check against forbidden names
 	if forbiddenSet[lowerAlias] {
 		return &lint.Diagnostic{
-			RuleID:   "AL07",
-			Severity: lint.SeverityWarning,
-			Message:  aliasType + " alias '" + alias + "' is forbidden; use a more descriptive name",
-			Pos:      pos,
+			RuleID:           "AL07",
+			Severity:         lint.SeverityWarning,
+			Message:          aliasType + " alias '" + alias + "' is forbidden; use a more descriptive name",
+			Pos:              pos,
+			DocumentationURL: lint.BuildDocURL("AL07"),
+			ImpactScore:      lint.ImpactMedium.Int(),
+			AutoFixable:      false,
 		}
 	}
 
@@ -113,10 +116,13 @@ func checkAlias(alias, aliasType string, patterns []*regexp.Regexp, forbiddenSet
 	for _, re := range patterns {
 		if re.MatchString(lowerAlias) {
 			return &lint.Diagnostic{
-				RuleID:   "AL07",
-				Severity: lint.SeverityWarning,
-				Message:  aliasType + " alias '" + alias + "' matches forbidden pattern; use a more descriptive name",
-				Pos:      pos,
+				RuleID:           "AL07",
+				Severity:         lint.SeverityWarning,
+				Message:          aliasType + " alias '" + alias + "' matches forbidden pattern; use a more descriptive name",
+				Pos:              pos,
+				DocumentationURL: lint.BuildDocURL("AL07"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			}
 		}
 	}

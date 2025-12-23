@@ -54,18 +54,24 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 		if alias != "" {
 			if len(alias) < minLen {
 				diagnostics = append(diagnostics, lint.Diagnostic{
-					RuleID:   "AL06",
-					Severity: lint.SeverityInfo,
-					Message:  "Table alias '" + alias + "' is too short; minimum length is " + string(rune('0'+minLen)),
-					Pos:      pos,
+					RuleID:           "AL06",
+					Severity:         lint.SeverityInfo,
+					Message:          "Table alias '" + alias + "' is too short; minimum length is " + string(rune('0'+minLen)),
+					Pos:              pos,
+					DocumentationURL: lint.BuildDocURL("AL06"),
+					ImpactScore:      lint.ImpactLow.Int(),
+					AutoFixable:      false,
 				})
 			}
 			if len(alias) > maxLen {
 				diagnostics = append(diagnostics, lint.Diagnostic{
-					RuleID:   "AL06",
-					Severity: lint.SeverityInfo,
-					Message:  "Table alias '" + alias + "' is too long; maximum length is " + string(rune('0'+maxLen)),
-					Pos:      pos,
+					RuleID:           "AL06",
+					Severity:         lint.SeverityInfo,
+					Message:          "Table alias '" + alias + "' is too long; maximum length is " + string(rune('0'+maxLen)),
+					Pos:              pos,
+					DocumentationURL: lint.BuildDocURL("AL06"),
+					ImpactScore:      lint.ImpactLow.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}
@@ -80,18 +86,24 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 				alias := strings.TrimSpace(col.Alias)
 				if len(alias) < minLen {
 					diagnostics = append(diagnostics, lint.Diagnostic{
-						RuleID:   "AL06",
-						Severity: lint.SeverityInfo,
-						Message:  "Column alias '" + alias + "' is too short",
-						Pos:      corePos,
+						RuleID:           "AL06",
+						Severity:         lint.SeverityInfo,
+						Message:          "Column alias '" + alias + "' is too short",
+						Pos:              corePos,
+						DocumentationURL: lint.BuildDocURL("AL06"),
+						ImpactScore:      lint.ImpactLow.Int(),
+						AutoFixable:      false,
 					})
 				}
 				if len(alias) > maxLen {
 					diagnostics = append(diagnostics, lint.Diagnostic{
-						RuleID:   "AL06",
-						Severity: lint.SeverityInfo,
-						Message:  "Column alias '" + alias + "' is too long",
-						Pos:      corePos,
+						RuleID:           "AL06",
+						Severity:         lint.SeverityInfo,
+						Message:          "Column alias '" + alias + "' is too long",
+						Pos:              corePos,
+						DocumentationURL: lint.BuildDocURL("AL06"),
+						ImpactScore:      lint.ImpactLow.Int(),
+						AutoFixable:      false,
 					})
 				}
 			}

@@ -42,10 +42,13 @@ func checkColumnCountMismatch(stmt any, _ lint.DialectInfo, _ map[string]any) []
 		count := countColumns(cores[i])
 		if count != firstCount {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM04",
-				Severity: lint.SeverityError,
-				Message:  fmt.Sprintf("Column count mismatch in set operation: first query has %d columns, query %d has %d columns", firstCount, i+1, count),
-				Pos:      cores[i].Span.Start,
+				RuleID:           "AM04",
+				Severity:         lint.SeverityError,
+				Message:          fmt.Sprintf("Column count mismatch in set operation: first query has %d columns, query %d has %d columns", firstCount, i+1, count),
+				Pos:              cores[i].Span.Start,
+				DocumentationURL: lint.BuildDocURL("AM04"),
+				ImpactScore:      lint.ImpactCritical.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

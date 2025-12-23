@@ -53,9 +53,12 @@ func checkBlockedWords(stmt any, _ lint.DialectInfo, opts map[string]any) []lint
 	for _, fn := range ast.CollectFuncCalls(selectStmt) {
 		if blocked[strings.ToUpper(fn.Name)] {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "CV09",
-				Severity: lint.SeverityWarning,
-				Message:  "Use of blocked word '" + strings.ToUpper(fn.Name) + "' detected",
+				RuleID:           "CV09",
+				Severity:         lint.SeverityWarning,
+				Message:          "Use of blocked word '" + strings.ToUpper(fn.Name) + "' detected",
+				DocumentationURL: lint.BuildDocURL("CV09"),
+				ImpactScore:      lint.ImpactHigh.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

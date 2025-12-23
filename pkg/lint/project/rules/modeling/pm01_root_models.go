@@ -13,7 +13,7 @@ func init() {
 		Name:        "root-models",
 		Group:       "modeling",
 		Description: "Models with no sources (broken DAG lineage)",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkRootModels,
 	})
 }
@@ -37,11 +37,14 @@ func checkRootModels(ctx *project.Context) []project.Diagnostic {
 		// Check if model has no sources
 		if len(model.Sources) == 0 {
 			diagnostics = append(diagnostics, project.Diagnostic{
-				RuleID:   "PM01",
-				Severity: project.SeverityWarning,
-				Message:  fmt.Sprintf("Model '%s' has no upstream dependencies (broken lineage)", model.Name),
-				Model:    model.Path,
-				FilePath: model.FilePath,
+				RuleID:           "PM01",
+				Severity:         lint.SeverityWarning,
+				Message:          fmt.Sprintf("Model '%s' has no upstream dependencies (broken lineage)", model.Name),
+				Model:            model.Path,
+				FilePath:         model.FilePath,
+				DocumentationURL: lint.BuildDocURL("PM01"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

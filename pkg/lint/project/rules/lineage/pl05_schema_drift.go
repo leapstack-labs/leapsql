@@ -62,11 +62,14 @@ func checkSchemaDrift(ctx *project.Context) []project.Diagnostic {
 				msg := buildDriftMessage(source, added, removed)
 
 				diagnostics = append(diagnostics, project.Diagnostic{
-					RuleID:   "PL05",
-					Severity: lint.SeverityWarning,
-					Message:  msg,
-					Model:    model.Path,
-					FilePath: model.FilePath,
+					RuleID:           "PL05",
+					Severity:         lint.SeverityWarning,
+					Message:          msg,
+					Model:            model.Path,
+					FilePath:         model.FilePath,
+					DocumentationURL: lint.BuildDocURL("PL05"),
+					ImpactScore:      lint.ImpactHigh.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}
@@ -97,14 +100,19 @@ func usesSelectStar(model *project.ModelInfo) bool {
 }
 
 // getSnapshotColumns retrieves the snapshot columns for a model/source combination.
-// In a full implementation, this would query the column_snapshots table.
+// Returns nil if no snapshot exists or if the store is not available.
 func getSnapshotColumns(ctx *project.Context, modelPath, source string) []string {
-	// This is a placeholder - in a real implementation, the context would
-	// provide access to snapshot data via the store
-	_ = ctx
-	_ = modelPath
-	_ = source
-	return nil
+	store := ctx.Store()
+	if store == nil {
+		return nil // No store available, skip schema drift detection
+	}
+
+	columns, _, err := store.GetColumnSnapshot(modelPath, source)
+	if err != nil {
+		return nil // Error getting snapshot, skip silently
+	}
+
+	return columns
 }
 
 // getCurrentColumns gets the current columns for a source table.
@@ -122,23 +130,23 @@ func getCurrentColumns(ctx *project.Context, source string) []string {
 	return nil
 }
 
-// diffColumns compares old and new column lists.
-func diffColumns(old, new []string) (added, removed []string) {
+// diffColumns compares old and current column lists.
+func diffColumns(old, current []string) (added, removed []string) {
 	oldSet := make(map[string]bool)
 	for _, c := range old {
 		oldSet[c] = true
 	}
 
-	newSet := make(map[string]bool)
-	for _, c := range new {
-		newSet[c] = true
+	currentSet := make(map[string]bool)
+	for _, c := range current {
+		currentSet[c] = true
 		if !oldSet[c] {
 			added = append(added, c)
 		}
 	}
 
 	for _, c := range old {
-		if !newSet[c] {
+		if !currentSet[c] {
 			removed = append(removed, c)
 		}
 	}

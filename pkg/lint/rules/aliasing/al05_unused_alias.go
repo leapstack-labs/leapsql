@@ -63,9 +63,12 @@ func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	for alias, used := range aliases {
 		if !used {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AL05",
-				Severity: lint.SeverityWarning,
-				Message:  "Table alias '" + alias + "' is defined but never referenced",
+				RuleID:           "AL05",
+				Severity:         lint.SeverityWarning,
+				Message:          "Table alias '" + alias + "' is defined but never referenced",
+				DocumentationURL: lint.BuildDocURL("AL05"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

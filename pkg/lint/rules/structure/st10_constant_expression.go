@@ -52,10 +52,13 @@ func findConstantExpressions(expr parser.Expr, pos token.Position) []lint.Diagno
 		// Check for 1=1, 'a'='a', etc.
 		if isConstantEquality(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST10",
-				Severity: lint.SeverityInfo,
-				Message:  "Unnecessary constant expression; this condition is always true",
-				Pos:      pos,
+				RuleID:           "ST10",
+				Severity:         lint.SeverityInfo,
+				Message:          "Unnecessary constant expression; this condition is always true",
+				Pos:              pos,
+				DocumentationURL: lint.BuildDocURL("ST10"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 
@@ -69,10 +72,13 @@ func findConstantExpressions(expr parser.Expr, pos token.Position) []lint.Diagno
 		// Check for WHERE true, WHERE false, WHERE 1, WHERE 0
 		if isConstantBooleanLiteral(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "ST10",
-				Severity: lint.SeverityInfo,
-				Message:  "Unnecessary constant expression; this condition is always " + boolValue(e),
-				Pos:      pos,
+				RuleID:           "ST10",
+				Severity:         lint.SeverityInfo,
+				Message:          "Unnecessary constant expression; this condition is always " + boolValue(e),
+				Pos:              pos,
+				DocumentationURL: lint.BuildDocURL("ST10"),
+				ImpactScore:      lint.ImpactLow.Int(),
+				AutoFixable:      false,
 			})
 		}
 

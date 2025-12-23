@@ -44,9 +44,12 @@ func checkIsNullComparison(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 				msg = "Use IS NOT NULL instead of != NULL"
 			}
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "CV05",
-				Severity: lint.SeverityWarning,
-				Message:  msg + "; = NULL always evaluates to NULL, not true or false",
+				RuleID:           "CV05",
+				Severity:         lint.SeverityWarning,
+				Message:          msg + "; = NULL always evaluates to NULL, not true or false",
+				DocumentationURL: lint.BuildDocURL("CV05"),
+				ImpactScore:      lint.ImpactHigh.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

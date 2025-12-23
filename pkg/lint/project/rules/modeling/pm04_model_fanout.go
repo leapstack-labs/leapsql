@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
 
@@ -14,7 +15,7 @@ func init() {
 		Name:        "model-fanout",
 		Group:       "modeling",
 		Description: "Model has too many direct downstream consumers",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkModelFanout,
 		ConfigKeys:  []string{"threshold"},
 	})
@@ -45,12 +46,15 @@ func checkModelFanout(ctx *project.Context) []project.Diagnostic {
 
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PM04",
-				Severity: project.SeverityWarning,
+				Severity: lint.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Model '%s' has %d direct downstream consumers (threshold: %d): %s; consider creating an intermediate abstraction",
 					model.Name, len(children), threshold, strings.Join(sortedChildren, ", ")),
-				Model:    model.Path,
-				FilePath: model.FilePath,
+				Model:            model.Path,
+				FilePath:         model.FilePath,
+				DocumentationURL: lint.BuildDocURL("PM04"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

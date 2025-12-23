@@ -15,8 +15,8 @@ func TestParse_BasicSQL(t *testing.T) {
 	assert.Equal(t, "test.sql", doc.URI)
 	assert.Equal(t, 1, doc.Version)
 	assert.Equal(t, content, doc.Content)
-	assert.Nil(t, doc.FrontmatterError)
-	assert.Nil(t, doc.TemplateError)
+	assert.NoError(t, doc.FrontmatterError)
+	assert.NoError(t, doc.TemplateError)
 	// SQL won't parse without dialect, that's expected
 }
 
@@ -34,7 +34,7 @@ SELECT id, name FROM users`
 	assert.True(t, doc.Frontmatter.HasYAML)
 	assert.Equal(t, "my_model", doc.Frontmatter.Config.Name)
 	assert.Equal(t, "table", doc.Frontmatter.Config.Materialized)
-	assert.Nil(t, doc.FrontmatterError)
+	assert.NoError(t, doc.FrontmatterError)
 }
 
 func TestParse_InvalidFrontmatter(t *testing.T) {
@@ -46,7 +46,7 @@ SELECT id FROM users`
 	doc := Parse(content, "test.sql", 1, nil)
 
 	require.NotNil(t, doc)
-	assert.NotNil(t, doc.FrontmatterError)
+	require.Error(t, doc.FrontmatterError)
 	assert.True(t, doc.HasFrontmatterError())
 }
 
@@ -59,8 +59,8 @@ SELECT id, {{ utils.column_name() }} FROM users`
 	doc := Parse(content, "test.sql", 1, nil)
 
 	require.NotNil(t, doc)
-	assert.Nil(t, doc.FrontmatterError)
-	assert.Nil(t, doc.TemplateError)
+	assert.NoError(t, doc.FrontmatterError)
+	assert.NoError(t, doc.TemplateError)
 	assert.Contains(t, doc.SQLContent, "__EXPR__")
 }
 

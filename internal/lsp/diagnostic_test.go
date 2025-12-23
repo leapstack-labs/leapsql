@@ -322,13 +322,13 @@ func TestDiagnosticCodes(t *testing.T) {
 
 func TestProjectSeverityToLSP(t *testing.T) {
 	tests := []struct {
-		input    project.Severity
+		input    lint.Severity
 		expected DiagnosticSeverity
 	}{
-		{project.SeverityError, DiagnosticSeverityError},
-		{project.SeverityWarning, DiagnosticSeverityWarning},
-		{project.SeverityInfo, DiagnosticSeverityInformation},
-		{project.SeverityHint, DiagnosticSeverityHint},
+		{lint.SeverityError, DiagnosticSeverityError},
+		{lint.SeverityWarning, DiagnosticSeverityWarning},
+		{lint.SeverityInfo, DiagnosticSeverityInformation},
+		{lint.SeverityHint, DiagnosticSeverityHint},
 	}
 
 	for _, tt := range tests {

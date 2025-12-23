@@ -45,9 +45,12 @@ func checkConsistentQualification(stmt any, _ lint.DialectInfo, _ map[string]any
 	// Check for mixed qualification
 	if qualified > 0 && unqualified > 0 {
 		return []lint.Diagnostic{{
-			RuleID:   "RF03",
-			Severity: lint.SeverityInfo,
-			Message:  "Mixed column qualification style; some columns are qualified, others are not",
+			RuleID:           "RF03",
+			Severity:         lint.SeverityInfo,
+			Message:          "Mixed column qualification style; some columns are qualified, others are not",
+			DocumentationURL: lint.BuildDocURL("RF03"),
+			ImpactScore:      lint.ImpactLow.Int(),
+			AutoFixable:      false,
 		}}
 	}
 

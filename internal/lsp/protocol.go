@@ -130,11 +130,17 @@ const (
 
 // Diagnostic represents a diagnostic, such as a compiler error or warning.
 type Diagnostic struct {
-	Range    Range              `json:"range"`
-	Severity DiagnosticSeverity `json:"severity,omitempty"`
-	Code     string             `json:"code,omitempty"`
-	Source   string             `json:"source,omitempty"`
-	Message  string             `json:"message"`
+	Range           Range              `json:"range"`
+	Severity        DiagnosticSeverity `json:"severity,omitempty"`
+	Code            string             `json:"code,omitempty"`
+	CodeDescription *CodeDescription   `json:"codeDescription,omitempty"`
+	Source          string             `json:"source,omitempty"`
+	Message         string             `json:"message"`
+}
+
+// CodeDescription provides a URL with more information about a diagnostic code.
+type CodeDescription struct {
+	Href string `json:"href"`
 }
 
 // PublishDiagnosticsParams are sent from server to client to publish diagnostics.

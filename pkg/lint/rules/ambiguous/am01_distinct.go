@@ -33,10 +33,13 @@ func checkDistinctWithGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []
 
 	if core.Distinct && len(core.GroupBy) > 0 {
 		return []lint.Diagnostic{{
-			RuleID:   "AM01",
-			Severity: lint.SeverityWarning,
-			Message:  "Using DISTINCT with GROUP BY is redundant; GROUP BY already produces unique rows",
-			Pos:      core.Span.Start,
+			RuleID:           "AM01",
+			Severity:         lint.SeverityWarning,
+			Message:          "Using DISTINCT with GROUP BY is redundant; GROUP BY already produces unique rows",
+			Pos:              core.Span.Start,
+			DocumentationURL: lint.BuildDocURL("AM01"),
+			ImpactScore:      lint.ImpactMedium.Int(),
+			AutoFixable:      false,
 		}}
 	}
 	return nil

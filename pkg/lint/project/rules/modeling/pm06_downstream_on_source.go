@@ -13,7 +13,7 @@ func init() {
 		Name:        "downstream-on-source",
 		Group:       "modeling",
 		Description: "Marts or intermediate model depends directly on source (not staging)",
-		Severity:    project.SeverityWarning,
+		Severity:    lint.SeverityWarning,
 		Check:       checkDownstreamOnSource,
 	})
 }
@@ -45,12 +45,15 @@ func checkDownstreamOnSource(ctx *project.Context) []project.Diagnostic {
 				// This is an external source - marts/intermediate shouldn't reference it directly
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:   "PM06",
-					Severity: project.SeverityWarning,
+					Severity: lint.SeverityWarning,
 					Message: fmt.Sprintf(
 						"%s model '%s' depends directly on source '%s'; use a staging model instead",
 						string(model.Type), model.Name, source),
-					Model:    model.Path,
-					FilePath: model.FilePath,
+					Model:            model.Path,
+					FilePath:         model.FilePath,
+					DocumentationURL: lint.BuildDocURL("PM06"),
+					ImpactScore:      lint.ImpactHigh.Int(),
+					AutoFixable:      false,
 				})
 			}
 		}

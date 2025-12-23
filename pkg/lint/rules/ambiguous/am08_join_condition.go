@@ -51,10 +51,13 @@ func checkJoinConditionTables(stmt any, _ lint.DialectInfo, _ map[string]any) []
 
 		if !hasRightRef && len(refs) > 0 {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM08",
-				Severity: lint.SeverityWarning,
-				Message:  "Join condition does not appear to reference the joined table '" + rightTable + "'",
-				Pos:      join.Span.Start,
+				RuleID:           "AM08",
+				Severity:         lint.SeverityWarning,
+				Message:          "Join condition does not appear to reference the joined table '" + rightTable + "'",
+				Pos:              join.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AM08"),
+				ImpactScore:      lint.ImpactHigh.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

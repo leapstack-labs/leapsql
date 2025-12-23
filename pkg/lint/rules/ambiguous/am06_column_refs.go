@@ -45,9 +45,12 @@ func checkAmbiguousColumnRef(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 	for _, colRef := range ast.CollectColumnRefs(selectStmt) {
 		if colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM06",
-				Severity: lint.SeverityWarning,
-				Message:  "Column '" + colRef.Column + "' is unqualified and may be ambiguous with multiple tables; consider adding table qualifier",
+				RuleID:           "AM06",
+				Severity:         lint.SeverityWarning,
+				Message:          "Column '" + colRef.Column + "' is unqualified and may be ambiguous with multiple tables; consider adding table qualifier",
+				DocumentationURL: lint.BuildDocURL("AM06"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

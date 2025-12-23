@@ -30,10 +30,13 @@ func checkImplicitJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Di
 	for _, join := range ast.CollectJoins(selectStmt) {
 		if join.Type == parser.JoinComma {
 			diagnostics = append(diagnostics, lint.Diagnostic{
-				RuleID:   "AM05",
-				Severity: lint.SeverityInfo,
-				Message:  "Comma-separated tables create an implicit cross join; consider using explicit JOIN syntax",
-				Pos:      join.Span.Start,
+				RuleID:           "AM05",
+				Severity:         lint.SeverityInfo,
+				Message:          "Comma-separated tables create an implicit cross join; consider using explicit JOIN syntax",
+				Pos:              join.Span.Start,
+				DocumentationURL: lint.BuildDocURL("AM05"),
+				ImpactScore:      lint.ImpactMedium.Int(),
+				AutoFixable:      false,
 			})
 		}
 	}

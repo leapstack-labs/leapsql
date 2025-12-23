@@ -260,7 +260,8 @@ func (p *Provider) buildProjectContext() *project.Context {
 		"models", len(models),
 		"duration", time.Since(startTime))
 
-	return project.NewContext(models, parents, children, p.config)
+	// Use NewContextWithStore to enable schema drift detection (PL05)
+	return project.NewContextWithStore(models, parents, children, p.config, p.store)
 }
 
 // Store returns the underlying state store.
