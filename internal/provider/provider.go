@@ -241,13 +241,14 @@ func (p *Provider) buildProjectContext() *project.Context {
 		}
 
 		models[m.Path] = &project.ModelInfo{
-			Path:         m.Path,
-			Name:         m.Name,
-			FilePath:     m.FilePath,
-			Columns:      columns,
-			Materialized: m.Materialized,
-			Tags:         m.Tags,
-			Meta:         m.Meta,
+			Path:           m.Path,
+			Name:           m.Name,
+			FilePath:       m.FilePath,
+			Columns:        columns,
+			Materialized:   m.Materialized,
+			Tags:           m.Tags,
+			Meta:           m.Meta,
+			UsesSelectStar: m.UsesSelectStar,
 		}
 		parents[m.Path] = parentPaths
 		children[m.Path] = childPaths

@@ -41,20 +41,21 @@ type Run struct {
 
 // Model represents a registered model in the state store.
 type Model struct {
-	ID           string         `json:"id"`
-	Path         string         `json:"path"`         // e.g., "models.staging.stg_users"
-	Name         string         `json:"name"`         // e.g., "stg_users"
-	Materialized string         `json:"materialized"` // "table", "view", "incremental"
-	UniqueKey    string         `json:"unique_key,omitempty"`
-	ContentHash  string         `json:"content_hash"`
-	FilePath     string         `json:"file_path,omitempty"` // Absolute path to .sql file
-	Owner        string         `json:"owner,omitempty"`
-	Schema       string         `json:"schema,omitempty"`
-	Tags         []string       `json:"tags,omitempty"`
-	Tests        []TestConfig   `json:"tests,omitempty"`
-	Meta         map[string]any `json:"meta,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
+	ID             string         `json:"id"`
+	Path           string         `json:"path"`         // e.g., "models.staging.stg_users"
+	Name           string         `json:"name"`         // e.g., "stg_users"
+	Materialized   string         `json:"materialized"` // "table", "view", "incremental"
+	UniqueKey      string         `json:"unique_key,omitempty"`
+	ContentHash    string         `json:"content_hash"`
+	FilePath       string         `json:"file_path,omitempty"` // Absolute path to .sql file
+	Owner          string         `json:"owner,omitempty"`
+	Schema         string         `json:"schema,omitempty"`
+	Tags           []string       `json:"tags,omitempty"`
+	Tests          []TestConfig   `json:"tests,omitempty"`
+	Meta           map[string]any `json:"meta,omitempty"`
+	UsesSelectStar bool           `json:"uses_select_star"` // true if model uses SELECT * or t.*
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // TestConfig represents a test configuration for a model.

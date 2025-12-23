@@ -79,24 +79,9 @@ func checkSchemaDrift(ctx *project.Context) []project.Diagnostic {
 }
 
 // usesSelectStar checks if a model uses SELECT * anywhere.
-// In a full implementation, this would be stored in model metadata during parsing.
+// This is now detected at parse time and stored in model metadata.
 func usesSelectStar(model *project.ModelInfo) bool {
-	// For now, we check if the model has columns but they're all passthrough
-	// A more accurate check would be done during SQL parsing
-	if len(model.Columns) == 0 {
-		return false
-	}
-
-	// Check if all columns are direct passthroughs (no transformation)
-	passthroughCount := 0
-	for _, col := range model.Columns {
-		if col.TransformType == "" && col.Function == "" {
-			passthroughCount++
-		}
-	}
-
-	// If most columns are passthrough, likely SELECT *
-	return passthroughCount > len(model.Columns)/2
+	return model.UsesSelectStar
 }
 
 // getSnapshotColumns retrieves the snapshot columns for a model/source combination.
@@ -126,7 +111,8 @@ func getCurrentColumns(ctx *project.Context, source string) []string {
 		return cols
 	}
 
-	// Source is an external table - would need adapter to query schema
+	// TODO: External source schema introspection not yet supported.
+	// Currently only detects drift in model-to-model dependencies.
 	return nil
 }
 

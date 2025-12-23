@@ -1459,6 +1459,100 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 }
 
 // =============================================================================
+// UsesSelectStar Flag Tests
+// =============================================================================
+
+func TestExtractLineage_UsesSelectStar(t *testing.T) {
+	// Get DuckDB dialect for testing
+	duckdb, ok := dialect.Get("duckdb")
+	if !ok {
+		t.Fatal("DuckDB dialect not found - ensure duckdb/dialect package is imported")
+	}
+
+	tests := []struct {
+		name           string
+		sql            string
+		usesSelectStar bool
+	}{
+		{
+			name:           "SELECT * sets flag true",
+			sql:            `SELECT * FROM users`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "SELECT t.* sets flag true",
+			sql:            `SELECT u.* FROM users u`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "explicit columns sets flag false",
+			sql:            `SELECT id, name, email FROM users`,
+			usesSelectStar: false,
+		},
+		{
+			name:           "mixed explicit and star sets flag true",
+			sql:            `SELECT id, u.* FROM users u`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "CTE with star in final SELECT sets flag true",
+			sql:            `WITH cte AS (SELECT id, name FROM users) SELECT * FROM cte`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "CTE with explicit columns in final SELECT sets flag false",
+			sql:            `WITH cte AS (SELECT * FROM users) SELECT id, name FROM cte`,
+			usesSelectStar: false,
+		},
+		{
+			name:           "subquery in FROM with star in outer sets flag true",
+			sql:            `SELECT * FROM (SELECT id, name FROM users) sub`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "join with table star sets flag true",
+			sql:            `SELECT u.*, o.amount FROM users u JOIN orders o ON u.id = o.user_id`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "join with explicit columns sets flag false",
+			sql:            `SELECT u.id, u.name, o.amount FROM users u JOIN orders o ON u.id = o.user_id`,
+			usesSelectStar: false,
+		},
+		{
+			name:           "aggregation without star sets flag false",
+			sql:            `SELECT customer_id, COUNT(*) AS cnt FROM orders GROUP BY customer_id`,
+			usesSelectStar: false,
+		},
+		{
+			name:           "UNION with star sets flag true",
+			sql:            `SELECT * FROM users UNION SELECT * FROM archived_users`,
+			usesSelectStar: true,
+		},
+		{
+			name:           "UNION with explicit columns sets flag false",
+			sql:            `SELECT id, name FROM users UNION SELECT id, name FROM archived_users`,
+			usesSelectStar: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lineage, err := ExtractLineageWithOptions(tt.sql, ExtractLineageOptions{
+				Dialect: duckdb,
+			})
+			if err != nil {
+				t.Fatalf("ExtractLineageWithOptions failed: %v", err)
+			}
+
+			if lineage.UsesSelectStar != tt.usesSelectStar {
+				t.Errorf("UsesSelectStar = %v, want %v", lineage.UsesSelectStar, tt.usesSelectStar)
+			}
+		})
+	}
+}
+
+// =============================================================================
 // Error Cases
 // =============================================================================
 

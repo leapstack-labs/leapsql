@@ -34,8 +34,9 @@ type ColumnLineage struct {
 
 // ModelLineage describes the complete lineage of a SQL model.
 type ModelLineage struct {
-	Sources []string         // All source tables (deduplicated, sorted)
-	Columns []*ColumnLineage // Lineage for each output column
+	Sources        []string         // All source tables (deduplicated, sorted)
+	Columns        []*ColumnLineage // Lineage for each output column
+	UsesSelectStar bool             // true if SELECT * or t.* detected
 }
 
 // ExtractLineageOptions configures the lineage extraction.
@@ -71,9 +72,10 @@ func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*Mode
 
 // lineageExtractor walks the AST to extract lineage information.
 type lineageExtractor struct {
-	dialect *dialect.Dialect
-	schema  parser.Schema
-	sources map[string]struct{} // Collected source tables
+	dialect        *dialect.Dialect
+	schema         parser.Schema
+	sources        map[string]struct{} // Collected source tables
+	usesSelectStar bool                // Track star usage during extraction
 }
 
 // extract extracts lineage from a parsed statement.
@@ -103,8 +105,9 @@ func (e *lineageExtractor) extract(stmt *parser.SelectStmt) (*ModelLineage, erro
 
 	// Build result
 	result := &ModelLineage{
-		Sources: e.getSortedSources(),
-		Columns: columns,
+		Sources:        e.getSortedSources(),
+		Columns:        columns,
+		UsesSelectStar: e.usesSelectStar,
 	}
 
 	return result, nil
@@ -175,12 +178,14 @@ func (e *lineageExtractor) extractCoreLineage(scope *parser.Scope, core *parser.
 func (e *lineageExtractor) extractSelectItemLineage(scope *parser.Scope, colResolver *parser.ColumnResolver, item parser.SelectItem, index int) []*ColumnLineage {
 	// Handle SELECT *
 	if item.Star {
+		e.usesSelectStar = true
 		lineages := e.expandStar(scope, "", index)
 		return e.applyStarModifiers(scope, colResolver, lineages, item.Modifiers)
 	}
 
 	// Handle SELECT table.*
 	if item.TableStar != "" {
+		e.usesSelectStar = true
 		lineages := e.expandStar(scope, item.TableStar, index)
 		return e.applyStarModifiers(scope, colResolver, lineages, item.Modifiers)
 	}

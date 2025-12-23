@@ -73,6 +73,8 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 		} else {
 			e.logger.Debug("model executed", "model", m.Path, "rows_affected", rowsAffected, "duration_ms", executionMS)
 			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			// Save column snapshot for schema drift detection
+			e.saveModelSnapshot(run.ID, m, model)
 		}
 
 		_ = executionMS // Note: execution time tracked but not stored in current schema
@@ -89,6 +91,8 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	} else {
 		e.logger.Info("run completed", "run_id", run.ID)
 		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		// Cleanup old snapshots after successful run
+		_ = e.store.DeleteOldSnapshots(5)
 	}
 
 	// Refresh run from store
@@ -161,6 +165,8 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 			runErr = execErr
 		} else {
 			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			// Save column snapshot for schema drift detection
+			e.saveModelSnapshot(run.ID, m, model)
 		}
 
 		if runErr != nil {
@@ -172,6 +178,8 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
 	} else {
 		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		// Cleanup old snapshots after successful run
+		_ = e.store.DeleteOldSnapshots(5)
 	}
 
 	run, _ = e.store.GetRun(run.ID)
@@ -193,5 +201,28 @@ func (e *Engine) executeModel(ctx context.Context, m *parser.ModelConfig, model 
 		return e.executeIncremental(ctx, m, model, sql)
 	default:
 		return 0, fmt.Errorf("unknown materialization: %s", m.Materialized)
+	}
+}
+
+// saveModelSnapshot saves column snapshots for models that use SELECT *.
+// This enables schema drift detection (PL05) by storing the current column
+// state of source tables after a successful model run.
+func (e *Engine) saveModelSnapshot(runID string, m *parser.ModelConfig, model *state.Model) {
+	if !model.UsesSelectStar {
+		return
+	}
+
+	for _, source := range m.Sources {
+		cols, err := e.store.GetModelColumns(source)
+		if err != nil || len(cols) == 0 {
+			continue
+		}
+
+		colNames := make([]string, len(cols))
+		for i, c := range cols {
+			colNames[i] = c.Name
+		}
+
+		_ = e.store.SaveColumnSnapshot(runID, m.Path, source, colNames)
 	}
 }

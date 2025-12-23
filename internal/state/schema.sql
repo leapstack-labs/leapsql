@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS models (
     tags TEXT,           -- JSON array: ["finance", "revenue"]
     tests TEXT,          -- JSON array of test configs
     meta TEXT,           -- JSON object for extensions
+    uses_select_star INTEGER DEFAULT 0,  -- 0=false, 1=true (for schema drift detection)
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     

@@ -25,6 +25,16 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 	testsJSON := serializeJSONPtr(model.Tests)
 	metaJSON := serializeJSONPtr(model.Meta)
 
+	// Convert bool to int64 for SQLite
+	var usesSelectStar *int64
+	if model.UsesSelectStar {
+		one := int64(1)
+		usesSelectStar = &one
+	} else {
+		zero := int64(0)
+		usesSelectStar = &zero
+	}
+
 	now := time.Now().UTC()
 
 	// Check if model already exists by path
@@ -40,18 +50,19 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 		model.UpdatedAt = now
 
 		return s.queries.UpdateModel(ctx(), sqlcgen.UpdateModelParams{
-			Name:         model.Name,
-			Materialized: model.Materialized,
-			UniqueKey:    nullableString(model.UniqueKey),
-			ContentHash:  model.ContentHash,
-			FilePath:     nullableString(model.FilePath),
-			Owner:        nullableString(model.Owner),
-			SchemaName:   nullableString(model.Schema),
-			Tags:         tagsJSON,
-			Tests:        testsJSON,
-			Meta:         metaJSON,
-			UpdatedAt:    model.UpdatedAt,
-			ID:           model.ID,
+			Name:           model.Name,
+			Materialized:   model.Materialized,
+			UniqueKey:      nullableString(model.UniqueKey),
+			ContentHash:    model.ContentHash,
+			FilePath:       nullableString(model.FilePath),
+			Owner:          nullableString(model.Owner),
+			SchemaName:     nullableString(model.Schema),
+			Tags:           tagsJSON,
+			Tests:          testsJSON,
+			Meta:           metaJSON,
+			UsesSelectStar: usesSelectStar,
+			UpdatedAt:      model.UpdatedAt,
+			ID:             model.ID,
 		})
 	}
 
@@ -63,20 +74,21 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 	model.UpdatedAt = now
 
 	return s.queries.InsertModel(ctx(), sqlcgen.InsertModelParams{
-		ID:           model.ID,
-		Path:         model.Path,
-		Name:         model.Name,
-		Materialized: model.Materialized,
-		UniqueKey:    nullableString(model.UniqueKey),
-		ContentHash:  model.ContentHash,
-		FilePath:     nullableString(model.FilePath),
-		Owner:        nullableString(model.Owner),
-		SchemaName:   nullableString(model.Schema),
-		Tags:         tagsJSON,
-		Tests:        testsJSON,
-		Meta:         metaJSON,
-		CreatedAt:    model.CreatedAt,
-		UpdatedAt:    model.UpdatedAt,
+		ID:             model.ID,
+		Path:           model.Path,
+		Name:           model.Name,
+		Materialized:   model.Materialized,
+		UniqueKey:      nullableString(model.UniqueKey),
+		ContentHash:    model.ContentHash,
+		FilePath:       nullableString(model.FilePath),
+		Owner:          nullableString(model.Owner),
+		SchemaName:     nullableString(model.Schema),
+		Tags:           tagsJSON,
+		Tests:          testsJSON,
+		Meta:           metaJSON,
+		UsesSelectStar: usesSelectStar,
+		CreatedAt:      model.CreatedAt,
+		UpdatedAt:      model.UpdatedAt,
 	})
 }
 
@@ -344,6 +356,10 @@ func convertModel(row sqlcgen.Model) (*Model, error) {
 	}
 	if row.SchemaName != nil {
 		model.Schema = *row.SchemaName
+	}
+	// Convert int64 to bool for UsesSelectStar
+	if row.UsesSelectStar != nil && *row.UsesSelectStar == 1 {
+		model.UsesSelectStar = true
 	}
 
 	// Deserialize JSON fields

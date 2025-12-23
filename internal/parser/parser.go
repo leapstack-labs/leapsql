@@ -43,6 +43,8 @@ type ModelConfig struct {
 	Sources []string
 	// Columns contains column-level lineage information
 	Columns []ColumnInfo
+	// UsesSelectStar is true if model uses SELECT * or t.*
+	UsesSelectStar bool
 	// SQL is the raw SQL content (excluding pragmas/frontmatter)
 	SQL string
 	// RawContent is the full file content including pragmas/frontmatter
@@ -232,6 +234,7 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 		if err == nil {
 			config.Sources = result.Sources
 			config.Columns = result.Columns
+			config.UsesSelectStar = result.UsesSelectStar
 		}
 		// If lineage extraction fails, we continue without sources/columns
 		// The model may have syntax errors or use unsupported SQL features
@@ -242,8 +245,9 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 
 // lineageResult holds both table sources and column lineage information.
 type lineageResult struct {
-	Sources []string
-	Columns []ColumnInfo
+	Sources        []string
+	Columns        []ColumnInfo
+	UsesSelectStar bool
 }
 
 // extractLineage uses the lineage parser to extract all table sources and column lineage from SQL.
@@ -281,8 +285,9 @@ func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
 	}
 
 	return &lineageResult{
-		Sources: modelLineage.Sources,
-		Columns: columns,
+		Sources:        modelLineage.Sources,
+		Columns:        columns,
+		UsesSelectStar: modelLineage.UsesSelectStar,
 	}, nil
 }
 

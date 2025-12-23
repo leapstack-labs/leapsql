@@ -21,7 +21,7 @@ func (q *Queries) DeleteModelByFilePath(ctx context.Context, filePath *string) e
 
 const getModelByFilePath = `-- name: GetModelByFilePath :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
 FROM models
 WHERE file_path = ?
 `
@@ -42,6 +42,7 @@ func (q *Queries) GetModelByFilePath(ctx context.Context, filePath *string) (Mod
 		&i.Tags,
 		&i.Tests,
 		&i.Meta,
+		&i.UsesSelectStar,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -50,7 +51,7 @@ func (q *Queries) GetModelByFilePath(ctx context.Context, filePath *string) (Mod
 
 const getModelByID = `-- name: GetModelByID :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
 FROM models
 WHERE id = ?
 `
@@ -71,6 +72,7 @@ func (q *Queries) GetModelByID(ctx context.Context, id string) (Model, error) {
 		&i.Tags,
 		&i.Tests,
 		&i.Meta,
+		&i.UsesSelectStar,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -79,7 +81,7 @@ func (q *Queries) GetModelByID(ctx context.Context, id string) (Model, error) {
 
 const getModelByPath = `-- name: GetModelByPath :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
 FROM models
 WHERE path = ?
 `
@@ -100,6 +102,7 @@ func (q *Queries) GetModelByPath(ctx context.Context, path string) (Model, error
 		&i.Tags,
 		&i.Tests,
 		&i.Meta,
+		&i.UsesSelectStar,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -108,25 +111,26 @@ func (q *Queries) GetModelByPath(ctx context.Context, path string) (Model, error
 
 const insertModel = `-- name: InsertModel :exec
 INSERT INTO models (id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertModelParams struct {
-	ID           string    `json:"id"`
-	Path         string    `json:"path"`
-	Name         string    `json:"name"`
-	Materialized string    `json:"materialized"`
-	UniqueKey    *string   `json:"unique_key"`
-	ContentHash  string    `json:"content_hash"`
-	FilePath     *string   `json:"file_path"`
-	Owner        *string   `json:"owner"`
-	SchemaName   *string   `json:"schema_name"`
-	Tags         *string   `json:"tags"`
-	Tests        *string   `json:"tests"`
-	Meta         *string   `json:"meta"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	Path           string    `json:"path"`
+	Name           string    `json:"name"`
+	Materialized   string    `json:"materialized"`
+	UniqueKey      *string   `json:"unique_key"`
+	ContentHash    string    `json:"content_hash"`
+	FilePath       *string   `json:"file_path"`
+	Owner          *string   `json:"owner"`
+	SchemaName     *string   `json:"schema_name"`
+	Tags           *string   `json:"tags"`
+	Tests          *string   `json:"tests"`
+	Meta           *string   `json:"meta"`
+	UsesSelectStar *int64    `json:"uses_select_star"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) error {
@@ -143,6 +147,7 @@ func (q *Queries) InsertModel(ctx context.Context, arg InsertModelParams) error 
 		arg.Tags,
 		arg.Tests,
 		arg.Meta,
+		arg.UsesSelectStar,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -178,7 +183,7 @@ func (q *Queries) ListModelFilePaths(ctx context.Context) ([]*string, error) {
 
 const listModels = `-- name: ListModels :many
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
 FROM models
 ORDER BY path
 `
@@ -205,6 +210,7 @@ func (q *Queries) ListModels(ctx context.Context) ([]Model, error) {
 			&i.Tags,
 			&i.Tests,
 			&i.Meta,
+			&i.UsesSelectStar,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -224,23 +230,24 @@ func (q *Queries) ListModels(ctx context.Context) ([]Model, error) {
 const updateModel = `-- name: UpdateModel :exec
 UPDATE models
 SET name = ?, materialized = ?, unique_key = ?, content_hash = ?, file_path = ?,
-    owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, updated_at = ?
+    owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, uses_select_star = ?, updated_at = ?
 WHERE id = ?
 `
 
 type UpdateModelParams struct {
-	Name         string    `json:"name"`
-	Materialized string    `json:"materialized"`
-	UniqueKey    *string   `json:"unique_key"`
-	ContentHash  string    `json:"content_hash"`
-	FilePath     *string   `json:"file_path"`
-	Owner        *string   `json:"owner"`
-	SchemaName   *string   `json:"schema_name"`
-	Tags         *string   `json:"tags"`
-	Tests        *string   `json:"tests"`
-	Meta         *string   `json:"meta"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	ID           string    `json:"id"`
+	Name           string    `json:"name"`
+	Materialized   string    `json:"materialized"`
+	UniqueKey      *string   `json:"unique_key"`
+	ContentHash    string    `json:"content_hash"`
+	FilePath       *string   `json:"file_path"`
+	Owner          *string   `json:"owner"`
+	SchemaName     *string   `json:"schema_name"`
+	Tags           *string   `json:"tags"`
+	Tests          *string   `json:"tests"`
+	Meta           *string   `json:"meta"`
+	UsesSelectStar *int64    `json:"uses_select_star"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
 }
 
 func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) error {
@@ -255,6 +262,7 @@ func (q *Queries) UpdateModel(ctx context.Context, arg UpdateModelParams) error 
 		arg.Tags,
 		arg.Tests,
 		arg.Meta,
+		arg.UsesSelectStar,
 		arg.UpdatedAt,
 		arg.ID,
 	)

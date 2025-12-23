@@ -24,15 +24,16 @@ type SnapshotStore interface {
 // ModelInfo holds all metadata about a model for project-level analysis.
 // This is a richer representation than lint.ModelInfo, with computed fields.
 type ModelInfo struct {
-	Path         string            // e.g., "staging.customers"
-	Name         string            // e.g., "stg_customers"
-	FilePath     string            // Absolute path to .sql file
-	Type         lint.ModelType    // Inferred or explicit model type
-	Sources      []string          // Table references (deps)
-	Columns      []lint.ColumnInfo // Column-level lineage
-	Materialized string            // table, view, incremental
-	Tags         []string
-	Meta         map[string]any
+	Path           string            // e.g., "staging.customers"
+	Name           string            // e.g., "stg_customers"
+	FilePath       string            // Absolute path to .sql file
+	Type           lint.ModelType    // Inferred or explicit model type
+	Sources        []string          // Table references (deps)
+	Columns        []lint.ColumnInfo // Column-level lineage
+	Materialized   string            // table, view, incremental
+	Tags           []string
+	Meta           map[string]any
+	UsesSelectStar bool // true if model uses SELECT * or t.*
 }
 
 // NewContext creates a new project context for analysis.

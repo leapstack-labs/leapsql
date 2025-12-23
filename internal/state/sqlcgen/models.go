@@ -60,20 +60,21 @@ type MacroNamespace struct {
 }
 
 type Model struct {
-	ID           string    `json:"id"`
-	Path         string    `json:"path"`
-	Name         string    `json:"name"`
-	Materialized string    `json:"materialized"`
-	UniqueKey    *string   `json:"unique_key"`
-	ContentHash  string    `json:"content_hash"`
-	FilePath     *string   `json:"file_path"`
-	Owner        *string   `json:"owner"`
-	SchemaName   *string   `json:"schema_name"`
-	Tags         *string   `json:"tags"`
-	Tests        *string   `json:"tests"`
-	Meta         *string   `json:"meta"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	Path           string    `json:"path"`
+	Name           string    `json:"name"`
+	Materialized   string    `json:"materialized"`
+	UniqueKey      *string   `json:"unique_key"`
+	ContentHash    string    `json:"content_hash"`
+	FilePath       *string   `json:"file_path"`
+	Owner          *string   `json:"owner"`
+	SchemaName     *string   `json:"schema_name"`
+	Tags           *string   `json:"tags"`
+	Tests          *string   `json:"tests"`
+	Meta           *string   `json:"meta"`
+	UsesSelectStar *int64    `json:"uses_select_star"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type ModelColumn struct {

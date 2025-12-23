@@ -356,16 +356,17 @@ func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content
 // saveModelToStore saves a parsed model to the state store.
 func (e *Engine) saveModelToStore(m *parser.ModelConfig, absPath, hash string) error {
 	model := &state.Model{
-		Path:         m.Path,
-		Name:         m.Name,
-		Materialized: m.Materialized,
-		UniqueKey:    m.UniqueKey,
-		ContentHash:  computeHash(m.RawContent),
-		FilePath:     absPath,
-		Owner:        m.Owner,
-		Schema:       m.Schema,
-		Tags:         m.Tags,
-		Meta:         m.Meta,
+		Path:           m.Path,
+		Name:           m.Name,
+		Materialized:   m.Materialized,
+		UniqueKey:      m.UniqueKey,
+		ContentHash:    computeHash(m.RawContent),
+		FilePath:       absPath,
+		Owner:          m.Owner,
+		Schema:         m.Schema,
+		Tags:           m.Tags,
+		Meta:           m.Meta,
+		UsesSelectStar: m.UsesSelectStar,
 	}
 
 	if err := e.store.RegisterModel(model); err != nil {
