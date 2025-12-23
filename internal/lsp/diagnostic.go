@@ -9,6 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules" // Register SQLFluff-style lint rules
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
@@ -383,4 +384,122 @@ func toLSPSeverity(s lint.Severity) DiagnosticSeverity {
 	default:
 		return DiagnosticSeverityWarning
 	}
+}
+
+// runProjectHealthDiagnostics runs project-level lint rules and returns diagnostics grouped by file.
+func (s *Server) runProjectHealthDiagnostics() map[string][]Diagnostic {
+	ctx := s.buildProjectContext()
+	if ctx == nil {
+		return nil
+	}
+
+	diags := s.projectAnalyzer.Analyze(ctx)
+	if len(diags) == 0 {
+		return nil
+	}
+
+	// Group diagnostics by file
+	byFile := make(map[string][]Diagnostic)
+	for _, d := range diags {
+		filePath := d.FilePath
+		if filePath == "" {
+			continue // Skip diagnostics without file paths
+		}
+
+		lspDiag := Diagnostic{
+			Range: Range{
+				// Project health diagnostics typically apply to the whole file
+				Start: Position{Line: 0, Character: 0},
+				End:   Position{Line: 0, Character: 100},
+			},
+			Severity: projectSeverityToLSP(d.Severity),
+			Code:     d.RuleID,
+			Source:   "leapsql-project-health",
+			Message:  d.Message,
+		}
+		byFile[filePath] = append(byFile[filePath], lspDiag)
+	}
+
+	return byFile
+}
+
+// projectSeverityToLSP converts project.Severity to LSP DiagnosticSeverity.
+func projectSeverityToLSP(s project.Severity) DiagnosticSeverity {
+	switch s {
+	case project.SeverityError:
+		return DiagnosticSeverityError
+	case project.SeverityWarning:
+		return DiagnosticSeverityWarning
+	case project.SeverityInfo:
+		return DiagnosticSeverityInformation
+	case project.SeverityHint:
+		return DiagnosticSeverityHint
+	default:
+		return DiagnosticSeverityWarning
+	}
+}
+
+// publishProjectHealthDiagnostics runs project health analysis and publishes diagnostics.
+func (s *Server) publishProjectHealthDiagnostics() {
+	diagsByFile := s.runProjectHealthDiagnostics()
+	if diagsByFile == nil {
+		return
+	}
+
+	for filePath, diags := range diagsByFile {
+		// Convert file path to URI
+		uri := PathToURI(filePath)
+
+		// Get existing file-level diagnostics (if any)
+		doc := s.documents.Get(uri)
+		if doc != nil {
+			// Merge with existing diagnostics by re-running publish for this file
+			s.publishDiagnosticsWithProjectHealth(uri, diags)
+		} else {
+			// File not open, just publish project health diagnostics
+			s.sendNotification("textDocument/publishDiagnostics", &PublishDiagnosticsParams{
+				URI:         uri,
+				Diagnostics: diags,
+			})
+		}
+	}
+}
+
+// publishDiagnosticsWithProjectHealth publishes diagnostics for a file including project health.
+func (s *Server) publishDiagnosticsWithProjectHealth(uri string, projectDiags []Diagnostic) {
+	doc := s.documents.Get(uri)
+	if doc == nil {
+		return
+	}
+
+	var diagnostics []Diagnostic
+
+	// Only process SQL files for file-level diagnostics
+	if strings.HasSuffix(uri, ".sql") {
+		// 1. Check frontmatter
+		frontmatterDiags := s.validateFrontmatter(doc)
+		diagnostics = append(diagnostics, frontmatterDiags...)
+
+		// 2. Check template syntax
+		templateDiags := s.validateTemplate(doc)
+		diagnostics = append(diagnostics, templateDiags...)
+
+		// 3. Check SQL syntax
+		sqlDiags := s.validateSQL(doc)
+		diagnostics = append(diagnostics, sqlDiags...)
+
+		// 4. Validate macro references
+		if s.store != nil {
+			macroDiags := s.validateMacroReferences(doc)
+			diagnostics = append(diagnostics, macroDiags...)
+		}
+	}
+
+	// 5. Add project health diagnostics
+	diagnostics = append(diagnostics, projectDiags...)
+
+	s.sendNotification("textDocument/publishDiagnostics", &PublishDiagnosticsParams{
+		URI:         uri,
+		Diagnostics: diagnostics,
+	})
 }

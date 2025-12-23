@@ -7,6 +7,8 @@ import (
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi" // Register ANSI dialect
+	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
 
 func TestExtractSQL(t *testing.T) {
@@ -316,4 +318,47 @@ func TestDiagnosticCodes(t *testing.T) {
 	for _, tt := range tests {
 		assert.NotEmpty(t, tt.code, "diagnostic code should not be empty for %s", tt.description)
 	}
+}
+
+func TestProjectSeverityToLSP(t *testing.T) {
+	tests := []struct {
+		input    project.Severity
+		expected DiagnosticSeverity
+	}{
+		{project.SeverityError, DiagnosticSeverityError},
+		{project.SeverityWarning, DiagnosticSeverityWarning},
+		{project.SeverityInfo, DiagnosticSeverityInformation},
+		{project.SeverityHint, DiagnosticSeverityHint},
+	}
+
+	for _, tt := range tests {
+		result := projectSeverityToLSP(tt.input)
+		assert.Equal(t, tt.expected, result, "projectSeverityToLSP(%v)", tt.input)
+	}
+}
+
+func TestServer_RunProjectHealthDiagnostics_NoStore(t *testing.T) {
+	server := &Server{
+		documents:       NewDocumentStore(),
+		store:           nil, // No store
+		projectAnalyzer: project.NewAnalyzer(nil),
+		projectConfig:   lint.DefaultProjectHealthConfig(),
+	}
+
+	// Should return nil when store is unavailable
+	result := server.runProjectHealthDiagnostics()
+	assert.Nil(t, result, "expected nil when store is unavailable")
+}
+
+func TestServer_BuildProjectContext_NoStore(t *testing.T) {
+	server := &Server{
+		documents:       NewDocumentStore(),
+		store:           nil, // No store
+		projectAnalyzer: project.NewAnalyzer(nil),
+		projectConfig:   lint.DefaultProjectHealthConfig(),
+	}
+
+	// Should return nil when store is unavailable
+	ctx := server.buildProjectContext()
+	assert.Nil(t, ctx, "expected nil when store is unavailable")
 }

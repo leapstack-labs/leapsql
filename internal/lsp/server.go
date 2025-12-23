@@ -16,6 +16,9 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/lint/project"
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // Register project rules
 
 	// Import dialect implementations so they register themselves
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
@@ -42,6 +45,10 @@ type Server struct {
 	// SQL dialect for validation (never nil after initialization)
 	dialect           *dialect.Dialect
 	dialectFromConfig bool // true if dialect was loaded from config, false if ANSI default
+
+	// Project health analyzer for DAG/architecture linting
+	projectAnalyzer *project.Analyzer
+	projectConfig   lint.ProjectHealthConfig
 
 	// I/O
 	reader  *bufio.Reader
@@ -73,6 +80,8 @@ func NewServerWithLogger(reader io.Reader, writer io.Writer, logger *slog.Logger
 		logger:              logger,
 		macroNamespaceCache: make(map[string]bool),
 		modelNameCache:      make(map[string]bool),
+		projectAnalyzer:     project.NewAnalyzer(nil),
+		projectConfig:       lint.DefaultProjectHealthConfig(),
 	}
 }
 
@@ -311,6 +320,9 @@ func (s *Server) handleInitialized(_ *JSONRPCMessage) error {
 			Type:    MessageTypeWarning,
 			Message: "SQLite database not found. Run 'leapsql discover' to enable full IDE features.",
 		})
+	} else {
+		// Run project health diagnostics on startup if store is available
+		s.publishProjectHealthDiagnostics()
 	}
 
 	// Show info if using default ANSI dialect
@@ -411,6 +423,12 @@ func (s *Server) handleDidSave(msg *JSONRPCMessage) error {
 		s.reindexMacroFile(path)
 	}
 
+	// If it's a .sql file, re-run project health diagnostics
+	// Project health rules may be affected by model changes
+	if strings.HasSuffix(path, ".sql") && s.store != nil {
+		s.publishProjectHealthDiagnostics()
+	}
+
 	return nil
 }
 
@@ -505,4 +523,80 @@ func (s *Server) loadDialectFromConfig() {
 	s.dialect, _ = dialect.Get("ansi")
 	s.dialectFromConfig = false
 	s.logger.Info("No target configured, defaulting to ANSI dialect")
+}
+
+// buildProjectContext creates a project.Context from the store's model data.
+// Returns nil if the store is unavailable or has no models.
+func (s *Server) buildProjectContext() *project.Context {
+	if s.store == nil {
+		return nil
+	}
+
+	// Get all models from store
+	storeModels, err := s.store.ListModels()
+	if err != nil || len(storeModels) == 0 {
+		return nil
+	}
+
+	// Convert store models to project models
+	models := make(map[string]*project.ModelInfo)
+	parents := make(map[string][]string)
+	children := make(map[string][]string)
+
+	for _, m := range storeModels {
+		// Get columns for this model
+		cols, _ := s.store.GetModelColumns(m.Path)
+		columns := make([]lint.ColumnInfo, len(cols))
+		for i, c := range cols {
+			sources := make([]lint.SourceRef, len(c.Sources))
+			for j, src := range c.Sources {
+				sources[j] = lint.SourceRef{
+					Table:  src.Table,
+					Column: src.Column,
+				}
+			}
+			columns[i] = lint.ColumnInfo{
+				Name:          c.Name,
+				TransformType: c.TransformType,
+				Function:      c.Function,
+				Sources:       sources,
+			}
+		}
+
+		// Get dependencies
+		deps, _ := s.store.GetDependencies(m.ID)
+		dependents, _ := s.store.GetDependents(m.ID)
+
+		// Convert dependency IDs to model paths
+		var parentPaths []string
+		for _, depID := range deps {
+			if depModel, err := s.store.GetModelByID(depID); err == nil {
+				parentPaths = append(parentPaths, depModel.Path)
+			}
+		}
+
+		var childPaths []string
+		for _, depID := range dependents {
+			if depModel, err := s.store.GetModelByID(depID); err == nil {
+				childPaths = append(childPaths, depModel.Path)
+			}
+		}
+
+		models[m.Path] = &project.ModelInfo{
+			Path:         m.Path,
+			Name:         m.Name,
+			FilePath:     m.FilePath,
+			Columns:      columns,
+			Materialized: m.Materialized,
+			Tags:         m.Tags,
+			Meta:         m.Meta,
+		}
+		parents[m.Path] = parentPaths
+		children[m.Path] = childPaths
+	}
+
+	// Infer model types
+	project.InferAndSetTypes(models)
+
+	return project.NewContext(models, parents, children, s.projectConfig)
 }
