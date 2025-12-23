@@ -20,7 +20,7 @@ var UnionDistinct = lint.RuleDef{
 	Check:       checkUnionDistinct,
 }
 
-func checkUnionDistinct(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkUnionDistinct(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil

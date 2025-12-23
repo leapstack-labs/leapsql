@@ -67,7 +67,8 @@ type RuleDef struct {
 
 // CheckFunc analyzes a statement and returns diagnostics.
 // The stmt parameter is *parser.SelectStmt passed as any to avoid import cycles.
-type CheckFunc func(stmt any, dialect DialectInfo) []Diagnostic
+// The opts parameter contains rule-specific options from configuration.
+type CheckFunc func(stmt any, dialect DialectInfo, opts map[string]any) []Diagnostic
 
 // Diagnostic represents a lint finding.
 type Diagnostic struct {

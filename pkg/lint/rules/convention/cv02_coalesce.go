@@ -22,7 +22,7 @@ var PreferCoalesce = lint.RuleDef{
 	Check:       checkPreferCoalesce,
 }
 
-func checkPreferCoalesce(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkPreferCoalesce(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

@@ -134,6 +134,7 @@ Built with Go and DuckDB
 	rootCmd.AddCommand(commands.NewDiscoverCommand())
 	rootCmd.AddCommand(commands.NewLSPCommand())
 	rootCmd.AddCommand(commands.NewInitCommand())
+	rootCmd.AddCommand(commands.NewLintCommand())
 	rootCmd.AddCommand(NewCompletionCommand())
 
 	return rootCmd

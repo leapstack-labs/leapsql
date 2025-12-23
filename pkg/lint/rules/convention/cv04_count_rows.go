@@ -22,7 +22,7 @@ var CountStyle = lint.RuleDef{
 	Check:       checkCountStyle,
 }
 
-func checkCountStyle(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

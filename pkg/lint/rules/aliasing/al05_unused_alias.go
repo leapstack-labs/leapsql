@@ -22,7 +22,7 @@ var UnusedTableAlias = lint.RuleDef{
 	Check:       checkUnusedTableAlias,
 }
 
-func checkUnusedTableAlias(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

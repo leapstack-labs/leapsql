@@ -22,7 +22,7 @@ var UniqueTableAlias = lint.RuleDef{
 	Check:       checkUniqueTableAlias,
 }
 
-func checkUniqueTableAlias(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkUniqueTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

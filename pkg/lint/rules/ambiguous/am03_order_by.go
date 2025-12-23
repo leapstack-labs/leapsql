@@ -20,7 +20,7 @@ var OrderByAmbiguous = lint.RuleDef{
 	Check:       checkOrderByAmbiguous,
 }
 
-func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil

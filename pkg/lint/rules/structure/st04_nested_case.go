@@ -20,7 +20,7 @@ var NestedCase = lint.RuleDef{
 	Check:       checkNestedCase,
 }
 
-func checkNestedCase(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

@@ -20,7 +20,7 @@ var ExpressionAlias = lint.RuleDef{
 	Check:       checkExpressionAlias,
 }
 
-func checkExpressionAlias(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

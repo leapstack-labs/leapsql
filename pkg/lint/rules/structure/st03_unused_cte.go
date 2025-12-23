@@ -22,7 +22,7 @@ var UnusedCTE = lint.RuleDef{
 	Check:       checkUnusedCTE,
 }
 
-func checkUnusedCTE(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt.With == nil {
 		return nil

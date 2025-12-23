@@ -20,7 +20,7 @@ var SelectColumnOrder = lint.RuleDef{
 	Check:       checkSelectColumnOrder,
 }
 
-func checkSelectColumnOrder(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkSelectColumnOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

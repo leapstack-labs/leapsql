@@ -68,8 +68,11 @@ func (a *Analyzer) Analyze(stmt any, provider RuleProvider) []Diagnostic {
 			continue
 		}
 
-		// Run the rule
-		diags := rule.Check(stmt, provider)
+		// Get rule-specific options
+		opts := a.config.GetRuleOptions(rule.ID)
+
+		// Run the rule with options
+		diags := rule.Check(stmt, provider, opts)
 
 		// Apply severity overrides
 		for i := range diags {
@@ -108,8 +111,11 @@ func (a *Analyzer) AnalyzeWithRegistryRules(stmt any, dialect DialectInfo) []Dia
 			continue
 		}
 
-		// Run the rule
-		diags := rule.Check(stmt, dialect)
+		// Get rule-specific options
+		opts := a.config.GetRuleOptions(rule.ID)
+
+		// Run the rule with options
+		diags := rule.Check(stmt, dialect, opts)
 
 		// Apply severity overrides
 		for i := range diags {

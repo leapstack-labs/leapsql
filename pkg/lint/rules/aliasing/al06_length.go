@@ -28,14 +28,14 @@ const (
 	defaultMaxLength = 30
 )
 
-func checkAliasLength(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil
 	}
 
-	minLen := defaultMinLength
-	maxLen := defaultMaxLength
+	minLen := lint.GetIntOption(opts, "min_length", defaultMinLength)
+	maxLen := lint.GetIntOption(opts, "max_length", defaultMaxLength)
 
 	var diagnostics []lint.Diagnostic
 

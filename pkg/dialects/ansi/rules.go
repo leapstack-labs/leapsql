@@ -16,7 +16,7 @@ var SelectStarWarning = lint.RuleDef{
 	Check:       checkSelectStar,
 }
 
-func checkSelectStar(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkSelectStar(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil
@@ -53,7 +53,7 @@ var LimitWithoutOrderBy = lint.RuleDef{
 	Check:       checkLimitWithoutOrderBy,
 }
 
-func checkLimitWithoutOrderBy(stmt any, d lint.DialectInfo) []lint.Diagnostic {
+func checkLimitWithoutOrderBy(stmt any, d lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	// Only check if dialect supports LIMIT clause
 	if !d.IsClauseToken(token.LIMIT) {
 		return nil
@@ -92,7 +92,7 @@ var ImplicitCrossJoin = lint.RuleDef{
 	Check:       checkImplicitCrossJoin,
 }
 
-func checkImplicitCrossJoin(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkImplicitCrossJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil

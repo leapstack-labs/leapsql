@@ -20,7 +20,7 @@ var DistinctVsGroupBy = lint.RuleDef{
 	Check:       checkDistinctVsGroupBy,
 }
 
-func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil

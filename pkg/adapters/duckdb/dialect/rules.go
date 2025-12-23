@@ -16,7 +16,7 @@ var QualifyWithoutWindow = lint.RuleDef{
 	Check:       checkQualifyWithoutWindow,
 }
 
-func checkQualifyWithoutWindow(stmt any, d lint.DialectInfo) []lint.Diagnostic {
+func checkQualifyWithoutWindow(stmt any, d lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil

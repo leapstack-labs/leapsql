@@ -30,10 +30,19 @@ var defaultBlockedWords = map[string]bool{
 	"TRUNCATE": true,
 }
 
-func checkBlockedWords(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkBlockedWords(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil
+	}
+
+	// Build blocked words set from config or use defaults
+	blocked := defaultBlockedWords
+	if configWords := lint.GetStringSliceOption(opts, "blocked_words", nil); len(configWords) > 0 {
+		blocked = make(map[string]bool)
+		for _, w := range configWords {
+			blocked[strings.ToUpper(w)] = true
+		}
 	}
 
 	// Currently we can only detect blocked words as function calls
@@ -42,7 +51,7 @@ func checkBlockedWords(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
 
 	// Check function names
 	for _, fn := range ast.CollectFuncCalls(selectStmt) {
-		if defaultBlockedWords[strings.ToUpper(fn.Name)] {
+		if blocked[strings.ToUpper(fn.Name)] {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:   "CV09",
 				Severity: lint.SeverityWarning,

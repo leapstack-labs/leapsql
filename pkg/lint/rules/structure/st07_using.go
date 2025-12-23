@@ -21,7 +21,7 @@ var PreferUsing = lint.RuleDef{
 	Check:       checkPreferUsing,
 }
 
-func checkPreferUsing(stmt any, _ lint.DialectInfo) []lint.Diagnostic {
+func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 	selectStmt, ok := stmt.(*parser.SelectStmt)
 	if !ok {
 		return nil
