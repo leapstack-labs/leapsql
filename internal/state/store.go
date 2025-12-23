@@ -206,4 +206,14 @@ type Store interface {
 	// List tracked file paths (for detecting deletions)
 	ListModelFilePaths() ([]string, error)
 	ListMacroFilePaths() ([]string, error)
+
+	// Column snapshot operations for schema drift detection
+	SaveColumnSnapshot(runID string, modelPath string, sourceTable string, columns []string) error
+	GetColumnSnapshot(modelPath string, sourceTable string) (columns []string, runID string, err error)
+	DeleteOldSnapshots(keepRuns int) error
+
+	// Batch query operations for performance (reduces ~500 queries to ~5 per save)
+	BatchGetAllColumns() (map[string][]ColumnInfo, error)
+	BatchGetAllDependencies() (map[string][]string, error)
+	BatchGetAllDependents() (map[string][]string, error)
 }

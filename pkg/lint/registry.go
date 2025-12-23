@@ -19,6 +19,9 @@ func Register(rule RuleDef) {
 	globalRegistry.mu.Lock()
 	defer globalRegistry.mu.Unlock()
 	globalRegistry.rules[rule.ID] = rule
+
+	// Also register in the unified registry
+	RegisterSQLRule(WrapRuleDef(rule))
 }
 
 // GetAll returns all registered rules.

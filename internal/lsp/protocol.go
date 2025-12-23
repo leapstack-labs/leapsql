@@ -84,6 +84,7 @@ type ServerCapabilities struct {
 	DefinitionProvider         bool                     `json:"definitionProvider,omitempty"`
 	ReferencesProvider         bool                     `json:"referencesProvider,omitempty"`
 	DocumentFormattingProvider bool                     `json:"documentFormattingProvider,omitempty"`
+	CodeActionProvider         *CodeActionOptions       `json:"codeActionProvider,omitempty"`
 }
 
 // TextDocumentSyncKind defines how the client syncs document changes.
@@ -302,3 +303,61 @@ const (
 	MessageTypeInfo    MessageType = 3
 	MessageTypeLog     MessageType = 4
 )
+
+// --- Code Actions ---
+
+// CodeActionKind defines the kind of a code action.
+type CodeActionKind string
+
+// CodeActionKind constants.
+const (
+	CodeActionKindEmpty                 CodeActionKind = ""
+	CodeActionKindQuickFix              CodeActionKind = "quickfix"
+	CodeActionKindRefactor              CodeActionKind = "refactor"
+	CodeActionKindRefactorExtract       CodeActionKind = "refactor.extract"
+	CodeActionKindRefactorInline        CodeActionKind = "refactor.inline"
+	CodeActionKindRefactorRewrite       CodeActionKind = "refactor.rewrite"
+	CodeActionKindSource                CodeActionKind = "source"
+	CodeActionKindSourceOrganizeImports CodeActionKind = "source.organizeImports"
+	CodeActionKindSourceFixAll          CodeActionKind = "source.fixAll"
+)
+
+// CodeActionParams is the request parameters for textDocument/codeAction.
+type CodeActionParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Range        Range                  `json:"range"`
+	Context      CodeActionContext      `json:"context"`
+}
+
+// CodeActionContext contains additional diagnostic information.
+type CodeActionContext struct {
+	Diagnostics []Diagnostic     `json:"diagnostics"`
+	Only        []CodeActionKind `json:"only,omitempty"`
+}
+
+// CodeAction represents a code action (Quick Fix, refactoring, etc.).
+type CodeAction struct {
+	Title       string         `json:"title"`
+	Kind        CodeActionKind `json:"kind,omitempty"`
+	Diagnostics []Diagnostic   `json:"diagnostics,omitempty"`
+	IsPreferred bool           `json:"isPreferred,omitempty"`
+	Edit        *WorkspaceEdit `json:"edit,omitempty"`
+	Command     *Command       `json:"command,omitempty"`
+}
+
+// WorkspaceEdit represents changes to many resources managed in the workspace.
+type WorkspaceEdit struct {
+	Changes map[string][]TextEdit `json:"changes,omitempty"`
+}
+
+// Command represents a reference to a command.
+type Command struct {
+	Title     string `json:"title"`
+	Command   string `json:"command"`
+	Arguments []any  `json:"arguments,omitempty"`
+}
+
+// CodeActionOptions are options for the code action provider.
+type CodeActionOptions struct {
+	CodeActionKinds []CodeActionKind `json:"codeActionKinds,omitempty"`
+}

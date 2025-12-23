@@ -16,7 +16,7 @@ type AnalyzerConfig struct {
 	DisabledRules map[string]bool
 
 	// SeverityOverrides changes the default severity of rules
-	SeverityOverrides map[string]Severity
+	SeverityOverrides map[string]lint.Severity
 
 	// ProjectHealth contains thresholds and settings
 	ProjectHealth lint.ProjectHealthConfig
@@ -26,7 +26,7 @@ type AnalyzerConfig struct {
 func NewAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
 		DisabledRules:     make(map[string]bool),
-		SeverityOverrides: make(map[string]Severity),
+		SeverityOverrides: make(map[string]lint.Severity),
 		ProjectHealth:     lint.DefaultProjectHealthConfig(),
 	}
 }
@@ -74,7 +74,6 @@ func (a *Analyzer) Analyze(ctx *Context) []Diagnostic {
 // AnalyzeProject implements lint.ProjectProvider.
 func (a *Analyzer) AnalyzeProject(ctx lint.ProjectContext) []lint.Diagnostic {
 	// Convert lint.ProjectContext to our internal Context
-	// This requires building the internal representation
 	projectCtx, ok := ctx.(*Context)
 	if !ok {
 		return nil
@@ -82,15 +81,14 @@ func (a *Analyzer) AnalyzeProject(ctx lint.ProjectContext) []lint.Diagnostic {
 
 	diags := a.Analyze(projectCtx)
 
-	// Convert to lint.Diagnostic
+	// Convert to lint.Diagnostic (Severity is now the same type)
 	result := make([]lint.Diagnostic, len(diags))
 	for i, d := range diags {
 		result[i] = lint.Diagnostic{
 			RuleID:   d.RuleID,
-			Severity: convertSeverity(d.Severity),
+			Severity: d.Severity, // No conversion needed - same type
 			Message:  d.Message,
 		}
-		// If we have a file path, we could set Pos here
 	}
 	return result
 }
@@ -104,29 +102,13 @@ func (a *Analyzer) isDisabled(ruleID string) bool {
 	return a.disabledRules[ruleID]
 }
 
-func (a *Analyzer) getSeverity(ruleID string, defaultSev Severity) Severity {
+func (a *Analyzer) getSeverity(ruleID string, defaultSev lint.Severity) lint.Severity {
 	if a.config != nil {
 		if sev, ok := a.config.SeverityOverrides[ruleID]; ok {
 			return sev
 		}
 	}
 	return defaultSev
-}
-
-// convertSeverity converts project severity to lint severity.
-func convertSeverity(s Severity) lint.Severity {
-	switch s {
-	case SeverityError:
-		return lint.SeverityError
-	case SeverityWarning:
-		return lint.SeverityWarning
-	case SeverityInfo:
-		return lint.SeverityInfo
-	case SeverityHint:
-		return lint.SeverityHint
-	default:
-		return lint.SeverityWarning
-	}
 }
 
 // Disable disables a rule by ID.

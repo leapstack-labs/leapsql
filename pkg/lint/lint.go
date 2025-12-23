@@ -77,7 +77,20 @@ type Diagnostic struct {
 	Message  string
 	Pos      token.Position
 	EndPos   token.Position // Optional: end of the problematic range
-	Fixes    []Fix          // Optional: suggested fixes (for future LSP code actions)
+	Fixes    []Fix          // Optional: suggested fixes (for LSP code actions)
+
+	// Remediation metadata
+	DocumentationURL string        // URL to rule documentation, e.g., "https://leapsql.dev/docs/rules/AM01"
+	ImpactScore      int           // 0-100, used for health score weighting
+	AutoFixable      bool          // true if Fixes can be auto-applied
+	RelatedInfo      []RelatedInfo // Additional locations/context
+}
+
+// RelatedInfo provides additional context for a diagnostic.
+type RelatedInfo struct {
+	FilePath string
+	Pos      token.Position
+	Message  string
 }
 
 // Fix represents a suggested code fix.

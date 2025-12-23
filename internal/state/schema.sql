@@ -167,3 +167,20 @@ CREATE TABLE IF NOT EXISTS file_hashes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_file_hashes_type ON file_hashes(file_type);
+
+-- column_snapshots: store known-good column state after successful runs
+-- Used by schema drift detection to compare current vs. last-known state
+CREATE TABLE IF NOT EXISTS column_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_path TEXT NOT NULL,
+    source_table TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    column_index INTEGER NOT NULL,
+    snapshot_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    run_id TEXT NOT NULL,  -- Links to successful run
+    UNIQUE(model_path, source_table, column_name, run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_model ON column_snapshots(model_path);
+CREATE INDEX IF NOT EXISTS idx_snapshots_source ON column_snapshots(source_table);
+CREATE INDEX IF NOT EXISTS idx_snapshots_run_id ON column_snapshots(run_id);

@@ -15,6 +15,16 @@ type ColumnLineage struct {
 	SourceColumn string `json:"source_column"`
 }
 
+type ColumnSnapshot struct {
+	ID          int64      `json:"id"`
+	ModelPath   string     `json:"model_path"`
+	SourceTable string     `json:"source_table"`
+	ColumnName  string     `json:"column_name"`
+	ColumnIndex int64      `json:"column_index"`
+	SnapshotAt  *time.Time `json:"snapshot_at"`
+	RunID       string     `json:"run_id"`
+}
+
 type Dependency struct {
 	ModelID  string `json:"model_id"`
 	ParentID string `json:"parent_id"`

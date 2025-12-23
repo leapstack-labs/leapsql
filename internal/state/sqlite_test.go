@@ -1065,3 +1065,168 @@ func TestSQLiteStore_Trace(t *testing.T) {
 		})
 	}
 }
+
+// --- Batch query tests ---
+
+func TestSQLiteStore_BatchGetAllColumns(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Setup: Register models and save columns
+	models := []*Model{
+		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"},
+		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "def"},
+		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "ghi"},
+	}
+	for _, m := range models {
+		require.NoError(t, store.RegisterModel(m))
+	}
+
+	// Save columns for each model
+	require.NoError(t, store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+		{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "name"}}},
+	}))
+
+	require.NoError(t, store.SaveModelColumns("staging.stg_orders", []ColumnInfo{
+		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
+		{Name: "customer_id", Index: 1, Sources: []SourceRef{{Table: "raw_orders", Column: "customer_id"}}},
+		{Name: "total", Index: 2, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
+	}))
+
+	require.NoError(t, store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+		{Name: "order_count", Index: 1, TransformType: "EXPR", Function: "count", Sources: []SourceRef{{Table: "stg_orders", Column: "order_id"}}},
+	}))
+
+	// Test: BatchGetAllColumns
+	allColumns, err := store.BatchGetAllColumns()
+	require.NoError(t, err)
+
+	// Verify: Check we got all models
+	assert.Len(t, allColumns, 3, "should have columns for 3 models")
+
+	// Verify: Check stg_customers columns
+	stgCustCols := allColumns["staging.stg_customers"]
+	assert.Len(t, stgCustCols, 2, "stg_customers should have 2 columns")
+	assert.Equal(t, "customer_id", stgCustCols[0].Name)
+	assert.Len(t, stgCustCols[0].Sources, 1)
+	assert.Equal(t, "raw_customers", stgCustCols[0].Sources[0].Table)
+
+	// Verify: Check stg_orders columns
+	stgOrdersCols := allColumns["staging.stg_orders"]
+	assert.Len(t, stgOrdersCols, 3, "stg_orders should have 3 columns")
+	assert.Equal(t, "EXPR", stgOrdersCols[2].TransformType)
+	assert.Equal(t, "sum", stgOrdersCols[2].Function)
+
+	// Verify: Check marts.customer_summary columns
+	martsCols := allColumns["marts.customer_summary"]
+	assert.Len(t, martsCols, 2, "customer_summary should have 2 columns")
+}
+
+func TestSQLiteStore_BatchGetAllDependencies(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Setup: Create models with dependencies
+	//   stg_customers (no deps)
+	//   stg_orders (no deps)
+	//   customer_summary (depends on stg_customers, stg_orders)
+	//   order_summary (depends on stg_orders)
+	models := []*Model{
+		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "1"},
+		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "2"},
+		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "3"},
+		{Path: "marts.order_summary", Name: "order_summary", ContentHash: "4"},
+	}
+	for _, m := range models {
+		require.NoError(t, store.RegisterModel(m))
+	}
+
+	// Set dependencies
+	require.NoError(t, store.SetDependencies(models[2].ID, []string{models[0].ID, models[1].ID})) // customer_summary -> stg_customers, stg_orders
+	require.NoError(t, store.SetDependencies(models[3].ID, []string{models[1].ID}))               // order_summary -> stg_orders
+
+	// Test: BatchGetAllDependencies
+	allDeps, err := store.BatchGetAllDependencies()
+	require.NoError(t, err)
+
+	// Verify: customer_summary has 2 dependencies
+	custSummaryDeps := allDeps[models[2].ID]
+	assert.Len(t, custSummaryDeps, 2, "customer_summary should have 2 dependencies")
+
+	// Verify: order_summary has 1 dependency
+	orderSummaryDeps := allDeps[models[3].ID]
+	assert.Len(t, orderSummaryDeps, 1, "order_summary should have 1 dependency")
+	assert.Equal(t, models[1].ID, orderSummaryDeps[0])
+
+	// Verify: staging models have no dependencies
+	assert.Empty(t, allDeps[models[0].ID], "stg_customers should have no dependencies")
+	assert.Empty(t, allDeps[models[1].ID], "stg_orders should have no dependencies")
+}
+
+func TestSQLiteStore_BatchGetAllDependents(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Setup: Same as BatchGetAllDependencies test
+	models := []*Model{
+		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "1"},
+		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "2"},
+		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "3"},
+		{Path: "marts.order_summary", Name: "order_summary", ContentHash: "4"},
+	}
+	for _, m := range models {
+		require.NoError(t, store.RegisterModel(m))
+	}
+
+	require.NoError(t, store.SetDependencies(models[2].ID, []string{models[0].ID, models[1].ID}))
+	require.NoError(t, store.SetDependencies(models[3].ID, []string{models[1].ID}))
+
+	// Test: BatchGetAllDependents
+	allDependents, err := store.BatchGetAllDependents()
+	require.NoError(t, err)
+
+	// Verify: stg_customers has 1 dependent (customer_summary)
+	stgCustDependents := allDependents[models[0].ID]
+	assert.Len(t, stgCustDependents, 1, "stg_customers should have 1 dependent")
+	assert.Equal(t, models[2].ID, stgCustDependents[0])
+
+	// Verify: stg_orders has 2 dependents (customer_summary, order_summary)
+	stgOrdersDependents := allDependents[models[1].ID]
+	assert.Len(t, stgOrdersDependents, 2, "stg_orders should have 2 dependents")
+
+	// Verify: marts models have no dependents
+	assert.Empty(t, allDependents[models[2].ID], "customer_summary should have no dependents")
+	assert.Empty(t, allDependents[models[3].ID], "order_summary should have no dependents")
+}
+
+func TestSQLiteStore_BatchGetAllColumns_Empty(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Test with no data
+	allColumns, err := store.BatchGetAllColumns()
+	require.NoError(t, err)
+	assert.Empty(t, allColumns)
+}
+
+func TestSQLiteStore_BatchGetAllDependencies_Empty(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Test with no data
+	allDeps, err := store.BatchGetAllDependencies()
+	require.NoError(t, err)
+	assert.Empty(t, allDeps)
+}
+
+func TestSQLiteStore_BatchGetAllDependents_Empty(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Test with no data
+	allDependents, err := store.BatchGetAllDependents()
+	require.NoError(t, err)
+	assert.Empty(t, allDependents)
+}
