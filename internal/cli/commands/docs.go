@@ -4,9 +4,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/docs"
 	"github.com/spf13/cobra"
 )
+
+// DocsOptions holds options for docs commands.
+type DocsOptions struct {
+	ModelsPath  string
+	OutputPath  string
+	ProjectName string
+	Port        int
+}
 
 // NewDocsCommand creates the docs command with subcommands.
 func NewDocsCommand() *cobra.Command {
@@ -27,9 +36,7 @@ and execution history.`,
 }
 
 func newDocsBuildCommand() *cobra.Command {
-	var outputPath string
-	var projectName string
-	var modelsPath string
+	opts := &DocsOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "build",
@@ -44,23 +51,24 @@ func newDocsBuildCommand() *cobra.Command {
   # Build with custom project name
   leapsql docs build --project "My Data Platform"`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runDocsBuild(modelsPath, outputPath, projectName)
+			// Get config inside RunE, not at command definition time
+			cfg := getConfig()
+			if opts.ModelsPath == "" {
+				opts.ModelsPath = cfg.ModelsDir
+			}
+			return runDocsBuild(opts)
 		},
 	}
 
-	cfg := getConfig()
-	cmd.Flags().StringVar(&modelsPath, "models", cfg.ModelsDir, "Path to models directory")
-	cmd.Flags().StringVar(&outputPath, "output", "./docs-site", "Output directory for generated site")
-	cmd.Flags().StringVar(&projectName, "project", "LeapSQL Project", "Project name for documentation")
+	cmd.Flags().StringVar(&opts.ModelsPath, "models", "", "Path to models directory (default: from config)")
+	cmd.Flags().StringVar(&opts.OutputPath, "output", "./docs-site", "Output directory for generated site")
+	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
 
 	return cmd
 }
 
 func newDocsServeCommand() *cobra.Command {
-	var outputPath string
-	var projectName string
-	var modelsPath string
-	var port int
+	opts := &DocsOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -72,67 +80,74 @@ func newDocsServeCommand() *cobra.Command {
   # Serve on custom port
   leapsql docs serve --port 3000`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runDocsServe(modelsPath, outputPath, projectName, port)
+			// Get config inside RunE, not at command definition time
+			cfg := getConfig()
+			if opts.ModelsPath == "" {
+				opts.ModelsPath = cfg.ModelsDir
+			}
+			return runDocsServe(opts)
 		},
 	}
 
-	cfg := getConfig()
-	cmd.Flags().StringVar(&modelsPath, "models", cfg.ModelsDir, "Path to models directory")
-	cmd.Flags().StringVar(&outputPath, "output", "./.leapsql-docs", "Output directory for generated site")
-	cmd.Flags().StringVar(&projectName, "project", "LeapSQL Project", "Project name for documentation")
-	cmd.Flags().IntVar(&port, "port", 8080, "Port to serve on")
+	cmd.Flags().StringVar(&opts.ModelsPath, "models", "", "Path to models directory (default: from config)")
+	cmd.Flags().StringVar(&opts.OutputPath, "output", "./.leapsql-docs", "Output directory for generated site")
+	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
+	cmd.Flags().IntVar(&opts.Port, "port", 8080, "Port to serve on")
 
 	return cmd
 }
 
-func runDocsBuild(modelsPath, outputPath, projectName string) error {
+func runDocsBuild(opts *DocsOptions) error {
 	// Validate models directory exists
-	if _, err := os.Stat(modelsPath); os.IsNotExist(err) {
-		return fmt.Errorf("models directory does not exist: %s", modelsPath)
+	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
+		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
 	fmt.Printf("Building documentation...\n")
-	fmt.Printf("  Models:  %s\n", modelsPath)
-	fmt.Printf("  Output:  %s\n", outputPath)
-	fmt.Printf("  Project: %s\n", projectName)
+	fmt.Printf("  Models:  %s\n", opts.ModelsPath)
+	fmt.Printf("  Output:  %s\n", opts.OutputPath)
+	fmt.Printf("  Project: %s\n", opts.ProjectName)
 	fmt.Println()
 
-	gen := docs.NewGenerator(projectName)
+	gen := docs.NewGenerator(opts.ProjectName)
 
-	if err := gen.LoadModels(modelsPath); err != nil {
+	if err := gen.LoadModels(opts.ModelsPath); err != nil {
 		return fmt.Errorf("failed to load models: %w", err)
 	}
 
-	if err := gen.Build(outputPath); err != nil {
+	if err := gen.Build(opts.OutputPath); err != nil {
 		return fmt.Errorf("failed to build docs: %w", err)
 	}
 
 	fmt.Printf("Documentation generated successfully!\n")
-	fmt.Printf("Open %s/index.html in your browser\n", outputPath)
+	fmt.Printf("Open %s/index.html in your browser\n", opts.OutputPath)
 
 	return nil
 }
 
-func runDocsServe(modelsPath, outputPath, projectName string, port int) error {
+func runDocsServe(opts *DocsOptions) error {
 	// Validate models directory exists
-	if _, err := os.Stat(modelsPath); os.IsNotExist(err) {
-		return fmt.Errorf("models directory does not exist: %s", modelsPath)
+	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
+		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
 	fmt.Printf("Building documentation...\n")
-	fmt.Printf("  Models:  %s\n", modelsPath)
-	fmt.Printf("  Project: %s\n", projectName)
+	fmt.Printf("  Models:  %s\n", opts.ModelsPath)
+	fmt.Printf("  Project: %s\n", opts.ProjectName)
 	fmt.Println()
 
-	gen := docs.NewGenerator(projectName)
+	gen := docs.NewGenerator(opts.ProjectName)
 
-	if err := gen.LoadModels(modelsPath); err != nil {
+	if err := gen.LoadModels(opts.ModelsPath); err != nil {
 		return fmt.Errorf("failed to load models: %w", err)
 	}
 
-	if err := gen.Serve(outputPath, port); err != nil {
+	if err := gen.Serve(opts.OutputPath, opts.Port); err != nil {
 		return fmt.Errorf("failed to serve docs: %w", err)
 	}
 
 	return nil
 }
+
+// Ensure config package is imported for getConfig usage
+var _ = config.DefaultModelsDir

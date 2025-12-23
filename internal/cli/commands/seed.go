@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/spf13/cobra"
 )
@@ -43,21 +42,17 @@ Use --output to override: auto, text, markdown, json`,
 }
 
 func runSeed(cmd *cobra.Command) error {
-	cfg := getConfig()
-	logger := config.GetLogger(cmd.Context())
-
-	// Create renderer based on output format
-	mode := output.Mode(cfg.OutputFormat)
-	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
-
-	eng, err := createEngine(cfg, logger)
+	cmdCtx, cleanup, err := NewCommandContext(cmd)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = eng.Close() }()
+	defer cleanup()
+
+	cfg := cmdCtx.Cfg
+	eng := cmdCtx.Engine
+	r := cmdCtx.Renderer
 
 	ctx := context.Background()
-
 	effectiveMode := r.EffectiveMode()
 
 	// Get list of seed files before loading
@@ -142,10 +137,9 @@ func seedText(r *output.Renderer, seedsDir string, files []string) error {
 	r.Println("")
 	r.Header(2, "Loaded Seeds")
 
-	for i, file := range files {
+	for _, file := range files {
 		tableName := strings.TrimSuffix(file, ".csv")
 		r.StatusLine(tableName, "success", file)
-		_ = i // suppress unused variable warning
 	}
 
 	r.Println("")

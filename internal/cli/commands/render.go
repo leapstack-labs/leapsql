@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
@@ -44,14 +43,14 @@ Output adapts to environment:
 }
 
 func runRender(cmd *cobra.Command, modelPath string) error {
-	cfg := getConfig()
-	logger := config.GetLogger(cmd.Context())
-
-	eng, err := createEngine(cfg, logger)
+	cmdCtx, cleanup, err := NewCommandContext(cmd)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = eng.Close() }()
+	defer cleanup()
+
+	eng := cmdCtx.Engine
+	r := cmdCtx.Renderer
 
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
@@ -61,10 +60,6 @@ func runRender(cmd *cobra.Command, modelPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to render model: %w", err)
 	}
-
-	// Create renderer
-	mode := output.Mode(cfg.OutputFormat)
-	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	effectiveMode := r.EffectiveMode()
 	switch effectiveMode {

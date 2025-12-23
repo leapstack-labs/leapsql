@@ -5,11 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
 )
+
+// GraphQuerier provides read-only access to DAG structure.
+type GraphQuerier interface {
+	GetParents(string) []string
+	GetChildren(string) []string
+	NodeCount() int
+	EdgeCount() int
+}
 
 // NewDAGCommand creates the dag command.
 func NewDAGCommand() *cobra.Command {
@@ -44,23 +51,19 @@ Output adapts to environment:
 }
 
 func runDAG(cmd *cobra.Command) error {
-	cfg := getConfig()
-	logger := config.GetLogger(cmd.Context())
-
-	eng, err := createEngine(cfg, logger)
+	cmdCtx, cleanup, err := NewCommandContext(cmd)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = eng.Close() }()
+	defer cleanup()
+
+	eng := cmdCtx.Engine
+	r := cmdCtx.Renderer
 
 	// Discover models
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
 		return fmt.Errorf("failed to discover models: %w", err)
 	}
-
-	// Create renderer
-	mode := output.Mode(cfg.OutputFormat)
-	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
 
 	graph := eng.GetGraph()
 
@@ -82,12 +85,7 @@ func runDAG(cmd *cobra.Command) error {
 }
 
 // dagText outputs DAG in styled text format.
-func dagText(r *output.Renderer, graph interface {
-	GetParents(string) []string
-	GetChildren(string) []string
-	NodeCount() int
-	EdgeCount() int
-}, levels [][]string) error {
+func dagText(r *output.Renderer, graph GraphQuerier, levels [][]string) error {
 	styles := r.Styles()
 
 	r.Header(1, "Dependency Graph")
@@ -115,12 +113,7 @@ func dagText(r *output.Renderer, graph interface {
 }
 
 // dagMarkdown outputs DAG in markdown format.
-func dagMarkdown(r *output.Renderer, graph interface {
-	GetParents(string) []string
-	GetChildren(string) []string
-	NodeCount() int
-	EdgeCount() int
-}, levels [][]string) error {
+func dagMarkdown(r *output.Renderer, graph GraphQuerier, levels [][]string) error {
 	r.Println(output.FormatHeader(1, "Dependency Graph"))
 	r.Println("")
 
@@ -154,12 +147,7 @@ func dagMarkdown(r *output.Renderer, graph interface {
 }
 
 // dagJSON outputs DAG in JSON format.
-func dagJSON(r *output.Renderer, graph interface {
-	GetParents(string) []string
-	GetChildren(string) []string
-	NodeCount() int
-	EdgeCount() int
-}, levels [][]string) error {
+func dagJSON(r *output.Renderer, graph GraphQuerier, levels [][]string) error {
 	dagOutput := output.DAGOutput{
 		Levels:      make([]output.DAGLevel, 0, len(levels)),
 		TotalModels: graph.NodeCount(),

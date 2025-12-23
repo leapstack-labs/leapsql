@@ -71,14 +71,20 @@ Output adapts to environment:
 }
 
 func runLint(cmd *cobra.Command, opts *LintOptions) error {
-	cfg := getConfig()
-	logger := config.GetLogger(cmd.Context())
-
-	eng, err := createEngine(cfg, logger)
+	cmdCtx, cleanup, err := NewCommandContext(cmd)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = eng.Close() }()
+	defer cleanup()
+
+	eng := cmdCtx.Engine
+	cfg := cmdCtx.Cfg
+	r := cmdCtx.Renderer
+
+	// Override renderer if format flag is set
+	if opts.Format != "" {
+		r = output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), output.Mode(opts.Format))
+	}
 
 	// Discover models
 	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
@@ -107,12 +113,6 @@ func runLint(cmd *cobra.Command, opts *LintOptions) error {
 	results = filterBySeverity(results, opts.Severity)
 
 	// Render output
-	mode := output.Mode(cfg.OutputFormat)
-	if opts.Format != "" {
-		mode = output.Mode(opts.Format)
-	}
-	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
-
 	hasIssues := renderLintResults(r, results)
 
 	// Exit with code 1 if issues found

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
@@ -45,19 +44,15 @@ Output adapts to environment:
 }
 
 func runDiscover(cmd *cobra.Command) error {
-	cfg := getConfig()
-	logger := config.GetLogger(cmd.Context())
-
-	// Create renderer
-	mode := output.Mode(cfg.OutputFormat)
-	r := output.NewRenderer(cmd.OutOrStdout(), cmd.ErrOrStderr(), mode)
-
-	// Create engine (no DB connection needed for discovery)
-	eng, err := createEngine(cfg, logger)
+	cmdCtx, cleanup, err := NewCommandContext(cmd)
 	if err != nil {
-		return fmt.Errorf("failed to create engine: %w", err)
+		return err
 	}
-	defer func() { _ = eng.Close() }()
+	defer cleanup()
+
+	cfg := cmdCtx.Cfg
+	eng := cmdCtx.Engine
+	r := cmdCtx.Renderer
 
 	// Run unified discovery
 	force, _ := cmd.Flags().GetBool("force")
