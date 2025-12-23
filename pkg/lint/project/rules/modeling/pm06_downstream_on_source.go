@@ -1,0 +1,60 @@
+package modeling
+
+import (
+	"fmt"
+
+	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/lint/project"
+)
+
+func init() {
+	project.Register(project.RuleDef{
+		ID:          "PM06",
+		Name:        "downstream-on-source",
+		Group:       "modeling",
+		Description: "Marts or intermediate model depends directly on source (not staging)",
+		Severity:    project.SeverityWarning,
+		Check:       checkDownstreamOnSource,
+	})
+}
+
+// checkDownstreamOnSource flags marts and intermediate models that depend
+// directly on raw sources instead of staging models. This breaks the
+// recommended data transformation pattern:
+//
+//	Sources → Staging → Intermediate → Marts
+//
+// When marts/intermediate models reference sources directly, it:
+//   - Bypasses data cleaning in staging
+//   - Leads to duplicated transformation logic
+//   - Makes lineage harder to understand
+//
+// Best practice: All raw sources should flow through staging models first.
+func checkDownstreamOnSource(ctx *project.Context) []project.Diagnostic {
+	var diagnostics []project.Diagnostic
+
+	for _, model := range ctx.Models() {
+		// Only check marts and intermediate models
+		if model.Type != lint.ModelTypeMarts && model.Type != lint.ModelTypeIntermediate {
+			continue
+		}
+
+		// Check if any of its sources are external (not a known model)
+		for _, source := range model.Sources {
+			if !ctx.IsModel(source) {
+				// This is an external source - marts/intermediate shouldn't reference it directly
+				diagnostics = append(diagnostics, project.Diagnostic{
+					RuleID:   "PM06",
+					Severity: project.SeverityWarning,
+					Message: fmt.Sprintf(
+						"%s model '%s' depends directly on source '%s'; use a staging model instead",
+						string(model.Type), model.Name, source),
+					Model:    model.Path,
+					FilePath: model.FilePath,
+				})
+			}
+		}
+	}
+
+	return diagnostics
+}
