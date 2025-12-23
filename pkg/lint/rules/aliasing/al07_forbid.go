@@ -1,0 +1,125 @@
+package aliasing
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/lint/internal/ast"
+	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
+
+func init() {
+	lint.Register(ForbidAlias)
+}
+
+// ForbidAlias warns about forbidden alias patterns.
+var ForbidAlias = lint.RuleDef{
+	ID:          "AL07",
+	Name:        "aliasing.forbid",
+	Group:       "aliasing",
+	Description: "Forbidden alias patterns (e.g., single letters, t1/t2).",
+	Severity:    lint.SeverityWarning,
+	ConfigKeys:  []string{"forbidden_patterns", "forbidden_names"},
+	Check:       checkForbidAlias,
+}
+
+// Default forbidden patterns:
+// - Single lowercase letter: ^[a-z]$
+// - Numbered tables: ^t\d+$
+var defaultForbiddenPatterns = []string{
+	`^[a-z]$`,  // single lowercase letters like a, b, c
+	`^t\d+$`,   // t1, t2, t3, etc.
+	`^tbl\d*$`, // tbl, tbl1, tbl2, etc.
+}
+
+func checkForbidAlias(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.Diagnostic {
+	selectStmt, ok := stmt.(*parser.SelectStmt)
+	if !ok {
+		return nil
+	}
+
+	// Get forbidden patterns from config or use defaults
+	patterns := lint.GetStringSliceOption(opts, "forbidden_patterns", defaultForbiddenPatterns)
+	forbiddenNames := lint.GetStringSliceOption(opts, "forbidden_names", nil)
+
+	// Compile patterns
+	var compiledPatterns []*regexp.Regexp
+	for _, p := range patterns {
+		if re, err := regexp.Compile(p); err == nil {
+			compiledPatterns = append(compiledPatterns, re)
+		}
+	}
+
+	// Build forbidden names set (case-insensitive)
+	forbiddenSet := make(map[string]bool)
+	for _, name := range forbiddenNames {
+		forbiddenSet[strings.ToLower(name)] = true
+	}
+
+	var diagnostics []lint.Diagnostic
+
+	// Check table aliases
+	for _, ref := range ast.CollectTableRefs(selectStmt) {
+		var alias string
+		pos := ast.GetTableRefPosition(ref)
+		switch t := ref.(type) {
+		case *parser.TableName:
+			alias = t.Alias
+		case *parser.DerivedTable:
+			alias = t.Alias
+		case *parser.LateralTable:
+			alias = t.Alias
+		}
+		if alias != "" {
+			if diag := checkAlias(alias, "Table", compiledPatterns, forbiddenSet, pos); diag != nil {
+				diagnostics = append(diagnostics, *diag)
+			}
+		}
+	}
+
+	// Check column aliases
+	core := ast.GetSelectCore(selectStmt)
+	if core != nil {
+		corePos := ast.GetSelectCorePosition(core)
+		for _, col := range core.Columns {
+			if col.Alias != "" {
+				alias := strings.TrimSpace(col.Alias)
+				if diag := checkAlias(alias, "Column", compiledPatterns, forbiddenSet, corePos); diag != nil {
+					diagnostics = append(diagnostics, *diag)
+				}
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+func checkAlias(alias, aliasType string, patterns []*regexp.Regexp, forbiddenSet map[string]bool, pos token.Position) *lint.Diagnostic {
+	lowerAlias := strings.ToLower(alias)
+
+	// Check against forbidden names
+	if forbiddenSet[lowerAlias] {
+		return &lint.Diagnostic{
+			RuleID:   "AL07",
+			Severity: lint.SeverityWarning,
+			Message:  aliasType + " alias '" + alias + "' is forbidden; use a more descriptive name",
+			Pos:      pos,
+		}
+	}
+
+	// Check against patterns
+	for _, re := range patterns {
+		if re.MatchString(lowerAlias) {
+			return &lint.Diagnostic{
+				RuleID:   "AL07",
+				Severity: lint.SeverityWarning,
+				Message:  aliasType + " alias '" + alias + "' matches forbidden pattern; use a more descriptive name",
+				Pos:      pos,
+			}
+		}
+	}
+
+	return nil
+}

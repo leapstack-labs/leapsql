@@ -2,9 +2,6 @@ package convention
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
-	"github.com/leapstack-labs/leapsql/pkg/lint/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
-	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 func init() {
@@ -12,29 +9,29 @@ func init() {
 }
 
 // NotEqualOperator recommends consistent not-equal operator usage.
-// Note: This rule is limited because the AST normalizes both <> and != to NE token.
-// We recommend != over <> but cannot detect the original source syntax.
+//
+// NOT IMPLEMENTED: This rule cannot be implemented because the lexer normalizes
+// both <> and != to the same NE token. The original source syntax is not preserved
+// in the AST, making it impossible to detect which operator was used.
+//
+// To implement this rule would require:
+// - Adding an OriginalOp field to BinaryExpr to track the source syntax
+// - Modifying the lexer to preserve the original operator form
+//
+// See: plans/done/sqlfluff-linting-gaps.md for more details.
 var NotEqualOperator = lint.RuleDef{
 	ID:          "CV01",
 	Name:        "convention.not_equal",
 	Group:       "convention",
-	Description: "Prefer != over <> for not equal operator.",
+	Description: "Prefer != over <> for not equal operator (NOT IMPLEMENTED: AST normalizes both operators).",
 	Severity:    lint.SeverityHint,
 	Check:       checkNotEqualOperator,
 }
 
-func checkNotEqualOperator(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
-	if !ok {
-		return nil
-	}
-
-	// Note: Both <> and != are tokenized as NE, so we cannot distinguish them
-	// at the AST level. This rule is a placeholder for when we add source tracking.
-	var diagnostics []lint.Diagnostic
-	for _, binExpr := range ast.CollectBinaryExprs(selectStmt) {
-		// We can only detect that NE is used, not which form
-		_ = binExpr.Op == token.NE
-	}
-	return diagnostics
+// checkNotEqualOperator is a stub that returns no diagnostics.
+// See the comment on NotEqualOperator for why this cannot be implemented.
+func checkNotEqualOperator(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
+	// NOT IMPLEMENTED: The lexer normalizes both <> and != to NE token.
+	// We cannot detect which operator form was used in the source.
+	return nil
 }

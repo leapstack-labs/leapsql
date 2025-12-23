@@ -14,6 +14,10 @@ import (
 // This allows CLI code to use config.TargetConfig without importing internal/config.
 type TargetConfig = sharedcfg.TargetConfig
 
+// LintConfig is an alias for the shared lint configuration.
+// This allows CLI code to use config.LintConfig without importing internal/config.
+type LintConfig = sharedcfg.LintConfig
+
 // Config holds all CLI configuration options.
 type Config struct {
 	ModelsDir    string               `koanf:"models_dir"`
@@ -25,6 +29,7 @@ type Config struct {
 	Verbose      bool                 `koanf:"verbose"`
 	OutputFormat string               `koanf:"output"`
 	Target       *TargetConfig        `koanf:"target"`
+	Lint         *LintConfig          `koanf:"lint"`
 	Environments map[string]EnvConfig `koanf:"environments"`
 }
 

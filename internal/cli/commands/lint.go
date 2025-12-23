@@ -125,7 +125,26 @@ func runLint(cmd *cobra.Command, opts *LintOptions) error {
 func buildLintConfig(cfg *config.Config, opts *LintOptions) *lint.Config {
 	lintCfg := lint.NewConfig()
 
-	// Apply CLI overrides
+	// Apply project config first (lower precedence)
+	if cfg != nil && cfg.Lint != nil {
+		projectLint := cfg.Lint
+		// Apply disabled rules from project config
+		for _, id := range projectLint.Disabled {
+			lintCfg.Disable(strings.TrimSpace(id))
+		}
+		// Apply severity overrides from project config
+		for id, sev := range projectLint.Severity {
+			if s, ok := lint.ParseSeverity(sev); ok {
+				lintCfg.SetSeverity(id, s)
+			}
+		}
+		// Apply rule-specific options from project config
+		for id, ruleOpts := range projectLint.Rules {
+			lintCfg.SetRuleOptions(id, ruleOpts)
+		}
+	}
+
+	// Apply CLI overrides (higher precedence)
 	for _, id := range opts.Disable {
 		lintCfg.Disable(strings.TrimSpace(id))
 	}
@@ -143,7 +162,6 @@ func buildLintConfig(cfg *config.Config, opts *LintOptions) *lint.Config {
 		}
 	}
 
-	_ = cfg // Future: read lint config from project config
 	return lintCfg
 }
 

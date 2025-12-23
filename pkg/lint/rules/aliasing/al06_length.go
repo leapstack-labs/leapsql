@@ -42,6 +42,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 	// Check table aliases
 	for _, ref := range ast.CollectTableRefs(selectStmt) {
 		var alias string
+		var pos = ast.GetTableRefPosition(ref)
 		switch t := ref.(type) {
 		case *parser.TableName:
 			alias = t.Alias
@@ -56,6 +57,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 					RuleID:   "AL06",
 					Severity: lint.SeverityInfo,
 					Message:  "Table alias '" + alias + "' is too short; minimum length is " + string(rune('0'+minLen)),
+					Pos:      pos,
 				})
 			}
 			if len(alias) > maxLen {
@@ -63,6 +65,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 					RuleID:   "AL06",
 					Severity: lint.SeverityInfo,
 					Message:  "Table alias '" + alias + "' is too long; maximum length is " + string(rune('0'+maxLen)),
+					Pos:      pos,
 				})
 			}
 		}
@@ -71,6 +74,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 	// Check column aliases
 	core := ast.GetSelectCore(selectStmt)
 	if core != nil {
+		corePos := ast.GetSelectCorePosition(core)
 		for _, col := range core.Columns {
 			if col.Alias != "" {
 				alias := strings.TrimSpace(col.Alias)
@@ -79,6 +83,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 						RuleID:   "AL06",
 						Severity: lint.SeverityInfo,
 						Message:  "Column alias '" + alias + "' is too short",
+						Pos:      corePos,
 					})
 				}
 				if len(alias) > maxLen {
@@ -86,6 +91,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 						RuleID:   "AL06",
 						Severity: lint.SeverityInfo,
 						Message:  "Column alias '" + alias + "' is too long",
+						Pos:      corePos,
 					})
 				}
 			}

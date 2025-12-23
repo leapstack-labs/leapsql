@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
+	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,6 +64,75 @@ func TestBuildLintConfig(t *testing.T) {
 				assert.True(t, cfg.IsDisabled(r.ID), "rule %q should be disabled", r.ID)
 			}
 		}
+	})
+
+	t.Run("project config disabled rules", func(t *testing.T) {
+		projectCfg := &config.Config{
+			Lint: &config.LintConfig{
+				Disabled: []string{"AM01", "ST01"},
+			},
+		}
+		opts := &LintOptions{}
+		cfg := buildLintConfig(projectCfg, opts)
+
+		require.NotNil(t, cfg)
+		assert.True(t, cfg.IsDisabled("AM01"))
+		assert.True(t, cfg.IsDisabled("ST01"))
+		assert.False(t, cfg.IsDisabled("AM02"))
+	})
+
+	t.Run("project config severity overrides", func(t *testing.T) {
+		projectCfg := &config.Config{
+			Lint: &config.LintConfig{
+				Severity: map[string]string{
+					"AM01": "error",
+					"ST01": "hint",
+				},
+			},
+		}
+		opts := &LintOptions{}
+		cfg := buildLintConfig(projectCfg, opts)
+
+		require.NotNil(t, cfg)
+		assert.Equal(t, lint.SeverityError, cfg.GetSeverity("AM01", lint.SeverityWarning))
+		assert.Equal(t, lint.SeverityHint, cfg.GetSeverity("ST01", lint.SeverityWarning))
+		// Rule without override should return default
+		assert.Equal(t, lint.SeverityWarning, cfg.GetSeverity("AM02", lint.SeverityWarning))
+	})
+
+	t.Run("project config rule options", func(t *testing.T) {
+		projectCfg := &config.Config{
+			Lint: &config.LintConfig{
+				Rules: map[string]sharedcfg.RuleOptions{
+					"AL06": {"min_length": 3, "max_length": 20},
+				},
+			},
+		}
+		opts := &LintOptions{}
+		cfg := buildLintConfig(projectCfg, opts)
+
+		require.NotNil(t, cfg)
+		al06Opts := cfg.GetRuleOptions("AL06")
+		require.NotNil(t, al06Opts)
+		assert.Equal(t, 3, int(al06Opts["min_length"].(int)))
+		assert.Equal(t, 20, int(al06Opts["max_length"].(int)))
+	})
+
+	t.Run("CLI overrides project config", func(t *testing.T) {
+		projectCfg := &config.Config{
+			Lint: &config.LintConfig{
+				Disabled: []string{"AM01"},
+			},
+		}
+		opts := &LintOptions{
+			Disable: []string{"AM02"}, // Additional disable via CLI
+		}
+		cfg := buildLintConfig(projectCfg, opts)
+
+		require.NotNil(t, cfg)
+		// Both should be disabled
+		assert.True(t, cfg.IsDisabled("AM01"))
+		assert.True(t, cfg.IsDisabled("AM02"))
 	})
 }
 

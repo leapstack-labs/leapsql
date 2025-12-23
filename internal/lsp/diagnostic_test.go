@@ -263,7 +263,7 @@ func TestServer_ValidateSQL(t *testing.T) {
 		},
 		{
 			name:         "valid JOIN",
-			content:      "SELECT u.id FROM users u JOIN orders o ON u.id = o.user_id",
+			content:      "SELECT usr.id FROM users usr JOIN orders ord ON usr.id = ord.user_id",
 			expectErrors: false,
 		},
 		{
