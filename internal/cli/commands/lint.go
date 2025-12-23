@@ -11,18 +11,21 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	intparser "github.com/leapstack-labs/leapsql/internal/parser"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
-	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules" // register rules
+	"github.com/leapstack-labs/leapsql/pkg/lint/project"
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // register project rules
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules"         // register rules
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/spf13/cobra"
 )
 
 // LintOptions holds options for the lint command.
 type LintOptions struct {
-	Path     string   // File or directory path
-	Format   string   // Output format: text, json
-	Disable  []string // Rule IDs to disable
-	Severity string   // Minimum severity: error, warning, info, hint
-	Rules    []string // Run only specific rules
+	Path        string   // File or directory path
+	Format      string   // Output format: text, json
+	Disable     []string // Rule IDs to disable
+	Severity    string   // Minimum severity: error, warning, info, hint
+	Rules       []string // Run only specific rules
+	SkipProject bool     // Skip project health linting
 }
 
 // NewLintCommand creates the lint command.
@@ -66,6 +69,7 @@ Output adapts to environment:
 	cmd.Flags().StringSliceVar(&opts.Disable, "disable", nil, "Rule IDs to disable")
 	cmd.Flags().StringVar(&opts.Severity, "severity", "warning", "Minimum severity: error, warning, info, hint")
 	cmd.Flags().StringSliceVar(&opts.Rules, "rule", nil, "Run only specific rules")
+	cmd.Flags().BoolVar(&opts.SkipProject, "skip-project", false, "Skip project health linting")
 
 	return cmd
 }
@@ -106,17 +110,25 @@ func runLint(cmd *cobra.Command, opts *LintOptions) error {
 	// Filter models by path if specified
 	models := filterModelsByPath(eng.GetModels(), opts.Path)
 
-	// Analyze each model
+	// Analyze each model (SQL-level linting)
 	results := analyzeModels(models, analyzer, d, eng)
+
+	// Run project health linting
+	var projectResults []project.Diagnostic
+	if !opts.SkipProject && isProjectHealthEnabled(cfg) {
+		projectResults = runProjectHealthLinting(eng, cfg, opts)
+	}
 
 	// Filter by severity threshold
 	results = filterBySeverity(results, opts.Severity)
+	projectResults = filterProjectBySeverity(projectResults, opts.Severity)
 
 	// Render output
 	hasIssues := renderLintResults(r, results)
+	hasProjectIssues := renderProjectHealthResults(r, projectResults)
 
 	// Exit with code 1 if issues found
-	if hasIssues {
+	if hasIssues || hasProjectIssues {
 		return fmt.Errorf("lint issues found")
 	}
 	return nil
@@ -356,6 +368,218 @@ func severityStyle(r *output.Renderer, sev lint.Severity) string {
 	case lint.SeverityInfo:
 		return r.Styles().Info.Render("info   ")
 	case lint.SeverityHint:
+		return r.Styles().Muted.Render("hint   ")
+	default:
+		return r.Styles().Muted.Render("unknown")
+	}
+}
+
+// isProjectHealthEnabled checks if project health linting is enabled in config.
+func isProjectHealthEnabled(cfg *config.Config) bool {
+	if cfg == nil || cfg.Lint == nil || cfg.Lint.ProjectHealth == nil {
+		return true // Enabled by default
+	}
+	return cfg.Lint.ProjectHealth.IsEnabled()
+}
+
+// runProjectHealthLinting runs project-level lint rules.
+func runProjectHealthLinting(eng *engine.Engine, cfg *config.Config, opts *LintOptions) []project.Diagnostic {
+	// Build project context from engine models
+	ctx := buildProjectContext(eng, cfg)
+	if ctx == nil {
+		return nil
+	}
+
+	// Build analyzer config
+	analyzerCfg := buildProjectAnalyzerConfig(cfg, opts)
+	analyzer := project.NewAnalyzer(analyzerCfg)
+
+	return analyzer.Analyze(ctx)
+}
+
+// buildProjectContext creates a project.Context from engine data.
+func buildProjectContext(eng *engine.Engine, cfg *config.Config) *project.Context {
+	engineModels := eng.GetModels()
+	if len(engineModels) == 0 {
+		return nil
+	}
+
+	// Convert engine models to project models
+	models := make(map[string]*project.ModelInfo)
+	for path, m := range engineModels {
+		models[path] = &project.ModelInfo{
+			Path:         m.Path,
+			Name:         m.Name,
+			FilePath:     m.FilePath,
+			Sources:      m.Sources,
+			Columns:      convertColumns(m.Columns),
+			Materialized: m.Materialized,
+			Tags:         m.Tags,
+			Meta:         m.Meta,
+		}
+	}
+
+	// Infer model types
+	project.InferAndSetTypes(models)
+
+	// Build parent/child relationships from the graph
+	graph := eng.GetGraph()
+	parents := make(map[string][]string)
+	children := make(map[string][]string)
+
+	if graph != nil {
+		for path := range models {
+			parents[path] = graph.GetParents(path)
+			children[path] = graph.GetChildren(path)
+		}
+	}
+
+	// Build config
+	projectCfg := buildProjectHealthConfig(cfg)
+
+	return project.NewContext(models, parents, children, projectCfg)
+}
+
+// convertColumns converts parser.ColumnInfo to lint.ColumnInfo.
+func convertColumns(cols []intparser.ColumnInfo) []lint.ColumnInfo {
+	result := make([]lint.ColumnInfo, len(cols))
+	for i, c := range cols {
+		sources := make([]lint.SourceRef, len(c.Sources))
+		for j, s := range c.Sources {
+			sources[j] = lint.SourceRef{
+				Table:  s.Table,
+				Column: s.Column,
+			}
+		}
+		result[i] = lint.ColumnInfo{
+			Name:          c.Name,
+			TransformType: c.TransformType,
+			Function:      c.Function,
+			Sources:       sources,
+		}
+	}
+	return result
+}
+
+// buildProjectHealthConfig creates lint.ProjectHealthConfig from CLI config.
+func buildProjectHealthConfig(cfg *config.Config) lint.ProjectHealthConfig {
+	result := lint.DefaultProjectHealthConfig()
+
+	if cfg == nil || cfg.Lint == nil || cfg.Lint.ProjectHealth == nil {
+		return result
+	}
+
+	ph := cfg.Lint.ProjectHealth
+	if ph.Thresholds.ModelFanout > 0 {
+		result.ModelFanoutThreshold = ph.Thresholds.ModelFanout
+	}
+	if ph.Thresholds.TooManyJoins > 0 {
+		result.TooManyJoinsThreshold = ph.Thresholds.TooManyJoins
+	}
+	if ph.Thresholds.PassthroughColumns > 0 {
+		result.PassthroughColumnThreshold = ph.Thresholds.PassthroughColumns
+	}
+	if ph.Thresholds.StarlarkComplexity > 0 {
+		result.StarlarkComplexityThreshold = ph.Thresholds.StarlarkComplexity
+	}
+
+	return result
+}
+
+// buildProjectAnalyzerConfig builds analyzer config from CLI config.
+func buildProjectAnalyzerConfig(cfg *config.Config, opts *LintOptions) *project.AnalyzerConfig {
+	analyzerCfg := project.NewAnalyzerConfig()
+
+	// Apply disabled rules from CLI
+	for _, id := range opts.Disable {
+		analyzerCfg.DisabledRules[strings.TrimSpace(id)] = true
+	}
+
+	// Apply config from project config
+	if cfg != nil && cfg.Lint != nil && cfg.Lint.ProjectHealth != nil {
+		for id, sev := range cfg.Lint.ProjectHealth.Rules {
+			if sev == "off" {
+				analyzerCfg.DisabledRules[id] = true
+			} else {
+				// Parse severity override
+				switch strings.ToLower(sev) {
+				case "error":
+					analyzerCfg.SeverityOverrides[id] = project.SeverityError
+				case "warning":
+					analyzerCfg.SeverityOverrides[id] = project.SeverityWarning
+				case "info":
+					analyzerCfg.SeverityOverrides[id] = project.SeverityInfo
+				case "hint":
+					analyzerCfg.SeverityOverrides[id] = project.SeverityHint
+				}
+			}
+		}
+	}
+
+	return analyzerCfg
+}
+
+// filterProjectBySeverity filters project diagnostics by severity threshold.
+func filterProjectBySeverity(diags []project.Diagnostic, severityThreshold string) []project.Diagnostic {
+	threshold := parseSeverityThreshold(severityThreshold)
+
+	var filtered []project.Diagnostic
+	for _, d := range diags {
+		if d.Severity <= threshold {
+			filtered = append(filtered, d)
+		}
+	}
+	return filtered
+}
+
+// parseSeverityThreshold converts a severity string to project.Severity.
+func parseSeverityThreshold(s string) project.Severity {
+	switch strings.ToLower(s) {
+	case "error":
+		return project.SeverityError
+	case "warning":
+		return project.SeverityWarning
+	case "info":
+		return project.SeverityInfo
+	case "hint":
+		return project.SeverityHint
+	default:
+		return project.SeverityWarning
+	}
+}
+
+// renderProjectHealthResults renders project health diagnostics.
+func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic) bool {
+	if len(diags) == 0 {
+		return false
+	}
+
+	r.Println("")
+	r.Println(r.Styles().Bold.Render("Project Health Results:"))
+
+	for _, d := range diags {
+		sevStyle := projectSeverityStyle(r, d.Severity)
+		r.Printf("  %s  %s  %s\n",
+			sevStyle,
+			r.Styles().Bold.Render(d.RuleID),
+			d.Message,
+		)
+	}
+
+	r.Println("")
+	return true
+}
+
+// projectSeverityStyle returns the styled severity string for project diagnostics.
+func projectSeverityStyle(r *output.Renderer, sev project.Severity) string {
+	switch sev {
+	case project.SeverityError:
+		return r.Styles().Error.Render("error  ")
+	case project.SeverityWarning:
+		return r.Styles().Warning.Render("warning")
+	case project.SeverityInfo:
+		return r.Styles().Info.Render("info   ")
+	case project.SeverityHint:
 		return r.Styles().Muted.Render("hint   ")
 	default:
 		return r.Styles().Muted.Render("unknown")

@@ -88,10 +88,42 @@ type LintConfig struct {
 
 	// Rules contains rule-specific options
 	Rules map[string]RuleOptions `koanf:"rules"`
+
+	// ProjectHealth holds project-level linting configuration
+	ProjectHealth *ProjectHealthConfig `koanf:"project_health"`
 }
 
 // RuleOptions holds rule-specific configuration options.
 type RuleOptions map[string]any
+
+// ProjectHealthConfig holds configuration for project-level linting.
+type ProjectHealthConfig struct {
+	// Enabled controls whether project health linting is enabled (default: true)
+	Enabled *bool `koanf:"enabled"`
+
+	// Thresholds for various rules
+	Thresholds ProjectHealthThresholds `koanf:"thresholds"`
+
+	// Rules maps rule IDs to severity overrides (off, info, warning, error)
+	Rules map[string]string `koanf:"rules"`
+}
+
+// ProjectHealthThresholds holds configurable thresholds for project health rules.
+type ProjectHealthThresholds struct {
+	ModelFanout        int `koanf:"model_fanout"`        // PM04: default 3
+	TooManyJoins       int `koanf:"too_many_joins"`      // PM05: default 7
+	PassthroughColumns int `koanf:"passthrough_columns"` // PL01: default 20
+	StarlarkComplexity int `koanf:"starlark_complexity"` // PT01: default 10
+}
+
+// IsEnabled returns whether project health linting is enabled.
+// Defaults to true if not explicitly set.
+func (c *ProjectHealthConfig) IsEnabled() bool {
+	if c == nil || c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
+}
 
 // ProjectConfig holds the minimal project configuration needed by tools like the LSP.
 // This is a subset of the full CLI Config.
