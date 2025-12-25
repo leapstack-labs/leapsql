@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/testutil"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,6 +17,27 @@ func setupTestStore(t *testing.T) *SQLiteStore {
 	require.NoError(t, store.Open(":memory:"))
 	require.NoError(t, store.InitSchema())
 	return store
+}
+
+// newTestModel creates a Model (core.PersistedModel) for testing.
+// This helper uses the composition pattern required by core.PersistedModel.
+func newTestModel(path, name, materialized, contentHash string) *Model {
+	return &Model{
+		Model: &core.Model{
+			Path:         path,
+			Name:         name,
+			Materialized: materialized,
+		},
+		ContentHash: contentHash,
+	}
+}
+
+// newTestModelFull creates a Model with all core fields for testing.
+func newTestModelFull(coreModel *core.Model, contentHash string) *Model {
+	return &Model{
+		Model:       coreModel,
+		ContentHash: contentHash,
+	}
 }
 
 func TestSQLiteStore_OpenClose(t *testing.T) {
@@ -180,12 +202,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		{
 			name: "register model",
 			setup: func(t *testing.T, store *SQLiteStore) *Model {
-				model := &Model{
-					Path:         "models.staging.stg_users",
-					Name:         "stg_users",
-					Materialized: "table",
-					ContentHash:  "abc123",
-				}
+				model := newTestModel("models.staging.stg_users", "stg_users", "table", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
@@ -196,12 +213,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		{
 			name: "register model upsert",
 			setup: func(_ *testing.T, store *SQLiteStore) *Model {
-				model := &Model{
-					Path:         "models.staging.stg_users",
-					Name:         "stg_users",
-					Materialized: "table",
-					ContentHash:  "abc123",
-				}
+				model := newTestModel("models.staging.stg_users", "stg_users", "table", "abc123")
 				_ = store.RegisterModel(model)
 				return model
 			},
@@ -217,12 +229,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		{
 			name: "get model by ID",
 			setup: func(_ *testing.T, store *SQLiteStore) *Model {
-				model := &Model{
-					Path:         "models.staging.stg_orders",
-					Name:         "stg_orders",
-					Materialized: "view",
-					ContentHash:  "hash123",
-				}
+				model := newTestModel("models.staging.stg_orders", "stg_orders", "view", "hash123")
 				_ = store.RegisterModel(model)
 				return model
 			},
@@ -235,13 +242,12 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		{
 			name: "get model by path",
 			setup: func(_ *testing.T, store *SQLiteStore) *Model {
-				model := &Model{
+				model := newTestModelFull(&core.Model{
 					Path:         "models.marts.revenue",
 					Name:         "revenue",
 					Materialized: "incremental",
 					UniqueKey:    "transaction_id",
-					ContentHash:  "xyz789",
-				}
+				}, "xyz789")
 				_ = store.RegisterModel(model)
 				return model
 			},
@@ -266,12 +272,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		{
 			name: "update model hash",
 			setup: func(t *testing.T, store *SQLiteStore) *Model {
-				model := &Model{
-					Path:         "models.test",
-					Name:         "test",
-					Materialized: "table",
-					ContentHash:  "original",
-				}
+				model := newTestModel("models.test", "test", "table", "original")
 				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
@@ -287,9 +288,9 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			name: "list models",
 			setup: func(t *testing.T, store *SQLiteStore) *Model {
 				models := []*Model{
-					{Path: "models.a", Name: "a", Materialized: "table", ContentHash: "1"},
-					{Path: "models.b", Name: "b", Materialized: "table", ContentHash: "2"},
-					{Path: "models.c", Name: "c", Materialized: "table", ContentHash: "3"},
+					newTestModel("models.a", "a", "table", "1"),
+					newTestModel("models.b", "b", "table", "2"),
+					newTestModel("models.c", "c", "table", "3"),
 				}
 				for _, m := range models {
 					require.NoError(t, store.RegisterModel(m))
@@ -333,12 +334,11 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 	}{
 		{
 			name: "with all frontmatter fields",
-			model: &Model{
+			model: newTestModelFull(&core.Model{
 				Path:         "models.staging.stg_users",
 				Name:         "stg_users",
 				Materialized: "incremental",
 				UniqueKey:    "user_id",
-				ContentHash:  "abc123",
 				Owner:        "data-team",
 				Schema:       "analytics",
 				Tags:         []string{"pii", "daily"},
@@ -350,7 +350,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 					"priority": "high",
 					"sla":      24,
 				},
-			},
+			}, "abc123"),
 			verify: func(t *testing.T, retrieved *Model) {
 				assert.Equal(t, "data-team", retrieved.Owner)
 				assert.Equal(t, "analytics", retrieved.Schema)
@@ -362,13 +362,8 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 			},
 		},
 		{
-			name: "with empty optional fields",
-			model: &Model{
-				Path:         "models.simple",
-				Name:         "simple",
-				Materialized: "table",
-				ContentHash:  "hash123",
-			},
+			name:  "with empty optional fields",
+			model: newTestModel("models.simple", "simple", "table", "hash123"),
 			verify: func(t *testing.T, retrieved *Model) {
 				assert.Empty(t, retrieved.Owner)
 				assert.Empty(t, retrieved.Schema)
@@ -379,11 +374,10 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 		},
 		{
 			name: "with accepted values test",
-			model: &Model{
+			model: newTestModelFull(&core.Model{
 				Path:         "models.accepted_values_test",
 				Name:         "accepted_values_test",
 				Materialized: "table",
-				ContentHash:  "hash",
 				Tests: []TestConfig{
 					{
 						AcceptedValues: &AcceptedValuesConfig{
@@ -392,7 +386,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, "hash"),
 			verify: func(t *testing.T, retrieved *Model) {
 				require.Len(t, retrieved.Tests, 1)
 				require.NotNil(t, retrieved.Tests[0].AcceptedValues)
@@ -422,14 +416,13 @@ func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// Register initial model
-	model := &Model{
+	model := newTestModelFull(&core.Model{
 		Path:         "models.update_test",
 		Name:         "update_test",
 		Materialized: "table",
-		ContentHash:  "hash1",
 		Owner:        "team-a",
 		Tags:         []string{"initial"},
-	}
+	}, "hash1")
 	require.NoError(t, store.RegisterModel(model))
 
 	// Update the model with new frontmatter fields
@@ -456,16 +449,15 @@ func TestSQLiteStore_GetModelByID_WithFrontmatterFields(t *testing.T) {
 	store := setupTestStore(t)
 	defer func() { _ = store.Close() }()
 
-	model := &Model{
+	model := newTestModelFull(&core.Model{
 		Path:         "models.get_by_id_test",
 		Name:         "get_by_id_test",
 		Materialized: "view",
-		ContentHash:  "hash123",
 		Owner:        "analytics",
 		Schema:       "reporting",
 		Tags:         []string{"finance"},
 		Meta:         map[string]any{"department": "finance"},
-	}
+	}, "hash123")
 
 	require.NoError(t, store.RegisterModel(model))
 
@@ -482,14 +474,14 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	models := []*Model{
-		{
-			Path: "models.list_a", Name: "list_a", Materialized: "table", ContentHash: "1",
+		newTestModelFull(&core.Model{
+			Path: "models.list_a", Name: "list_a", Materialized: "table",
 			Owner: "team-a", Tags: []string{"tag-a"},
-		},
-		{
-			Path: "models.list_b", Name: "list_b", Materialized: "table", ContentHash: "2",
+		}, "1"),
+		newTestModelFull(&core.Model{
+			Path: "models.list_b", Name: "list_b", Materialized: "table",
 			Owner: "team-b", Tags: []string{"tag-b"},
-		},
+		}, "2"),
 	}
 
 	for _, m := range models {
@@ -518,7 +510,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			name: "record model run",
 			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
 				run, _ := store.CreateRun("test")
-				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
+				model := newTestModel("models.test", "test", "table", "hash")
 				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
@@ -539,7 +531,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			name: "update model run",
 			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
 				run, _ := store.CreateRun("test")
-				model := &Model{Path: "models.test", Name: "test", Materialized: "table", ContentHash: "hash"}
+				model := newTestModel("models.test", "test", "table", "hash")
 				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
@@ -571,7 +563,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 				require.NoError(t, err)
 				run2, err := store.CreateRun("test")
 				require.NoError(t, err)
-				model := &Model{Path: "models.test", Name: "test", ContentHash: "hash"}
+				model := newTestModel("models.test", "test", "", "hash")
 				require.NoError(t, store.RegisterModel(model))
 
 				mr1 := &ModelRun{RunID: run1.ID, ModelID: model.ID, Status: ModelRunStatusSuccess}
@@ -628,9 +620,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		{
 			name: "set dependencies",
 			setup: func(t *testing.T, store *SQLiteStore) []*Model {
-				parent1 := &Model{Path: "models.parent1", Name: "parent1", ContentHash: "1"}
-				parent2 := &Model{Path: "models.parent2", Name: "parent2", ContentHash: "2"}
-				child := &Model{Path: "models.child", Name: "child", ContentHash: "3"}
+				parent1 := newTestModel("models.parent1", "parent1", "", "1")
+				parent2 := newTestModel("models.parent2", "parent2", "", "2")
+				child := newTestModel("models.child", "child", "", "3")
 
 				_ = store.RegisterModel(parent1)
 				_ = store.RegisterModel(parent2)
@@ -648,9 +640,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		{
 			name: "replace dependencies",
 			setup: func(t *testing.T, store *SQLiteStore) []*Model {
-				parent1 := &Model{Path: "models.p1", Name: "p1", ContentHash: "1"}
-				parent2 := &Model{Path: "models.p2", Name: "p2", ContentHash: "2"}
-				child := &Model{Path: "models.c", Name: "c", ContentHash: "3"}
+				parent1 := newTestModel("models.p1", "p1", "", "1")
+				parent2 := newTestModel("models.p2", "p2", "", "2")
+				child := newTestModel("models.c", "c", "", "3")
 
 				_ = store.RegisterModel(parent1)
 				_ = store.RegisterModel(parent2)
@@ -671,9 +663,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		{
 			name: "get dependents",
 			setup: func(_ *testing.T, store *SQLiteStore) []*Model {
-				parent := &Model{Path: "models.parent", Name: "parent", ContentHash: "1"}
-				child1 := &Model{Path: "models.child1", Name: "child1", ContentHash: "2"}
-				child2 := &Model{Path: "models.child2", Name: "child2", ContentHash: "3"}
+				parent := newTestModel("models.parent", "parent", "", "1")
+				child1 := newTestModel("models.child1", "child1", "", "2")
+				child2 := newTestModel("models.child2", "child2", "", "3")
 
 				_ = store.RegisterModel(parent)
 				_ = store.RegisterModel(child1)
@@ -772,11 +764,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 		{
 			name: "save and get model columns",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				model := &Model{
-					Path:        "staging.stg_customers",
-					Name:        "stg_customers",
-					ContentHash: "abc123",
-				}
+				model := newTestModel("staging.stg_customers", "stg_customers", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
 				columns := []ColumnInfo{
@@ -820,11 +808,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 		{
 			name: "save model columns upsert",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				model := &Model{
-					Path:        "staging.stg_orders",
-					Name:        "stg_orders",
-					ContentHash: "abc123",
-				}
+				model := newTestModel("staging.stg_orders", "stg_orders", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
 				initialColumns := []ColumnInfo{
@@ -858,11 +842,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 		{
 			name: "delete model columns",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				model := &Model{
-					Path:        "staging.stg_products",
-					Name:        "stg_products",
-					ContentHash: "abc123",
-				}
+				model := newTestModel("staging.stg_products", "stg_products", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
 				columns := []ColumnInfo{
@@ -906,16 +886,8 @@ func TestSQLiteStore_Trace(t *testing.T) {
 		{
 			name: "trace column backward",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				stgModel := &Model{
-					Path:        "staging.stg_customers",
-					Name:        "stg_customers",
-					ContentHash: "abc",
-				}
-				martModel := &Model{
-					Path:        "marts.customer_summary",
-					Name:        "customer_summary",
-					ContentHash: "def",
-				}
+				stgModel := newTestModel("staging.stg_customers", "stg_customers", "", "abc")
+				martModel := newTestModel("marts.customer_summary", "customer_summary", "", "def")
 				require.NoError(t, store.RegisterModel(stgModel))
 				require.NoError(t, store.RegisterModel(martModel))
 
@@ -954,16 +926,8 @@ func TestSQLiteStore_Trace(t *testing.T) {
 		{
 			name: "trace column forward",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				stgModel := &Model{
-					Path:        "staging.stg_customers",
-					Name:        "stg_customers",
-					ContentHash: "abc",
-				}
-				martModel := &Model{
-					Path:        "marts.customer_summary",
-					Name:        "customer_summary",
-					ContentHash: "def",
-				}
+				stgModel := newTestModel("staging.stg_customers", "stg_customers", "", "abc")
+				martModel := newTestModel("marts.customer_summary", "customer_summary", "", "def")
 				require.NoError(t, store.RegisterModel(stgModel))
 				require.NoError(t, store.RegisterModel(martModel))
 
@@ -997,9 +961,9 @@ func TestSQLiteStore_Trace(t *testing.T) {
 		{
 			name: "trace column forward multiple consumers",
 			setup: func(t *testing.T, store *SQLiteStore) {
-				stgModel := &Model{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"}
-				summaryModel := &Model{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "def"}
-				metricsModel := &Model{Path: "marts.customer_metrics", Name: "customer_metrics", ContentHash: "ghi"}
+				stgModel := newTestModel("staging.stg_customers", "stg_customers", "", "abc")
+				summaryModel := newTestModel("marts.customer_summary", "customer_summary", "", "def")
+				metricsModel := newTestModel("marts.customer_metrics", "customer_metrics", "", "ghi")
 
 				for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
 					require.NoError(t, store.RegisterModel(m))
@@ -1074,9 +1038,9 @@ func TestSQLiteStore_BatchGetAllColumns(t *testing.T) {
 
 	// Setup: Register models and save columns
 	models := []*Model{
-		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "abc"},
-		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "def"},
-		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "ghi"},
+		newTestModel("staging.stg_customers", "stg_customers", "", "abc"),
+		newTestModel("staging.stg_orders", "stg_orders", "", "def"),
+		newTestModel("marts.customer_summary", "customer_summary", "", "ghi"),
 	}
 	for _, m := range models {
 		require.NoError(t, store.RegisterModel(m))
@@ -1134,10 +1098,10 @@ func TestSQLiteStore_BatchGetAllDependencies(t *testing.T) {
 	//   customer_summary (depends on stg_customers, stg_orders)
 	//   order_summary (depends on stg_orders)
 	models := []*Model{
-		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "1"},
-		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "2"},
-		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "3"},
-		{Path: "marts.order_summary", Name: "order_summary", ContentHash: "4"},
+		newTestModel("staging.stg_customers", "stg_customers", "", "1"),
+		newTestModel("staging.stg_orders", "stg_orders", "", "2"),
+		newTestModel("marts.customer_summary", "customer_summary", "", "3"),
+		newTestModel("marts.order_summary", "order_summary", "", "4"),
 	}
 	for _, m := range models {
 		require.NoError(t, store.RegisterModel(m))
@@ -1171,10 +1135,10 @@ func TestSQLiteStore_BatchGetAllDependents(t *testing.T) {
 
 	// Setup: Same as BatchGetAllDependencies test
 	models := []*Model{
-		{Path: "staging.stg_customers", Name: "stg_customers", ContentHash: "1"},
-		{Path: "staging.stg_orders", Name: "stg_orders", ContentHash: "2"},
-		{Path: "marts.customer_summary", Name: "customer_summary", ContentHash: "3"},
-		{Path: "marts.order_summary", Name: "order_summary", ContentHash: "4"},
+		newTestModel("staging.stg_customers", "stg_customers", "", "1"),
+		newTestModel("staging.stg_orders", "stg_orders", "", "2"),
+		newTestModel("marts.customer_summary", "customer_summary", "", "3"),
+		newTestModel("marts.order_summary", "order_summary", "", "4"),
 	}
 	for _, m := range models {
 		require.NoError(t, store.RegisterModel(m))

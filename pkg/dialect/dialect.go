@@ -9,42 +9,35 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-// NormalizationStrategy defines how unquoted identifiers are normalized.
-type NormalizationStrategy int
+// Type aliases for backward compatibility - these types are now defined in pkg/core.
+// Use core.* types directly in new code.
+type (
+	// NormalizationStrategy is an alias for core.NormalizationStrategy.
+	NormalizationStrategy = core.NormalizationStrategy
 
-const (
-	// NormLowercase normalizes unquoted identifiers to lowercase (default SQL behavior).
-	NormLowercase NormalizationStrategy = iota
-	// NormUppercase normalizes unquoted identifiers to uppercase (Snowflake, Oracle).
-	NormUppercase
-	// NormCaseSensitive preserves identifier case exactly (MySQL, ClickHouse).
-	NormCaseSensitive
-	// NormCaseInsensitive normalizes to lowercase for comparison (BigQuery, Hive, DuckDB).
-	NormCaseInsensitive
+	// PlaceholderStyle is an alias for core.PlaceholderStyle.
+	PlaceholderStyle = core.PlaceholderStyle
+
+	// IdentifierConfig is an alias for core.IdentifierConfig.
+	IdentifierConfig = core.IdentifierConfig
 )
 
-// PlaceholderStyle defines how query parameters are formatted.
-type PlaceholderStyle int
-
+// Re-export constants from core for backward compatibility.
 const (
-	// PlaceholderQuestion uses ? for all parameters (DuckDB, MySQL, SQLite).
-	PlaceholderQuestion PlaceholderStyle = iota
-	// PlaceholderDollar uses $1, $2, etc. for parameters (PostgreSQL).
-	PlaceholderDollar
-)
+	NormLowercase       = core.NormLowercase
+	NormUppercase       = core.NormUppercase
+	NormCaseSensitive   = core.NormCaseSensitive
+	NormCaseInsensitive = core.NormCaseInsensitive
 
-// IdentifierConfig defines how identifiers are quoted and normalized.
-type IdentifierConfig struct {
-	Quote         string                // Quote character: ", `, [
-	QuoteEnd      string                // End quote character (usually same as Quote, ] for [)
-	Escape        string                // Escape sequence: "", ``, ]]
-	Normalization NormalizationStrategy // How to normalize unquoted identifiers
-}
+	PlaceholderQuestion = core.PlaceholderQuestion
+	PlaceholderDollar   = core.PlaceholderDollar
+)
 
 // Type classifies how a function affects lineage.
 type Type int
@@ -159,6 +152,53 @@ type Dialect struct {
 
 	// Lint rules for this dialect
 	lintRules []lint.RuleDef
+}
+
+// Config returns the pure data configuration for this dialect.
+// This provides access to dialect configuration without SPI dependencies.
+func (d *Dialect) Config() *core.DialectConfig {
+	// Collect aggregates
+	aggregates := make([]string, 0, len(d.aggregates))
+	for f := range d.aggregates {
+		aggregates = append(aggregates, f)
+	}
+
+	// Collect generators
+	generators := make([]string, 0, len(d.generators))
+	for f := range d.generators {
+		generators = append(generators, f)
+	}
+
+	// Collect windows
+	windows := make([]string, 0, len(d.windows))
+	for f := range d.windows {
+		windows = append(windows, f)
+	}
+
+	// Collect table functions
+	tableFunctions := make([]string, 0, len(d.tableFunctions))
+	for f := range d.tableFunctions {
+		tableFunctions = append(tableFunctions, f)
+	}
+
+	// Collect keywords
+	keywords := make([]string, 0, len(d.keywords))
+	for kw := range d.keywords {
+		keywords = append(keywords, kw)
+	}
+
+	return &core.DialectConfig{
+		Name:           d.Name,
+		Identifiers:    d.Identifiers,
+		DefaultSchema:  d.DefaultSchema,
+		Placeholder:    d.Placeholder,
+		Aggregates:     aggregates,
+		Generators:     generators,
+		Windows:        windows,
+		TableFunctions: tableFunctions,
+		Keywords:       keywords,
+		DataTypes:      d.dataTypes,
+	}
 }
 
 // FunctionLineageType returns the lineage classification for a function.

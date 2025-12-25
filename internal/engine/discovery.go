@@ -12,9 +12,10 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/macro"
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/registry"
 	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // DiscoveryOptions configures the discovery process.
@@ -268,13 +269,13 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 	e.logger.Debug("discovering models", "models_dir", absModelsDir)
 
 	// Clear in-memory state for fresh build
-	e.models = make(map[string]*parser.ModelConfig)
+	e.models = make(map[string]*loader.ModelConfig)
 	e.registry = registry.NewModelRegistry()
 
 	// Track which files we've seen
 	seenFiles := make(map[string]bool)
 
-	scanner := parser.NewScanner(absModelsDir, e.dialect)
+	scanner := loader.NewScanner(absModelsDir, e.dialect)
 
 	err := filepath.Walk(absModelsDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".sql") {
@@ -287,7 +288,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 
 		needsParse, newHash, content := e.shouldParseFile(absPath, opts.ForceFullRefresh)
 
-		var modelConfig *parser.ModelConfig
+		var modelConfig *loader.ModelConfig
 
 		if !needsParse {
 			// Try to load from SQLite
@@ -341,10 +342,10 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 }
 
 // reconstructModelConfig creates a ModelConfig from stored state and file content.
-func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content []byte) *parser.ModelConfig {
+func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content []byte) *loader.ModelConfig {
 	// We need to re-parse the file to get the full SQL and sources
 	// But we can skip the full parse validation since we know it was valid before
-	scanner := parser.NewScanner(e.modelsDir, e.dialect)
+	scanner := loader.NewScanner(e.modelsDir, e.dialect)
 	config, err := scanner.ParseContent(filePath, content)
 	if err != nil {
 		// If parsing fails now, return nil to trigger full re-parse
@@ -354,19 +355,21 @@ func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content
 }
 
 // saveModelToStore saves a parsed model to the state store.
-func (e *Engine) saveModelToStore(m *parser.ModelConfig, absPath, hash string) error {
+func (e *Engine) saveModelToStore(m *loader.ModelConfig, absPath, hash string) error {
 	model := &state.Model{
-		Path:           m.Path,
-		Name:           m.Name,
-		Materialized:   m.Materialized,
-		UniqueKey:      m.UniqueKey,
-		ContentHash:    computeHash(m.RawContent),
-		FilePath:       absPath,
-		Owner:          m.Owner,
-		Schema:         m.Schema,
-		Tags:           m.Tags,
-		Meta:           m.Meta,
-		UsesSelectStar: m.UsesSelectStar,
+		Model: &core.Model{
+			Path:           m.Path,
+			Name:           m.Name,
+			Materialized:   m.Materialized,
+			UniqueKey:      m.UniqueKey,
+			FilePath:       absPath,
+			Owner:          m.Owner,
+			Schema:         m.Schema,
+			Tags:           m.Tags,
+			Meta:           m.Meta,
+			UsesSelectStar: m.UsesSelectStar,
+		},
+		ContentHash: computeHash(m.RawContent),
 	}
 
 	if err := e.store.RegisterModel(model); err != nil {
@@ -379,10 +382,7 @@ func (e *Engine) saveModelToStore(m *parser.ModelConfig, absPath, hash string) e
 		for _, col := range m.Columns {
 			sources := make([]state.SourceRef, 0, len(col.Sources))
 			for _, src := range col.Sources {
-				sources = append(sources, state.SourceRef{
-					Table:  src.Table,
-					Column: src.Column,
-				})
+				sources = append(sources, state.SourceRef(src))
 			}
 			stateColumns = append(stateColumns, state.ColumnInfo{
 				Name:          col.Name,

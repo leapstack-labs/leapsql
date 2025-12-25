@@ -1,6 +1,6 @@
-// Package parser provides SQL model file parsing with pragma extraction.
+// Package loader provides SQL model file parsing with pragma extraction.
 // It handles DBGo-specific pragmas like @config, @import, and #if directives.
-package parser
+package loader
 
 import (
 	"bufio"
@@ -11,70 +11,22 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/internal/lineage"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
-// ModelConfig holds configuration extracted from SQL model pragmas and frontmatter.
-type ModelConfig struct {
-	// Path is the model path (e.g., "staging.customers")
-	Path string
-	// Name is the model name (filename without extension)
-	Name string
-	// FilePath is the absolute path to the SQL file
-	FilePath string
-	// Materialized defines how the model is stored: table, view, incremental
-	Materialized string
-	// UniqueKey for incremental models
-	UniqueKey string
-	// Owner is the team/person responsible for this model
-	Owner string
-	// Schema is the database schema for this model
-	Schema string
-	// Tags are metadata labels for filtering/organizing models
-	Tags []string
-	// Meta contains custom extension fields
-	Meta map[string]any
-	// Tests contains test configurations from frontmatter
-	Tests []TestConfig
-	// Imports are explicit model dependencies from @import pragmas (legacy)
-	Imports []string
-	// Sources are all table names referenced in the SQL (auto-detected via lineage parser)
-	// This includes both model references and external/raw tables
-	Sources []string
-	// Columns contains column-level lineage information
-	Columns []ColumnInfo
-	// UsesSelectStar is true if model uses SELECT * or t.*
-	UsesSelectStar bool
-	// SQL is the raw SQL content (excluding pragmas/frontmatter)
-	SQL string
-	// RawContent is the full file content including pragmas/frontmatter
-	RawContent string
-	// Conditionals are #if directives for environment-specific SQL
-	Conditionals []Conditional
-	// HasFrontmatter indicates if YAML frontmatter was found
-	HasFrontmatter bool
-}
+// ModelConfig is a type alias to core.Model for backward compatibility.
+// New code should use core.Model directly.
+type ModelConfig = core.Model
 
-// Conditional represents an #if directive block.
-type Conditional struct {
-	Condition string
-	Content   string
-}
+// Conditional is a type alias to core.Conditional for backward compatibility.
+type Conditional = core.Conditional
 
-// SourceRef represents a source column reference in lineage.
-type SourceRef struct {
-	Table  string
-	Column string
-}
+// SourceRef is a type alias to core.SourceRef for backward compatibility.
+type SourceRef = core.SourceRef
 
-// ColumnInfo represents column lineage information.
-type ColumnInfo struct {
-	Name          string
-	Index         int
-	TransformType string      // "" (direct) or "EXPR"
-	Function      string      // "sum", "count", etc.
-	Sources       []SourceRef // where this column comes from
-}
+// ColumnInfo is a type alias to core.ColumnInfo for backward compatibility.
+type ColumnInfo = core.ColumnInfo
 
 // Parser parses SQL model files and extracts pragmas.
 type Parser struct {
@@ -105,7 +57,7 @@ var (
 )
 
 // ParseFile parses a single SQL model file.
-func (p *Parser) ParseFile(filePath string) (*ModelConfig, error) {
+func (p *Parser) ParseFile(filePath string) (*core.Model, error) {
 	content, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is validated by filepath.Walk
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -115,20 +67,20 @@ func (p *Parser) ParseFile(filePath string) (*ModelConfig, error) {
 }
 
 // ParseContent parses SQL content from a file.
-func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, error) {
-	config := &ModelConfig{
+func (p *Parser) ParseContent(filePath string, content string) (*core.Model, error) {
+	model := &core.Model{
 		FilePath:     filePath,
 		RawContent:   content,
 		Materialized: "table", // default
 		Imports:      []string{},
-		Conditionals: []Conditional{},
+		Conditionals: []core.Conditional{},
 		Tags:         []string{},
 		Meta:         make(map[string]any),
 	}
 
 	// Derive name and path from file path
-	config.Name = strings.TrimSuffix(filepath.Base(filePath), ".sql")
-	config.Path = p.filePathToModelPath(filePath)
+	model.Name = strings.TrimSuffix(filepath.Base(filePath), ".sql")
+	model.Path = p.filePathToModelPath(filePath)
 
 	// Try to extract YAML frontmatter first (new preferred format)
 	frontmatter, err := ExtractFrontmatter(content)
@@ -138,39 +90,39 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 
 	// Use SQL after frontmatter extraction
 	sqlContent := frontmatter.SQL
-	config.HasFrontmatter = frontmatter.HasYAML
+	model.HasFrontmatter = frontmatter.HasYAML
 
 	// Apply frontmatter config if present
 	if frontmatter.HasYAML && frontmatter.Config != nil {
 		fc := frontmatter.Config
 		if fc.Name != "" {
-			config.Name = fc.Name
+			model.Name = fc.Name
 		}
 		if fc.Materialized != "" {
-			config.Materialized = fc.Materialized
+			model.Materialized = fc.Materialized
 		}
 		if fc.UniqueKey != "" {
-			config.UniqueKey = fc.UniqueKey
+			model.UniqueKey = fc.UniqueKey
 		}
-		config.Owner = fc.Owner
+		model.Owner = fc.Owner
 		if fc.Schema != "" {
-			config.Schema = fc.Schema
+			model.Schema = fc.Schema
 		}
 		if len(fc.Tags) > 0 {
-			config.Tags = fc.Tags
+			model.Tags = fc.Tags
 		}
 		if fc.Meta != nil {
-			config.Meta = fc.Meta
+			model.Meta = fc.Meta
 		}
 		if len(fc.Tests) > 0 {
-			config.Tests = fc.Tests
+			model.Tests = fc.Tests
 		}
 	}
 
 	// Continue parsing legacy pragmas from the SQL content
 	var sqlLines []string
 	var inConditional bool
-	var currentConditional Conditional
+	var currentConditional core.Conditional
 
 	scanner := bufio.NewScanner(strings.NewReader(sqlContent))
 	for scanner.Scan() {
@@ -178,7 +130,7 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 
 		// Check for @config pragma (legacy, overrides frontmatter)
 		if matches := configPattern.FindStringSubmatch(line); len(matches) > 1 {
-			p.parseConfig(matches[1], config)
+			p.parseConfig(matches[1], model)
 			continue
 		}
 
@@ -188,7 +140,7 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 			for _, imp := range imports {
 				imp = strings.TrimSpace(imp)
 				if imp != "" {
-					config.Imports = append(config.Imports, imp)
+					model.Imports = append(model.Imports, imp)
 				}
 			}
 			continue
@@ -197,16 +149,16 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 		// Check for #if directive
 		if matches := ifPattern.FindStringSubmatch(line); len(matches) > 1 {
 			inConditional = true
-			currentConditional = Conditional{Condition: strings.TrimSpace(matches[1])}
+			currentConditional = core.Conditional{Condition: strings.TrimSpace(matches[1])}
 			continue
 		}
 
 		// Check for #endif directive
 		if endifPattern.MatchString(line) {
 			if inConditional {
-				config.Conditionals = append(config.Conditionals, currentConditional)
+				model.Conditionals = append(model.Conditionals, currentConditional)
 				inConditional = false
-				currentConditional = Conditional{}
+				currentConditional = core.Conditional{}
 			}
 			continue
 		}
@@ -225,28 +177,28 @@ func (p *Parser) ParseContent(filePath string, content string) (*ModelConfig, er
 		return nil, fmt.Errorf("error scanning file: %w", err)
 	}
 
-	config.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
+	model.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 
 	// Auto-detect table sources and column lineage using the lineage parser
 	// Only if dialect is available
-	if config.SQL != "" && p.Dialect != nil {
-		result, err := p.extractLineage(config.SQL)
+	if model.SQL != "" && p.Dialect != nil {
+		result, err := p.extractLineage(model.SQL)
 		if err == nil {
-			config.Sources = result.Sources
-			config.Columns = result.Columns
-			config.UsesSelectStar = result.UsesSelectStar
+			model.Sources = result.Sources
+			model.Columns = result.Columns
+			model.UsesSelectStar = result.UsesSelectStar
 		}
 		// If lineage extraction fails, we continue without sources/columns
 		// The model may have syntax errors or use unsupported SQL features
 	}
 
-	return config, nil
+	return model, nil
 }
 
 // lineageResult holds both table sources and column lineage information.
 type lineageResult struct {
 	Sources        []string
-	Columns        []ColumnInfo
+	Columns        []core.ColumnInfo
 	UsesSelectStar bool
 }
 
@@ -263,19 +215,19 @@ func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
 		return nil, err
 	}
 
-	// Convert lineage.ColumnLineage to parser.ColumnInfo
-	columns := make([]ColumnInfo, 0, len(modelLineage.Columns))
+	// Convert lineage.ColumnLineage to core.ColumnInfo
+	columns := make([]core.ColumnInfo, 0, len(modelLineage.Columns))
 	for i, col := range modelLineage.Columns {
 		// Convert source columns
-		sources := make([]SourceRef, 0, len(col.Sources))
+		sources := make([]core.SourceRef, 0, len(col.Sources))
 		for _, src := range col.Sources {
-			sources = append(sources, SourceRef{
+			sources = append(sources, core.SourceRef{
 				Table:  src.Table,
 				Column: src.Column,
 			})
 		}
 
-		columns = append(columns, ColumnInfo{
+		columns = append(columns, core.ColumnInfo{
 			Name:          col.Name,
 			Index:         i,
 			TransformType: string(col.Transform),
@@ -292,7 +244,7 @@ func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
 }
 
 // parseConfig parses config pragma key-value pairs.
-func (p *Parser) parseConfig(configStr string, config *ModelConfig) {
+func (p *Parser) parseConfig(configStr string, model *core.Model) {
 	matches := kvPattern.FindAllStringSubmatch(configStr, -1)
 	for _, match := range matches {
 		if len(match) >= 3 {
@@ -301,9 +253,9 @@ func (p *Parser) parseConfig(configStr string, config *ModelConfig) {
 
 			switch key {
 			case "materialized":
-				config.Materialized = value
+				model.Materialized = value
 			case "unique_key":
-				config.UniqueKey = value
+				model.UniqueKey = value
 			}
 		}
 	}
@@ -340,8 +292,8 @@ func NewScanner(baseDir string, d *dialect.Dialect) *Scanner {
 }
 
 // ScanDir recursively scans a directory for SQL files and parses them.
-func (s *Scanner) ScanDir(dir string) ([]*ModelConfig, error) {
-	var models []*ModelConfig
+func (s *Scanner) ScanDir(dir string) ([]*core.Model, error) {
+	var models []*core.Model
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -358,12 +310,12 @@ func (s *Scanner) ScanDir(dir string) ([]*ModelConfig, error) {
 			return nil
 		}
 
-		config, err := s.parser.ParseFile(path)
+		model, err := s.parser.ParseFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 
-		models = append(models, config)
+		models = append(models, model)
 		return nil
 	})
 
@@ -376,7 +328,7 @@ func (s *Scanner) ScanDir(dir string) ([]*ModelConfig, error) {
 
 // ParseContent parses SQL content from a file path and content bytes.
 // This is useful for incremental parsing when file content is already loaded.
-func (s *Scanner) ParseContent(filePath string, content []byte) (*ModelConfig, error) {
+func (s *Scanner) ParseContent(filePath string, content []byte) (*core.Model, error) {
 	return s.parser.ParseContent(filePath, string(content))
 }
 

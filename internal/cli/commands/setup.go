@@ -114,7 +114,7 @@ func createEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, erro
 	var adapterConfig *adapter.Config
 
 	if cfg.Target != nil {
-		targetInfo = cfg.Target.ToTargetInfo()
+		targetInfo = starctx.TargetInfoFromConfig(cfg.Target)
 		adapterConfig = &adapter.Config{
 			Type:     cfg.Target.Type,
 			Path:     cfg.Target.Database,

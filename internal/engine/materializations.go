@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/state"
 )
 
@@ -70,7 +70,7 @@ func (e *Engine) executeView(ctx context.Context, path, sql string) (int64, erro
 }
 
 // executeIncremental handles incremental model execution.
-func (e *Engine) executeIncremental(ctx context.Context, m *parser.ModelConfig, _ *state.Model, sql string) (int64, error) {
+func (e *Engine) executeIncremental(ctx context.Context, m *loader.ModelConfig, _ *state.Model, sql string) (int64, error) {
 	tableName := pathToTableName(m.Path)
 
 	// Check if table exists

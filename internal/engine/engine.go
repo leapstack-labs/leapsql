@@ -11,7 +11,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/macro"
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/registry"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
@@ -40,7 +40,7 @@ type Engine struct {
 	environment   string
 	target        *starctx.TargetInfo
 	graph         *dag.Graph
-	models        map[string]*parser.ModelConfig
+	models        map[string]*loader.ModelConfig
 	registry      *registry.ModelRegistry
 	macroRegistry *macro.Registry
 }
@@ -166,7 +166,7 @@ func New(cfg Config) (*Engine, error) {
 		environment:   env,
 		target:        target,
 		graph:         dag.NewGraph(),
-		models:        make(map[string]*parser.ModelConfig),
+		models:        make(map[string]*loader.ModelConfig),
 		registry:      registry.NewModelRegistry(),
 		macroRegistry: macroRegistry,
 	}, nil
@@ -244,7 +244,7 @@ func (e *Engine) GetGraph() *dag.Graph {
 }
 
 // GetModels returns all discovered models.
-func (e *Engine) GetModels() map[string]*parser.ModelConfig {
+func (e *Engine) GetModels() map[string]*loader.ModelConfig {
 	return e.models
 }
 

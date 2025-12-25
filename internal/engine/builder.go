@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/template"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // RenderModel renders the SQL for a model with all templates expanded.
@@ -23,14 +24,16 @@ func (e *Engine) RenderModel(modelPath string) (string, error) {
 	model, err := e.store.GetModelByPath(modelPath)
 	if err != nil {
 		// Model not in state store, create minimal version
-		model = &state.Model{Path: modelPath, Name: m.Name}
+		model = &state.Model{
+			Model: &core.Model{Path: modelPath, Name: m.Name},
+		}
 	}
 
 	return e.buildSQL(m, model), nil
 }
 
 // buildSQL prepares the SQL for execution using template rendering.
-func (e *Engine) buildSQL(m *parser.ModelConfig, model *state.Model) string {
+func (e *Engine) buildSQL(m *loader.ModelConfig, model *state.Model) string {
 	// Create execution context for this model
 	ctx := e.createExecutionContext(m)
 
@@ -46,7 +49,7 @@ func (e *Engine) buildSQL(m *parser.ModelConfig, model *state.Model) string {
 }
 
 // buildSQLLegacy provides backward compatibility with simple string replacement.
-func (e *Engine) buildSQLLegacy(m *parser.ModelConfig, _ *state.Model) string {
+func (e *Engine) buildSQLLegacy(m *loader.ModelConfig, _ *state.Model) string {
 	sql := m.SQL
 
 	// Replace {{ this }} with the model's table name
@@ -57,7 +60,7 @@ func (e *Engine) buildSQLLegacy(m *parser.ModelConfig, _ *state.Model) string {
 }
 
 // createExecutionContext builds a Starlark execution context for template rendering.
-func (e *Engine) createExecutionContext(m *parser.ModelConfig) *starctx.ExecutionContext {
+func (e *Engine) createExecutionContext(m *loader.ModelConfig) *starctx.ExecutionContext {
 	// Build config dict from model config
 	config := starctx.BuildConfigDict(
 		m.Name,
@@ -88,7 +91,7 @@ func (e *Engine) createExecutionContext(m *parser.ModelConfig) *starctx.Executio
 }
 
 // getModelSchema extracts the schema from a model path.
-func (e *Engine) getModelSchema(m *parser.ModelConfig) string {
+func (e *Engine) getModelSchema(m *loader.ModelConfig) string {
 	// If schema is explicitly set, use it
 	if m.Schema != "" {
 		return m.Schema

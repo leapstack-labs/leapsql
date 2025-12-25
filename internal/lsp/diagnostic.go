@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/provider"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
@@ -107,8 +107,8 @@ func (s *Server) frontmatterErrorToDiagnostic(err error) []Diagnostic {
 	var pos Position
 	var msg string
 
-	var parseErr *parser.FrontmatterParseError
-	var unknownErr *parser.UnknownFieldError
+	var parseErr *loader.FrontmatterParseError
+	var unknownErr *loader.UnknownFieldError
 
 	switch {
 	case errors.As(err, &parseErr):
@@ -192,14 +192,14 @@ func (s *Server) sqlErrorToDiagnostic(err error) []Diagnostic {
 func (s *Server) validateFrontmatter(doc *Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	_, err := parser.ExtractFrontmatter(doc.Content)
+	_, err := loader.ExtractFrontmatter(doc.Content)
 	if err != nil {
 		// Try to get position from error
 		var pos Position
 		var msg string
 
-		var parseErr *parser.FrontmatterParseError
-		var unknownErr *parser.UnknownFieldError
+		var parseErr *loader.FrontmatterParseError
+		var unknownErr *loader.UnknownFieldError
 
 		switch {
 		case errors.As(err, &parseErr):

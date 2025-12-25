@@ -1,5 +1,7 @@
 package config
 
+import "github.com/leapstack-labs/leapsql/pkg/core"
+
 // Default configuration values.
 const (
 	DefaultModelsDir = "models"
@@ -8,7 +10,10 @@ const (
 )
 
 // ApplyDefaults applies default values to a ProjectConfig.
-func (c *ProjectConfig) ApplyDefaults() {
+func ApplyDefaults(c *core.ProjectConfig) {
+	if c == nil {
+		return
+	}
 	if c.ModelsDir == "" {
 		c.ModelsDir = DefaultModelsDir
 	}
@@ -20,8 +25,8 @@ func (c *ProjectConfig) ApplyDefaults() {
 	}
 }
 
-// ApplyDefaults applies default values to a TargetConfig based on the target type.
-func (t *TargetConfig) ApplyDefaults() {
+// ApplyTargetDefaults applies default values to a TargetConfig based on the target type.
+func ApplyTargetDefaults(t *core.TargetConfig) {
 	if t == nil {
 		return
 	}

@@ -38,9 +38,9 @@ func LoadFromDir(dir string) (*ProjectConfig, error) {
 	}
 
 	// Apply defaults
-	cfg.ApplyDefaults()
+	ApplyDefaults(&cfg)
 	if cfg.Target != nil {
-		cfg.Target.ApplyDefaults()
+		ApplyTargetDefaults(cfg.Target)
 	}
 
 	return &cfg, nil

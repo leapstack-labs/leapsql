@@ -14,6 +14,7 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/v2"
+	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/spf13/pflag"
 )
 
@@ -154,7 +155,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	}
 
 	// Apply defaults based on target type
-	cfg.Target.ApplyDefaults()
+	sharedcfg.ApplyTargetDefaults(cfg.Target)
 
 	// Expand environment variables in target
 	expandTargetEnvVars(cfg.Target)
@@ -167,7 +168,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	}
 
 	// Validate target configuration
-	if err := cfg.Target.Validate(); err != nil {
+	if err := sharedcfg.ValidateTarget(cfg.Target); err != nil {
 		return nil, fmt.Errorf("invalid target configuration: %w", err)
 	}
 

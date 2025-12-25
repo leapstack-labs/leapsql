@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/state"
 )
 
@@ -40,7 +40,7 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	// Execute each model
 	var runErr error
 	for _, node := range sorted {
-		m := node.Data.(*parser.ModelConfig)
+		m := node.Data.(*loader.ModelConfig)
 
 		// Get model from state store
 		model, err := e.store.GetModelByPath(m.Path)
@@ -187,7 +187,7 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 }
 
 // executeModel executes a single model and returns rows affected.
-func (e *Engine) executeModel(ctx context.Context, m *parser.ModelConfig, model *state.Model) (int64, error) {
+func (e *Engine) executeModel(ctx context.Context, m *loader.ModelConfig, model *state.Model) (int64, error) {
 	e.logger.Debug("executing model", "model_path", m.Path, "materialization", m.Materialized)
 
 	sql := e.buildSQL(m, model)
@@ -207,7 +207,7 @@ func (e *Engine) executeModel(ctx context.Context, m *parser.ModelConfig, model 
 // saveModelSnapshot saves column snapshots for models that use SELECT *.
 // This enables schema drift detection (PL05) by storing the current column
 // state of source tables after a successful model run.
-func (e *Engine) saveModelSnapshot(runID string, m *parser.ModelConfig, model *state.Model) {
+func (e *Engine) saveModelSnapshot(runID string, m *loader.ModelConfig, model *state.Model) {
 	if !model.UsesSelectStar {
 		return
 	}

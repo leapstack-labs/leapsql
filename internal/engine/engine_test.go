@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/testutil"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -187,7 +188,7 @@ func TestBuildSQL(t *testing.T) {
 	defer func() { _ = engine.Close() }()
 
 	// Create a mock model config - LeapSQL uses pure SQL, dependencies are auto-detected
-	modelCfg := &parser.ModelConfig{
+	modelCfg := &loader.ModelConfig{
 		Path:         "marts.summary",
 		Name:         "summary",
 		Materialized: "table",
@@ -197,8 +198,10 @@ func TestBuildSQL(t *testing.T) {
 	}
 
 	model := &state.Model{
-		ID:   "test-id",
-		Path: "marts.summary",
+		Model: &core.Model{
+			Path: "marts.summary",
+		},
+		ID: "test-id",
 	}
 
 	sql := engine.buildSQL(modelCfg, model)

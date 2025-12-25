@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // RegisterModel registers a new model or updates an existing one.
@@ -15,12 +16,17 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 		return fmt.Errorf("database not opened")
 	}
 
+	// Ensure embedded Model is not nil
+	if model.Model == nil {
+		model.Model = &core.Model{}
+	}
+
 	// Default materialized to "table" if not set
 	if model.Materialized == "" {
 		model.Materialized = "table"
 	}
 
-	// Serialize complex fields to JSON
+	// Serialize complex fields to JSON (accessing via embedded Model)
 	tagsJSON := serializeJSONPtr(model.Tags)
 	testsJSON := serializeJSONPtr(model.Tests)
 	metaJSON := serializeJSONPtr(model.Meta)
@@ -333,44 +339,50 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
 	return convertModelRun(row), nil
 }
 
-// convertModel converts a sqlcgen.Model to a state.Model.
+// convertModel converts a sqlcgen.Model to a state.Model (core.PersistedModel).
 func convertModel(row sqlcgen.Model) (*Model, error) {
-	model := &Model{
-		ID:           row.ID,
+	// Create the embedded core.Model first
+	coreModel := &core.Model{
 		Path:         row.Path,
 		Name:         row.Name,
 		Materialized: row.Materialized,
-		ContentHash:  row.ContentHash,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
 	}
 
 	if row.UniqueKey != nil {
-		model.UniqueKey = *row.UniqueKey
+		coreModel.UniqueKey = *row.UniqueKey
 	}
 	if row.FilePath != nil {
-		model.FilePath = *row.FilePath
+		coreModel.FilePath = *row.FilePath
 	}
 	if row.Owner != nil {
-		model.Owner = *row.Owner
+		coreModel.Owner = *row.Owner
 	}
 	if row.SchemaName != nil {
-		model.Schema = *row.SchemaName
+		coreModel.Schema = *row.SchemaName
 	}
 	// Convert int64 to bool for UsesSelectStar
 	if row.UsesSelectStar != nil && *row.UsesSelectStar == 1 {
-		model.UsesSelectStar = true
+		coreModel.UsesSelectStar = true
 	}
 
-	// Deserialize JSON fields
-	if err := deserializeJSON(row.Tags, &model.Tags); err != nil {
+	// Deserialize JSON fields into core.Model
+	if err := deserializeJSON(row.Tags, &coreModel.Tags); err != nil {
 		return nil, fmt.Errorf("failed to deserialize tags: %w", err)
 	}
-	if err := deserializeJSON(row.Tests, &model.Tests); err != nil {
+	if err := deserializeJSON(row.Tests, &coreModel.Tests); err != nil {
 		return nil, fmt.Errorf("failed to deserialize tests: %w", err)
 	}
-	if err := deserializeJSON(row.Meta, &model.Meta); err != nil {
+	if err := deserializeJSON(row.Meta, &coreModel.Meta); err != nil {
 		return nil, fmt.Errorf("failed to deserialize meta: %w", err)
+	}
+
+	// Create the PersistedModel with embedded Model
+	model := &Model{
+		Model:       coreModel,
+		ID:          row.ID,
+		ContentHash: row.ContentHash,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
 	}
 
 	return model, nil

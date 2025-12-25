@@ -9,7 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	intparser "github.com/leapstack-labs/leapsql/internal/parser"
+	intparser "github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // register project rules

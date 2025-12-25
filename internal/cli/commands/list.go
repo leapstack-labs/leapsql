@@ -10,7 +10,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -269,5 +269,5 @@ func listJSON(eng *engine.Engine, r *output.Renderer) error {
 }
 
 // Unused type aliases kept for reference
-var _ = (*parser.ModelConfig)(nil)
+var _ = (*loader.ModelConfig)(nil)
 var _ = (*dag.Graph)(nil)

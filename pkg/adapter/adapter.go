@@ -3,90 +3,34 @@
 //
 // This package contains the public contract that all database adapters must implement.
 // Concrete adapter implementations are in pkg/adapters/ subdirectories.
+//
+// Note: Core types (Config, Column, Metadata, Rows) are now defined in pkg/core.
+// This package re-exports them via type aliases for backward compatibility.
+// New code should import pkg/core directly.
 package adapter
 
 import (
 	"context"
-	"database/sql"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
-// Config holds the configuration for connecting to a database.
-type Config struct {
-	// Type specifies the database type (e.g., "duckdb", "postgres")
-	Type string
+// Type aliases for backward compatibility - these types are now defined in pkg/core.
+// Use core.* types directly in new code.
+type (
+	// Config is an alias for core.AdapterConfig.
+	Config = core.AdapterConfig
 
-	// Path is the file path for file-based databases (e.g., DuckDB, SQLite)
-	// Use ":memory:" for in-memory databases
-	Path string
+	// Column is an alias for core.Column.
+	Column = core.Column
 
-	// Host is the hostname for network-based databases
-	Host string
+	// Metadata is an alias for core.TableMetadata.
+	Metadata = core.TableMetadata
 
-	// Port is the port number for network-based databases
-	Port int
-
-	// Database is the database name
-	Database string
-
-	// Username for authentication
-	Username string
-
-	// Password for authentication
-	Password string
-
-	// Schema is the default schema to use
-	Schema string
-
-	// Options contains additional driver-specific options
-	Options map[string]string
-
-	// Params holds adapter-specific configuration.
-	// The framework passes the raw YAML/JSON structure; adapters parse it.
-	Params map[string]any
-}
-
-// Column represents a column in a database table.
-type Column struct {
-	// Name is the column name
-	Name string
-
-	// Type is the data type of the column
-	Type string
-
-	// Nullable indicates whether the column allows NULL values
-	Nullable bool
-
-	// PrimaryKey indicates whether the column is part of the primary key
-	PrimaryKey bool
-
-	// Position is the ordinal position of the column in the table
-	Position int
-}
-
-// Metadata holds metadata about a database table.
-type Metadata struct {
-	// Schema is the schema containing the table
-	Schema string
-
-	// Name is the table name
-	Name string
-
-	// Columns contains metadata for each column
-	Columns []Column
-
-	// RowCount is the approximate number of rows (may not be exact)
-	RowCount int64
-
-	// SizeBytes is the approximate size of the table in bytes
-	SizeBytes int64
-}
-
-// Rows wraps sql.Rows to provide a consistent interface across adapters.
-type Rows struct {
-	*sql.Rows
-}
+	// Rows is an alias for core.Rows.
+	Rows = core.Rows
+)
 
 // Adapter defines the interface that all database adapters must implement.
 // It provides methods for connecting to databases, executing SQL, and

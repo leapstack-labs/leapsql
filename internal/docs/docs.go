@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/registry"
 )
 
@@ -103,7 +103,7 @@ type Catalog struct {
 // Generator generates documentation from parsed models.
 type Generator struct {
 	registry    *registry.ModelRegistry
-	models      []*parser.ModelConfig
+	models      []*loader.ModelConfig
 	projectName string
 }
 
@@ -118,7 +118,7 @@ func NewGenerator(projectName string) *Generator {
 // LoadModels loads models from a directory.
 func (g *Generator) LoadModels(modelsDir string) error {
 	// Pass nil for dialect - lineage extraction will be skipped for docs
-	scanner := parser.NewScanner(modelsDir, nil)
+	scanner := loader.NewScanner(modelsDir, nil)
 	models, err := scanner.ScanDir(modelsDir)
 	if err != nil {
 		return fmt.Errorf("failed to scan models: %w", err)
@@ -265,8 +265,8 @@ func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc, sources []Sourc
 	return lineage
 }
 
-// convertColumns converts parser.ColumnInfo to ColumnDoc.
-func convertColumns(columns []parser.ColumnInfo) []ColumnDoc {
+// convertColumns converts loader.ColumnInfo to ColumnDoc.
+func convertColumns(columns []loader.ColumnInfo) []ColumnDoc {
 	if columns == nil {
 		return []ColumnDoc{}
 	}
@@ -293,7 +293,7 @@ func convertColumns(columns []parser.ColumnInfo) []ColumnDoc {
 }
 
 // buildColumnLineage constructs the column-level lineage graph.
-func (g *Generator) buildColumnLineage(models []*parser.ModelConfig, _ map[string]*ModelDoc) ColumnLineageDoc {
+func (g *Generator) buildColumnLineage(models []*loader.ModelConfig, _ map[string]*ModelDoc) ColumnLineageDoc {
 	lineage := ColumnLineageDoc{
 		Nodes: []ColumnLineageNode{},
 		Edges: []ColumnLineageEdge{},

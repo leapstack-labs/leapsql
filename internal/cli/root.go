@@ -193,7 +193,7 @@ func CreateEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, erro
 	// Build target info for template rendering
 	var targetInfo *starctx.TargetInfo
 	if cfg.Target != nil {
-		targetInfo = cfg.Target.ToTargetInfo()
+		targetInfo = starctx.TargetInfoFromConfig(cfg.Target)
 	}
 
 	// Build adapter config from target

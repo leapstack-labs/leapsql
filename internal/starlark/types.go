@@ -4,6 +4,7 @@ package starlark
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -38,6 +39,19 @@ func (t *ThisInfo) ToStarlark() starlark.Value {
 		"name":   starlark.String(t.Name),
 		"schema": starlark.String(t.Schema),
 	})
+}
+
+// TargetInfoFromConfig converts a core.TargetConfig to a TargetInfo for template rendering.
+// This extracts only the fields that should be exposed to templates (not credentials).
+func TargetInfoFromConfig(t *core.TargetConfig) *TargetInfo {
+	if t == nil {
+		return nil
+	}
+	return &TargetInfo{
+		Type:     t.Type,
+		Schema:   t.Schema,
+		Database: t.Database,
+	}
 }
 
 // GoToStarlark converts a Go value to a Starlark value.

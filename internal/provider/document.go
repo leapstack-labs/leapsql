@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/parser"
+	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
@@ -19,7 +19,7 @@ type ParsedDocument struct {
 	Content string
 
 	// Frontmatter parsing result
-	Frontmatter      *parser.FrontmatterResult
+	Frontmatter      *loader.FrontmatterResult
 	FrontmatterError error
 	FrontmatterEnd   int // Byte offset where frontmatter ends
 
@@ -46,7 +46,7 @@ func Parse(content string, uri string, version int, d *dialect.Dialect) *ParsedD
 	}
 
 	// Phase 1: Extract frontmatter
-	fm, err := parser.ExtractFrontmatter(content)
+	fm, err := loader.ExtractFrontmatter(content)
 	doc.Frontmatter = fm
 	doc.FrontmatterError = err
 

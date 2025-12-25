@@ -1,39 +1,27 @@
-// Package parser provides YAML frontmatter parsing for SQL model files.
-package parser
+// Package loader provides YAML frontmatter parsing for SQL model files.
+package loader
 
 import (
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"gopkg.in/yaml.v3"
 )
 
 // FrontmatterConfig represents parsed YAML frontmatter.
 // Unknown fields cause parse errors (use Meta for extensions).
 type FrontmatterConfig struct {
-	Name         string         `yaml:"name"`
-	Description  string         `yaml:"description"`
-	Materialized string         `yaml:"materialized"` // table, view, incremental
-	UniqueKey    string         `yaml:"unique_key"`
-	Owner        string         `yaml:"owner"`
-	Schema       string         `yaml:"schema"`
-	Tags         []string       `yaml:"tags"`
-	Tests        []TestConfig   `yaml:"tests"`
-	Meta         map[string]any `yaml:"meta"` // Extension point for custom fields
-}
-
-// TestConfig represents a test configuration in frontmatter.
-type TestConfig struct {
-	Unique         []string              `yaml:"unique,omitempty"`
-	NotNull        []string              `yaml:"not_null,omitempty"`
-	AcceptedValues *AcceptedValuesConfig `yaml:"accepted_values,omitempty"`
-}
-
-// AcceptedValuesConfig represents accepted values test configuration.
-type AcceptedValuesConfig struct {
-	Column string   `yaml:"column"`
-	Values []string `yaml:"values"`
+	Name         string            `yaml:"name"`
+	Description  string            `yaml:"description"`
+	Materialized string            `yaml:"materialized"` // table, view, incremental
+	UniqueKey    string            `yaml:"unique_key"`
+	Owner        string            `yaml:"owner"`
+	Schema       string            `yaml:"schema"`
+	Tags         []string          `yaml:"tags"`
+	Tests        []core.TestConfig `yaml:"tests"`
+	Meta         map[string]any    `yaml:"meta"` // Extension point for custom fields
 }
 
 // FrontmatterResult holds the result of frontmatter extraction.
@@ -78,6 +66,32 @@ func ExtractFrontmatter(content string) (*FrontmatterResult, error) {
 	return result, nil
 }
 
+// testConfigYAML is an internal type for YAML unmarshaling with correct tags.
+type testConfigYAML struct {
+	Unique         []string                  `yaml:"unique,omitempty"`
+	NotNull        []string                  `yaml:"not_null,omitempty"`
+	AcceptedValues *acceptedValuesConfigYAML `yaml:"accepted_values,omitempty"`
+}
+
+// acceptedValuesConfigYAML is an internal type for YAML unmarshaling.
+type acceptedValuesConfigYAML struct {
+	Column string   `yaml:"column"`
+	Values []string `yaml:"values"`
+}
+
+// frontmatterConfigYAML is an internal type for YAML unmarshaling.
+type frontmatterConfigYAML struct {
+	Name         string           `yaml:"name"`
+	Description  string           `yaml:"description"`
+	Materialized string           `yaml:"materialized"`
+	UniqueKey    string           `yaml:"unique_key"`
+	Owner        string           `yaml:"owner"`
+	Schema       string           `yaml:"schema"`
+	Tags         []string         `yaml:"tags"`
+	Tests        []testConfigYAML `yaml:"tests"`
+	Meta         map[string]any   `yaml:"meta"`
+}
+
 // parseFrontmatterYAML parses YAML content with strict field validation.
 func parseFrontmatterYAML(yamlContent string) (*FrontmatterConfig, error) {
 	// First, decode into a map to check for unknown fields
@@ -109,29 +123,56 @@ func parseFrontmatterYAML(yamlContent string) (*FrontmatterConfig, error) {
 		}
 	}
 
-	// Now decode into the struct
-	var config FrontmatterConfig
-	if err := yaml.Unmarshal([]byte(yamlContent), &config); err != nil {
+	// Now decode into the internal YAML struct
+	var yamlConfig frontmatterConfigYAML
+	if err := yaml.Unmarshal([]byte(yamlContent), &yamlConfig); err != nil {
 		return nil, &FrontmatterParseError{
 			Message: fmt.Sprintf("failed to parse frontmatter: %v", err),
 		}
 	}
 
 	// Validate materialized value if present
-	if config.Materialized != "" {
+	if yamlConfig.Materialized != "" {
 		validMaterialized := map[string]bool{
 			"table":       true,
 			"view":        true,
 			"incremental": true,
 		}
-		if !validMaterialized[config.Materialized] {
+		if !validMaterialized[yamlConfig.Materialized] {
 			return nil, &FrontmatterParseError{
-				Message: fmt.Sprintf("invalid materialized value: %q, must be one of: table, view, incremental", config.Materialized),
+				Message: fmt.Sprintf("invalid materialized value: %q, must be one of: table, view, incremental", yamlConfig.Materialized),
 			}
 		}
 	}
 
-	return &config, nil
+	// Convert to FrontmatterConfig with core types
+	config := &FrontmatterConfig{
+		Name:         yamlConfig.Name,
+		Description:  yamlConfig.Description,
+		Materialized: yamlConfig.Materialized,
+		UniqueKey:    yamlConfig.UniqueKey,
+		Owner:        yamlConfig.Owner,
+		Schema:       yamlConfig.Schema,
+		Tags:         yamlConfig.Tags,
+		Meta:         yamlConfig.Meta,
+	}
+
+	// Convert tests
+	for _, t := range yamlConfig.Tests {
+		test := core.TestConfig{
+			Unique:  t.Unique,
+			NotNull: t.NotNull,
+		}
+		if t.AcceptedValues != nil {
+			test.AcceptedValues = &core.AcceptedValuesConfig{
+				Column: t.AcceptedValues.Column,
+				Values: t.AcceptedValues.Values,
+			}
+		}
+		config.Tests = append(config.Tests, test)
+	}
+
+	return config, nil
 }
 
 // ApplyDefaults applies default values to a FrontmatterConfig based on file context.
