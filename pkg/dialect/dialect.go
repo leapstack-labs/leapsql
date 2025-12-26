@@ -2,7 +2,7 @@
 //
 // This package contains the public contract for dialect definitions used by the parser,
 // lineage analyzer, and other SQL-aware components. Concrete dialect implementations
-// are registered from pkg/adapters/*/dialect packages.
+// are registered from pkg/dialects/*/ packages.
 package dialect
 
 import (
@@ -460,6 +460,7 @@ func (d *Dialect) IsFromItemToken(t token.TokenType) bool {
 // Builder provides a fluent API for constructing dialects.
 type Builder struct {
 	dialect *Dialect
+	config  *core.DialectConfig // Optional config for auto-wiring features
 }
 
 // NewDialect creates a new dialect builder with the given name.
@@ -494,6 +495,41 @@ func NewDialect(name string) *Builder {
 			fromItems:      make(map[token.TokenType]spi.FromItemHandler),
 		},
 	}
+}
+
+// New creates a dialect builder from a DialectConfig.
+// The builder will auto-wire features based on config flags when Build() is called.
+// This is the preferred constructor for dialects that use feature flags.
+func New(cfg *core.DialectConfig) *Builder {
+	b := &Builder{
+		config: cfg,
+		dialect: &Dialect{
+			Name:          cfg.Name,
+			Identifiers:   cfg.Identifiers,
+			DefaultSchema: cfg.DefaultSchema,
+			Placeholder:   cfg.Placeholder,
+			// Initialize all maps
+			aggregates:     make(map[string]struct{}),
+			generators:     make(map[string]struct{}),
+			windows:        make(map[string]struct{}),
+			tableFunctions: make(map[string]struct{}),
+			docs:           make(map[string]FunctionDoc),
+			keywords:       make(map[string]struct{}),
+			reservedWords:  make(map[string]struct{}),
+			dataTypes:      nil,
+			clauseSequence: nil,
+			clauseDefs:     make(map[token.TokenType]ClauseDef),
+			symbols:        make(map[string]token.TokenType),
+			dynamicKw:      make(map[string]token.TokenType),
+			precedence:     make(map[token.TokenType]int),
+			infixHandlers:  make(map[token.TokenType]spi.InfixHandler),
+			prefixHandlers: make(map[token.TokenType]spi.PrefixHandler),
+			joinTypes:      make(map[token.TokenType]JoinTypeDef),
+			starModifiers:  make(map[token.TokenType]spi.StarModifierHandler),
+			fromItems:      make(map[token.TokenType]spi.FromItemHandler),
+		},
+	}
+	return b
 }
 
 // Identifiers configures identifier quoting and normalization.
@@ -585,8 +621,101 @@ func (b *Builder) WithReservedWords(words ...string) *Builder {
 }
 
 // Build returns the constructed dialect.
+// If the builder was created with New(cfg), this auto-wires features based on config flags.
 func (b *Builder) Build() *Dialect {
+	cfg := b.config
+	if cfg == nil {
+		return b.dialect
+	}
+
+	// ===== Auto-wire function classifications from config =====
+	for _, f := range cfg.Aggregates {
+		b.dialect.aggregates[b.dialect.NormalizeName(f)] = struct{}{}
+	}
+	for _, f := range cfg.Generators {
+		b.dialect.generators[b.dialect.NormalizeName(f)] = struct{}{}
+	}
+	for _, f := range cfg.Windows {
+		b.dialect.windows[b.dialect.NormalizeName(f)] = struct{}{}
+	}
+	for _, f := range cfg.TableFunctions {
+		b.dialect.tableFunctions[b.dialect.NormalizeName(f)] = struct{}{}
+	}
+	for _, kw := range cfg.Keywords {
+		b.dialect.keywords[b.dialect.NormalizeName(kw)] = struct{}{}
+	}
+	b.dialect.dataTypes = append(b.dialect.dataTypes, cfg.DataTypes...)
+
+	// ===== Auto-wire clause extensions =====
+
+	// GROUP BY - use standard or ALL-aware handler
+	b.addClauseIfMissing(token.GROUP, GroupBy(GroupByOpts{
+		AllowAll: cfg.SupportsGroupByAll,
+	}))
+
+	// ORDER BY - use standard or ALL-aware handler
+	b.addClauseIfMissing(token.ORDER, OrderBy(OrderByOpts{
+		AllowAll: cfg.SupportsOrderByAll,
+	}))
+
+	// QUALIFY
+	if cfg.SupportsQualify {
+		b.AddKeyword("QUALIFY", token.QUALIFY)
+		b.addClauseIfMissing(token.QUALIFY, StandardQualify)
+	}
+
+	// ===== Auto-wire operator extensions =====
+
+	if cfg.SupportsIlike {
+		b.AddKeyword("ILIKE", token.ILIKE)
+		b.dialect.precedence[token.ILIKE] = spi.PrecedenceComparison
+	}
+
+	if cfg.SupportsCastOperator {
+		b.AddOperator("::", token.DCOLON)
+		b.dialect.precedence[token.DCOLON] = spi.PrecedencePostfix
+	}
+
+	// ===== Auto-wire join extensions =====
+
+	if cfg.SupportsSemiAntiJoins {
+		b.AddKeyword("SEMI", token.SEMI)
+		b.AddKeyword("ANTI", token.ANTI)
+		b.AddJoinType(token.SEMI, JoinTypeDef{
+			Token:       token.SEMI,
+			Type:        "SEMI",
+			RequiresOn:  true,
+			AllowsUsing: true,
+		})
+		b.AddJoinType(token.ANTI, JoinTypeDef{
+			Token:       token.ANTI,
+			Type:        "ANTI",
+			RequiresOn:  true,
+			AllowsUsing: true,
+		})
+	}
+
 	return b.dialect
+}
+
+// addClauseIfMissing adds a clause only if not already registered.
+func (b *Builder) addClauseIfMissing(t token.TokenType, def ClauseDef) {
+	if _, exists := b.dialect.clauseDefs[t]; !exists {
+		def.Token = t
+		b.dialect.clauseDefs[t] = def
+		recordClause(t, t.String())
+		// Add to sequence if not present
+		found := false
+		for _, tok := range b.dialect.clauseSequence {
+			if tok == t {
+				found = true
+				break
+			}
+		}
+		if !found {
+			b.dialect.clauseSequence = append(b.dialect.clauseSequence, t)
+		}
+	}
 }
 
 // ---------- Parsing Behavior Builder Methods ----------

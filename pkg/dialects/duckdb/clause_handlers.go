@@ -1,4 +1,4 @@
-package dialect
+package duckdb
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/spi"

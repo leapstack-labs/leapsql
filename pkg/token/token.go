@@ -118,6 +118,16 @@ const (
 	WITH
 	WITHIN
 
+	// Extended SQL tokens (not ANSI-92, but common in modern dialects)
+	QUALIFY   // DuckDB, Databricks, Snowflake, BigQuery
+	ILIKE     // DuckDB, Postgres, Databricks, Snowflake
+	RETURNING // Postgres, SQLite, DuckDB
+	SEMI      // SEMI JOIN (DuckDB, Databricks, Spark)
+	ANTI      // ANTI JOIN (DuckDB, Databricks, Spark)
+
+	// Extended operators
+	DCOLON // :: cast operator (Postgres, DuckDB, Databricks)
+
 	// Template tokens
 	MACRO // {{ ... }} content
 
@@ -238,7 +248,16 @@ var tokenNames = map[TokenType]string{
 	WINDOW:    "WINDOW",
 	WITH:      "WITH",
 	WITHIN:    "WITHIN",
-	MACRO:     "MACRO",
+
+	// Extended SQL tokens
+	QUALIFY:   "QUALIFY",
+	ILIKE:     "ILIKE",
+	RETURNING: "RETURNING",
+	SEMI:      "SEMI",
+	ANTI:      "ANTI",
+	DCOLON:    "::",
+
+	MACRO: "MACRO",
 }
 
 // keywords maps lowercase keyword strings to their token types.
@@ -311,6 +330,13 @@ var keywords = map[string]TokenType{
 	"window":    WINDOW,
 	"with":      WITH,
 	"within":    WITHIN,
+
+	// Extended SQL keywords
+	"qualify":   QUALIFY,
+	"ilike":     ILIKE,
+	"returning": RETURNING,
+	"semi":      SEMI,
+	"anti":      ANTI,
 }
 
 // LookupIdent returns the token type for the given identifier.
@@ -326,7 +352,7 @@ func LookupIdent(ident string) TokenType {
 
 // IsKeyword returns true if the token type is a keyword.
 func IsKeyword(t TokenType) bool {
-	return t >= ALL && t <= WITHIN
+	return (t >= ALL && t <= WITHIN) || (t >= QUALIFY && t <= ANTI)
 }
 
 // IsOperator returns true if the token type is an operator.

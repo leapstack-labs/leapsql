@@ -12,7 +12,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 
 	// Import dialect to ensure it's registered
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 )
 
 func init() {

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Import duckdb dialect so it registers itself
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 // testDialect returns the DuckDB dialect for testing.

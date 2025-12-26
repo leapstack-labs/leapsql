@@ -1,10 +1,10 @@
-package dialect_test
+package duckdb_test
 
 import (
 	"testing"
 
-	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
-	postgresDialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
+	"github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,7 @@ import (
 
 func TestGroupByAll(t *testing.T) {
 	sql := "SELECT category, region, SUM(sales) FROM orders GROUP BY ALL"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -25,7 +25,7 @@ func TestGroupByAll(t *testing.T) {
 
 func TestGroupByAllWithHaving(t *testing.T) {
 	sql := "SELECT category, COUNT(*) FROM orders GROUP BY ALL HAVING COUNT(*) > 10"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -35,7 +35,7 @@ func TestGroupByAllWithHaving(t *testing.T) {
 
 func TestGroupByAllWithQualify(t *testing.T) {
 	sql := "SELECT category, SUM(sales), ROW_NUMBER() OVER (ORDER BY SUM(sales) DESC) AS rn FROM orders GROUP BY ALL QUALIFY rn <= 3"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -46,7 +46,7 @@ func TestGroupByAllWithQualify(t *testing.T) {
 func TestGroupByRegular(t *testing.T) {
 	// Ensure regular GROUP BY still works
 	sql := "SELECT category, COUNT(*) FROM orders GROUP BY category"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -58,7 +58,7 @@ func TestGroupByRegular(t *testing.T) {
 
 func TestOrderByAll(t *testing.T) {
 	sql := "SELECT name, age, city FROM users ORDER BY ALL"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -69,7 +69,7 @@ func TestOrderByAll(t *testing.T) {
 
 func TestOrderByAllDesc(t *testing.T) {
 	sql := "SELECT name, age FROM users ORDER BY ALL DESC"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -79,7 +79,7 @@ func TestOrderByAllDesc(t *testing.T) {
 
 func TestOrderByAllAsc(t *testing.T) {
 	sql := "SELECT name, age FROM users ORDER BY ALL ASC"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -90,7 +90,7 @@ func TestOrderByAllAsc(t *testing.T) {
 func TestOrderByRegular(t *testing.T) {
 	// Ensure regular ORDER BY still works
 	sql := "SELECT name, age FROM users ORDER BY name, age DESC"
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -107,7 +107,7 @@ func TestCombinedGroupByAndOrderByAll(t *testing.T) {
 		GROUP BY ALL
 		ORDER BY ALL DESC
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -122,7 +122,7 @@ func TestGroupByAllNotInPostgres(t *testing.T) {
 	// In Postgres dialect, GROUP BY ALL is not recognized as a special syntax
 	// ALL is a reserved keyword, so it causes a parse error
 	sql := "SELECT category, SUM(sales) FROM orders GROUP BY ALL"
-	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
+	_, err := parser.ParseWithDialect(sql, postgres.Postgres)
 	// This should error because ALL is a keyword, not an identifier
 	assert.Error(t, err, "Postgres dialect should not support GROUP BY ALL")
 }
@@ -131,7 +131,7 @@ func TestOrderByAllNotInPostgres(t *testing.T) {
 	// In Postgres dialect, ORDER BY ALL is not recognized as a special syntax
 	// ALL is a reserved keyword, so it causes a parse error
 	sql := "SELECT name FROM users ORDER BY ALL"
-	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
+	_, err := parser.ParseWithDialect(sql, postgres.Postgres)
 	// This should error because ALL is a keyword, not an identifier
 	assert.Error(t, err, "Postgres dialect should not support ORDER BY ALL")
 }
@@ -140,41 +140,41 @@ func TestOrderByAllNotInPostgres(t *testing.T) {
 
 func TestFormatGroupByAll(t *testing.T) {
 	input := "SELECT category, SUM(sales) FROM orders GROUP BY ALL"
-	stmt, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	output := format.Format(stmt, duckdbDialect.DuckDB)
+	output := format.Format(stmt, duckdb.DuckDB)
 	assert.Contains(t, output, "GROUP BY ALL")
 	assert.NotContains(t, output, "GROUP BY category")
 }
 
 func TestFormatOrderByAllDesc(t *testing.T) {
 	input := "SELECT name, age FROM users ORDER BY ALL DESC"
-	stmt, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	output := format.Format(stmt, duckdbDialect.DuckDB)
+	output := format.Format(stmt, duckdb.DuckDB)
 	assert.Contains(t, output, "ORDER BY ALL DESC")
 }
 
 func TestFormatOrderByAllAsc(t *testing.T) {
 	// ASC is the default, so we don't necessarily print it
 	input := "SELECT name, age FROM users ORDER BY ALL ASC"
-	stmt, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	output := format.Format(stmt, duckdbDialect.DuckDB)
+	output := format.Format(stmt, duckdb.DuckDB)
 	assert.Contains(t, output, "ORDER BY ALL")
 	// Note: ASC may or may not be printed since it's the default
 }
 
 func TestGroupByAllRoundTrip(t *testing.T) {
 	input := "SELECT category, region, SUM(sales) FROM orders GROUP BY ALL"
-	stmt1, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt1, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	formatted := format.Format(stmt1, duckdbDialect.DuckDB)
-	stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+	formatted := format.Format(stmt1, duckdb.DuckDB)
+	stmt2, err := parser.ParseWithDialect(formatted, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	// Both should have GroupByAll set
@@ -184,11 +184,11 @@ func TestGroupByAllRoundTrip(t *testing.T) {
 
 func TestOrderByAllRoundTrip(t *testing.T) {
 	input := "SELECT name, age FROM users ORDER BY ALL DESC"
-	stmt1, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt1, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	formatted := format.Format(stmt1, duckdbDialect.DuckDB)
-	stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+	formatted := format.Format(stmt1, duckdb.DuckDB)
+	stmt2, err := parser.ParseWithDialect(formatted, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	// Both should have OrderByAll and OrderByAllDesc set
@@ -200,11 +200,11 @@ func TestOrderByAllRoundTrip(t *testing.T) {
 
 func TestCombinedRoundTrip(t *testing.T) {
 	input := "SELECT category, SUM(sales) AS total FROM orders GROUP BY ALL ORDER BY ALL DESC"
-	stmt1, err := parser.ParseWithDialect(input, duckdbDialect.DuckDB)
+	stmt1, err := parser.ParseWithDialect(input, duckdb.DuckDB)
 	require.NoError(t, err)
 
-	formatted := format.Format(stmt1, duckdbDialect.DuckDB)
-	stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+	formatted := format.Format(stmt1, duckdb.DuckDB)
+	stmt2, err := parser.ParseWithDialect(formatted, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	// Both should have all flags set
@@ -233,7 +233,7 @@ func TestGroupByAllWithComplexQuery(t *testing.T) {
 		ORDER BY total DESC
 		LIMIT 100
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -255,7 +255,7 @@ func TestOrderByAllWithComplexQuery(t *testing.T) {
 		LIMIT 50
 		OFFSET 10
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left

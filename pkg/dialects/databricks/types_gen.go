@@ -2,7 +2,7 @@
 // Source: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-datatypes
 // Generated: 2025-12-26
 
-package dialect
+package databricks
 
 // databricksTypes contains all supported data types for LSP completions.
 var databricksTypes = []string{

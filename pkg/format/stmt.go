@@ -291,7 +291,9 @@ func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
 				if i > 0 {
 					p.write(", ")
 				}
-				p.formatExpr(item.Expr)
+				if expr, ok := item.Expr.(parser.Expr); ok {
+					p.formatExpr(expr)
+				}
 				p.space()
 				p.kw(token.AS)
 				p.space()

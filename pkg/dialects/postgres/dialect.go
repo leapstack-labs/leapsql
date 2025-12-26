@@ -1,8 +1,8 @@
-// Package dialect provides the PostgreSQL SQL dialect definition.
-// This package is lightweight and has no database driver dependencies,
+// Package postgres provides the PostgreSQL SQL dialect definition.
+// This package is pure Go with no database driver dependencies,
 // making it suitable for use in the LSP and other tools that need
 // dialect information without the overhead of database connections.
-package dialect
+package postgres
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -15,21 +15,11 @@ func init() {
 	dialect.Register(Postgres)
 }
 
-// PostgreSQL-specific tokens (registered dynamically)
-var (
-	// TokenIlike is case-insensitive LIKE (shared with DuckDB)
-	// Note: If DuckDB dialect is also loaded, this will get a new ID
-	// but that's fine - each dialect has its own token namespace
-	TokenIlike = token.Register("ILIKE")
-	// TokenDcolon is the :: cast operator (Postgres style)
-	TokenDcolon = token.Register("::")
-)
-
 // --- PostgreSQL-specific Operators ---
 
 var postgresOperators = []dialect.OperatorDef{
-	{Token: TokenIlike, Precedence: spi.PrecedenceComparison},
-	{Token: TokenDcolon, Symbol: "::", Precedence: spi.PrecedencePostfix},
+	{Token: token.ILIKE, Precedence: spi.PrecedenceComparison},
+	{Token: token.DCOLON, Symbol: "::", Precedence: spi.PrecedencePostfix},
 }
 
 // postgresReservedWords contains common PostgreSQL reserved words.
@@ -60,7 +50,7 @@ var Postgres = dialect.NewDialect("postgres").
 	DefaultSchema("public").
 	PlaceholderStyle(core.PlaceholderDollar).
 	// Register PostgreSQL-specific keywords for the lexer
-	AddKeyword("ILIKE", TokenIlike).
+	AddKeyword("ILIKE", token.ILIKE).
 	// Clause Sequence - standard ANSI clauses (no QUALIFY)
 	Clauses(dialect.StandardSelectClauses...).
 	// Operators - compose from standard + custom

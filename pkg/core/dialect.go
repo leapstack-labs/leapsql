@@ -27,6 +27,21 @@ type DialectConfig struct {
 	// Keywords for autocomplete/highlighting
 	Keywords  []string
 	DataTypes []string
+
+	// Feature Flags - Builder auto-wires based on these
+	//
+	// Clause extensions
+	SupportsQualify    bool // QUALIFY clause for window filtering
+	SupportsReturning  bool // RETURNING clause for DML
+	SupportsGroupByAll bool // GROUP BY ALL
+	SupportsOrderByAll bool // ORDER BY ALL
+
+	// Operator extensions
+	SupportsIlike        bool // ILIKE case-insensitive LIKE
+	SupportsCastOperator bool // :: cast operator
+
+	// Join extensions
+	SupportsSemiAntiJoins bool // SEMI/ANTI join types
 }
 
 // NormalizationStrategy defines how unquoted identifiers are normalized.

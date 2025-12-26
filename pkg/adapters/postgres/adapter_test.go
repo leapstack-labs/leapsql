@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
-	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/core"
+	pgdialect "github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

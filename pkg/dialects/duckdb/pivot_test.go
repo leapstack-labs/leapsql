@@ -1,9 +1,9 @@
-package dialect_test
+package duckdb_test
 
 import (
 	"testing"
 
-	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +19,7 @@ func TestPivotBasic(t *testing.T) {
 			SUM(amount) FOR month IN ('Jan', 'Feb', 'Mar')
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT")
 	require.NotNil(t, stmt.Body)
 	require.NotNil(t, stmt.Body.Left)
@@ -44,7 +44,7 @@ func TestPivotMultipleAggregates(t *testing.T) {
 			FOR region IN ('North', 'South')
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with multiple aggregates")
 
 	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
@@ -62,7 +62,7 @@ func TestPivotInStar(t *testing.T) {
 			SUM(amount) FOR month IN *
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with IN *")
 
 	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
@@ -79,7 +79,7 @@ func TestPivotWithAlias(t *testing.T) {
 			SUM(amount) FOR month IN ('Jan', 'Feb')
 		) AS pivoted
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with alias")
 
 	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
@@ -95,7 +95,7 @@ func TestPivotWithAliasNoAS(t *testing.T) {
 			SUM(amount) FOR month IN ('Jan', 'Feb')
 		) p
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with alias (no AS)")
 
 	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
@@ -113,7 +113,7 @@ func TestUnpivotBasic(t *testing.T) {
 			value FOR quarter IN (q1, q2, q3, q4)
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT")
 
 	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
@@ -131,7 +131,7 @@ func TestUnpivotMultipleValueColumns(t *testing.T) {
 			(revenue, cost) FOR quarter IN ((q1_rev, q1_cost), (q2_rev, q2_cost))
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with multiple value columns")
 
 	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
@@ -150,7 +150,7 @@ func TestUnpivotWithAliases(t *testing.T) {
 			value FOR quarter IN (q1 AS 'Q1 2024', q2 AS 'Q2 2024')
 		)
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with column aliases")
 
 	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
@@ -167,7 +167,7 @@ func TestUnpivotWithTableAlias(t *testing.T) {
 			value FOR quarter IN (q1, q2)
 		) AS u
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with table alias")
 
 	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
@@ -184,7 +184,7 @@ func TestPivotWithJoin(t *testing.T) {
 		PIVOT (SUM(amount) FOR month IN ('Jan', 'Feb')) p
 		JOIN regions r ON p.region_id = r.id
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with JOIN")
 
 	from := stmt.Body.Left.From
@@ -203,7 +203,7 @@ func TestPivotAfterSubquery(t *testing.T) {
 		) s
 		PIVOT (SUM(amount) FOR month IN ('Jan', 'Feb'))
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT after subquery")
 
 	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
@@ -250,15 +250,15 @@ func TestPivotRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse original
-			stmt1, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt1, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Initial parse failed")
 
 			// Format
-			formatted := format.Format(stmt1, duckdbDialect.DuckDB)
+			formatted := format.Format(stmt1, duckdb.DuckDB)
 			require.NotEmpty(t, formatted, "Format produced empty output")
 
 			// Parse formatted output
-			stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+			stmt2, err := parser.ParseWithDialect(formatted, duckdb.DuckDB)
 			require.NoError(t, err, "Re-parse failed for: %s", formatted)
 
 			// Both should parse successfully and have similar structure
@@ -277,7 +277,7 @@ func TestPivotUnpivotInCTE(t *testing.T) {
 		)
 		SELECT * FROM pivoted
 	`
-	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
+	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT in CTE")
 	require.NotNil(t, stmt.With)
 	require.Len(t, stmt.With.CTEs, 1)
@@ -323,7 +323,7 @@ func TestPivotUnpivotErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			_, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			assert.Error(t, err, "Expected parse error for: %s", tt.sql)
 		})
 	}

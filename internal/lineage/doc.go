@@ -15,7 +15,7 @@
 //
 // # Basic Usage
 //
-//	import _ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+//	import _ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 //
 //	duckdb, _ := dialect.Get("duckdb")
 //	schema := parser.Schema{

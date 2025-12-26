@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
-	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 
 	_ "github.com/marcboeker/go-duckdb" // duckdb driver
 )

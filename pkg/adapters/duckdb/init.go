@@ -12,7 +12,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 
 	// Import dialect to ensure it's registered
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 func init() {

@@ -1,4 +1,4 @@
-package dialect
+package duckdb
 
 // DuckDB-specific join type values.
 // These are defined as untyped string constants to avoid import cycles.

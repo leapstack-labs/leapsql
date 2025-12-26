@@ -2,7 +2,10 @@
 // clause handlers to interact with the parser without circular dependencies.
 package spi
 
-import "github.com/leapstack-labs/leapsql/pkg/token"
+import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
 
 // ParserOps exposes parser operations to dialect clause handlers.
 // This interface allows dialect-specific code to interact with the parser
@@ -57,7 +60,8 @@ type FromItemHandler func(p ParserOps, sourceTable TableRef) (TableRef, error)
 type TableRef interface{}
 
 // StarModifier is the parsed result for star expression modifiers.
-type StarModifier interface{}
+// This is an alias to core.StarModifier for use in handler signatures.
+type StarModifier = core.StarModifier
 
 // Node is the parsed result (opaque to avoid circular deps).
 type Node interface{}

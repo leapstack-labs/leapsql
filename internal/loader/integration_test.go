@@ -10,7 +10,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 
 	// Import duckdb dialect so it registers itself
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 // getTestDialect returns the DuckDB dialect for integration tests.

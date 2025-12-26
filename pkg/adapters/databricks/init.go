@@ -4,5 +4,5 @@ package databricks
 
 import (
 	// Import dialect subpackage to register the Databricks dialect.
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/databricks/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/databricks"
 )

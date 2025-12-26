@@ -1,8 +1,8 @@
-// Package dialect provides the Databricks SQL dialect definition.
-// This package is lightweight and has no database driver dependencies,
+// Package databricks provides the Databricks SQL dialect definition.
+// This package is pure Go with no database driver dependencies,
 // making it suitable for use in the LSP and other tools that need
 // dialect information without the overhead of database connections.
-package dialect
+package databricks
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -11,34 +11,25 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-//go:generate go run ../../../../scripts/gendatabricks -gen=all -outdir=.
+//go:generate go run ../../../scripts/gendatabricks -gen=all -outdir=.
 
 func init() {
 	dialect.Register(Databricks)
 }
 
-// Databricks-specific tokens (registered dynamically)
+// Databricks-specific tokens
+// Standard tokens (QUALIFY, ILIKE, SEMI, ANTI, DCOLON) use builtin token constants
 var (
-	// TokenQualify is the QUALIFY clause for filtering window functions
-	TokenQualify = token.Register("QUALIFY")
-	// TokenIlike is case-insensitive LIKE
-	TokenIlike = token.Register("ILIKE")
 	// TokenRlike is regex match (RLIKE)
 	TokenRlike = token.Register("RLIKE")
 	// TokenRegexp is regex match (REGEXP alias)
 	TokenRegexp = token.Register("REGEXP")
-	// TokenDcolon is the :: cast operator
-	TokenDcolon = token.Register("::")
 	// TokenColon is the : JSON path operator
 	TokenColon = token.Register(":")
 	// TokenQDcolon is the ?:: try-cast operator
 	TokenQDcolon = token.Register("?::")
 	// TokenDiv is integer division
 	TokenDiv = token.Register("DIV")
-
-	// Join type tokens
-	TokenSemi = token.Register("SEMI")
-	TokenAnti = token.Register("ANTI")
 
 	// LATERAL VIEW tokens
 	TokenLateral = token.Register("LATERAL")
@@ -56,7 +47,7 @@ var (
 
 // DatabricksQualify is the QUALIFY clause for window function filtering.
 var DatabricksQualify = dialect.ClauseDef{
-	Token:   TokenQualify,
+	Token:   token.QUALIFY,
 	Handler: parseQualify,
 	Slot:    spi.SlotQualify,
 }
@@ -70,10 +61,10 @@ func parseQualify(p spi.ParserOps) (spi.Node, error) {
 // --- Databricks-specific Operators ---
 
 var databricksOperators = []dialect.OperatorDef{
-	{Token: TokenIlike, Precedence: spi.PrecedenceComparison},
+	{Token: token.ILIKE, Precedence: spi.PrecedenceComparison},
 	{Token: TokenRlike, Precedence: spi.PrecedenceComparison},
 	{Token: TokenRegexp, Precedence: spi.PrecedenceComparison},
-	{Token: TokenDcolon, Symbol: "::", Precedence: spi.PrecedencePostfix},
+	{Token: token.DCOLON, Symbol: "::", Precedence: spi.PrecedencePostfix},
 	{Token: TokenColon, Symbol: ":", Precedence: spi.PrecedencePostfix},
 	{Token: TokenQDcolon, Symbol: "?::", Precedence: spi.PrecedencePostfix},
 	{Token: TokenDiv, Symbol: "DIV", Precedence: spi.PrecedenceMultiply},
@@ -83,13 +74,13 @@ var databricksOperators = []dialect.OperatorDef{
 
 var databricksJoinTypes = []dialect.JoinTypeDef{
 	{
-		Token:       TokenSemi,
+		Token:       token.SEMI,
 		Type:        JoinSemi,
 		RequiresOn:  true,
 		AllowsUsing: true,
 	},
 	{
-		Token:       TokenAnti,
+		Token:       token.ANTI,
 		Type:        JoinAnti,
 		RequiresOn:  true,
 		AllowsUsing: true,
@@ -110,13 +101,13 @@ var Databricks = dialect.NewDialect("databricks").
 	DefaultSchema("default").
 	PlaceholderStyle(core.PlaceholderQuestion).
 	// Register Databricks-specific keywords for the lexer
-	AddKeyword("QUALIFY", TokenQualify).
-	AddKeyword("ILIKE", TokenIlike).
+	AddKeyword("QUALIFY", token.QUALIFY).
+	AddKeyword("ILIKE", token.ILIKE).
 	AddKeyword("RLIKE", TokenRlike).
 	AddKeyword("REGEXP", TokenRegexp).
 	AddKeyword("DIV", TokenDiv).
-	AddKeyword("SEMI", TokenSemi).
-	AddKeyword("ANTI", TokenAnti).
+	AddKeyword("SEMI", token.SEMI).
+	AddKeyword("ANTI", token.ANTI).
 	AddKeyword("LATERAL", TokenLateral).
 	AddKeyword("VIEW", TokenView).
 	AddKeyword("OUTER", TokenOuter).

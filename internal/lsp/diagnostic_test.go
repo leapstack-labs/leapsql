@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect" // Register DuckDB dialect
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb" // Register DuckDB dialect
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )

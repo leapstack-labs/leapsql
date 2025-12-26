@@ -1,9 +1,9 @@
-package dialect
+package duckdb
 
 import (
 	"fmt"
 
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -42,7 +42,7 @@ func parseExclude(p spi.ParserOps) (spi.StarModifier, error) {
 		return nil, fmt.Errorf("EXCLUDE: %w", err)
 	}
 
-	return &parser.ExcludeModifier{Columns: cols}, nil
+	return &core.ExcludeModifier{Columns: cols}, nil
 }
 
 // parseReplace handles * REPLACE (expr AS col, ...).
@@ -52,7 +52,7 @@ func parseReplace(p spi.ParserOps) (spi.StarModifier, error) {
 		return nil, fmt.Errorf("REPLACE: %w", err)
 	}
 
-	var items []parser.ReplaceItem
+	var items []core.ReplaceItem
 	for {
 		expr, err := p.ParseExpression()
 		if err != nil {
@@ -68,8 +68,8 @@ func parseReplace(p spi.ParserOps) (spi.StarModifier, error) {
 			return nil, fmt.Errorf("REPLACE: %w", err)
 		}
 
-		items = append(items, parser.ReplaceItem{
-			Expr:  expr.(parser.Expr),
+		items = append(items, core.ReplaceItem{
+			Expr:  expr,
 			Alias: name,
 		})
 
@@ -82,7 +82,7 @@ func parseReplace(p spi.ParserOps) (spi.StarModifier, error) {
 		return nil, fmt.Errorf("REPLACE: %w", err)
 	}
 
-	return &parser.ReplaceModifier{Items: items}, nil
+	return &core.ReplaceModifier{Items: items}, nil
 }
 
 // parseRename handles * RENAME (old AS new, ...).
@@ -92,7 +92,7 @@ func parseRename(p spi.ParserOps) (spi.StarModifier, error) {
 		return nil, fmt.Errorf("RENAME: %w", err)
 	}
 
-	var items []parser.RenameItem
+	var items []core.RenameItem
 	for {
 		oldName, err := p.ParseIdentifier()
 		if err != nil {
@@ -108,7 +108,7 @@ func parseRename(p spi.ParserOps) (spi.StarModifier, error) {
 			return nil, fmt.Errorf("RENAME: %w", err)
 		}
 
-		items = append(items, parser.RenameItem{
+		items = append(items, core.RenameItem{
 			OldName: oldName,
 			NewName: newName,
 		})
@@ -122,5 +122,5 @@ func parseRename(p spi.ParserOps) (spi.StarModifier, error) {
 		return nil, fmt.Errorf("RENAME: %w", err)
 	}
 
-	return &parser.RenameModifier{Items: items}, nil
+	return &core.RenameModifier{Items: items}, nil
 }

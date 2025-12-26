@@ -14,9 +14,9 @@ import (
 
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
-	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	pgdialect "github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 )
 
 // Adapter implements the adapter.Adapter interface for PostgreSQL.

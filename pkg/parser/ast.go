@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/leapstack-labs/leapsql/pkg/token"
+import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/token"
+)
 
 // Statement represents a SQL statement.
 type Statement interface {
@@ -137,51 +140,36 @@ func (WindowDef) node() {}
 
 // SelectItem represents an item in the SELECT list.
 type SelectItem struct {
-	Star      bool           // SELECT *
-	TableStar string         // SELECT t.*
-	Expr      Expr           // Expression
-	Alias     string         // AS alias
-	Modifiers []StarModifier // DuckDB: EXCLUDE, REPLACE, RENAME modifiers
+	Star      bool                // SELECT *
+	TableStar string              // SELECT t.*
+	Expr      Expr                // Expression
+	Alias     string              // AS alias
+	Modifiers []core.StarModifier // DuckDB: EXCLUDE, REPLACE, RENAME modifiers
 }
 
-// StarModifier is the interface for star expression modifiers (DuckDB).
-// Implemented by ExcludeModifier, ReplaceModifier, and RenameModifier.
-type StarModifier interface {
-	starModifier()
-}
+// StarModifier is an alias to core.StarModifier for backwards compatibility.
+// Deprecated: Use core.StarModifier directly.
+type StarModifier = core.StarModifier
 
-// ExcludeModifier represents * EXCLUDE (col1, col2, ...).
-type ExcludeModifier struct {
-	Columns []string // Column names to exclude
-}
+// ExcludeModifier is an alias to core.ExcludeModifier for backwards compatibility.
+// Deprecated: Use core.ExcludeModifier directly.
+type ExcludeModifier = core.ExcludeModifier
 
-func (*ExcludeModifier) starModifier() {}
+// ReplaceItem is an alias to core.ReplaceItem for backwards compatibility.
+// Deprecated: Use core.ReplaceItem directly.
+type ReplaceItem = core.ReplaceItem
 
-// ReplaceItem represents a single replacement in REPLACE modifier.
-type ReplaceItem struct {
-	Expr  Expr   // Expression to use
-	Alias string // Column name to replace
-}
+// ReplaceModifier is an alias to core.ReplaceModifier for backwards compatibility.
+// Deprecated: Use core.ReplaceModifier directly.
+type ReplaceModifier = core.ReplaceModifier
 
-// ReplaceModifier represents * REPLACE (expr AS col, ...).
-type ReplaceModifier struct {
-	Items []ReplaceItem
-}
+// RenameItem is an alias to core.RenameItem for backwards compatibility.
+// Deprecated: Use core.RenameItem directly.
+type RenameItem = core.RenameItem
 
-func (*ReplaceModifier) starModifier() {}
-
-// RenameItem represents a single rename in RENAME modifier.
-type RenameItem struct {
-	OldName string
-	NewName string
-}
-
-// RenameModifier represents * RENAME (old AS new, ...).
-type RenameModifier struct {
-	Items []RenameItem
-}
-
-func (*RenameModifier) starModifier() {}
+// RenameModifier is an alias to core.RenameModifier for backwards compatibility.
+// Deprecated: Use core.RenameModifier directly.
+type RenameModifier = core.RenameModifier
 
 // FromClause represents the FROM clause.
 type FromClause struct {
@@ -204,7 +192,7 @@ type Join struct {
 // The value is the SQL keyword (e.g., "LEFT", "INNER", "SEMI").
 // Join type constants are defined in their respective dialect packages:
 //   - Standard joins (INNER, LEFT, RIGHT, FULL, CROSS): pkg/dialect/joins.go
-//   - DuckDB joins (SEMI, ANTI, ASOF, POSITIONAL): pkg/adapters/duckdb/dialect/join_types.go
+//   - DuckDB joins (SEMI, ANTI, ASOF, POSITIONAL): pkg/dialects/duckdb/join_types.go
 type JoinType string
 
 // JoinComma represents an implicit cross join using comma syntax.

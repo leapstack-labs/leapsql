@@ -135,3 +135,54 @@ func ParseFetch(p spi.ParserOps) (spi.Node, error) {
 
 	return fetch, nil
 }
+
+// ParseQualify handles the QUALIFY clause (DuckDB, Databricks, etc.).
+// The QUALIFY keyword has already been consumed.
+func ParseQualify(p spi.ParserOps) (spi.Node, error) {
+	return p.ParseExpression()
+}
+
+// --- GROUP BY ALL / ORDER BY ALL support ---
+
+// groupByAllMarker implements spi.GroupByAllMarker.
+type groupByAllMarker struct{}
+
+func (g *groupByAllMarker) IsGroupByAll() bool { return true }
+
+// ParseGroupByWithAll handles GROUP BY with optional ALL keyword.
+// The GROUP keyword has already been consumed.
+func ParseGroupByWithAll(p spi.ParserOps) (spi.Node, error) {
+	if err := p.Expect(token.BY); err != nil {
+		return nil, err
+	}
+	if p.Match(token.ALL) {
+		return &groupByAllMarker{}, nil
+	}
+	return p.ParseExpressionList()
+}
+
+// orderByAllMarker implements spi.OrderByAllMarker.
+type orderByAllMarker struct {
+	desc bool
+}
+
+func (o *orderByAllMarker) IsOrderByAll() bool { return true }
+func (o *orderByAllMarker) IsDesc() bool       { return o.desc }
+
+// ParseOrderByWithAll handles ORDER BY with optional ALL keyword.
+// The ORDER keyword has already been consumed.
+func ParseOrderByWithAll(p spi.ParserOps) (spi.Node, error) {
+	if err := p.Expect(token.BY); err != nil {
+		return nil, err
+	}
+	if p.Match(token.ALL) {
+		desc := false
+		if p.Match(token.DESC) {
+			desc = true
+		} else {
+			p.Match(token.ASC) // consume optional ASC
+		}
+		return &orderByAllMarker{desc: desc}, nil
+	}
+	return p.ParseOrderByList()
+}

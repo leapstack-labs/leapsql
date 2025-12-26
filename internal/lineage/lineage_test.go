@@ -9,7 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 
 	// Import duckdb dialect so it registers itself
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 // =============================================================================

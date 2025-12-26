@@ -1,9 +1,9 @@
-package dialect_test
+package duckdb_test
 
 import (
 	"testing"
 
-	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +57,7 @@ func TestListLiteral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 			require.NotNil(t, stmt.Body)
 			require.NotNil(t, stmt.Body.Left)
@@ -108,7 +108,7 @@ func TestStructLiteral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			expr := stmt.Body.Left.Columns[0].Expr
@@ -155,7 +155,7 @@ func TestLambdaExpr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			// The lambda is typically the second argument to a function
@@ -224,7 +224,7 @@ func TestIndexExpr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			expr := stmt.Body.Left.Columns[0].Expr
@@ -274,7 +274,7 @@ func TestNestedExpressions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 			require.NotNil(t, stmt.Body.Left.Columns[0].Expr)
 		})
@@ -325,15 +325,15 @@ func TestExpressionRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse original
-			stmt1, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt1, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Initial parse failed")
 
 			// Format
-			formatted := format.Format(stmt1, duckdbDialect.DuckDB)
+			formatted := format.Format(stmt1, duckdb.DuckDB)
 			require.NotEmpty(t, formatted, "Format produced empty output")
 
 			// Parse formatted output
-			stmt2, err := parser.ParseWithDialect(formatted, duckdbDialect.DuckDB)
+			stmt2, err := parser.ParseWithDialect(formatted, duckdb.DuckDB)
 			require.NoError(t, err, "Re-parse failed for: %s", formatted)
 
 			// Both should have the same number of columns
@@ -377,7 +377,7 @@ func TestExpressionsInContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 			require.NotNil(t, stmt)
 		})
@@ -411,7 +411,7 @@ func TestExpressionErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parser.ParseWithDialect(tt.sql, duckdbDialect.DuckDB)
+			_, err := parser.ParseWithDialect(tt.sql, duckdb.DuckDB)
 			assert.Error(t, err, "Expected parse error for: %s", tt.sql)
 		})
 	}

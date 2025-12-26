@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Import dialect packages to register them
-	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
-	postgresDialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
+	postgresDialect "github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 )
 
 // ---------- QUALIFY Clause Tests ----------
@@ -94,7 +94,7 @@ func TestDuckDBAcceptsILIKE(t *testing.T) {
 	// Verify the WHERE clause contains a LIKE expression with ILIKE op
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
+	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
 
 func TestPostgresAcceptsILIKE(t *testing.T) {
@@ -106,7 +106,7 @@ func TestPostgresAcceptsILIKE(t *testing.T) {
 
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.Equal(t, postgresDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
+	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
 
 func TestILIKEWithNOT(t *testing.T) {
@@ -117,7 +117,7 @@ func TestILIKEWithNOT(t *testing.T) {
 
 	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
-	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op, "Should be case-insensitive ILIKE")
+	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 	assert.True(t, likeExpr.Not, "Should be negated with NOT")
 }
 
@@ -139,7 +139,7 @@ func TestILIKEPrecedence(t *testing.T) {
 	// Left side should be ILIKE
 	likeExpr, ok := binExpr.Left.(*parser.LikeExpr)
 	require.True(t, ok, "Left of AND should be ILIKE")
-	assert.Equal(t, duckdbDialect.TokenIlike, likeExpr.Op)
+	assert.Equal(t, token.ILIKE, likeExpr.Op)
 
 	// Right side should be comparison
 	rightExpr, ok := binExpr.Right.(*parser.BinaryExpr)
@@ -317,7 +317,7 @@ func TestDialectInheritance(t *testing.T) {
 	assert.True(t, contains(postgresSeq, parser.TOKEN_ORDER), "Postgres should have ORDER")
 
 	// DuckDB should have QUALIFY, Postgres should not
-	assert.True(t, contains(duckdbSeq, duckdbDialect.TokenQualify), "DuckDB should have QUALIFY")
+	assert.True(t, contains(duckdbSeq, token.QUALIFY), "DuckDB should have QUALIFY")
 
 	// Check that Postgres sequence doesn't contain QUALIFY
 	for _, tok := range postgresSeq {
@@ -340,7 +340,7 @@ func TestClauseSlotAssignment(t *testing.T) {
 
 func TestGlobalClauseRegistry(t *testing.T) {
 	// After loading dialects, QUALIFY should be in the global registry
-	name, ok := dialect.IsKnownClause(duckdbDialect.TokenQualify)
+	name, ok := dialect.IsKnownClause(token.QUALIFY)
 	assert.True(t, ok, "QUALIFY should be in global clause registry")
 	assert.Equal(t, "QUALIFY", name)
 }
@@ -353,7 +353,7 @@ func TestAllKnownClauses(t *testing.T) {
 	require.NotEmpty(t, allClauses, "Should have registered clauses")
 
 	// QUALIFY should be registered (from DuckDB dialect)
-	_, hasQualify := allClauses[duckdbDialect.TokenQualify]
+	_, hasQualify := allClauses[token.QUALIFY]
 	assert.True(t, hasQualify, "QUALIFY should be in AllKnownClauses")
 }
 
@@ -369,11 +369,11 @@ func TestUnsupportedClauseErrorMessage(t *testing.T) {
 
 func TestDialectIsClauseToken(t *testing.T) {
 	// DuckDB should report QUALIFY as a clause token
-	assert.True(t, duckdbDialect.DuckDB.IsClauseToken(duckdbDialect.TokenQualify),
+	assert.True(t, duckdbDialect.DuckDB.IsClauseToken(token.QUALIFY),
 		"DuckDB should report QUALIFY as a clause token")
 
 	// Postgres should NOT report QUALIFY as a clause token
-	assert.False(t, postgresDialect.Postgres.IsClauseToken(duckdbDialect.TokenQualify),
+	assert.False(t, postgresDialect.Postgres.IsClauseToken(token.QUALIFY),
 		"Postgres should NOT report QUALIFY as a clause token")
 
 	// Both should report WHERE as a clause token
@@ -385,7 +385,7 @@ func TestDialectIsClauseToken(t *testing.T) {
 
 func TestDialectClauseDef(t *testing.T) {
 	// DuckDB should have a ClauseDef for QUALIFY
-	def, ok := duckdbDialect.DuckDB.ClauseDef(duckdbDialect.TokenQualify)
+	def, ok := duckdbDialect.DuckDB.ClauseDef(token.QUALIFY)
 	require.True(t, ok, "DuckDB should have ClauseDef for QUALIFY")
 	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
 
@@ -407,7 +407,7 @@ func TestAllClauseTokens(t *testing.T) {
 		if tok == parser.TOKEN_WHERE {
 			hasWhere = true
 		}
-		if tok == duckdbDialect.TokenQualify {
+		if tok == token.QUALIFY {
 			hasQualify = true
 		}
 	}

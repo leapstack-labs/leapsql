@@ -1,6 +1,8 @@
-// Package dialect provides static metadata for DuckDB functions that are not
+// Package duckdb provides the DuckDB SQL dialect implementation.
+//
+// This file contains static metadata for DuckDB functions that are not
 // exposed via duckdb_functions() or require manual documentation.
-package dialect
+package duckdb
 
 import "github.com/leapstack-labs/leapsql/pkg/dialect"
 

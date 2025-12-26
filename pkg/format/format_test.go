@@ -3,7 +3,7 @@ package format
 import (
 	"testing"
 
-	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

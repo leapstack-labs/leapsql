@@ -1,8 +1,8 @@
-// Package dialect provides the DuckDB SQL dialect definition.
-// This package is lightweight and has no database driver dependencies,
+// Package duckdb provides the DuckDB SQL dialect definition.
+// This package is pure Go with no database driver dependencies,
 // making it suitable for use in the LSP and other tools that need
 // dialect information without the overhead of database connections.
-package dialect
+package duckdb
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -11,26 +11,19 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-//go:generate go run ../../../../scripts/gendialect -dialect=duckdb -gen=all -outdir=.
+//go:generate go run ../../../scripts/gendialect -dialect=duckdb -gen=all -outdir=.
 
 func init() {
 	dialect.Register(DuckDB)
 }
 
-// DuckDB-specific tokens (registered dynamically)
+// DuckDB-specific tokens
+// Standard tokens (QUALIFY, ILIKE, SEMI, ANTI, DCOLON) use builtin token constants
 var (
-	// TokenQualify is a DuckDB-specific clause for filtering window functions
-	TokenQualify = token.Register("QUALIFY")
-	// TokenIlike is case-insensitive LIKE (DuckDB and Postgres)
-	TokenIlike = token.Register("ILIKE")
-	// TokenDcolon is the :: cast operator
-	TokenDcolon = token.Register("::")
 	// TokenDslash is the // integer division operator
 	TokenDslash = token.Register("//")
 
-	// DuckDB-specific join type tokens
-	TokenSemi       = token.Register("SEMI")
-	TokenAnti       = token.Register("ANTI")
+	// DuckDB-specific join type tokens (not in standard token set)
 	TokenAsof       = token.Register("ASOF")
 	TokenPositional = token.Register("POSITIONAL")
 
@@ -60,7 +53,7 @@ var DuckDBOrderBy = dialect.ClauseDef{
 
 // DuckDBQualify is the QUALIFY clause for window function filtering.
 var DuckDBQualify = dialect.ClauseDef{
-	Token:   TokenQualify,
+	Token:   token.QUALIFY,
 	Handler: parseQualify,
 	Slot:    spi.SlotQualify,
 }
@@ -74,8 +67,8 @@ func parseQualify(p spi.ParserOps) (spi.Node, error) {
 // --- DuckDB-specific Operators ---
 
 var duckDBOperators = []dialect.OperatorDef{
-	{Token: TokenIlike, Precedence: spi.PrecedenceComparison},
-	{Token: TokenDcolon, Symbol: "::", Precedence: spi.PrecedencePostfix},
+	{Token: token.ILIKE, Precedence: spi.PrecedenceComparison},
+	{Token: token.DCOLON, Symbol: "::", Precedence: spi.PrecedencePostfix},
 	{Token: TokenDslash, Symbol: "//", Precedence: spi.PrecedenceMultiply},
 }
 
@@ -83,13 +76,13 @@ var duckDBOperators = []dialect.OperatorDef{
 
 var duckDBJoinTypes = []dialect.JoinTypeDef{
 	{
-		Token:       TokenSemi,
+		Token:       token.SEMI,
 		Type:        JoinSemi,
 		RequiresOn:  true,
 		AllowsUsing: true,
 	},
 	{
-		Token:       TokenAnti,
+		Token:       token.ANTI,
 		Type:        JoinAnti,
 		RequiresOn:  true,
 		AllowsUsing: true,
@@ -116,10 +109,10 @@ var DuckDB = dialect.NewDialect("duckdb").
 	DefaultSchema("main").
 	PlaceholderStyle(core.PlaceholderQuestion).
 	// Register DuckDB-specific keywords for the lexer
-	AddKeyword("QUALIFY", TokenQualify).
-	AddKeyword("ILIKE", TokenIlike).
-	AddKeyword("SEMI", TokenSemi).
-	AddKeyword("ANTI", TokenAnti).
+	AddKeyword("QUALIFY", token.QUALIFY).
+	AddKeyword("ILIKE", token.ILIKE).
+	AddKeyword("SEMI", token.SEMI).
+	AddKeyword("ANTI", token.ANTI).
 	AddKeyword("ASOF", TokenAsof).
 	AddKeyword("POSITIONAL", TokenPositional).
 	AddKeyword("EXCLUDE", TokenExclude).

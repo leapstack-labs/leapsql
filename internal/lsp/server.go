@@ -23,7 +23,7 @@ import (
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // Register project rules
 
 	// Import dialect implementations so they register themselves
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 // Server implements the Language Server Protocol for LeapSQL.

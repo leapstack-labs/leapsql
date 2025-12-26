@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	// Import duckdb dialect so it registers itself
-	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 )
 
 func TestInTemplateExpr(t *testing.T) {

@@ -219,10 +219,12 @@ func (e *lineageExtractor) applyStarModifiers(scope *parser.Scope, colResolver *
 			for _, l := range lineages {
 				if repl, ok := replaceMap[e.dialect.NormalizeName(l.Name)]; ok {
 					// Extract lineage from the replacement expression
-					exprLineage := e.extractExprLineage(scope, colResolver, repl.Expr)
-					l.Sources = exprLineage.Sources
-					l.Transform = core.TransformExpression
-					l.Function = exprLineage.Function
+					if expr, ok := repl.Expr.(parser.Expr); ok {
+						exprLineage := e.extractExprLineage(scope, colResolver, expr)
+						l.Sources = exprLineage.Sources
+						l.Transform = core.TransformExpression
+						l.Function = exprLineage.Function
+					}
 				}
 			}
 

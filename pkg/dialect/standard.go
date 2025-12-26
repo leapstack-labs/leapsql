@@ -74,6 +74,13 @@ var (
 		Handler: ParseFetch,
 		Slot:    spi.SlotFetch,
 	}
+
+	// StandardQualify is the standard QUALIFY clause definition (DuckDB, Databricks, etc.).
+	StandardQualify = ClauseDef{
+		Token:   token.QUALIFY,
+		Handler: ParseQualify,
+		Slot:    spi.SlotQualify,
+	}
 )
 
 // StandardSelectClauses is the typical ANSI SELECT clause sequence.
@@ -87,4 +94,43 @@ var StandardSelectClauses = []ClauseDef{
 	StandardLimit,
 	StandardOffset,
 	StandardFetch,
+}
+
+// --- Configurable Clause Factory Functions ---
+// These functions return ClauseDefs with behavior customized by options.
+
+// GroupByOpts configures GROUP BY clause behavior.
+type GroupByOpts struct {
+	AllowAll bool // Support GROUP BY ALL
+}
+
+// GroupBy returns a ClauseDef for GROUP BY with options.
+func GroupBy(opts GroupByOpts) ClauseDef {
+	if opts.AllowAll {
+		return ClauseDef{
+			Token:    token.GROUP,
+			Handler:  ParseGroupByWithAll,
+			Slot:     spi.SlotGroupBy,
+			Keywords: []string{"GROUP", "BY"},
+		}
+	}
+	return StandardGroupBy
+}
+
+// OrderByOpts configures ORDER BY clause behavior.
+type OrderByOpts struct {
+	AllowAll bool // Support ORDER BY ALL
+}
+
+// OrderBy returns a ClauseDef for ORDER BY with options.
+func OrderBy(opts OrderByOpts) ClauseDef {
+	if opts.AllowAll {
+		return ClauseDef{
+			Token:    token.ORDER,
+			Handler:  ParseOrderByWithAll,
+			Slot:     spi.SlotOrderBy,
+			Keywords: []string{"ORDER", "BY"},
+		}
+	}
+	return StandardOrderBy
 }

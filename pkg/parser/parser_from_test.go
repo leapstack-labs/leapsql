@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	// Import DuckDB dialect for side effects (dialect registration) and constants
-	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"

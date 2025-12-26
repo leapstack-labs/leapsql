@@ -2,7 +2,7 @@
 // Source: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-functions-builtin-alpha
 // Generated: 2025-12-26
 
-package dialect
+package databricks
 
 import "github.com/leapstack-labs/leapsql/pkg/dialect"
 

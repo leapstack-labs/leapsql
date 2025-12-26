@@ -1,7 +1,9 @@
-// Package dialect provides manually-maintained metadata for the Databricks dialect.
-// This file contains function classifications that cannot be extracted from documentation,
-// such as generator functions (functions that produce values without input columns).
-package dialect
+// Package databricks provides the Databricks SQL dialect implementation.
+//
+// This file contains manually-maintained metadata for function classifications
+// that cannot be extracted from documentation, such as generator functions
+// (functions that produce values without input columns).
+package databricks
 
 // databricksGenerators contains functions that produce values without reading columns.
 // These are not classified in Databricks documentation, so we maintain them manually.
@@ -41,4 +43,4 @@ var databricksGenerators = []string{
 //   - types_gen.go: databricksTypes
 //
 // To regenerate, run:
-//   go run ./scripts/gendatabricks -gen=all -outdir=pkg/adapters/databricks/dialect/
+//   go run ./scripts/gendatabricks -gen=all -outdir=pkg/dialects/databricks/

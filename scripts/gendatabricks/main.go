@@ -3,10 +3,10 @@
 //
 // Usage:
 //
-//	go run ./scripts/gendatabricks -gen=all -outdir=pkg/adapters/databricks/dialect/
-//	go run ./scripts/gendatabricks -gen=functions -out=pkg/adapters/databricks/dialect/functions_gen.go
-//	go run ./scripts/gendatabricks -gen=keywords -out=pkg/adapters/databricks/dialect/keywords_gen.go
-//	go run ./scripts/gendatabricks -gen=types -out=pkg/adapters/databricks/dialect/types_gen.go
+//	go run ./scripts/gendatabricks -gen=all -outdir=pkg/dialects/databricks/
+//	go run ./scripts/gendatabricks -gen=functions -out=pkg/dialects/databricks/functions_gen.go
+//	go run ./scripts/gendatabricks -gen=keywords -out=pkg/dialects/databricks/keywords_gen.go
+//	go run ./scripts/gendatabricks -gen=types -out=pkg/dialects/databricks/types_gen.go
 //
 // The scraper fetches function names from the alphabetical list, then concurrently
 // fetches documentation from each individual function page for full coverage.
