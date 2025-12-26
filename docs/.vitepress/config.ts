@@ -111,6 +111,14 @@ function sidebar(): DefaultTheme.Sidebar {
         ],
       },
       {
+        text: 'Linting',
+        items: [
+          { text: 'Overview', link: '/linting/' },
+          { text: 'SQL Rules', link: '/linting/sql-rules' },
+          { text: 'Project Rules', link: '/linting/project-rules' },
+        ],
+      },
+      {
         text: 'CLI Reference',
         items: [
           { text: 'Overview', link: '/cli/' },

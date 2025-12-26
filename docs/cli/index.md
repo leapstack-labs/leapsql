@@ -29,8 +29,10 @@ leapsql <command> [options]
 | [`dag`](/cli/dag) | Show the dependency graph |
 | [`discover`](/cli/discover) | Index macros and models for IDE features |
 | [`docs`](/cli/docs) | Generate and serve documentation site |
+| [`doctor`](/cli/doctor) | Run a comprehensive project health check |
 | [`init`](/cli/init) | Initialize a new LeapSQL project |
 | [`lineage`](/cli/lineage) | Show lineage for a model |
+| [`lint`](/cli/lint) | Run lint rules on SQL models |
 | [`list`](/cli/list) | List all models and their dependencies |
 | [`lsp`](/cli/lsp) | Start the Language Server Protocol server |
 | [`render`](/cli/render) | Render SQL for a model with templates expanded |

@@ -1,4 +1,4 @@
-// Package main provides a generator that extracts CLI, schema, and globals metadata
+// Package main provides a generator that extracts CLI, schema, globals, and lint metadata
 // from LeapSQL source code and generates markdown documentation.
 //
 // Usage:
@@ -6,6 +6,7 @@
 //	go run ./scripts/gendocs -gen=cli -outdir=docs/cli
 //	go run ./scripts/gendocs -gen=schema -outdir=docs/concepts
 //	go run ./scripts/gendocs -gen=globals -outdir=docs/templating
+//	go run ./scripts/gendocs -gen=lint -outdir=docs/linting
 //	go run ./scripts/gendocs -gen=all
 package main
 
@@ -17,7 +18,7 @@ import (
 )
 
 var (
-	genFlag    = flag.String("gen", "all", "what to generate: cli, schema, globals, all")
+	genFlag    = flag.String("gen", "all", "what to generate: cli, schema, globals, lint, all")
 	outDirFlag = flag.String("outdir", "", "output directory (defaults based on gen type)")
 )
 
@@ -25,9 +26,9 @@ func main() {
 	flag.Parse()
 
 	// Validate gen flag
-	validGenFlags := map[string]bool{"cli": true, "schema": true, "globals": true, "all": true}
+	validGenFlags := map[string]bool{"cli": true, "schema": true, "globals": true, "lint": true, "all": true}
 	if !validGenFlags[*genFlag] {
-		log.Fatalf("unknown -gen value: %s (use: cli, schema, globals, all)", *genFlag)
+		log.Fatalf("unknown -gen value: %s (use: cli, schema, globals, lint, all)", *genFlag)
 	}
 
 	// Find project root (where go.mod is)
@@ -66,6 +67,15 @@ func main() {
 			log.Fatalf("failed to generate globals docs: %v", err)
 		}
 
+	case "lint":
+		outDir := *outDirFlag
+		if outDir == "" {
+			outDir = filepath.Join(projectRoot, "docs", "linting")
+		}
+		if err := generateLintDocs(outDir); err != nil {
+			log.Fatalf("failed to generate lint docs: %v", err)
+		}
+
 	case "all":
 		// Generate CLI docs
 		cliOutDir := filepath.Join(projectRoot, "docs", "cli")
@@ -83,6 +93,12 @@ func main() {
 		globalsOutDir := filepath.Join(projectRoot, "docs", "templating")
 		if err := generateGlobalsDocs(globalsOutDir); err != nil {
 			log.Fatalf("failed to generate globals docs: %v", err)
+		}
+
+		// Generate lint docs
+		lintOutDir := filepath.Join(projectRoot, "docs", "linting")
+		if err := generateLintDocs(lintOutDir); err != nil {
+			log.Fatalf("failed to generate lint docs: %v", err)
 		}
 	}
 
