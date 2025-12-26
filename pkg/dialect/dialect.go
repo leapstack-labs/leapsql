@@ -33,6 +33,7 @@ const (
 
 // JoinTypeDef defines a dialect-specific join type.
 type JoinTypeDef struct {
+	Token         token.TokenType // The trigger token for this join type
 	Type          string          // JoinType value (e.g., "LEFT", "SEMI")
 	OptionalToken token.TokenType // Optional modifier token (OUTER) - 0 means none
 	RequiresOn    bool            // true if ON clause is required
@@ -41,10 +42,11 @@ type JoinTypeDef struct {
 
 // ClauseDef bundles clause parsing logic with storage destination.
 type ClauseDef struct {
-	Handler  spi.ClauseHandler
-	Slot     spi.ClauseSlot
-	Keywords []string // Keywords to print for this clause (e.g. "GROUP", "BY")
-	Inline   bool     // true for same-line clauses (LIMIT, OFFSET)
+	Token    token.TokenType   // The trigger token for this clause (e.g., token.WHERE)
+	Handler  spi.ClauseHandler // Handler function to parse the clause
+	Slot     spi.ClauseSlot    // Where to store the parsed result
+	Keywords []string          // Keywords to print for this clause (e.g. "GROUP", "BY")
+	Inline   bool              // true for same-line clauses (LIMIT, OFFSET)
 }
 
 // ClauseOption configures a ClauseDef.
@@ -113,8 +115,7 @@ type Dialect struct {
 	reservedWords map[string]struct{} // All keywords that need quoting as identifiers
 	dataTypes     []string
 
-	// Parsing behavior (NEW - for dialect-aware parsing)
-	parent         *Dialect                                    // Parent dialect for inheritance
+	// Parsing behavior (for dialect-aware parsing)
 	clauseSequence []token.TokenType                           // Order of clauses in SELECT statement
 	clauseDefs     map[token.TokenType]ClauseDef               // Handler + Slot per clause
 	symbols        map[string]token.TokenType                  // Custom operators: "::" -> DCOLON
@@ -336,37 +337,21 @@ func (d *Dialect) QuoteIdentifierIfNeeded(name string) string {
 
 // ClauseSequence returns the ordered list of clause token types for this dialect.
 func (d *Dialect) ClauseSequence() []token.TokenType {
-	if d.clauseSequence != nil {
-		return d.clauseSequence
-	}
-	if d.parent != nil {
-		return d.parent.ClauseSequence()
-	}
-	return nil
+	return d.clauseSequence
 }
 
 // ClauseHandler returns the handler for a clause token type.
 func (d *Dialect) ClauseHandler(t token.TokenType) spi.ClauseHandler {
-	if d.clauseDefs != nil {
-		if def, ok := d.clauseDefs[t]; ok {
-			return def.Handler
-		}
-	}
-	if d.parent != nil {
-		return d.parent.ClauseHandler(t)
+	if def, ok := d.clauseDefs[t]; ok {
+		return def.Handler
 	}
 	return nil
 }
 
 // ClauseDef returns the definition (handler + slot) for a clause token type.
 func (d *Dialect) ClauseDef(t token.TokenType) (ClauseDef, bool) {
-	if d.clauseDefs != nil {
-		if def, ok := d.clauseDefs[t]; ok {
-			return def, true
-		}
-	}
-	if d.parent != nil {
-		return d.parent.ClauseDef(t)
+	if def, ok := d.clauseDefs[t]; ok {
+		return def, true
 	}
 	return ClauseDef{}, false
 }
@@ -379,48 +364,24 @@ func (d *Dialect) IsClauseToken(t token.TokenType) bool {
 
 // AllClauseTokens returns all clause tokens registered in this dialect.
 func (d *Dialect) AllClauseTokens() []token.TokenType {
-	seen := make(map[token.TokenType]bool)
-	var tokens []token.TokenType
-
+	tokens := make([]token.TokenType, 0, len(d.clauseDefs))
 	for t := range d.clauseDefs {
-		if !seen[t] {
-			seen[t] = true
-			tokens = append(tokens, t)
-		}
-	}
-	if d.parent != nil {
-		for _, t := range d.parent.AllClauseTokens() {
-			if !seen[t] {
-				seen[t] = true
-				tokens = append(tokens, t)
-			}
-		}
+		tokens = append(tokens, t)
 	}
 	return tokens
 }
 
 // Symbols returns the custom operators map for lexer symbol matching.
 func (d *Dialect) Symbols() map[string]token.TokenType {
-	if d.symbols != nil {
-		return d.symbols
-	}
-	if d.parent != nil {
-		return d.parent.Symbols()
-	}
-	return nil
+	return d.symbols
 }
 
 // LookupKeyword returns the token type for a dynamic keyword.
 // Returns the token type and true if found, or IDENT and false if not.
 func (d *Dialect) LookupKeyword(name string) (token.TokenType, bool) {
 	lowerName := strings.ToLower(name)
-	if d.dynamicKw != nil {
-		if t, ok := d.dynamicKw[lowerName]; ok {
-			return t, true
-		}
-	}
-	if d.parent != nil {
-		return d.parent.LookupKeyword(name)
+	if t, ok := d.dynamicKw[lowerName]; ok {
+		return t, true
 	}
 	return token.IDENT, false
 }
@@ -428,52 +389,32 @@ func (d *Dialect) LookupKeyword(name string) (token.TokenType, bool) {
 // Precedence returns the precedence level for an operator token.
 // Returns 0 (PrecedenceNone) if the operator is not recognized.
 func (d *Dialect) Precedence(t token.TokenType) int {
-	if d.precedence != nil {
-		if p, ok := d.precedence[t]; ok {
-			return p
-		}
-	}
-	if d.parent != nil {
-		return d.parent.Precedence(t)
+	if p, ok := d.precedence[t]; ok {
+		return p
 	}
 	return spi.PrecedenceNone
 }
 
 // InfixHandler returns the custom infix handler for an operator token.
 func (d *Dialect) InfixHandler(t token.TokenType) spi.InfixHandler {
-	if d.infixHandlers != nil {
-		if h, ok := d.infixHandlers[t]; ok {
-			return h
-		}
-	}
-	if d.parent != nil {
-		return d.parent.InfixHandler(t)
+	if h, ok := d.infixHandlers[t]; ok {
+		return h
 	}
 	return nil
 }
 
 // PrefixHandler returns the custom prefix handler for an operator token.
 func (d *Dialect) PrefixHandler(t token.TokenType) spi.PrefixHandler {
-	if d.prefixHandlers != nil {
-		if h, ok := d.prefixHandlers[t]; ok {
-			return h
-		}
-	}
-	if d.parent != nil {
-		return d.parent.PrefixHandler(t)
+	if h, ok := d.prefixHandlers[t]; ok {
+		return h
 	}
 	return nil
 }
 
 // JoinTypeDef returns the definition for a dialect-specific join type.
 func (d *Dialect) JoinTypeDef(t token.TokenType) (JoinTypeDef, bool) {
-	if d.joinTypes != nil {
-		if def, ok := d.joinTypes[t]; ok {
-			return def, true
-		}
-	}
-	if d.parent != nil {
-		return d.parent.JoinTypeDef(t)
+	if def, ok := d.joinTypes[t]; ok {
+		return def, true
 	}
 	return JoinTypeDef{}, false
 }
@@ -486,35 +427,17 @@ func (d *Dialect) IsJoinTypeToken(t token.TokenType) bool {
 
 // AllJoinTypeTokens returns all join type tokens registered in this dialect.
 func (d *Dialect) AllJoinTypeTokens() []token.TokenType {
-	seen := make(map[token.TokenType]bool)
-	var tokens []token.TokenType
-
+	tokens := make([]token.TokenType, 0, len(d.joinTypes))
 	for t := range d.joinTypes {
-		if !seen[t] {
-			seen[t] = true
-			tokens = append(tokens, t)
-		}
-	}
-	if d.parent != nil {
-		for _, t := range d.parent.AllJoinTypeTokens() {
-			if !seen[t] {
-				seen[t] = true
-				tokens = append(tokens, t)
-			}
-		}
+		tokens = append(tokens, t)
 	}
 	return tokens
 }
 
 // StarModifierHandler returns the handler for a star modifier token type.
 func (d *Dialect) StarModifierHandler(t token.TokenType) spi.StarModifierHandler {
-	if d.starModifiers != nil {
-		if h, ok := d.starModifiers[t]; ok {
-			return h
-		}
-	}
-	if d.parent != nil {
-		return d.parent.StarModifierHandler(t)
+	if h, ok := d.starModifiers[t]; ok {
+		return h
 	}
 	return nil
 }
@@ -526,13 +449,8 @@ func (d *Dialect) IsStarModifierToken(t token.TokenType) bool {
 
 // FromItemHandler returns the handler for a FROM item token type.
 func (d *Dialect) FromItemHandler(t token.TokenType) spi.FromItemHandler {
-	if d.fromItems != nil {
-		if h, ok := d.fromItems[t]; ok {
-			return h
-		}
-	}
-	if d.parent != nil {
-		return d.parent.FromItemHandler(t)
+	if h, ok := d.fromItems[t]; ok {
+		return h
 	}
 	return nil
 }
@@ -542,24 +460,9 @@ func (d *Dialect) IsFromItemToken(t token.TokenType) bool {
 	return d.FromItemHandler(t) != nil
 }
 
-// Parent returns the parent dialect, if any.
-func (d *Dialect) Parent() *Dialect {
-	return d.parent
-}
-
-// LintRules returns all lint rules including inherited from parent.
+// LintRules returns all lint rules for this dialect.
 func (d *Dialect) LintRules() []lint.RuleDef {
-	var rules []lint.RuleDef
-
-	// Get parent rules first (inheritance)
-	if d.parent != nil {
-		rules = append(rules, d.parent.LintRules()...)
-	}
-
-	// Add this dialect's rules
-	rules = append(rules, d.lintRules...)
-
-	return rules
+	return d.lintRules
 }
 
 // Builder provides a fluent API for constructing dialects.
@@ -696,67 +599,6 @@ func (b *Builder) Build() *Dialect {
 
 // ---------- Parsing Behavior Builder Methods ----------
 
-// Extends inherits from a parent dialect (deep copy of parsing behavior).
-func (b *Builder) Extends(parent *Dialect) *Builder {
-	b.dialect.parent = parent
-	// Deep copy parent's parsing behavior
-	if parent.clauseSequence != nil {
-		b.dialect.clauseSequence = make([]token.TokenType, len(parent.clauseSequence))
-		copy(b.dialect.clauseSequence, parent.clauseSequence)
-	}
-	if parent.clauseDefs != nil {
-		for k, v := range parent.clauseDefs {
-			b.dialect.clauseDefs[k] = v
-		}
-	}
-	if parent.symbols != nil {
-		for k, v := range parent.symbols {
-			b.dialect.symbols[k] = v
-		}
-	}
-	if parent.dynamicKw != nil {
-		for k, v := range parent.dynamicKw {
-			b.dialect.dynamicKw[k] = v
-		}
-	}
-	if parent.precedence != nil {
-		for k, v := range parent.precedence {
-			b.dialect.precedence[k] = v
-		}
-	}
-	if parent.infixHandlers != nil {
-		for k, v := range parent.infixHandlers {
-			b.dialect.infixHandlers[k] = v
-		}
-	}
-	if parent.prefixHandlers != nil {
-		for k, v := range parent.prefixHandlers {
-			b.dialect.prefixHandlers[k] = v
-		}
-	}
-	if parent.joinTypes != nil {
-		for k, v := range parent.joinTypes {
-			b.dialect.joinTypes[k] = v
-		}
-	}
-	if parent.starModifiers != nil {
-		for k, v := range parent.starModifiers {
-			b.dialect.starModifiers[k] = v
-		}
-	}
-	if parent.fromItems != nil {
-		for k, v := range parent.fromItems {
-			b.dialect.fromItems[k] = v
-		}
-	}
-	// Copy lint rules from parent
-	if parent.lintRules != nil {
-		b.dialect.lintRules = make([]lint.RuleDef, len(parent.lintRules))
-		copy(b.dialect.lintRules, parent.lintRules)
-	}
-	return b
-}
-
 // AddOperator registers a custom operator symbol for the lexer.
 func (b *Builder) AddOperator(symbol string, t token.TokenType) *Builder {
 	b.dialect.symbols[symbol] = t
@@ -857,6 +699,47 @@ func (b *Builder) AddStarModifier(t token.TokenType, handler spi.StarModifierHan
 // AddFromItem registers a FROM clause item handler (e.g., PIVOT, UNPIVOT).
 func (b *Builder) AddFromItem(t token.TokenType, handler spi.FromItemHandler) *Builder {
 	b.dialect.fromItems[t] = handler
+	return b
+}
+
+// ---------- Bulk Builder Methods (Toolbox Composition) ----------
+
+// Clauses sets the clause sequence from a list of ClauseDefs.
+// This replaces inheritance - explicitly list all supported clauses.
+func (b *Builder) Clauses(defs ...ClauseDef) *Builder {
+	b.dialect.clauseSequence = make([]token.TokenType, len(defs))
+	for i, def := range defs {
+		b.dialect.clauseSequence[i] = def.Token
+		b.dialect.clauseDefs[def.Token] = def
+		recordClause(def.Token, def.Token.String())
+	}
+	return b
+}
+
+// Operators adds operator definitions in bulk.
+// If Symbol is provided, it's registered with the lexer.
+func (b *Builder) Operators(sets ...[]OperatorDef) *Builder {
+	for _, set := range sets {
+		for _, op := range set {
+			b.dialect.precedence[op.Token] = op.Precedence
+			if op.Handler != nil {
+				b.dialect.infixHandlers[op.Token] = op.Handler
+			}
+			if op.Symbol != "" {
+				b.dialect.symbols[op.Symbol] = op.Token
+			}
+		}
+	}
+	return b
+}
+
+// JoinTypes adds join type definitions in bulk.
+func (b *Builder) JoinTypes(sets ...[]JoinTypeDef) *Builder {
+	for _, set := range sets {
+		for _, jt := range set {
+			b.dialect.joinTypes[jt.Token] = jt
+		}
+	}
 	return b
 }
 

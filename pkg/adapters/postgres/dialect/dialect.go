@@ -7,7 +7,6 @@ package dialect
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -25,6 +24,13 @@ var (
 	// TokenDcolon is the :: cast operator (Postgres style)
 	TokenDcolon = token.Register("::")
 )
+
+// --- PostgreSQL-specific Operators ---
+
+var postgresOperators = []dialect.OperatorDef{
+	{Token: TokenIlike, Precedence: spi.PrecedenceComparison},
+	{Token: TokenDcolon, Symbol: "::", Precedence: spi.PrecedencePostfix},
+}
 
 // postgresReservedWords contains common PostgreSQL reserved words.
 // This is a manually maintained list of frequently problematic identifiers.
@@ -47,22 +53,23 @@ var postgresReservedWords = []string{
 }
 
 // Postgres is the PostgreSQL dialect configuration.
+// Uses explicit composition - no inheritance from ANSI.
 var Postgres = dialect.NewDialect("postgres").
-	// Inherit from ANSI base dialect (includes || operator)
-	Extends(ansi.ANSI).
-	// PostgreSQL-specific configuration
+	// Static Configuration
 	Identifiers(`"`, `"`, `""`, core.NormLowercase). // Postgres normalizes unquoted identifiers to lowercase
 	DefaultSchema("public").
 	PlaceholderStyle(core.PlaceholderDollar).
 	// Register PostgreSQL-specific keywords for the lexer
 	AddKeyword("ILIKE", TokenIlike).
-	// Register PostgreSQL-specific operators for the lexer
-	AddOperator("::", TokenDcolon).
-	// Add ILIKE operator with same precedence as LIKE
-	AddInfix(TokenIlike, spi.PrecedenceComparison).
-	// Add :: cast operator (postfix precedence)
-	AddInfix(TokenDcolon, spi.PrecedencePostfix).
-	// Note: PostgreSQL does NOT support QUALIFY - no clause addition
+	// Clause Sequence - standard ANSI clauses (no QUALIFY)
+	Clauses(dialect.StandardSelectClauses...).
+	// Operators - compose from standard + custom
+	Operators(
+		dialect.ANSIOperators,
+		postgresOperators,
+	).
+	// Join Types - standard ANSI only
+	JoinTypes(dialect.ANSIJoinTypes).
 	// Function classifications
 	Aggregates(
 		// Standard aggregates
@@ -109,6 +116,6 @@ var Postgres = dialect.NewDialect("postgres").
 		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
 	).
 	WithReservedWords(postgresReservedWords...).
-	// PostgreSQL-specific lint rules (inherits ANSI rules via Extends)
+	// PostgreSQL-specific lint rules
 	LintRulesAdd(AllRules...).
 	Build()

@@ -7,7 +7,6 @@ package dialect
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -41,17 +40,78 @@ var (
 	TokenFor     = token.Register("FOR")
 )
 
+// --- DuckDB-specific Clause Definitions ---
+
+// DuckDBGroupBy is GROUP BY with ALL support.
+var DuckDBGroupBy = dialect.ClauseDef{
+	Token:    token.GROUP,
+	Handler:  parseGroupByWithAll,
+	Slot:     spi.SlotGroupBy,
+	Keywords: []string{"GROUP", "BY"},
+}
+
+// DuckDBOrderBy is ORDER BY with ALL support.
+var DuckDBOrderBy = dialect.ClauseDef{
+	Token:    token.ORDER,
+	Handler:  parseOrderByWithAll,
+	Slot:     spi.SlotOrderBy,
+	Keywords: []string{"ORDER", "BY"},
+}
+
+// DuckDBQualify is the QUALIFY clause for window function filtering.
+var DuckDBQualify = dialect.ClauseDef{
+	Token:   TokenQualify,
+	Handler: parseQualify,
+	Slot:    spi.SlotQualify,
+}
+
 // parseQualify handles the QUALIFY clause (DuckDB-specific).
 // The QUALIFY keyword has already been consumed.
 func parseQualify(p spi.ParserOps) (spi.Node, error) {
 	return p.ParseExpression()
 }
 
+// --- DuckDB-specific Operators ---
+
+var duckDBOperators = []dialect.OperatorDef{
+	{Token: TokenIlike, Precedence: spi.PrecedenceComparison},
+	{Token: TokenDcolon, Symbol: "::", Precedence: spi.PrecedencePostfix},
+	{Token: TokenDslash, Symbol: "//", Precedence: spi.PrecedenceMultiply},
+}
+
+// --- DuckDB-specific Join Types ---
+
+var duckDBJoinTypes = []dialect.JoinTypeDef{
+	{
+		Token:       TokenSemi,
+		Type:        JoinSemi,
+		RequiresOn:  true,
+		AllowsUsing: true,
+	},
+	{
+		Token:       TokenAnti,
+		Type:        JoinAnti,
+		RequiresOn:  true,
+		AllowsUsing: true,
+	},
+	{
+		Token:       TokenAsof,
+		Type:        JoinAsof,
+		RequiresOn:  true,
+		AllowsUsing: false, // ASOF requires inequality conditions
+	},
+	{
+		Token:       TokenPositional,
+		Type:        JoinPositional,
+		RequiresOn:  false, // No condition for positional join
+		AllowsUsing: false,
+	},
+}
+
 // DuckDB is the DuckDB dialect configuration.
+// Uses explicit composition - no inheritance from ANSI.
 var DuckDB = dialect.NewDialect("duckdb").
-	// Inherit from ANSI base dialect (includes || operator)
-	Extends(ansi.ANSI).
-	// DuckDB-specific configuration
+	// Static Configuration
 	Identifiers(`"`, `"`, `""`, core.NormCaseInsensitive).
 	DefaultSchema("main").
 	PlaceholderStyle(core.PlaceholderQuestion).
@@ -62,65 +122,45 @@ var DuckDB = dialect.NewDialect("duckdb").
 	AddKeyword("ANTI", TokenAnti).
 	AddKeyword("ASOF", TokenAsof).
 	AddKeyword("POSITIONAL", TokenPositional).
-	// Register DuckDB-specific operators for the lexer
-	AddOperator("::", TokenDcolon).
-	AddOperator("//", TokenDslash).
-	// Override GROUP BY handler to support GROUP BY ALL
-	ClauseHandler(token.GROUP, parseGroupByWithAll, spi.SlotGroupBy, dialect.WithKeywords("GROUP", "BY")).
-	// Override ORDER BY handler to support ORDER BY ALL
-	ClauseHandler(token.ORDER, parseOrderByWithAll, spi.SlotOrderBy, dialect.WithKeywords("ORDER", "BY")).
-	// Add QUALIFY clause after HAVING in the clause sequence with slot
-	AddClauseAfter(token.HAVING, TokenQualify, parseQualify, spi.SlotQualify).
-	// Add ILIKE operator with same precedence as LIKE
-	AddInfix(TokenIlike, spi.PrecedenceComparison).
-	// Add :: cast operator (postfix precedence)
-	AddInfix(TokenDcolon, spi.PrecedencePostfix).
-	// Add // integer division (same as regular division)
-	AddInfix(TokenDslash, spi.PrecedenceMultiply).
-	// Register DuckDB-specific join types
-	AddJoinType(TokenSemi, dialect.JoinTypeDef{
-		Type:        "SEMI",
-		RequiresOn:  true,
-		AllowsUsing: true,
-	}).
-	AddJoinType(TokenAnti, dialect.JoinTypeDef{
-		Type:        "ANTI",
-		RequiresOn:  true,
-		AllowsUsing: true,
-	}).
-	AddJoinType(TokenAsof, dialect.JoinTypeDef{
-		Type:        "ASOF",
-		RequiresOn:  true,
-		AllowsUsing: false, // ASOF requires inequality conditions
-	}).
-	AddJoinType(TokenPositional, dialect.JoinTypeDef{
-		Type:        "POSITIONAL",
-		RequiresOn:  false, // No condition for positional join
-		AllowsUsing: false,
-	}).
-	// Register DuckDB-specific star modifier keywords
 	AddKeyword("EXCLUDE", TokenExclude).
 	AddKeyword("REPLACE", TokenReplace).
 	AddKeyword("RENAME", TokenRename).
-	// Register star modifier handlers
-	AddStarModifier(TokenExclude, parseExclude).
-	AddStarModifier(TokenReplace, parseReplace).
-	AddStarModifier(TokenRename, parseRename).
-	// Register DuckDB expression extensions (Phase 3)
-	// List literals: [1, 2, 3]
-	AddPrefix(token.LBRACKET, parseListLiteral).
-	// Struct literals: {'name': 'Alice', 'age': 30}
-	AddPrefix(token.LBRACE, parseStructLiteral).
-	// Array indexing/slicing: arr[1], arr[1:3]
-	AddInfixWithHandler(token.LBRACKET, spi.PrecedencePostfix, parseIndexOrSlice).
-	// Lambda expressions: x -> x * 2
-	// Use PrecedenceOr (lowest positive precedence) to allow x -> x + y to work
-	AddInfixWithHandler(token.ARROW, spi.PrecedenceOr, parseLambdaBody).
-	// Register PIVOT/UNPIVOT keywords for the lexer
 	AddKeyword("PIVOT", TokenPivot).
 	AddKeyword("UNPIVOT", TokenUnpivot).
 	AddKeyword("FOR", TokenFor).
-	// Register PIVOT/UNPIVOT FROM item handlers
+	// Clause Sequence - EXPLICIT, no inheritance
+	// DuckDB uses standard ANSI clauses with overrides and additions
+	Clauses(
+		dialect.StandardWhere,
+		DuckDBGroupBy, // Override: GROUP BY ALL support
+		dialect.StandardHaving,
+		DuckDBQualify, // DuckDB-specific: QUALIFY
+		dialect.StandardWindow,
+		DuckDBOrderBy, // Override: ORDER BY ALL support
+		dialect.StandardLimit,
+		dialect.StandardOffset,
+		dialect.StandardFetch,
+	).
+	// Operators - compose from standard + custom
+	Operators(
+		dialect.ANSIOperators,
+		duckDBOperators,
+	).
+	// Join Types - compose from standard + custom
+	JoinTypes(
+		dialect.ANSIJoinTypes,
+		duckDBJoinTypes,
+	).
+	// Star modifiers
+	AddStarModifier(TokenExclude, parseExclude).
+	AddStarModifier(TokenReplace, parseReplace).
+	AddStarModifier(TokenRename, parseRename).
+	// Expression extensions
+	AddPrefix(token.LBRACKET, parseListLiteral).
+	AddPrefix(token.LBRACE, parseStructLiteral).
+	AddInfixWithHandler(token.LBRACKET, spi.PrecedencePostfix, parseIndexOrSlice).
+	AddInfixWithHandler(token.ARROW, spi.PrecedenceOr, parseLambdaBody).
+	// FROM extensions
 	AddFromItem(TokenPivot, parsePivot).
 	AddFromItem(TokenUnpivot, parseUnpivot).
 	// Function classifications
@@ -133,6 +173,6 @@ var DuckDB = dialect.NewDialect("duckdb").
 	WithKeywords(duckDBCompletionKeywords...).
 	WithReservedWords(duckDBAllKeywords...).
 	WithDataTypes(duckDBTypes...).
-	// DuckDB-specific lint rules
+	// Lint rules - DuckDB-specific (ANSI rules must be added explicitly now)
 	LintRulesAdd(AllRules...).
 	Build()
