@@ -1,5 +1,7 @@
 package lint
 
+import "github.com/leapstack-labs/leapsql/pkg/core"
+
 // Provider is the base interface for all lint providers.
 type Provider interface {
 	Name() string
@@ -40,40 +42,15 @@ type ProjectContext interface {
 // ModelInfo represents a model for project-level analysis.
 // This mirrors the data needed from parser.ModelConfig without importing it.
 type ModelInfo struct {
-	Path         string         // Model path (e.g., "staging.customers")
-	Name         string         // Model name (e.g., "stg_customers")
-	FilePath     string         // Absolute path to .sql file
-	Type         ModelType      // Inferred or explicit model type
-	Sources      []string       // Table references (deps)
-	Columns      []ColumnInfo   // Column-level lineage
-	Materialized string         // table, view, incremental
-	Tags         []string       // Metadata tags
-	Meta         map[string]any // Custom metadata
-}
-
-// ModelType represents the semantic type of a model.
-type ModelType string
-
-// Model type constants.
-const (
-	ModelTypeStaging      ModelType = "staging"
-	ModelTypeIntermediate ModelType = "intermediate"
-	ModelTypeMarts        ModelType = "marts"
-	ModelTypeOther        ModelType = "other"
-)
-
-// ColumnInfo represents column lineage information for project-level analysis.
-type ColumnInfo struct {
-	Name          string      // Column name
-	TransformType string      // "" (direct) or "EXPR"
-	Function      string      // Aggregate/window function name
-	Sources       []SourceRef // Where this column comes from
-}
-
-// SourceRef represents a source column reference.
-type SourceRef struct {
-	Table  string
-	Column string
+	Path         string            // Model path (e.g., "staging.customers")
+	Name         string            // Model name (e.g., "stg_customers")
+	FilePath     string            // Absolute path to .sql file
+	Type         core.ModelType    // Inferred or explicit model type
+	Sources      []string          // Table references (deps)
+	Columns      []core.ColumnInfo // Column-level lineage
+	Materialized string            // table, view, incremental
+	Tags         []string          // Metadata tags
+	Meta         map[string]any    // Custom metadata
 }
 
 // ProjectHealthConfig holds configurable thresholds for project health rules.

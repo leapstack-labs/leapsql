@@ -412,7 +412,7 @@ func buildProjectContext(eng *engine.Engine, cfg *config.Config) *project.Contex
 			Name:         m.Name,
 			FilePath:     m.FilePath,
 			Sources:      m.Sources,
-			Columns:      convertColumns(m.Columns),
+			Columns:      m.Columns, // No conversion needed - both use core.ColumnInfo
 			Materialized: m.Materialized,
 			Tags:         m.Tags,
 			Meta:         m.Meta,
@@ -440,27 +440,6 @@ func buildProjectContext(eng *engine.Engine, cfg *config.Config) *project.Contex
 	// Use NewContextWithStore to enable schema drift detection (PL05)
 	store := eng.GetStateStore()
 	return project.NewContextWithStore(models, parents, children, projectCfg, store)
-}
-
-// convertColumns converts core.ColumnInfo to lint.ColumnInfo.
-func convertColumns(cols []core.ColumnInfo) []lint.ColumnInfo {
-	result := make([]lint.ColumnInfo, len(cols))
-	for i, c := range cols {
-		sources := make([]lint.SourceRef, len(c.Sources))
-		for j, s := range c.Sources {
-			sources[j] = lint.SourceRef{
-				Table:  s.Table,
-				Column: s.Column,
-			}
-		}
-		result[i] = lint.ColumnInfo{
-			Name:          c.Name,
-			TransformType: c.TransformType,
-			Function:      c.Function,
-			Sources:       sources,
-		}
-	}
-	return result
 }
 
 // buildProjectHealthConfig creates lint.ProjectHealthConfig from CLI config.

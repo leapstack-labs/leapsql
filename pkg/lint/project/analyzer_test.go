@@ -3,6 +3,7 @@ package project
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestAnalyzer_Analyze_NoRules(t *testing.T) {
 			Path:     "staging.customers",
 			Name:     "stg_customers",
 			FilePath: "/models/staging/stg_customers.sql",
-			Type:     lint.ModelTypeStaging,
+			Type:     core.ModelTypeStaging,
 		},
 	}
 

@@ -3,6 +3,7 @@ package lineage
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	"github.com/stretchr/testify/assert"
@@ -43,20 +44,20 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: false,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
-						{Name: "name", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "name"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
+						{Name: "name", Sources: []core.SourceRef{{Table: "staging.customers", Column: "name"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						{Name: "name"},
 						{Name: "email"}, // New column, but parent doesn't use SELECT *
@@ -77,19 +78,19 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						{Name: "name"},
 					},
@@ -105,19 +106,19 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						{Name: "name"},
 					},
@@ -137,19 +138,19 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						{Name: "name"},
 						{Name: "email"}, // New column added
@@ -171,19 +172,19 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						// name column removed
 					},
@@ -204,19 +205,19 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"staging.customers"},
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
 					},
 				},
 				"staging.customers": {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
 						{Name: "id"},
 						{Name: "email"}, // Added
 						// name removed
@@ -238,11 +239,11 @@ func TestPL05_SchemaDrift(t *testing.T) {
 					Path:           "marts.report",
 					Name:           "fct_report",
 					FilePath:       "/models/marts/fct_report.sql",
-					Type:           lint.ModelTypeMarts,
+					Type:           core.ModelTypeMarts,
 					UsesSelectStar: true,
 					Sources:        []string{"external_table"}, // Not a model
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "external_table", Column: "id"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "external_table", Column: "id"}}},
 					},
 				},
 			},

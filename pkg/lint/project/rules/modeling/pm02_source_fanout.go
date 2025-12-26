@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -34,7 +35,7 @@ func checkSourceFanout(ctx *project.Context) []project.Diagnostic {
 
 	for _, model := range ctx.Models() {
 		// Only look at non-staging models
-		if model.Type == lint.ModelTypeStaging {
+		if model.Type == core.ModelTypeStaging {
 			continue
 		}
 

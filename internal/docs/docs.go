@@ -285,7 +285,7 @@ func convertColumns(columns []core.ColumnInfo) []ColumnDoc {
 		result = append(result, ColumnDoc{
 			Name:          col.Name,
 			Index:         col.Index,
-			TransformType: col.TransformType,
+			TransformType: string(col.TransformType),
 			Function:      col.Function,
 			Sources:       sources,
 		})

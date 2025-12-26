@@ -3,6 +3,7 @@ package modeling
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -30,7 +31,7 @@ func checkRootModels(ctx *project.Context) []project.Diagnostic {
 	for _, model := range ctx.Models() {
 		// Skip staging models - they're expected to reference external sources
 		// which may not be in our model list
-		if model.Type == lint.ModelTypeStaging {
+		if model.Type == core.ModelTypeStaging {
 			continue
 		}
 

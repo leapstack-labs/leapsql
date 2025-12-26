@@ -39,7 +39,7 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []core.ColumnIn
 			ModelPath:     modelPath,
 			ColumnName:    col.Name,
 			ColumnIndex:   int64(col.Index),
-			TransformType: nullableString(col.TransformType),
+			TransformType: nullableString(string(col.TransformType)),
 			FunctionName:  nullableString(col.Function),
 		}); err != nil {
 			return fmt.Errorf("failed to insert column %s: %w", col.Name, err)
@@ -84,7 +84,7 @@ func (s *SQLiteStore) GetModelColumns(modelPath string) ([]core.ColumnInfo, erro
 		col := core.ColumnInfo{
 			Name:          row.ColumnName,
 			Index:         int(row.ColumnIndex),
-			TransformType: derefString(row.TransformType),
+			TransformType: core.TransformType(derefString(row.TransformType)),
 			Function:      derefString(row.FunctionName),
 		}
 		columnsIdxMap[col.Name] = len(columns)

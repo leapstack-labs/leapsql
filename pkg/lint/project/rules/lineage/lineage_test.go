@@ -3,6 +3,7 @@ package lineage
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func TestPL01_PassthroughBloat(t *testing.T) {
 					Path:     "marts.users",
 					Name:     "dim_users",
 					FilePath: "/models/marts/dim_users.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Columns:  makePassthroughColumns(25),
 				},
 			},
@@ -36,7 +37,7 @@ func TestPL01_PassthroughBloat(t *testing.T) {
 					Path:     "marts.users",
 					Name:     "dim_users",
 					FilePath: "/models/marts/dim_users.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Columns:  makePassthroughColumns(10),
 				},
 			},
@@ -50,7 +51,7 @@ func TestPL01_PassthroughBloat(t *testing.T) {
 					Path:     "marts.users",
 					Name:     "dim_users",
 					FilePath: "/models/marts/dim_users.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Columns:  makeTransformedColumns(25),
 				},
 			},
@@ -64,7 +65,7 @@ func TestPL01_PassthroughBloat(t *testing.T) {
 					Path:     "marts.users",
 					Name:     "dim_users",
 					FilePath: "/models/marts/dim_users.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Columns:  nil,
 				},
 			},
@@ -86,14 +87,14 @@ func TestPL01_PassthroughBloat(t *testing.T) {
 }
 
 // makePassthroughColumns creates n passthrough columns (direct, no transformation).
-func makePassthroughColumns(n int) []lint.ColumnInfo {
-	cols := make([]lint.ColumnInfo, n)
+func makePassthroughColumns(n int) []core.ColumnInfo {
+	cols := make([]core.ColumnInfo, n)
 	for i := 0; i < n; i++ {
-		cols[i] = lint.ColumnInfo{
+		cols[i] = core.ColumnInfo{
 			Name:          "col_" + string(rune('a'+i%26)),
 			TransformType: "", // Direct passthrough
 			Function:      "",
-			Sources: []lint.SourceRef{{
+			Sources: []core.SourceRef{{
 				Table:  "source_table",
 				Column: "col_" + string(rune('a'+i%26)),
 			}},
@@ -103,14 +104,14 @@ func makePassthroughColumns(n int) []lint.ColumnInfo {
 }
 
 // makeTransformedColumns creates n columns with transformations.
-func makeTransformedColumns(n int) []lint.ColumnInfo {
-	cols := make([]lint.ColumnInfo, n)
+func makeTransformedColumns(n int) []core.ColumnInfo {
+	cols := make([]core.ColumnInfo, n)
 	for i := 0; i < n; i++ {
-		cols[i] = lint.ColumnInfo{
+		cols[i] = core.ColumnInfo{
 			Name:          "col_" + string(rune('a'+i%26)),
 			TransformType: "EXPR",
 			Function:      "sum",
-			Sources: []lint.SourceRef{{
+			Sources: []core.SourceRef{{
 				Table:  "source_table",
 				Column: "col_" + string(rune('a'+i%26)),
 			}},
@@ -133,22 +134,22 @@ func TestPL02_OrphanedColumns(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "raw", Column: "id"}}},
-						{Name: "name", Sources: []lint.SourceRef{{Table: "raw", Column: "name"}}},
-						{Name: "unused_col", Sources: []lint.SourceRef{{Table: "raw", Column: "unused"}}},
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "raw", Column: "id"}}},
+						{Name: "name", Sources: []core.SourceRef{{Table: "raw", Column: "name"}}},
+						{Name: "unused_col", Sources: []core.SourceRef{{Table: "raw", Column: "unused"}}},
 					},
 				},
 				"marts.customers": {
 					Path:     "marts.customers",
 					Name:     "dim_customers",
 					FilePath: "/models/marts/dim_customers.sql",
-					Type:     lint.ModelTypeMarts,
-					Columns: []lint.ColumnInfo{
+					Type:     core.ModelTypeMarts,
+					Columns: []core.ColumnInfo{
 						// Only uses id and name from staging.customers, not unused_col
-						{Name: "customer_id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
-						{Name: "customer_name", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "name"}}},
+						{Name: "customer_id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
+						{Name: "customer_name", Sources: []core.SourceRef{{Table: "staging.customers", Column: "name"}}},
 					},
 				},
 			},
@@ -164,9 +165,9 @@ func TestPL02_OrphanedColumns(t *testing.T) {
 					Path:     "marts.customers",
 					Name:     "dim_customers",
 					FilePath: "/models/marts/dim_customers.sql",
-					Type:     lint.ModelTypeMarts,
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "staging", Column: "id"}}},
+					Type:     core.ModelTypeMarts,
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "staging", Column: "id"}}},
 					},
 				},
 			},
@@ -180,20 +181,20 @@ func TestPL02_OrphanedColumns(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
-					Columns: []lint.ColumnInfo{
-						{Name: "id", Sources: []lint.SourceRef{{Table: "raw", Column: "id"}}},
-						{Name: "name", Sources: []lint.SourceRef{{Table: "raw", Column: "name"}}},
+					Type:     core.ModelTypeStaging,
+					Columns: []core.ColumnInfo{
+						{Name: "id", Sources: []core.SourceRef{{Table: "raw", Column: "id"}}},
+						{Name: "name", Sources: []core.SourceRef{{Table: "raw", Column: "name"}}},
 					},
 				},
 				"marts.customers": {
 					Path:     "marts.customers",
 					Name:     "dim_customers",
 					FilePath: "/models/marts/dim_customers.sql",
-					Type:     lint.ModelTypeMarts,
-					Columns: []lint.ColumnInfo{
-						{Name: "customer_id", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "id"}}},
-						{Name: "customer_name", Sources: []lint.SourceRef{{Table: "staging.customers", Column: "name"}}},
+					Type:     core.ModelTypeMarts,
+					Columns: []core.ColumnInfo{
+						{Name: "customer_id", Sources: []core.SourceRef{{Table: "staging.customers", Column: "id"}}},
+						{Name: "customer_name", Sources: []core.SourceRef{{Table: "staging.customers", Column: "name"}}},
 					},
 				},
 			},
@@ -209,7 +210,7 @@ func TestPL02_OrphanedColumns(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
+					Type:     core.ModelTypeStaging,
 					Columns:  nil,
 				},
 			},
@@ -246,13 +247,13 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 					Path:     "marts.report",
 					Name:     "fct_report",
 					FilePath: "/models/marts/fct_report.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Sources:  []string{"table_a", "table_b"},
-					Columns: []lint.ColumnInfo{
+					Columns: []core.ColumnInfo{
 						// Column from table_a only
-						{Name: "col_a", Sources: []lint.SourceRef{{Table: "table_a", Column: "a"}}},
+						{Name: "col_a", Sources: []core.SourceRef{{Table: "table_a", Column: "a"}}},
 						// Column from table_b only - no bridging column!
-						{Name: "col_b", Sources: []lint.SourceRef{{Table: "table_b", Column: "b"}}},
+						{Name: "col_b", Sources: []core.SourceRef{{Table: "table_b", Column: "b"}}},
 					},
 				},
 			},
@@ -265,13 +266,13 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 					Path:     "marts.report",
 					Name:     "fct_report",
 					FilePath: "/models/marts/fct_report.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Sources:  []string{"table_a", "table_b"},
-					Columns: []lint.ColumnInfo{
-						{Name: "col_a", Sources: []lint.SourceRef{{Table: "table_a", Column: "a"}}},
-						{Name: "col_b", Sources: []lint.SourceRef{{Table: "table_b", Column: "b"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "col_a", Sources: []core.SourceRef{{Table: "table_a", Column: "a"}}},
+						{Name: "col_b", Sources: []core.SourceRef{{Table: "table_b", Column: "b"}}},
 						// Bridging column that references both tables
-						{Name: "joined_key", Sources: []lint.SourceRef{
+						{Name: "joined_key", Sources: []core.SourceRef{
 							{Table: "table_a", Column: "key"},
 							{Table: "table_b", Column: "key"},
 						}},
@@ -287,10 +288,10 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 					Path:     "marts.simple",
 					Name:     "simple_model",
 					FilePath: "/models/marts/simple.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Sources:  []string{"table_a"},
-					Columns: []lint.ColumnInfo{
-						{Name: "col_a", Sources: []lint.SourceRef{{Table: "table_a", Column: "a"}}},
+					Columns: []core.ColumnInfo{
+						{Name: "col_a", Sources: []core.SourceRef{{Table: "table_a", Column: "a"}}},
 					},
 				},
 			},
@@ -303,7 +304,7 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 					Path:     "marts.empty",
 					Name:     "empty_model",
 					FilePath: "/models/marts/empty.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Sources:  []string{"table_a", "table_b"},
 					Columns:  nil,
 				},
@@ -317,16 +318,16 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 					Path:     "marts.complex",
 					Name:     "complex_model",
 					FilePath: "/models/marts/complex.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 					Sources:  []string{"table_a", "table_b", "table_c"},
-					Columns: []lint.ColumnInfo{
+					Columns: []core.ColumnInfo{
 						// Bridges A and B
-						{Name: "ab_key", Sources: []lint.SourceRef{
+						{Name: "ab_key", Sources: []core.SourceRef{
 							{Table: "table_a", Column: "key"},
 							{Table: "table_b", Column: "key"},
 						}},
 						// C is not bridged to A or B
-						{Name: "col_c", Sources: []lint.SourceRef{{Table: "table_c", Column: "c"}}},
+						{Name: "col_c", Sources: []core.SourceRef{{Table: "table_c", Column: "c"}}},
 					},
 				},
 			},
@@ -348,11 +349,11 @@ func TestPL04_ImplicitCrossJoin(t *testing.T) {
 }
 
 func TestGetSourceTablesFromColumns(t *testing.T) {
-	cols := []lint.ColumnInfo{
-		{Name: "a", Sources: []lint.SourceRef{{Table: "t1", Column: "a"}}},
-		{Name: "b", Sources: []lint.SourceRef{{Table: "t2", Column: "b"}}},
-		{Name: "c", Sources: []lint.SourceRef{{Table: "t1", Column: "c"}}}, // duplicate table
-		{Name: "d", Sources: []lint.SourceRef{{Table: "", Column: "d"}}},   // empty table
+	cols := []core.ColumnInfo{
+		{Name: "a", Sources: []core.SourceRef{{Table: "t1", Column: "a"}}},
+		{Name: "b", Sources: []core.SourceRef{{Table: "t2", Column: "b"}}},
+		{Name: "c", Sources: []core.SourceRef{{Table: "t1", Column: "c"}}}, // duplicate table
+		{Name: "d", Sources: []core.SourceRef{{Table: "", Column: "d"}}},   // empty table
 	}
 
 	tables := getSourceTablesFromColumns(cols)
@@ -364,15 +365,15 @@ func TestGetSourceTablesFromColumns(t *testing.T) {
 func TestFindUnbridgedSourcePairs(t *testing.T) {
 	tests := []struct {
 		name     string
-		columns  []lint.ColumnInfo
+		columns  []core.ColumnInfo
 		sources  []string
 		wantLen  int
 		wantPair [][2]string
 	}{
 		{
 			name: "all pairs bridged",
-			columns: []lint.ColumnInfo{
-				{Name: "key", Sources: []lint.SourceRef{
+			columns: []core.ColumnInfo{
+				{Name: "key", Sources: []core.SourceRef{
 					{Table: "a", Column: "id"},
 					{Table: "b", Column: "id"},
 				}},
@@ -383,9 +384,9 @@ func TestFindUnbridgedSourcePairs(t *testing.T) {
 		},
 		{
 			name: "no bridging columns",
-			columns: []lint.ColumnInfo{
-				{Name: "col_a", Sources: []lint.SourceRef{{Table: "a", Column: "x"}}},
-				{Name: "col_b", Sources: []lint.SourceRef{{Table: "b", Column: "y"}}},
+			columns: []core.ColumnInfo{
+				{Name: "col_a", Sources: []core.SourceRef{{Table: "a", Column: "x"}}},
+				{Name: "col_b", Sources: []core.SourceRef{{Table: "b", Column: "y"}}},
 			},
 			sources:  []string{"a", "b"},
 			wantLen:  1,
@@ -393,12 +394,12 @@ func TestFindUnbridgedSourcePairs(t *testing.T) {
 		},
 		{
 			name: "three sources with one bridged pair",
-			columns: []lint.ColumnInfo{
-				{Name: "ab_key", Sources: []lint.SourceRef{
+			columns: []core.ColumnInfo{
+				{Name: "ab_key", Sources: []core.SourceRef{
 					{Table: "a", Column: "id"},
 					{Table: "b", Column: "id"},
 				}},
-				{Name: "col_c", Sources: []lint.SourceRef{{Table: "c", Column: "z"}}},
+				{Name: "col_c", Sources: []core.SourceRef{{Table: "c", Column: "z"}}},
 			},
 			sources: []string{"a", "b", "c"},
 			wantLen: 2, // (a,c) and (b,c) are unbridged

@@ -3,6 +3,7 @@ package modeling
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -35,7 +36,7 @@ func checkDownstreamOnSource(ctx *project.Context) []project.Diagnostic {
 
 	for _, model := range ctx.Models() {
 		// Only check marts and intermediate models
-		if model.Type != lint.ModelTypeMarts && model.Type != lint.ModelTypeIntermediate {
+		if model.Type != core.ModelTypeMarts && model.Type != core.ModelTypeIntermediate {
 			continue
 		}
 

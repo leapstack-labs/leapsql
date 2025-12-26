@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -74,7 +75,7 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 
 			if !isFact && !isDim && !isInt {
 				// Only warn if the model type is marts (inferred)
-				if model.Type == lint.ModelTypeMarts {
+				if model.Type == core.ModelTypeMarts {
 					diagnostics = append(diagnostics, project.Diagnostic{
 						RuleID:           "PS01",
 						Severity:         lint.SeverityWarning,

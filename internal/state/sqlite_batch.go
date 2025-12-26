@@ -29,7 +29,7 @@ func (s *SQLiteStore) BatchGetAllColumns() (map[string][]core.ColumnInfo, error)
 		col := core.ColumnInfo{
 			Name:          row.ColumnName,
 			Index:         int(row.ColumnIndex),
-			TransformType: derefString(row.TransformType),
+			TransformType: core.TransformType(derefString(row.TransformType)),
 			Function:      derefString(row.FunctionName),
 		}
 

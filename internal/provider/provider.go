@@ -182,44 +182,12 @@ func (p *Provider) buildProjectContext() *project.Context {
 	// Process each model
 	for _, m := range storeModels {
 		// Get columns from batch result or fallback to individual query
-		var columns []lint.ColumnInfo
+		var columns []core.ColumnInfo
 		if allColumns != nil {
-			cols := allColumns[m.Path]
-			columns = make([]lint.ColumnInfo, len(cols))
-			for i, c := range cols {
-				sources := make([]lint.SourceRef, len(c.Sources))
-				for j, src := range c.Sources {
-					sources[j] = lint.SourceRef{
-						Table:  src.Table,
-						Column: src.Column,
-					}
-				}
-				columns[i] = lint.ColumnInfo{
-					Name:          c.Name,
-					TransformType: c.TransformType,
-					Function:      c.Function,
-					Sources:       sources,
-				}
-			}
+			columns = allColumns[m.Path]
 		} else {
 			// Fallback to individual query
-			cols, _ := p.store.GetModelColumns(m.Path)
-			columns = make([]lint.ColumnInfo, len(cols))
-			for i, c := range cols {
-				sources := make([]lint.SourceRef, len(c.Sources))
-				for j, src := range c.Sources {
-					sources[j] = lint.SourceRef{
-						Table:  src.Table,
-						Column: src.Column,
-					}
-				}
-				columns[i] = lint.ColumnInfo{
-					Name:          c.Name,
-					TransformType: c.TransformType,
-					Function:      c.Function,
-					Sources:       sources,
-				}
-			}
+			columns, _ = p.store.GetModelColumns(m.Path)
 		}
 
 		// Get dependencies from batch result (convert IDs to paths)

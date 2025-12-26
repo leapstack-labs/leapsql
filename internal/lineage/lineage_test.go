@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 
@@ -36,7 +37,7 @@ func contains(slice []string, item string) bool {
 // colSpec defines expected column properties for table-driven tests
 type colSpec struct {
 	name      string
-	transform TransformType
+	transform core.TransformType
 	function  string // expected function name (empty = don't check)
 	srcCount  *int   // expected source count (nil = don't check)
 	srcTable  string // expected first source table (empty = don't check)
@@ -121,9 +122,9 @@ func TestExtractLineage_BasicSelects(t *testing.T) {
 			sql:     `SELECT id, name, email FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "email", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "email", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -131,8 +132,8 @@ func TestExtractLineage_BasicSelects(t *testing.T) {
 			sql:     `SELECT u.id, u.name FROM users u`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect, srcTable: "users"},
-				{name: "name", transform: TransformDirect, srcTable: "users"},
+				{name: "id", transform: core.TransformDirect, srcTable: "users"},
+				{name: "name", transform: core.TransformDirect, srcTable: "users"},
 			},
 		},
 		{
@@ -140,15 +141,15 @@ func TestExtractLineage_BasicSelects(t *testing.T) {
 			sql:     `SELECT id, name FROM public.users`,
 			sources: []string{"public.users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
 			name:    "catalog.schema.table",
 			sql:     `SELECT id FROM mydb.myschema.users`,
 			sources: []string{"mydb.myschema.users"},
-			cols:    []colSpec{{name: "id", transform: TransformDirect}},
+			cols:    []colSpec{{name: "id", transform: core.TransformDirect}},
 		},
 	})
 }
@@ -159,33 +160,33 @@ func TestExtractLineage_Expressions(t *testing.T) {
 			name:    "binary expression",
 			sql:     `SELECT price * quantity AS total FROM order_items`,
 			sources: []string{"order_items"},
-			cols:    []colSpec{{name: "total", transform: TransformExpression, srcCount: srcN(2)}},
+			cols:    []colSpec{{name: "total", transform: core.TransformExpression, srcCount: srcN(2)}},
 		},
 		{
 			name:    "scalar function UPPER",
 			sql:     `SELECT UPPER(name) AS upper_name FROM users`,
 			sources: []string{"users"},
-			cols:    []colSpec{{name: "upper_name", transform: TransformDirect}},
+			cols:    []colSpec{{name: "upper_name", transform: core.TransformDirect}},
 		},
 		{
 			name:    "COALESCE multiple cols",
 			sql:     `SELECT COALESCE(nickname, name) AS display_name FROM users`,
 			sources: []string{"users"},
-			cols:    []colSpec{{name: "display_name", transform: TransformExpression, srcCount: srcN(2)}},
+			cols:    []colSpec{{name: "display_name", transform: core.TransformExpression, srcCount: srcN(2)}},
 		},
 		{
 			name:    "CAST expression",
 			sql:     `SELECT CAST(id AS VARCHAR) AS id_str FROM users`,
 			sources: []string{"users"},
-			cols:    []colSpec{{name: "id_str", transform: TransformExpression}},
+			cols:    []colSpec{{name: "id_str", transform: core.TransformExpression}},
 		},
 		{
 			name:    "CASE expression",
 			sql:     `SELECT id, CASE WHEN status = 'active' THEN 'Active' ELSE 'Unknown' END AS status_label FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "status_label", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "status_label", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -193,9 +194,9 @@ func TestExtractLineage_Expressions(t *testing.T) {
 			sql:     `SELECT id, 'constant' AS label, 42 AS magic_number FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "label", transform: TransformExpression, srcCount: srcN(0)},
-				{name: "magic_number", transform: TransformExpression, srcCount: srcN(0)},
+				{name: "id", transform: core.TransformDirect},
+				{name: "label", transform: core.TransformExpression, srcCount: srcN(0)},
+				{name: "magic_number", transform: core.TransformExpression, srcCount: srcN(0)},
 			},
 		},
 		{
@@ -203,9 +204,9 @@ func TestExtractLineage_Expressions(t *testing.T) {
 			sql:     `SELECT id, NOW() AS current_time, RANDOM() AS rand_val FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "current_time", transform: TransformExpression, srcCount: srcN(0)},
-				{name: "rand_val", transform: TransformExpression, srcCount: srcN(0)},
+				{name: "id", transform: core.TransformDirect},
+				{name: "current_time", transform: core.TransformExpression, srcCount: srcN(0)},
+				{name: "rand_val", transform: core.TransformExpression, srcCount: srcN(0)},
 			},
 		},
 	})
@@ -218,8 +219,8 @@ func TestExtractLineage_Aggregates(t *testing.T) {
 			sql:     `SELECT customer_id, COUNT(*) AS order_count FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "order_count", transform: TransformExpression, function: "count"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "order_count", transform: core.TransformExpression, function: "count"},
 			},
 		},
 		{
@@ -227,8 +228,8 @@ func TestExtractLineage_Aggregates(t *testing.T) {
 			sql:     `SELECT customer_id, SUM(amount) AS total_amount FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "total_amount", transform: TransformExpression, function: "sum"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "total_amount", transform: core.TransformExpression, function: "sum"},
 			},
 		},
 		{
@@ -236,8 +237,8 @@ func TestExtractLineage_Aggregates(t *testing.T) {
 			sql:     `SELECT product_id, AVG(price) AS avg_price FROM products GROUP BY product_id`,
 			sources: []string{"products"},
 			cols: []colSpec{
-				{name: "product_id", transform: TransformDirect},
-				{name: "avg_price", transform: TransformExpression, function: "avg"},
+				{name: "product_id", transform: core.TransformDirect},
+				{name: "avg_price", transform: core.TransformExpression, function: "avg"},
 			},
 		},
 	})
@@ -251,9 +252,9 @@ func TestExtractLineage_WindowFunctions(t *testing.T) {
 			      FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "running_total", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "running_total", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -261,8 +262,8 @@ func TestExtractLineage_WindowFunctions(t *testing.T) {
 			sql:     `SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) AS row_num FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "row_num", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "row_num", transform: core.TransformExpression},
 			},
 		},
 	})
@@ -275,7 +276,7 @@ func TestExtractLineage_TableFunctions(t *testing.T) {
 			sql:     `SELECT i FROM generate_series(1, 10) AS t(i)`,
 			sources: []string{}, // table function is the source, not a table
 			cols: []colSpec{
-				{name: "i", transform: TransformDirect},
+				{name: "i", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -283,7 +284,7 @@ func TestExtractLineage_TableFunctions(t *testing.T) {
 			sql:     `SELECT generate_series(1, 10) AS series_val`,
 			sources: []string{},
 			cols: []colSpec{
-				{name: "series_val", transform: TransformExpression, function: "generate_series", srcCount: srcN(0)},
+				{name: "series_val", transform: core.TransformExpression, function: "generate_series", srcCount: srcN(0)},
 			},
 		},
 	})
@@ -299,8 +300,8 @@ func TestExtractLineage_CTEs(t *testing.T) {
 			SELECT id, name FROM active_users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -313,8 +314,8 @@ func TestExtractLineage_CTEs(t *testing.T) {
 			JOIN orders_summary o ON c.id = o.customer_id`,
 			sources: []string{"users", "orders"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect},
-				{name: "total", transform: TransformDirect}, // Direct from CTE column
+				{name: "name", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformDirect}, // Direct from CTE column
 			},
 		},
 		{
@@ -327,8 +328,8 @@ func TestExtractLineage_CTEs(t *testing.T) {
 			SELECT day, total FROM daily_totals`,
 			sources: []string{"transactions"},
 			cols: []colSpec{
-				{name: "day", transform: TransformDirect},   // Direct from CTE column
-				{name: "total", transform: TransformDirect}, // Direct from CTE column
+				{name: "day", transform: core.TransformDirect},   // Direct from CTE column
+				{name: "total", transform: core.TransformDirect}, // Direct from CTE column
 			},
 		},
 	})
@@ -343,8 +344,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      INNER JOIN orders o ON u.id = o.user_id`,
 			sources: []string{"users", "orders"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect, srcTable: "users"},
-				{name: "amount", transform: TransformDirect, srcTable: "orders"},
+				{name: "name", transform: core.TransformDirect, srcTable: "users"},
+				{name: "amount", transform: core.TransformDirect, srcTable: "orders"},
 			},
 		},
 		{
@@ -355,8 +356,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      GROUP BY c.name`,
 			sources: []string{"customers", "orders"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect},
-				{name: "total_orders", transform: TransformDirect}, // COALESCE returns direct when single source
+				{name: "name", transform: core.TransformDirect},
+				{name: "total_orders", transform: core.TransformDirect}, // COALESCE returns direct when single source
 			},
 		},
 		{
@@ -368,9 +369,9 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      JOIN products p ON oi.product_id = p.id`,
 			sources: []string{"customers", "orders", "order_items", "products"},
 			cols: []colSpec{
-				{name: "customer_name", transform: TransformDirect},
-				{name: "product_name", transform: TransformDirect},
-				{name: "quantity", transform: TransformDirect},
+				{name: "customer_name", transform: core.TransformDirect},
+				{name: "product_name", transform: core.TransformDirect},
+				{name: "quantity", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -380,9 +381,9 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      RIGHT JOIN users u ON o.user_id = u.id`,
 			sources: []string{"orders", "users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect, srcTable: "orders"},
-				{name: "amount", transform: TransformDirect, srcTable: "orders"},
-				{name: "name", transform: TransformDirect, srcTable: "users"},
+				{name: "id", transform: core.TransformDirect, srcTable: "orders"},
+				{name: "amount", transform: core.TransformDirect, srcTable: "orders"},
+				{name: "name", transform: core.TransformDirect, srcTable: "users"},
 			},
 		},
 		{
@@ -392,8 +393,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      FULL OUTER JOIN suppliers s ON c.region = s.region`,
 			sources: []string{"customers", "suppliers"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect, srcTable: "customers"},
-				{name: "supplier_name", transform: TransformDirect, srcTable: "suppliers"},
+				{name: "name", transform: core.TransformDirect, srcTable: "customers"},
+				{name: "supplier_name", transform: core.TransformDirect, srcTable: "suppliers"},
 			},
 		},
 		{
@@ -403,8 +404,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      CROSS JOIN colors c`,
 			sources: []string{"products", "colors"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect, srcTable: "products"},
-				{name: "color", transform: TransformDirect, srcTable: "colors"},
+				{name: "name", transform: core.TransformDirect, srcTable: "products"},
+				{name: "color", transform: core.TransformDirect, srcTable: "colors"},
 			},
 		},
 		{
@@ -413,8 +414,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      FROM table_a a, table_b b`,
 			sources: []string{"table_a", "table_b"},
 			cols: []colSpec{
-				{name: "x", transform: TransformDirect, srcTable: "table_a"},
-				{name: "y", transform: TransformDirect, srcTable: "table_b"},
+				{name: "x", transform: core.TransformDirect, srcTable: "table_a"},
+				{name: "y", transform: core.TransformDirect, srcTable: "table_b"},
 			},
 		},
 		{
@@ -426,8 +427,8 @@ func TestExtractLineage_Joins(t *testing.T) {
 			      ) recent ON true`,
 			sources: []string{"users", "orders"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect, srcTable: "users"},
-				{name: "amount", transform: TransformDirect},
+				{name: "name", transform: core.TransformDirect, srcTable: "users"},
+				{name: "amount", transform: core.TransformDirect},
 			},
 		},
 	})
@@ -442,8 +443,8 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      SELECT id, name FROM suppliers`,
 			sources: []string{"customers", "suppliers"},
 			cols: []colSpec{
-				{name: "id", transform: TransformExpression},
-				{name: "name", transform: TransformExpression},
+				{name: "id", transform: core.TransformExpression},
+				{name: "name", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -453,8 +454,8 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      SELECT id, email FROM archived_users`,
 			sources: []string{"users", "archived_users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformExpression},
-				{name: "email", transform: TransformExpression},
+				{name: "id", transform: core.TransformExpression},
+				{name: "email", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -463,7 +464,7 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      EXCEPT
 			      SELECT id FROM blocked_users`,
 			sources: []string{"all_users", "blocked_users"},
-			cols:    []colSpec{{name: "id", transform: TransformExpression}},
+			cols:    []colSpec{{name: "id", transform: core.TransformExpression}},
 		},
 		{
 			name: "INTERSECT",
@@ -471,7 +472,7 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      INTERSECT
 			      SELECT customer_id FROM returns`,
 			sources: []string{"orders", "returns"},
-			cols:    []colSpec{{name: "customer_id", transform: TransformExpression}},
+			cols:    []colSpec{{name: "customer_id", transform: core.TransformExpression}},
 		},
 		{
 			name: "chained UNION",
@@ -482,8 +483,8 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      SELECT id, name FROM partners`,
 			sources: []string{"customers", "suppliers", "partners"},
 			cols: []colSpec{
-				{name: "id", transform: TransformExpression},
-				{name: "name", transform: TransformExpression},
+				{name: "id", transform: core.TransformExpression},
+				{name: "name", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -492,7 +493,7 @@ func TestExtractLineage_SetOperations(t *testing.T) {
 			      UNION
 			      SELECT customer_id AS id FROM returns`,
 			sources: []string{"orders", "returns"},
-			cols:    []colSpec{{name: "id", transform: TransformExpression}},
+			cols:    []colSpec{{name: "id", transform: core.TransformExpression}},
 		},
 	})
 }
@@ -504,8 +505,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE status IN ('active', 'pending')`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -514,8 +515,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			      WHERE id IN (SELECT user_id FROM orders WHERE amount > 100)`,
 			sources: []string{"users"}, // Subqueries in WHERE don't add to lineage sources
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -523,8 +524,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE id NOT IN (1, 2, 3)`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -532,8 +533,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, amount FROM orders WHERE amount BETWEEN 100 AND 500`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -541,8 +542,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, created_at FROM orders WHERE created_at NOT BETWEEN '2024-01-01' AND '2024-12-31'`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "created_at", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "created_at", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -550,8 +551,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, email FROM users WHERE email LIKE '%@gmail.com'`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "email", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "email", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -559,8 +560,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE name ILIKE '%john%'`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -568,8 +569,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE deleted_at IS NULL`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -577,8 +578,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE email IS NOT NULL`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -587,8 +588,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			      WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)`,
 			sources: []string{"users"}, // Subqueries in WHERE don't add to lineage sources
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -597,8 +598,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			      WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)`,
 			sources: []string{"users"}, // Subqueries in WHERE don't add to lineage sources
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -606,8 +607,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, name FROM users WHERE (status = 'active' AND role = 'admin') OR (status = 'pending' AND created_at > '2024-01-01')`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -615,8 +616,8 @@ func TestExtractLineage_WhereExpressions(t *testing.T) {
 			sql:     `SELECT id, amount FROM orders WHERE amount >= 100 AND amount < 1000 AND status != 'cancelled'`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
 			},
 		},
 	})
@@ -628,7 +629,7 @@ func TestExtractLineage_StarExpansion(t *testing.T) {
 			name:    "star without schema",
 			sql:     `SELECT * FROM users`,
 			sources: []string{"users"},
-			cols:    []colSpec{{name: "*", transform: TransformDirect}},
+			cols:    []colSpec{{name: "*", transform: core.TransformDirect}},
 		},
 		{
 			name:    "star with schema",
@@ -636,10 +637,10 @@ func TestExtractLineage_StarExpansion(t *testing.T) {
 			schema:  parser.Schema{"users": {"id", "name", "email", "created_at"}},
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "email", transform: TransformDirect},
-				{name: "created_at", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "email", transform: core.TransformDirect},
+				{name: "created_at", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -651,9 +652,9 @@ func TestExtractLineage_StarExpansion(t *testing.T) {
 			},
 			sources: []string{"users", "orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
 			},
 		},
 	})
@@ -665,15 +666,15 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			name:    "DISTINCT",
 			sql:     `SELECT DISTINCT status FROM orders`,
 			sources: []string{"orders"},
-			cols:    []colSpec{{name: "status", transform: TransformDirect}},
+			cols:    []colSpec{{name: "status", transform: core.TransformDirect}},
 		},
 		{
 			name:    "DISTINCT multiple columns",
 			sql:     `SELECT DISTINCT customer_id, status FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "status", transform: TransformDirect},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "status", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -681,8 +682,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, name FROM users ORDER BY name ASC`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -690,8 +691,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, created_at FROM orders ORDER BY created_at DESC`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "created_at", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "created_at", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -699,8 +700,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, email FROM users ORDER BY email ASC NULLS FIRST`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "email", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "email", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -708,8 +709,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, deleted_at FROM users ORDER BY deleted_at DESC NULLS LAST`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "deleted_at", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "deleted_at", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -717,9 +718,9 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, name, created_at FROM users ORDER BY name ASC, created_at DESC`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "created_at", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "created_at", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -727,8 +728,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, name FROM users LIMIT 10`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -736,8 +737,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, name FROM users LIMIT 10 OFFSET 20`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -745,8 +746,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT DATE(created_at) AS day, COUNT(*) AS cnt FROM orders GROUP BY DATE(created_at)`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "day", transform: TransformDirect}, // Single-arg function is direct transform
-				{name: "cnt", transform: TransformExpression, function: "count"},
+				{name: "day", transform: core.TransformDirect}, // Single-arg function is direct transform
+				{name: "cnt", transform: core.TransformExpression, function: "count"},
 			},
 		},
 		{
@@ -754,8 +755,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT customer_id, SUM(amount) AS total FROM orders GROUP BY customer_id HAVING SUM(amount) > 1000`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "total", transform: TransformExpression, function: "sum"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformExpression, function: "sum"},
 			},
 		},
 		{
@@ -763,9 +764,9 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT id, name, ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn FROM employees QUALIFY rn = 1`,
 			sources: []string{"employees"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "rn", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "rn", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -773,8 +774,8 @@ func TestExtractLineage_SelectModifiers(t *testing.T) {
 			sql:     `SELECT DISTINCT customer_id, SUM(amount) AS total FROM orders WHERE status = 'completed' GROUP BY customer_id HAVING SUM(amount) > 100 ORDER BY total DESC LIMIT 10`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "total", transform: TransformExpression, function: "sum"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformExpression, function: "sum"},
 			},
 		},
 	})
@@ -792,8 +793,8 @@ func TestExtractLineage_DerivedTables(t *testing.T) {
 			      ) sub`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "total", transform: TransformDirect}, // Direct from subquery column
+				{name: "id", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformDirect}, // Direct from subquery column
 			},
 		},
 		{
@@ -810,8 +811,8 @@ func TestExtractLineage_DerivedTables(t *testing.T) {
 			      ) final`,
 			sources: []string{"users", "orders"},
 			cols: []colSpec{
-				{name: "name", transform: TransformDirect},
-				{name: "order_count", transform: TransformDirect}, // Direct from subquery column
+				{name: "name", transform: core.TransformDirect},
+				{name: "order_count", transform: core.TransformDirect}, // Direct from subquery column
 			},
 		},
 	})
@@ -854,11 +855,11 @@ func TestExtractLineage_ComplexQuery(t *testing.T) {
 			sql:     sql,
 			sources: []string{"orders", "order_items", "products", "categories"},
 			cols: []colSpec{
-				{name: "category_name", transform: TransformDirect},
-				{name: "month", transform: TransformDirect},              // Direct from CTE
-				{name: "revenue", transform: TransformDirect},            // Direct from CTE
-				{name: "cumulative_revenue", transform: TransformDirect}, // Direct from CTE
-				{name: "growth_pct", transform: TransformExpression},
+				{name: "category_name", transform: core.TransformDirect},
+				{name: "month", transform: core.TransformDirect},              // Direct from CTE
+				{name: "revenue", transform: core.TransformDirect},            // Direct from CTE
+				{name: "cumulative_revenue", transform: core.TransformDirect}, // Direct from CTE
+				{name: "growth_pct", transform: core.TransformExpression},
 			},
 		},
 	})
@@ -871,8 +872,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, MIN(amount) AS min_amount FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "min_amount", transform: TransformExpression, function: "min"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "min_amount", transform: core.TransformExpression, function: "min"},
 			},
 		},
 		{
@@ -880,8 +881,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, MAX(amount) AS max_amount FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "max_amount", transform: TransformExpression, function: "max"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "max_amount", transform: core.TransformExpression, function: "max"},
 			},
 		},
 		{
@@ -889,8 +890,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, COUNT(DISTINCT product_id) AS unique_products FROM order_items GROUP BY customer_id`,
 			sources: []string{"order_items"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "unique_products", transform: TransformExpression, function: "count"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "unique_products", transform: core.TransformExpression, function: "count"},
 			},
 		},
 		{
@@ -898,10 +899,10 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, MIN(amount) AS min_amt, MAX(amount) AS max_amt, AVG(amount) AS avg_amt FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "min_amt", transform: TransformExpression, function: "min"},
-				{name: "max_amt", transform: TransformExpression, function: "max"},
-				{name: "avg_amt", transform: TransformExpression, function: "avg"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "min_amt", transform: core.TransformExpression, function: "min"},
+				{name: "max_amt", transform: core.TransformExpression, function: "max"},
+				{name: "avg_amt", transform: core.TransformExpression, function: "avg"},
 			},
 		},
 		{
@@ -909,8 +910,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, SUM(quantity * price) AS total_value FROM order_items GROUP BY customer_id`,
 			sources: []string{"order_items"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "total_value", transform: TransformExpression, function: "sum"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "total_value", transform: core.TransformExpression, function: "sum"},
 			},
 		},
 		{
@@ -918,8 +919,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, COUNT(*) FILTER (WHERE status = 'completed') AS completed_count FROM orders GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "completed_count", transform: TransformExpression, function: "count"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "completed_count", transform: core.TransformExpression, function: "count"},
 			},
 		},
 		{
@@ -927,8 +928,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, STRING_AGG(product_name, ', ') AS products FROM order_items GROUP BY customer_id`,
 			sources: []string{"order_items"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "products", transform: TransformExpression, function: "string_agg"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "products", transform: core.TransformExpression, function: "string_agg"},
 			},
 		},
 		{
@@ -936,8 +937,8 @@ func TestExtractLineage_MoreAggregates(t *testing.T) {
 			sql:     `SELECT customer_id, ARRAY_AGG(product_id) AS product_ids FROM order_items GROUP BY customer_id`,
 			sources: []string{"order_items"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "product_ids", transform: TransformExpression, function: "array_agg"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "product_ids", transform: core.TransformExpression, function: "array_agg"},
 			},
 		},
 	})
@@ -950,10 +951,10 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, name, salary, RANK() OVER (ORDER BY salary DESC) AS salary_rank FROM employees`,
 			sources: []string{"employees"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "salary", transform: TransformDirect},
-				{name: "salary_rank", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "salary", transform: core.TransformDirect},
+				{name: "salary_rank", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -961,9 +962,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, name, DENSE_RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS dept_rank FROM employees`,
 			sources: []string{"employees"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "dept_rank", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "dept_rank", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -971,9 +972,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, NTILE(4) OVER (ORDER BY amount) AS quartile FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "quartile", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "quartile", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -981,9 +982,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, LAG(amount, 1) OVER (ORDER BY created_at) AS prev_amount FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "prev_amount", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "prev_amount", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -991,9 +992,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, LEAD(amount, 1) OVER (ORDER BY created_at) AS next_amount FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "next_amount", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "next_amount", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1001,9 +1002,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, LAG(amount, 1, 0) OVER (ORDER BY created_at) AS prev_amount FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "prev_amount", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "prev_amount", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1011,9 +1012,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, FIRST_VALUE(amount) OVER (PARTITION BY customer_id ORDER BY created_at) AS first_order FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "first_order", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "first_order", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1021,9 +1022,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, LAST_VALUE(amount) OVER (PARTITION BY customer_id ORDER BY created_at) AS last_order FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "last_order", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "last_order", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1031,9 +1032,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, NTH_VALUE(amount, 2) OVER (PARTITION BY customer_id ORDER BY created_at) AS second_order FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "second_order", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "second_order", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1043,9 +1044,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			      FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "rolling_sum", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "rolling_sum", transform: core.TransformExpression},
 			},
 		},
 		// NOTE: "window frame RANGE BETWEEN" with INTERVAL syntax is not supported by the parser
@@ -1056,9 +1057,9 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			      FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "cumulative", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "cumulative", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1066,10 +1067,10 @@ func TestExtractLineage_MoreWindowFunctions(t *testing.T) {
 			sql:     `SELECT id, amount, SUM(amount) OVER w AS total, AVG(amount) OVER w AS average FROM orders WINDOW w AS (PARTITION BY customer_id ORDER BY created_at)`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "total", transform: TransformExpression},
-				{name: "average", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformExpression},
+				{name: "average", transform: core.TransformExpression},
 			},
 		},
 	})
@@ -1082,8 +1083,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, ((price * quantity) + tax) AS total FROM order_items`,
 			sources: []string{"order_items"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "total", transform: TransformExpression, srcCount: srcN(3)},
+				{name: "id", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformExpression, srcCount: srcN(3)},
 			},
 		},
 		{
@@ -1091,8 +1092,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, -amount AS negative_amount FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "negative_amount", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "negative_amount", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1100,8 +1101,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, NOT is_active AS is_inactive FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "is_inactive", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "is_inactive", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1109,8 +1110,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, first_name || ' ' || last_name AS full_name FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "full_name", transform: TransformExpression, srcCount: srcN(2)},
+				{name: "id", transform: core.TransformDirect},
+				{name: "full_name", transform: core.TransformExpression, srcCount: srcN(2)},
 			},
 		},
 		{
@@ -1118,8 +1119,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, CONCAT(first_name, ' ', last_name) AS full_name FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "full_name", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "full_name", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1127,8 +1128,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, amount % 100 AS remainder FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "remainder", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "remainder", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1136,8 +1137,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, amount / 100 AS hundreds FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "hundreds", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "hundreds", transform: core.TransformExpression},
 			},
 		},
 		// NOTE: exponentiation (^), bitwise AND (&), bitwise OR (|) are not supported by the parser
@@ -1146,8 +1147,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, CASE WHEN status = 'a' THEN CASE WHEN priority = 1 THEN 'high' ELSE 'low' END ELSE 'unknown' END AS label FROM tasks`,
 			sources: []string{"tasks"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "label", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "label", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1155,8 +1156,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, CASE status WHEN 'active' THEN 1 WHEN 'pending' THEN 2 ELSE 0 END AS status_code FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "status_code", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "status_code", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1164,8 +1165,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, NULLIF(value, 0) AS safe_value FROM data`,
 			sources: []string{"data"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "safe_value", transform: TransformDirect}, // Single-source function is direct transform
+				{name: "id", transform: core.TransformDirect},
+				{name: "safe_value", transform: core.TransformDirect}, // Single-source function is direct transform
 			},
 		},
 		{
@@ -1173,9 +1174,9 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, GREATEST(a, b, c) AS max_val, LEAST(a, b, c) AS min_val FROM numbers`,
 			sources: []string{"numbers"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "max_val", transform: TransformExpression},
-				{name: "min_val", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "max_val", transform: core.TransformExpression},
+				{name: "min_val", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1183,8 +1184,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, IIF(amount > 100, 'high', 'low') AS category FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "category", transform: TransformDirect}, // Single-source function is direct transform
+				{name: "id", transform: core.TransformDirect},
+				{name: "category", transform: core.TransformDirect}, // Single-source function is direct transform
 			},
 		},
 		{
@@ -1192,8 +1193,8 @@ func TestExtractLineage_ExpressionEdgeCases(t *testing.T) {
 			sql:     `SELECT id, (status = 'active' AND amount > 0) AS is_valid FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "is_valid", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "is_valid", transform: core.TransformExpression},
 			},
 		},
 		// NOTE: type cast shorthand (::), array subscript ([n]), JSON access (->>) are not supported by the parser
@@ -1216,9 +1217,9 @@ func TestExtractLineage_CTEAdvanced(t *testing.T) {
 			SELECT id, name, level FROM subordinates`,
 			sources: []string{"employees"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "level", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "level", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -1240,8 +1241,8 @@ func TestExtractLineage_CTEAdvanced(t *testing.T) {
 			SELECT customer_name, total FROM summarized`,
 			sources: []string{"orders", "customers"},
 			cols: []colSpec{
-				{name: "customer_name", transform: TransformDirect},
-				{name: "total", transform: TransformDirect},
+				{name: "customer_name", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformDirect},
 			},
 		},
 		// NOTE: CTE with column list, MATERIALIZED hints, and NOT MATERIALIZED hints are not supported by the parser
@@ -1257,8 +1258,8 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			      LEFT JOIN employees m ON e.manager_id = m.id`,
 			sources: []string{"employees"},
 			cols: []colSpec{
-				{name: "employee", transform: TransformDirect, srcTable: "employees"},
-				{name: "manager", transform: TransformDirect, srcTable: "employees"},
+				{name: "employee", transform: core.TransformDirect, srcTable: "employees"},
+				{name: "manager", transform: core.TransformDirect, srcTable: "employees"},
 			},
 		},
 		{
@@ -1268,8 +1269,8 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			      LEFT JOIN customers c2 ON c1.referrer_id = c2.id`,
 			sources: []string{"customers"},
 			cols: []colSpec{
-				{name: "customer", transform: TransformDirect, srcTable: "customers"},
-				{name: "referred_by", transform: TransformDirect, srcTable: "customers"},
+				{name: "customer", transform: core.TransformDirect, srcTable: "customers"},
+				{name: "referred_by", transform: core.TransformDirect, srcTable: "customers"},
 			},
 		},
 		{
@@ -1289,9 +1290,9 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			GROUP BY region`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "region", transform: TransformDirect},
-				{name: "region_total", transform: TransformExpression, function: "sum"},
-				{name: "avg_monthly", transform: TransformExpression, function: "avg"},
+				{name: "region", transform: core.TransformDirect},
+				{name: "region_total", transform: core.TransformExpression, function: "sum"},
+				{name: "avg_monthly", transform: core.TransformExpression, function: "avg"},
 			},
 		},
 		// NOTE: correlated subqueries in SELECT are intentionally not supported per system.md
@@ -1306,10 +1307,10 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			GROUP BY customer_id`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "customer_id", transform: TransformDirect},
-				{name: "pending_total", transform: TransformExpression, function: "sum"},
-				{name: "completed_total", transform: TransformExpression, function: "sum"},
-				{name: "cancelled_total", transform: TransformExpression, function: "sum"},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "pending_total", transform: core.TransformExpression, function: "sum"},
+				{name: "completed_total", transform: core.TransformExpression, function: "sum"},
+				{name: "cancelled_total", transform: core.TransformExpression, function: "sum"},
 			},
 		},
 		{
@@ -1322,10 +1323,10 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			FROM orders`,
 			sources: []string{"orders"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "customer_id", transform: TransformDirect},
-				{name: "amount", transform: TransformDirect},
-				{name: "running_total", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "customer_id", transform: core.TransformDirect},
+				{name: "amount", transform: core.TransformDirect},
+				{name: "running_total", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1339,9 +1340,9 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			GROUP BY d.date, d.day_of_week`,
 			sources: []string{"dates", "orders"},
 			cols: []colSpec{
-				{name: "date", transform: TransformDirect, srcTable: "dates"},
-				{name: "day_of_week", transform: TransformDirect, srcTable: "dates"},
-				{name: "daily_total", transform: TransformDirect},
+				{name: "date", transform: core.TransformDirect, srcTable: "dates"},
+				{name: "day_of_week", transform: core.TransformDirect, srcTable: "dates"},
+				{name: "daily_total", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -1358,9 +1359,9 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			WHERE rn = 1`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "name", transform: TransformDirect},
-				{name: "email", transform: TransformDirect},
+				{name: "id", transform: core.TransformDirect},
+				{name: "name", transform: core.TransformDirect},
+				{name: "email", transform: core.TransformDirect},
 			},
 		},
 		{
@@ -1376,9 +1377,9 @@ func TestExtractLineage_RealWorldPatterns(t *testing.T) {
 			WHERE id - prev_id > 1`,
 			sources: []string{"items"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "prev_id", transform: TransformDirect},
-				{name: "gap", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "prev_id", transform: core.TransformDirect},
+				{name: "gap", transform: core.TransformExpression},
 			},
 		},
 		// NOTE: sessionization test removed - INTERVAL syntax is not supported
@@ -1392,7 +1393,7 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT (SELECT name FROM users LIMIT 1) AS user_name FROM orders`,
 			sources: []string{"orders", "users"},
 			cols: []colSpec{
-				{name: "user_name", transform: TransformExpression},
+				{name: "user_name", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1400,8 +1401,8 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT o.id, (SELECT p.amount FROM payments p WHERE p.order_id = o.id) AS paid FROM orders o`,
 			sources: []string{"orders", "payments"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect, srcTable: "orders"},
-				{name: "paid", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect, srcTable: "orders"},
+				{name: "paid", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1409,7 +1410,7 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT (SELECT COUNT(*) FROM items) AS item_count FROM dual`,
 			sources: []string{"dual", "items"},
 			cols: []colSpec{
-				{name: "item_count", transform: TransformExpression},
+				{name: "item_count", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1417,7 +1418,7 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT (SELECT (SELECT x FROM t3) FROM t2) AS val FROM t1`,
 			sources: []string{"t1", "t2", "t3"},
 			cols: []colSpec{
-				{name: "val", transform: TransformExpression},
+				{name: "val", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1425,7 +1426,7 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT (WITH x AS (SELECT a FROM source) SELECT a FROM x) AS val FROM main`,
 			sources: []string{"main", "source"},
 			cols: []colSpec{
-				{name: "val", transform: TransformExpression},
+				{name: "val", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1433,8 +1434,8 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT id, (SELECT u.fname || ' ' || u.lname FROM users u WHERE u.id = o.user_id) AS full_name FROM orders o`,
 			sources: []string{"orders", "users"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "full_name", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "full_name", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1442,8 +1443,8 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT (SELECT a FROM t1) AS col1, (SELECT b FROM t2) AS col2 FROM t3`,
 			sources: []string{"t1", "t2", "t3"},
 			cols: []colSpec{
-				{name: "col1", transform: TransformExpression},
-				{name: "col2", transform: TransformExpression},
+				{name: "col1", transform: core.TransformExpression},
+				{name: "col2", transform: core.TransformExpression},
 			},
 		},
 		{
@@ -1451,8 +1452,8 @@ func TestExtractLineage_ScalarSubqueries(t *testing.T) {
 			sql:     `SELECT id, (SELECT rate FROM rates WHERE type = 'default') * amount AS total FROM orders`,
 			sources: []string{"orders", "rates"},
 			cols: []colSpec{
-				{name: "id", transform: TransformDirect},
-				{name: "total", transform: TransformExpression},
+				{name: "id", transform: core.TransformDirect},
+				{name: "total", transform: core.TransformExpression},
 			},
 		},
 	})

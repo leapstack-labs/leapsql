@@ -3,7 +3,7 @@ package project
 import (
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,7 +11,7 @@ func TestInferModelType_Frontmatter(t *testing.T) {
 	tests := []struct {
 		name     string
 		model    *ModelInfo
-		expected lint.ModelType
+		expected core.ModelType
 	}{
 		{
 			name: "frontmatter staging override",
@@ -20,7 +20,7 @@ func TestInferModelType_Frontmatter(t *testing.T) {
 				FilePath: "/models/marts/customers.sql",
 				Meta:     map[string]any{"type": "staging"},
 			},
-			expected: lint.ModelTypeStaging,
+			expected: core.ModelTypeStaging,
 		},
 		{
 			name: "frontmatter intermediate override",
@@ -29,7 +29,7 @@ func TestInferModelType_Frontmatter(t *testing.T) {
 				FilePath: "/models/staging/orders.sql",
 				Meta:     map[string]any{"type": "intermediate"},
 			},
-			expected: lint.ModelTypeIntermediate,
+			expected: core.ModelTypeIntermediate,
 		},
 		{
 			name: "frontmatter marts override",
@@ -38,7 +38,7 @@ func TestInferModelType_Frontmatter(t *testing.T) {
 				FilePath: "/models/staging/users.sql",
 				Meta:     map[string]any{"type": "marts"},
 			},
-			expected: lint.ModelTypeMarts,
+			expected: core.ModelTypeMarts,
 		},
 	}
 
@@ -54,7 +54,7 @@ func TestInferModelType_Path(t *testing.T) {
 	tests := []struct {
 		name     string
 		model    *ModelInfo
-		expected lint.ModelType
+		expected core.ModelType
 	}{
 		{
 			name: "staging path",
@@ -62,7 +62,7 @@ func TestInferModelType_Path(t *testing.T) {
 				Name:     "customers",
 				FilePath: "/models/staging/customers.sql",
 			},
-			expected: lint.ModelTypeStaging,
+			expected: core.ModelTypeStaging,
 		},
 		{
 			name: "intermediate path",
@@ -70,7 +70,7 @@ func TestInferModelType_Path(t *testing.T) {
 				Name:     "orders",
 				FilePath: "/models/intermediate/orders.sql",
 			},
-			expected: lint.ModelTypeIntermediate,
+			expected: core.ModelTypeIntermediate,
 		},
 		{
 			name: "marts path",
@@ -78,7 +78,7 @@ func TestInferModelType_Path(t *testing.T) {
 				Name:     "users",
 				FilePath: "/models/marts/users.sql",
 			},
-			expected: lint.ModelTypeMarts,
+			expected: core.ModelTypeMarts,
 		},
 	}
 
@@ -94,7 +94,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 	tests := []struct {
 		name     string
 		model    *ModelInfo
-		expected lint.ModelType
+		expected core.ModelType
 	}{
 		{
 			name: "stg_ prefix",
@@ -102,7 +102,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 				Name:     "stg_customers",
 				FilePath: "/models/stg_customers.sql",
 			},
-			expected: lint.ModelTypeStaging,
+			expected: core.ModelTypeStaging,
 		},
 		{
 			name: "int_ prefix",
@@ -110,7 +110,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 				Name:     "int_orders",
 				FilePath: "/models/int_orders.sql",
 			},
-			expected: lint.ModelTypeIntermediate,
+			expected: core.ModelTypeIntermediate,
 		},
 		{
 			name: "fct_ prefix",
@@ -118,7 +118,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 				Name:     "fct_sales",
 				FilePath: "/models/fct_sales.sql",
 			},
-			expected: lint.ModelTypeMarts,
+			expected: core.ModelTypeMarts,
 		},
 		{
 			name: "dim_ prefix",
@@ -126,7 +126,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 				Name:     "dim_users",
 				FilePath: "/models/dim_users.sql",
 			},
-			expected: lint.ModelTypeMarts,
+			expected: core.ModelTypeMarts,
 		},
 		{
 			name: "no match",
@@ -134,7 +134,7 @@ func TestInferModelType_Prefix(t *testing.T) {
 				Name:     "customers",
 				FilePath: "/models/customers.sql",
 			},
-			expected: lint.ModelTypeOther,
+			expected: core.ModelTypeOther,
 		},
 	}
 
@@ -153,12 +153,12 @@ func TestInferModelType_Priority(t *testing.T) {
 		FilePath: "/models/staging/stg_users.sql",
 		Meta:     map[string]any{"type": "marts"},
 	}
-	assert.Equal(t, lint.ModelTypeMarts, InferModelType(model))
+	assert.Equal(t, core.ModelTypeMarts, InferModelType(model))
 
 	// Path should take priority over prefix
 	model = &ModelInfo{
 		Name:     "fct_orders",
 		FilePath: "/models/staging/fct_orders.sql",
 	}
-	assert.Equal(t, lint.ModelTypeStaging, InferModelType(model))
+	assert.Equal(t, core.ModelTypeStaging, InferModelType(model))
 }

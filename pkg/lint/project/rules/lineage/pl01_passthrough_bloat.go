@@ -3,6 +3,7 @@ package lineage
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -70,7 +71,7 @@ func checkPassthroughBloat(ctx *project.Context) []project.Diagnostic {
 }
 
 // isPassthrough checks if a column is a simple passthrough (no transformation).
-func isPassthrough(col lint.ColumnInfo) bool {
+func isPassthrough(col core.ColumnInfo) bool {
 	// A passthrough column has no transformation and comes from a single source
 	if col.TransformType != "" {
 		return false // Has transformation

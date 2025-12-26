@@ -823,7 +823,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 				assert.Len(t, retrieved[0].Sources, 1)
 
 				assert.Equal(t, "full_name", retrieved[1].Name)
-				assert.Equal(t, "EXPR", retrieved[1].TransformType)
+				assert.Equal(t, core.TransformExpression, retrieved[1].TransformType)
 				assert.Equal(t, "concat", retrieved[1].Function)
 				assert.Len(t, retrieved[1].Sources, 2)
 			},
@@ -1103,7 +1103,7 @@ func TestSQLiteStore_BatchGetAllColumns(t *testing.T) {
 	// Verify: Check stg_orders columns
 	stgOrdersCols := allColumns["staging.stg_orders"]
 	assert.Len(t, stgOrdersCols, 3, "stg_orders should have 3 columns")
-	assert.Equal(t, "EXPR", stgOrdersCols[2].TransformType)
+	assert.Equal(t, core.TransformExpression, stgOrdersCols[2].TransformType)
 	assert.Equal(t, "sum", stgOrdersCols[2].Function)
 
 	// Verify: Check marts.customer_summary columns

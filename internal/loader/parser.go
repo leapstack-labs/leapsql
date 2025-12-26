@@ -208,21 +208,12 @@ func (p *Loader) extractLineage(sql string) (*lineageResult, error) {
 	// Convert lineage.ColumnLineage to core.ColumnInfo
 	columns := make([]core.ColumnInfo, 0, len(modelLineage.Columns))
 	for i, col := range modelLineage.Columns {
-		// Convert source columns
-		sources := make([]core.SourceRef, 0, len(col.Sources))
-		for _, src := range col.Sources {
-			sources = append(sources, core.SourceRef{
-				Table:  src.Table,
-				Column: src.Column,
-			})
-		}
-
 		columns = append(columns, core.ColumnInfo{
 			Name:          col.Name,
 			Index:         i,
-			TransformType: string(col.Transform),
+			TransformType: col.Transform, // Both use core.TransformType now
 			Function:      col.Function,
-			Sources:       sources,
+			Sources:       col.Sources, // Both use []core.SourceRef now
 		})
 	}
 

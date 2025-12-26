@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -84,7 +85,7 @@ func checkImplicitCrossJoin(ctx *project.Context) []project.Diagnostic {
 }
 
 // getSourceTablesFromColumns extracts unique source table names from column lineage.
-func getSourceTablesFromColumns(columns []lint.ColumnInfo) []string {
+func getSourceTablesFromColumns(columns []core.ColumnInfo) []string {
 	tableSet := make(map[string]bool)
 	for _, col := range columns {
 		for _, src := range col.Sources {
@@ -104,7 +105,7 @@ func getSourceTablesFromColumns(columns []lint.ColumnInfo) []string {
 
 // findUnbridgedSourcePairs finds pairs of source tables where no column
 // references both tables (indicating no visible join key).
-func findUnbridgedSourcePairs(columns []lint.ColumnInfo, sources []string) [][2]string {
+func findUnbridgedSourcePairs(columns []core.ColumnInfo, sources []string) [][2]string {
 	// Build a map of which source pairs are bridged by at least one column
 	bridged := make(map[string]bool)
 

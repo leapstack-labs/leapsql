@@ -1,5 +1,26 @@
 package core
 
+// ModelType represents the semantic type of a model.
+type ModelType string
+
+// Model type constants.
+const (
+	ModelTypeStaging      ModelType = "staging"
+	ModelTypeIntermediate ModelType = "intermediate"
+	ModelTypeMarts        ModelType = "marts"
+	ModelTypeOther        ModelType = "other"
+)
+
+// TransformType describes how source columns are transformed.
+type TransformType string
+
+const (
+	// TransformDirect means the column is a direct copy (no transformation).
+	TransformDirect TransformType = ""
+	// TransformExpression means the column is derived from an expression.
+	TransformExpression TransformType = "EXPR"
+)
+
 // Model represents a SQL model (transformation unit).
 // This contains the core identity fields only.
 // Persistence-specific fields (ID, ContentHash, timestamps) belong in state.PersistedModel.
@@ -65,9 +86,9 @@ type SourceRef struct {
 type ColumnInfo struct {
 	Name          string
 	Index         int
-	TransformType string      // "" (direct) or "EXPR"
-	Function      string      // "sum", "count", etc.
-	Sources       []SourceRef // where this column comes from
+	TransformType TransformType // "" (direct) or "EXPR"
+	Function      string        // "sum", "count", etc.
+	Sources       []SourceRef   // where this column comes from
 }
 
 // Conditional represents an #if directive block.

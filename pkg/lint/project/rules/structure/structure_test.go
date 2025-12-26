@@ -3,6 +3,7 @@ package structure
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestPS01_ModelNaming(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "customers",
 					FilePath: "/models/staging/customers.sql",
-					Type:     lint.ModelTypeStaging,
+					Type:     core.ModelTypeStaging,
 				},
 			},
 			wantDiags: 1,
@@ -33,7 +34,7 @@ func TestPS01_ModelNaming(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
+					Type:     core.ModelTypeStaging,
 				},
 			},
 			wantDiags: 0,
@@ -45,7 +46,7 @@ func TestPS01_ModelNaming(t *testing.T) {
 					Path:     "intermediate.orders",
 					Name:     "orders",
 					FilePath: "/models/intermediate/orders.sql",
-					Type:     lint.ModelTypeIntermediate,
+					Type:     core.ModelTypeIntermediate,
 				},
 			},
 			wantDiags: 1,
@@ -75,7 +76,7 @@ func TestPS02_ModelDirectory(t *testing.T) {
 					Path:     "marts.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/marts/stg_customers.sql",
-					Type:     lint.ModelTypeMarts,
+					Type:     core.ModelTypeMarts,
 				},
 			},
 			wantDiags: 1,
@@ -87,7 +88,7 @@ func TestPS02_ModelDirectory(t *testing.T) {
 					Path:     "staging.customers",
 					Name:     "stg_customers",
 					FilePath: "/models/staging/stg_customers.sql",
-					Type:     lint.ModelTypeStaging,
+					Type:     core.ModelTypeStaging,
 				},
 			},
 			wantDiags: 0,
@@ -99,7 +100,7 @@ func TestPS02_ModelDirectory(t *testing.T) {
 					Path:     "staging.orders",
 					Name:     "fct_orders",
 					FilePath: "/models/staging/fct_orders.sql",
-					Type:     lint.ModelTypeStaging,
+					Type:     core.ModelTypeStaging,
 				},
 			},
 			wantDiags: 1,

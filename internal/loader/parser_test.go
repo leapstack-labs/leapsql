@@ -359,6 +359,6 @@ func TestParser_ParseContent_ColumnLineage(t *testing.T) {
 	// total_amount should be an expression (SUM)
 	col, ok = columnsByName["total_amount"]
 	require.True(t, ok, "missing total_amount column")
-	assert.Equal(t, "EXPR", col.TransformType)
+	assert.Equal(t, core.TransformExpression, col.TransformType)
 	assert.Equal(t, "sum", col.Function)
 }

@@ -3,6 +3,7 @@ package modeling
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -29,7 +30,7 @@ func checkStagingDependsStaging(ctx *project.Context) []project.Diagnostic {
 
 	for _, model := range ctx.Models() {
 		// Only check staging models
-		if model.Type != lint.ModelTypeStaging {
+		if model.Type != core.ModelTypeStaging {
 			continue
 		}
 
@@ -40,7 +41,7 @@ func checkStagingDependsStaging(ctx *project.Context) []project.Diagnostic {
 				continue // External source, not a model
 			}
 
-			if sourceModel.Type == lint.ModelTypeStaging {
+			if sourceModel.Type == core.ModelTypeStaging {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:   "PM03",
 					Severity: lint.SeverityWarning,

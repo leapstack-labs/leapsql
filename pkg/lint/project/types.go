@@ -1,6 +1,7 @@
 package project
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 )
 
@@ -27,9 +28,9 @@ type ModelInfo struct {
 	Path           string            // e.g., "staging.customers"
 	Name           string            // e.g., "stg_customers"
 	FilePath       string            // Absolute path to .sql file
-	Type           lint.ModelType    // Inferred or explicit model type
+	Type           core.ModelType    // Inferred or explicit model type
 	Sources        []string          // Table references (deps)
-	Columns        []lint.ColumnInfo // Column-level lineage
+	Columns        []core.ColumnInfo // Column-level lineage
 	Materialized   string            // table, view, incremental
 	Tags           []string
 	Meta           map[string]any
@@ -74,7 +75,7 @@ func (c *Context) GetModels() map[string]lint.ModelInfo {
 			FilePath:     m.FilePath,
 			Type:         m.Type,
 			Sources:      m.Sources,
-			Columns:      m.Columns,
+			Columns:      m.Columns, // No conversion needed - both use core.ColumnInfo
 			Materialized: m.Materialized,
 			Tags:         m.Tags,
 			Meta:         m.Meta,

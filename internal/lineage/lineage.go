@@ -4,32 +4,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
-// TransformType describes how source columns are transformed.
-type TransformType string
-
-const (
-	// TransformDirect means the column is a direct copy (no transformation).
-	TransformDirect TransformType = ""
-	// TransformExpression means the column is derived from an expression.
-	TransformExpression TransformType = "EXPR"
-)
-
-// SourceColumn represents a source column in the lineage.
-type SourceColumn struct {
-	Table  string // Source table name (may be qualified: schema.table)
-	Column string // Column name
-}
-
 // ColumnLineage describes the lineage of a single output column.
 type ColumnLineage struct {
-	Name      string         // Output column name
-	Sources   []SourceColumn // Source columns this output derives from
-	Transform TransformType  // Type of transformation applied
-	Function  string         // Function name (for aggregates/window functions)
+	Name      string             // Output column name
+	Sources   []core.SourceRef   // Source columns this output derives from
+	Transform core.TransformType // Type of transformation applied
+	Function  string             // Function name (for aggregates/window functions)
 }
 
 // ModelLineage describes the complete lineage of a SQL model.
@@ -139,8 +124,8 @@ func (e *lineageExtractor) extractBodyLineage(scope *parser.Scope, body *parser.
 			if i < len(rightColumns) {
 				col.Sources = e.mergeSources(col.Sources, rightColumns[i].Sources)
 				// Mark as expression since it's a union of values
-				if col.Transform == TransformDirect {
-					col.Transform = TransformExpression
+				if col.Transform == core.TransformDirect {
+					col.Transform = core.TransformExpression
 				}
 			}
 		}
@@ -236,7 +221,7 @@ func (e *lineageExtractor) applyStarModifiers(scope *parser.Scope, colResolver *
 					// Extract lineage from the replacement expression
 					exprLineage := e.extractExprLineage(scope, colResolver, repl.Expr)
 					l.Sources = exprLineage.Sources
-					l.Transform = TransformExpression
+					l.Transform = core.TransformExpression
 					l.Function = exprLineage.Function
 				}
 			}
@@ -269,13 +254,13 @@ func (e *lineageExtractor) expandStar(scope *parser.Scope, tableName string, _ i
 		}
 		return []*ColumnLineage{{
 			Name:      name,
-			Transform: TransformDirect,
+			Transform: core.TransformDirect,
 		}}
 	}
 
 	var lineages []*ColumnLineage
 	for _, ref := range refs {
-		source := SourceColumn{
+		source := core.SourceRef{
 			Table:  ref.Table,
 			Column: ref.Column,
 		}
@@ -299,8 +284,8 @@ func (e *lineageExtractor) expandStar(scope *parser.Scope, tableName string, _ i
 
 		lineages = append(lineages, &ColumnLineage{
 			Name:      ref.Column,
-			Sources:   []SourceColumn{source},
-			Transform: TransformDirect,
+			Sources:   []core.SourceRef{source},
+			Transform: core.TransformDirect,
 		})
 	}
 
@@ -320,13 +305,13 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		// Direct column reference
 		source := e.resolveColumnRef(scope, ex)
 		if source != nil {
-			lineage.Sources = []SourceColumn{*source}
+			lineage.Sources = []core.SourceRef{*source}
 		}
-		lineage.Transform = TransformDirect
+		lineage.Transform = core.TransformDirect
 
 	case *parser.Literal:
 		// Literals have no source columns
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.FuncCall:
 		// Collect all column refs from the function arguments
@@ -341,25 +326,25 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 			// Table function acts as a data source, not a transformation
 			// SELECT * FROM read_csv('file.csv') - the CSV is the source, not upstream columns
 			lineage.Sources = nil
-			lineage.Transform = TransformExpression
+			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
 		case dialect.LineageAggregate:
-			lineage.Transform = TransformExpression
+			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
 		case dialect.LineageWindow:
-			lineage.Transform = TransformExpression
+			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
 		case dialect.LineageGenerator:
 			// Generator functions have no source columns
 			lineage.Sources = nil
-			lineage.Transform = TransformExpression
+			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
 		default:
 			// Passthrough - keep all source columns
 			if len(sources) == 1 {
-				lineage.Transform = TransformDirect
+				lineage.Transform = core.TransformDirect
 			} else {
-				lineage.Transform = TransformExpression
+				lineage.Transform = core.TransformExpression
 			}
 		}
 
@@ -367,25 +352,25 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		// Collect all column refs from CASE expression
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.CastExpr:
 		// CAST preserves lineage but is a transformation
 		innerLineage := e.extractExprLineage(scope, colResolver, ex.Expr)
 		lineage.Sources = innerLineage.Sources
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.BinaryExpr:
 		// Recursively extract lineage from both sides (handles subqueries)
 		leftLineage := e.extractExprLineage(scope, colResolver, ex.Left)
 		rightLineage := e.extractExprLineage(scope, colResolver, ex.Right)
 		lineage.Sources = e.mergeSources(leftLineage.Sources, rightLineage.Sources)
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.UnaryExpr:
 		innerLineage := e.extractExprLineage(scope, colResolver, ex.Expr)
 		lineage.Sources = innerLineage.Sources
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.ParenExpr:
 		return e.extractExprLineage(scope, colResolver, ex.Expr)
@@ -416,7 +401,7 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 				}
 			}
 		}
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.LambdaExpr:
 		// Lambda expressions: extract lineage from body only
@@ -426,7 +411,7 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 			bodyLineage := e.extractExprLineage(scope, colResolver, ex.Body)
 			lineage.Sources = bodyLineage.Sources
 		}
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.StructLiteral:
 		// Struct literals: collect lineage from all field values
@@ -437,7 +422,7 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 				lineage.Sources = e.mergeSources(lineage.Sources, fieldLineage.Sources)
 			}
 		}
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.ListLiteral:
 		// List literals: collect lineage from all elements
@@ -446,7 +431,7 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 			elemLineage := e.extractExprLineage(scope, colResolver, elem)
 			lineage.Sources = e.mergeSources(lineage.Sources, elemLineage.Sources)
 		}
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	case *parser.IndexExpr:
 		// Index expressions: collect lineage from the indexed expression and indices
@@ -468,14 +453,14 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 			endLineage := e.extractExprLineage(scope, colResolver, ex.End)
 			lineage.Sources = e.mergeSources(lineage.Sources, endLineage.Sources)
 		}
-		lineage.Transform = TransformExpression
+		lineage.Transform = core.TransformExpression
 
 	default:
 		// For other expression types, collect all column references
 		sources := e.collectExprSources(scope, colResolver, expr)
 		lineage.Sources = sources
 		if len(sources) > 1 {
-			lineage.Transform = TransformExpression
+			lineage.Transform = core.TransformExpression
 		}
 	}
 
@@ -483,9 +468,9 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 }
 
 // collectExprSources collects all source columns from an expression.
-func (e *lineageExtractor) collectExprSources(scope *parser.Scope, colResolver *parser.ColumnResolver, expr parser.Expr) []SourceColumn {
+func (e *lineageExtractor) collectExprSources(scope *parser.Scope, colResolver *parser.ColumnResolver, expr parser.Expr) []core.SourceRef {
 	refs := colResolver.CollectColumns(expr)
-	var sources []SourceColumn
+	var sources []core.SourceRef
 	seen := make(map[string]struct{})
 
 	for _, ref := range refs {
@@ -503,7 +488,7 @@ func (e *lineageExtractor) collectExprSources(scope *parser.Scope, colResolver *
 }
 
 // resolveColumnRef resolves a column reference to its source.
-func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.ColumnRef) *SourceColumn {
+func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.ColumnRef) *core.SourceRef {
 	if ref == nil {
 		return nil
 	}
@@ -521,12 +506,12 @@ func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.Col
 			}
 			// Return source with the underlying table if there's only one, otherwise use the alias
 			if entry, entryOk := scope.Lookup(resolved.Table); entryOk && len(entry.UnderlyingSources) == 1 {
-				return &SourceColumn{
+				return &core.SourceRef{
 					Table:  entry.UnderlyingSources[0],
 					Column: resolved.Column,
 				}
 			}
-			return &SourceColumn{
+			return &core.SourceRef{
 				Table:  resolved.Table, // Keep CTE/derived alias for column lineage tracing
 				Column: resolved.Column,
 			}
@@ -539,7 +524,7 @@ func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.Col
 			e.sources[resolved.Table] = struct{}{}
 		}
 
-		return &SourceColumn{
+		return &core.SourceRef{
 			Table:  resolved.SourceTable,
 			Column: resolved.Column,
 		}
@@ -553,21 +538,21 @@ func (e *lineageExtractor) resolveColumnRef(scope *parser.Scope, ref *parser.Col
 				for _, underlying := range entry.UnderlyingSources {
 					e.sources[underlying] = struct{}{}
 				}
-				return &SourceColumn{
+				return &core.SourceRef{
 					Table:  ref.Table,
 					Column: ref.Column,
 				}
 			}
 		}
 		e.sources[ref.Table] = struct{}{}
-		return &SourceColumn{
+		return &core.SourceRef{
 			Table:  ref.Table,
 			Column: ref.Column,
 		}
 	}
 
 	// Unqualified column with no resolution - still include it
-	return &SourceColumn{
+	return &core.SourceRef{
 		Column: ref.Column,
 	}
 }
@@ -670,9 +655,9 @@ func (e *lineageExtractor) getSortedSources() []string {
 }
 
 // mergeSources merges two source lists, removing duplicates.
-func (e *lineageExtractor) mergeSources(a, b []SourceColumn) []SourceColumn {
+func (e *lineageExtractor) mergeSources(a, b []core.SourceRef) []core.SourceRef {
 	seen := make(map[string]struct{})
-	var result []SourceColumn
+	var result []core.SourceRef
 
 	for _, s := range a {
 		key := s.Table + "." + s.Column
