@@ -4,6 +4,7 @@ docs-site/
 session-ses*.md
 
 # Binaries
+/gendatabricks
 /leapsql
 *.exe
 *.exe~
