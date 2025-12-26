@@ -3,14 +3,14 @@ package format
 import (
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFormat_BasicSelect(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 	tests := []struct {
 		name     string
 		input    string
@@ -74,7 +74,7 @@ FROM t
 }
 
 func TestFormat_Joins(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 	tests := []struct {
 		name     string
 		input    string
@@ -135,7 +135,7 @@ LEFT JOIN c
 }
 
 func TestFormat_CTE(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "WITH cte AS (SELECT a FROM t) SELECT * FROM cte"
 	expected := `WITH
@@ -157,7 +157,7 @@ FROM cte
 }
 
 func TestFormat_Expressions(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 	tests := []struct {
 		name     string
 		input    string
@@ -254,7 +254,7 @@ WHERE
 }
 
 func TestFormat_GroupByOrderBy(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT a, COUNT(*) FROM t GROUP BY a ORDER BY a DESC"
 	expected := `SELECT
@@ -275,7 +275,7 @@ ORDER BY
 }
 
 func TestFormat_LimitOffset(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT * FROM t LIMIT 10 OFFSET 5"
 	expected := `SELECT
@@ -293,7 +293,7 @@ OFFSET 5
 }
 
 func TestFormat_Union(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT a FROM t1 UNION SELECT b FROM t2"
 	expected := `SELECT
@@ -313,7 +313,7 @@ FROM t2
 }
 
 func TestFormat_Subquery(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT * FROM (SELECT a FROM t) AS sub"
 	expected := `SELECT
@@ -333,7 +333,7 @@ FROM (
 }
 
 func TestFormat_MacroExpression(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT * FROM {{ ref('stg_users') }}"
 	expected := `SELECT
@@ -349,7 +349,7 @@ FROM {{ ref('stg_users') }}
 }
 
 func TestFormat_WindowFunction(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT id, ROW_NUMBER() OVER (PARTITION BY region ORDER BY sales DESC) FROM t"
 	expected := `SELECT
@@ -368,7 +368,7 @@ FROM t
 }
 
 func TestFormatSQL_Integration(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	// Test the one-call API
 	input := "select id,   sum(val) from   my_table where active=true"
@@ -387,7 +387,7 @@ WHERE
 }
 
 func TestFormat_CommentPreservation(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := `-- Leading comment
 SELECT id FROM users`
@@ -400,7 +400,7 @@ SELECT id FROM users`
 }
 
 func TestFormat_Cast(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT CAST(x AS INT) FROM t"
 	expected := `SELECT
@@ -416,7 +416,7 @@ FROM t
 }
 
 func TestFormat_Exists(t *testing.T) {
-	d := ansi.ANSI
+	d := duckdbdialect.DuckDB
 
 	input := "SELECT * FROM t WHERE EXISTS (SELECT 1 FROM other)"
 	expected := `SELECT

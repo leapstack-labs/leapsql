@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/sql/rules" // register rules
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -191,7 +191,7 @@ func TestCV09_BlockedWords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 
 			cfg := lint.NewConfig()
@@ -199,8 +199,8 @@ func TestCV09_BlockedWords(t *testing.T) {
 				cfg = cfg.SetRuleOptions("CV09", tt.config)
 			}
 
-			analyzer := lint.NewAnalyzerWithRegistry(cfg, "ansi")
-			diags := analyzer.AnalyzeWithRegistryRules(stmt, ansi.ANSI)
+			analyzer := lint.NewAnalyzerWithRegistry(cfg, "duckdb")
+			diags := analyzer.AnalyzeWithRegistryRules(stmt, duckdbdialect.DuckDB)
 
 			var cv09Diags []lint.Diagnostic
 			for _, d := range diags {

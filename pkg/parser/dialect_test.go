@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
@@ -42,13 +41,13 @@ func TestDuckDBAcceptsQualify(t *testing.T) {
 	assert.NotNil(t, stmt.Body.Left.Qualify, "QUALIFY expression should be parsed")
 }
 
-func TestANSIRejectsQualify(t *testing.T) {
+func TestPostgresRejectsQualify2(t *testing.T) {
 	sql := `SELECT name, ROW_NUMBER() OVER (ORDER BY id) as rn
 		FROM users
 		QUALIFY rn <= 10`
 
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
-	require.Error(t, err, "ANSI should reject QUALIFY clause")
+	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
+	require.Error(t, err, "Postgres should reject QUALIFY clause")
 	assert.Contains(t, err.Error(), "QUALIFY")
 }
 
@@ -74,22 +73,14 @@ func TestQualifyWithComplexExpression(t *testing.T) {
 
 // ---------- ILIKE Operator Tests ----------
 
-func TestANSIRejectsILIKE(t *testing.T) {
+func TestPostgresRejectsILIKE(t *testing.T) {
 	sql := `SELECT * FROM users WHERE name ILIKE '%john%'`
 
-	// ANSI dialect should not have ILIKE in its precedence table
-	// This means ILIKE will be parsed as an identifier, causing a syntax error
-	// or the expression will fail to parse correctly
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
-
-	// ANSI may parse ILIKE as an identifier since it's not in its keyword list
-	// The test verifies the behavior is different from DuckDB
-	// In strict mode, this should fail or produce different results
-	if err == nil {
-		// If it parses, verify ILIKE was not recognized as a keyword
-		// (this is the fallback behavior from the global token registry)
-		t.Log("ANSI parsed ILIKE due to global token registration - this is expected")
-	}
+	// Postgres dialect DOES support ILIKE, so this test verifies that
+	// The test was originally for ANSI, but now we test Postgres accepts it
+	stmt, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
+	require.NoError(t, err)
+	require.NotNil(t, stmt)
 }
 
 func TestDuckDBAcceptsILIKE(t *testing.T) {
@@ -159,7 +150,7 @@ func TestILIKEPrecedence(t *testing.T) {
 func TestLIKEPrecedenceWithOR(t *testing.T) {
 	sql := `SELECT * FROM t WHERE a LIKE '%x%' OR b LIKE '%y%'`
 
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
 	require.NoError(t, err)
 
 	// Should be: (a LIKE '%x%') OR (b LIKE '%y%')
@@ -176,7 +167,7 @@ func TestErrorIncludesPosition(t *testing.T) {
 FROM users
 WHERE (x = 1`
 
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	_, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
 	require.Error(t, err)
 
 	// The error should be a ParseError with position info
@@ -251,7 +242,7 @@ func TestClauseOrderEnforced(t *testing.T) {
 		ORDER BY cnt DESC
 		LIMIT 10`
 
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
 	require.NoError(t, err)
 	require.NotNil(t, stmt.Body.Left)
 
@@ -288,7 +279,7 @@ func TestDuckDBClauseSequenceWithQualify(t *testing.T) {
 
 func TestDialectRegistration(t *testing.T) {
 	// Verify all dialects are registered
-	dialects := []string{"ansi", "duckdb", "postgres"}
+	dialects := []string{"duckdb", "postgres"}
 
 	for _, name := range dialects {
 		d, ok := dialect.Get(name)
@@ -298,7 +289,7 @@ func TestDialectRegistration(t *testing.T) {
 }
 
 func TestDialectInheritance(t *testing.T) {
-	// DuckDB and Postgres should inherit from ANSI
+	// DuckDB and Postgres share common SQL features
 	duckdb := duckdbDialect.DuckDB
 	postgres := postgresDialect.Postgres
 
@@ -398,9 +389,9 @@ func TestDialectClauseDef(t *testing.T) {
 	require.True(t, ok, "DuckDB should have ClauseDef for QUALIFY")
 	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
 
-	// ANSI should have ClauseDef for WHERE
-	def, ok = ansi.ANSI.ClauseDef(parser.TOKEN_WHERE)
-	require.True(t, ok, "ANSI should have ClauseDef for WHERE")
+	// DuckDB should have ClauseDef for WHERE
+	def, ok = duckdbDialect.DuckDB.ClauseDef(parser.TOKEN_WHERE)
+	require.True(t, ok, "DuckDB should have ClauseDef for WHERE")
 	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
 }
 
@@ -519,15 +510,15 @@ func TestCombinedModifiers(t *testing.T) {
 	assert.True(t, isReplace, "Second modifier should be ReplaceModifier")
 }
 
-func TestStarModifiersNotInAnsi(t *testing.T) {
-	// Star modifiers should not parse in ANSI dialect
+func TestStarModifiersNotInPostgres(t *testing.T) {
+	// Star modifiers should not parse in Postgres dialect (DuckDB-specific extension)
 	sql := "SELECT * EXCLUDE (id) FROM users"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
 	require.NoError(t, err) // Parser is lenient
 
 	// But no modifiers should be parsed
 	item := stmt.Body.Left.Columns[0]
-	assert.Empty(t, item.Modifiers, "ANSI should not parse star modifiers")
+	assert.Empty(t, item.Modifiers, "Postgres should not parse star modifiers")
 }
 
 func TestTableStarWithModifiers(t *testing.T) {
@@ -800,16 +791,15 @@ func TestUnionByNameRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUnionByNameInAnsi(t *testing.T) {
-	// BY NAME should also work in ANSI since NAME is now a keyword
-	// The parser is lenient and doesn't restrict this to DuckDB
+func TestUnionByNameInPostgres(t *testing.T) {
+	// BY NAME should also work in Postgres since the parser is lenient
 	sql := "SELECT id FROM t1 UNION BY NAME SELECT id FROM t2"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
 	require.NoError(t, err)
 
 	// The ByName flag should be set
 	assert.True(t, stmt.Body.ByName,
-		"BY NAME should parse in ANSI (parser is lenient)")
+		"BY NAME should parse in Postgres (parser is lenient)")
 }
 
 // ---------- Soft Keyword Tests ----------

@@ -24,7 +24,6 @@ import (
 
 	// Import dialect implementations so they register themselves
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
-	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 )
 
 // Server implements the Language Server Protocol for LeapSQL.
@@ -532,10 +531,10 @@ func (s *Server) loadDialectFromConfig() {
 		}
 	}
 
-	// Default to ANSI
-	s.dialect, _ = dialect.Get("ansi")
+	// Default to DuckDB
+	s.dialect, _ = dialect.Get("duckdb")
 	s.dialectFromConfig = false
-	s.logger.Info("No target configured, defaulting to ANSI dialect")
+	s.logger.Info("No target configured, defaulting to DuckDB dialect")
 }
 
 // buildProjectContext delegates to the provider for project context.

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -63,11 +63,11 @@ func TestAnalyzer_WithRegisteredRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 
 			analyzer := lint.NewAnalyzer(lint.NewConfig())
-			diags := analyzer.Analyze(stmt, ansi.ANSI)
+			diags := analyzer.Analyze(stmt, duckdbdialect.DuckDB)
 
 			hasDiag := false
 			for _, d := range diags {
@@ -99,11 +99,11 @@ func TestAnalyzer_DisableRule(t *testing.T) {
 	cfg := lint.NewConfig().Disable("DISABLE01")
 
 	sql := "SELECT a FROM t"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
 	analyzer := lint.NewAnalyzer(cfg)
-	diags := analyzer.Analyze(stmt, ansi.ANSI)
+	diags := analyzer.Analyze(stmt, duckdbdialect.DuckDB)
 
 	// The rule should be disabled
 	for _, d := range diags {
@@ -124,11 +124,11 @@ func TestAnalyzer_SeverityOverride(t *testing.T) {
 	cfg := lint.NewConfig().SetSeverity("SEV01", lint.SeverityError)
 
 	sql := "SELECT a FROM t"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
 	analyzer := lint.NewAnalyzer(cfg)
-	diags := analyzer.Analyze(stmt, ansi.ANSI)
+	diags := analyzer.Analyze(stmt, duckdbdialect.DuckDB)
 
 	require.NotEmpty(t, diags)
 	for _, d := range diags {
@@ -159,7 +159,7 @@ func TestSeverity_String(t *testing.T) {
 
 func TestAnalyzer_NilStatement(t *testing.T) {
 	analyzer := lint.NewAnalyzer(lint.NewConfig())
-	diags := analyzer.Analyze(nil, ansi.ANSI)
+	diags := analyzer.Analyze(nil, duckdbdialect.DuckDB)
 	assert.Nil(t, diags)
 }
 
@@ -178,11 +178,11 @@ func TestAnalyzer_NilConfig(t *testing.T) {
 	require.NotNil(t, analyzer)
 
 	sql := "SELECT a FROM t"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
 	// Should still work with default config
-	diags := analyzer.Analyze(stmt, ansi.ANSI)
+	diags := analyzer.Analyze(stmt, duckdbdialect.DuckDB)
 	assert.NotEmpty(t, diags)
 }
 
@@ -217,12 +217,12 @@ func TestAnalyzer_DialectFilter(t *testing.T) {
 	})
 
 	sqlStr := "SELECT a FROM t"
-	stmt, err := parser.ParseWithDialect(sqlStr, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sqlStr, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
 	// ANSI dialect should only see UNI01, not PG01
 	analyzer := lint.NewAnalyzer(lint.NewConfig())
-	diags := analyzer.Analyze(stmt, ansi.ANSI)
+	diags := analyzer.Analyze(stmt, duckdbdialect.DuckDB)
 
 	var ids []string
 	for _, d := range diags {

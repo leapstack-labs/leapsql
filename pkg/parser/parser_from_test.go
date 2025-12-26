@@ -7,7 +7,6 @@ import (
 	// Import DuckDB dialect for side effects (dialect registration) and constants
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +56,7 @@ func TestNaturalJoin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 			require.NotNil(t, stmt.Body)
 			require.NotNil(t, stmt.Body.Left)
@@ -75,14 +74,14 @@ func TestNaturalJoin(t *testing.T) {
 
 func TestNaturalJoinRejectsOnClause(t *testing.T) {
 	sql := "SELECT * FROM t1 NATURAL JOIN t2 ON t1.id = t2.id"
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	_, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "NATURAL JOIN cannot have ON")
 }
 
 func TestNaturalJoinRejectsUsingClause(t *testing.T) {
 	sql := "SELECT * FROM t1 NATURAL JOIN t2 USING (id)"
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	_, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "NATURAL JOIN cannot have USING")
 }
@@ -130,7 +129,7 @@ func TestJoinUsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 			require.NotNil(t, stmt.Body.Left.From)
 			require.Len(t, stmt.Body.Left.From.Joins, 1)
@@ -201,7 +200,7 @@ func TestFetchClause(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 			require.NotNil(t, stmt.Body.Left)
 			require.NotNil(t, stmt.Body.Left.Fetch, "FETCH clause should be parsed")
@@ -226,7 +225,7 @@ func TestFetchClause(t *testing.T) {
 func TestFetchAndLimitCoexist(t *testing.T) {
 	// Parser should allow both (lenient) - validation is a separate concern
 	sql := "SELECT * FROM t LIMIT 10 FETCH FIRST 5 ROWS ONLY"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 	assert.NotNil(t, stmt.Body.Left.Limit, "LIMIT should be parsed")
 	assert.NotNil(t, stmt.Body.Left.Fetch, "FETCH should also be parsed")
@@ -234,7 +233,7 @@ func TestFetchAndLimitCoexist(t *testing.T) {
 
 func TestFetchWithOrderBy(t *testing.T) {
 	sql := "SELECT id, name FROM users ORDER BY id DESC FETCH FIRST 10 ROWS ONLY"
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
 	core := stmt.Body.Left
@@ -249,20 +248,20 @@ func TestFetchWithOrderBy(t *testing.T) {
 
 func TestFormatNaturalJoin(t *testing.T) {
 	input := "SELECT * FROM t1 NATURAL LEFT JOIN t2"
-	stmt, err := parser.ParseWithDialect(input, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(input, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
-	output := format.Format(stmt, ansi.ANSI)
+	output := format.Format(stmt, duckdbdialect.DuckDB)
 	assert.Contains(t, output, "NATURAL")
 	assert.Contains(t, output, "LEFT JOIN")
 }
 
 func TestFormatJoinUsing(t *testing.T) {
 	input := "SELECT * FROM t1 JOIN t2 USING (id, name)"
-	stmt, err := parser.ParseWithDialect(input, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(input, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 
-	output := format.Format(stmt, ansi.ANSI)
+	output := format.Format(stmt, duckdbdialect.DuckDB)
 	assert.Contains(t, output, "USING")
 	assert.Contains(t, output, "id")
 	assert.Contains(t, output, "name")
@@ -293,10 +292,10 @@ func TestFormatFetch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.input, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.input, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 
-			output := format.Format(stmt, ansi.ANSI)
+			output := format.Format(stmt, duckdbdialect.DuckDB)
 			for _, expected := range tt.expect {
 				assert.Contains(t, strings.ToUpper(output), expected,
 					"Output should contain %s", expected)
@@ -313,7 +312,7 @@ func TestMultipleJoinsWithDifferentStyles(t *testing.T) {
 		JOIN table_b b ON a.id = b.a_id
 		NATURAL LEFT JOIN table_c c`
 
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 	require.Len(t, stmt.Body.Left.From.Joins, 2)
 
@@ -338,7 +337,7 @@ func TestMultipleJoinsWithUsing(t *testing.T) {
 		JOIN customers c USING (customer_id)
 		JOIN products p USING (product_id)`
 
-	stmt, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
 	require.NoError(t, err)
 	require.Len(t, stmt.Body.Left.From.Joins, 2)
 

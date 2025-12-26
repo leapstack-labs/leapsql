@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	duckdbDialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	postgresDialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -116,24 +116,24 @@ func TestCombinedGroupByAndOrderByAll(t *testing.T) {
 	assert.True(t, core.OrderByAllDesc, "OrderByAllDesc should be true")
 }
 
-// ---------- ANSI Dialect Tests ----------
+// ---------- Postgres Dialect Tests ----------
 
-func TestGroupByAllNotInAnsi(t *testing.T) {
-	// In ANSI dialect, GROUP BY ALL is not recognized as a special syntax
+func TestGroupByAllNotInPostgres(t *testing.T) {
+	// In Postgres dialect, GROUP BY ALL is not recognized as a special syntax
 	// ALL is a reserved keyword, so it causes a parse error
 	sql := "SELECT category, SUM(sales) FROM orders GROUP BY ALL"
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
 	// This should error because ALL is a keyword, not an identifier
-	assert.Error(t, err, "ANSI dialect should not support GROUP BY ALL")
+	assert.Error(t, err, "Postgres dialect should not support GROUP BY ALL")
 }
 
-func TestOrderByAllNotInAnsi(t *testing.T) {
-	// In ANSI dialect, ORDER BY ALL is not recognized as a special syntax
+func TestOrderByAllNotInPostgres(t *testing.T) {
+	// In Postgres dialect, ORDER BY ALL is not recognized as a special syntax
 	// ALL is a reserved keyword, so it causes a parse error
 	sql := "SELECT name FROM users ORDER BY ALL"
-	_, err := parser.ParseWithDialect(sql, ansi.ANSI)
+	_, err := parser.ParseWithDialect(sql, postgresDialect.Postgres)
 	// This should error because ALL is a keyword, not an identifier
-	assert.Error(t, err, "ANSI dialect should not support ORDER BY ALL")
+	assert.Error(t, err, "Postgres dialect should not support ORDER BY ALL")
 }
 
 // ---------- Formatter Round-Trip Tests ----------

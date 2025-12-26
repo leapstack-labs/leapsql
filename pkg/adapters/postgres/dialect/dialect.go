@@ -116,6 +116,4 @@ var Postgres = dialect.NewDialect("postgres").
 		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
 	).
 	WithReservedWords(postgresReservedWords...).
-	// PostgreSQL-specific lint rules
-	LintRulesAdd(AllRules...).
 	Build()

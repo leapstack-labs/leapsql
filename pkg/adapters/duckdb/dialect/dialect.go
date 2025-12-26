@@ -173,6 +173,4 @@ var DuckDB = dialect.NewDialect("duckdb").
 	WithKeywords(duckDBCompletionKeywords...).
 	WithReservedWords(duckDBAllKeywords...).
 	WithDataTypes(duckDBTypes...).
-	// Lint rules - DuckDB-specific (ANSI rules must be added explicitly now)
-	LintRulesAdd(AllRules...).
 	Build()

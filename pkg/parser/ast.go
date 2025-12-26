@@ -203,7 +203,7 @@ type Join struct {
 // JoinType represents the type of join.
 // The value is the SQL keyword (e.g., "LEFT", "INNER", "SEMI").
 // Join type constants are defined in their respective dialect packages:
-//   - ANSI joins (INNER, LEFT, RIGHT, FULL, CROSS): pkg/dialects/ansi/join_types.go
+//   - Standard joins (INNER, LEFT, RIGHT, FULL, CROSS): pkg/dialect/joins.go
 //   - DuckDB joins (SEMI, ANTI, ASOF, POSITIONAL): pkg/adapters/duckdb/dialect/join_types.go
 type JoinType string
 

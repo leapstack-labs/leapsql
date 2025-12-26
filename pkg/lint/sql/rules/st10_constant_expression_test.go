@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
+	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/sql/rules" // register rules
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -103,11 +103,11 @@ func TestST10_ConstantExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stmt, err := parser.ParseWithDialect(tt.sql, ansi.ANSI)
+			stmt, err := parser.ParseWithDialect(tt.sql, duckdbdialect.DuckDB)
 			require.NoError(t, err)
 
-			analyzer := lint.NewAnalyzerWithRegistry(lint.NewConfig(), "ansi")
-			diags := analyzer.AnalyzeWithRegistryRules(stmt, ansi.ANSI)
+			analyzer := lint.NewAnalyzerWithRegistry(lint.NewConfig(), "duckdb")
+			diags := analyzer.AnalyzeWithRegistryRules(stmt, duckdbdialect.DuckDB)
 
 			var st10Diags []lint.Diagnostic
 			for _, d := range diags {

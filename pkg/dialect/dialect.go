@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -127,8 +126,6 @@ type Dialect struct {
 	starModifiers  map[token.TokenType]spi.StarModifierHandler // Star expression modifiers (EXCLUDE, REPLACE, RENAME)
 	fromItems      map[token.TokenType]spi.FromItemHandler     // FROM clause extensions (PIVOT, UNPIVOT, etc.)
 
-	// Lint rules for this dialect
-	lintRules []lint.RuleDef
 }
 
 // Config returns the pure data configuration for this dialect.
@@ -460,11 +457,6 @@ func (d *Dialect) IsFromItemToken(t token.TokenType) bool {
 	return d.FromItemHandler(t) != nil
 }
 
-// LintRules returns all lint rules for this dialect.
-func (d *Dialect) LintRules() []lint.RuleDef {
-	return d.lintRules
-}
-
 // Builder provides a fluent API for constructing dialects.
 type Builder struct {
 	dialect *Dialect
@@ -740,19 +732,5 @@ func (b *Builder) JoinTypes(sets ...[]JoinTypeDef) *Builder {
 			b.dialect.joinTypes[jt.Token] = jt
 		}
 	}
-	return b
-}
-
-// ---------- Lint Rule Builder Methods ----------
-
-// LintRule adds a lint rule to the dialect.
-func (b *Builder) LintRule(rule lint.RuleDef) *Builder {
-	b.dialect.lintRules = append(b.dialect.lintRules, rule)
-	return b
-}
-
-// LintRulesAdd adds multiple lint rules to the dialect.
-func (b *Builder) LintRulesAdd(rules ...lint.RuleDef) *Builder {
-	b.dialect.lintRules = append(b.dialect.lintRules, rules...)
 	return b
 }

@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect" // Register DuckDB dialect
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	_ "github.com/leapstack-labs/leapsql/pkg/dialects/ansi" // Register ANSI dialect
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -241,11 +241,11 @@ func TestServer_ValidateTemplate(t *testing.T) {
 }
 
 func TestServer_ValidateSQL(t *testing.T) {
-	// Get ANSI dialect for testing
-	ansiDialect, _ := dialect.Get("ansi")
+	// Get DuckDB dialect for testing
+	duckdbDialect, _ := dialect.Get("duckdb")
 	server := &Server{
 		documents: NewDocumentStore(),
-		dialect:   ansiDialect,
+		dialect:   duckdbDialect,
 	}
 
 	tests := []struct {
