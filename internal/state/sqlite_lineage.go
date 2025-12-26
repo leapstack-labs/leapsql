@@ -5,11 +5,12 @@ import (
 	"fmt"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // SaveModelColumns saves column lineage information for a model.
 // This replaces any existing column information for the model.
-func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) error {
+func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []core.ColumnInfo) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -64,7 +65,7 @@ func (s *SQLiteStore) SaveModelColumns(modelPath string, columns []ColumnInfo) e
 }
 
 // GetModelColumns retrieves column lineage information for a model.
-func (s *SQLiteStore) GetModelColumns(modelPath string) ([]ColumnInfo, error) {
+func (s *SQLiteStore) GetModelColumns(modelPath string) ([]core.ColumnInfo, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -77,10 +78,10 @@ func (s *SQLiteStore) GetModelColumns(modelPath string) ([]ColumnInfo, error) {
 
 	// Build columns with index map for lineage lookup
 	columnsIdxMap := make(map[string]int)
-	columns := make([]ColumnInfo, 0, len(colRows))
+	columns := make([]core.ColumnInfo, 0, len(colRows))
 
 	for _, row := range colRows {
-		col := ColumnInfo{
+		col := core.ColumnInfo{
 			Name:          row.ColumnName,
 			Index:         int(row.ColumnIndex),
 			TransformType: derefString(row.TransformType),
@@ -98,7 +99,7 @@ func (s *SQLiteStore) GetModelColumns(modelPath string) ([]ColumnInfo, error) {
 
 	for _, row := range lineageRows {
 		if idx, ok := columnsIdxMap[row.ColumnName]; ok {
-			columns[idx].Sources = append(columns[idx].Sources, SourceRef{
+			columns[idx].Sources = append(columns[idx].Sources, core.SourceRef{
 				Table:  row.SourceTable,
 				Column: row.SourceColumn,
 			})
@@ -137,7 +138,7 @@ func (s *SQLiteStore) DeleteModelColumns(modelPath string) error {
 
 // TraceColumnBackward traces a column back to its ultimate sources.
 // It follows the lineage recursively to find all upstream columns.
-func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]TraceResult, error) {
+func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]core.TraceResult, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -150,9 +151,9 @@ func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]Trace
 		return nil, fmt.Errorf("failed to trace column backward: %w", err)
 	}
 
-	results := make([]TraceResult, 0, len(rows))
+	results := make([]core.TraceResult, 0, len(rows))
 	for _, row := range rows {
-		results = append(results, TraceResult{
+		results = append(results, core.TraceResult{
 			ModelPath:  row.ModelPath,
 			ColumnName: row.ColumnName,
 			Depth:      int(row.Depth),
@@ -165,7 +166,7 @@ func (s *SQLiteStore) TraceColumnBackward(modelPath, columnName string) ([]Trace
 
 // TraceColumnForward traces where a column flows to downstream.
 // It follows the lineage recursively to find all downstream consumers.
-func (s *SQLiteStore) TraceColumnForward(modelPath, columnName string) ([]TraceResult, error) {
+func (s *SQLiteStore) TraceColumnForward(modelPath, columnName string) ([]core.TraceResult, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -178,9 +179,9 @@ func (s *SQLiteStore) TraceColumnForward(modelPath, columnName string) ([]TraceR
 		return nil, fmt.Errorf("failed to trace column forward: %w", err)
 	}
 
-	results := make([]TraceResult, 0, len(rows))
+	results := make([]core.TraceResult, 0, len(rows))
 	for _, row := range rows {
-		results = append(results, TraceResult{
+		results = append(results, core.TraceResult{
 			ModelPath:  row.ModelPath,
 			ColumnName: row.ColumnName,
 			Depth:      int(row.Depth),

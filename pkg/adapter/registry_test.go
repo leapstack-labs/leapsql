@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +39,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestNewAdapter_EmptyType(t *testing.T) {
-	cfg := Config{
+	cfg := core.AdapterConfig{
 		Type: "",
 	}
 

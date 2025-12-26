@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // SaveMacroNamespace stores a macro namespace and its functions.
 // This replaces any existing functions for the namespace.
-func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroFunction) error {
+func (s *SQLiteStore) SaveMacroNamespace(ns *core.MacroNamespace, functions []*core.MacroFunction) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -59,7 +60,7 @@ func (s *SQLiteStore) SaveMacroNamespace(ns *MacroNamespace, functions []*MacroF
 }
 
 // GetMacroNamespaces returns all macro namespaces.
-func (s *SQLiteStore) GetMacroNamespaces() ([]*MacroNamespace, error) {
+func (s *SQLiteStore) GetMacroNamespaces() ([]*core.MacroNamespace, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -69,7 +70,7 @@ func (s *SQLiteStore) GetMacroNamespaces() ([]*MacroNamespace, error) {
 		return nil, fmt.Errorf("failed to get namespaces: %w", err)
 	}
 
-	namespaces := make([]*MacroNamespace, 0, len(rows))
+	namespaces := make([]*core.MacroNamespace, 0, len(rows))
 	for _, row := range rows {
 		namespaces = append(namespaces, convertMacroNamespace(row))
 	}
@@ -78,7 +79,7 @@ func (s *SQLiteStore) GetMacroNamespaces() ([]*MacroNamespace, error) {
 }
 
 // GetMacroNamespace returns a single macro namespace by name.
-func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
+func (s *SQLiteStore) GetMacroNamespace(name string) (*core.MacroNamespace, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -95,7 +96,7 @@ func (s *SQLiteStore) GetMacroNamespace(name string) (*MacroNamespace, error) {
 }
 
 // GetMacroFunctions returns all functions for a namespace.
-func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*MacroFunction, error) {
+func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*core.MacroFunction, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -105,7 +106,7 @@ func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*MacroFunction, err
 		return nil, fmt.Errorf("failed to get functions: %w", err)
 	}
 
-	functions := make([]*MacroFunction, 0, len(rows))
+	functions := make([]*core.MacroFunction, 0, len(rows))
 	for _, row := range rows {
 		functions = append(functions, convertMacroFunction(row))
 	}
@@ -114,7 +115,7 @@ func (s *SQLiteStore) GetMacroFunctions(namespace string) ([]*MacroFunction, err
 }
 
 // GetMacroFunction returns a single function by namespace and name.
-func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*MacroFunction, error) {
+func (s *SQLiteStore) GetMacroFunction(namespace, name string) (*core.MacroFunction, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -151,7 +152,7 @@ func (s *SQLiteStore) MacroFunctionExists(namespace, name string) (bool, error) 
 }
 
 // SearchMacroNamespaces searches namespaces by prefix.
-func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*MacroNamespace, error) {
+func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*core.MacroNamespace, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -161,7 +162,7 @@ func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*MacroNamespace, e
 		return nil, fmt.Errorf("failed to search namespaces: %w", err)
 	}
 
-	namespaces := make([]*MacroNamespace, 0, len(rows))
+	namespaces := make([]*core.MacroNamespace, 0, len(rows))
 	for _, row := range rows {
 		namespaces = append(namespaces, convertMacroNamespace(row))
 	}
@@ -170,7 +171,7 @@ func (s *SQLiteStore) SearchMacroNamespaces(prefix string) ([]*MacroNamespace, e
 }
 
 // SearchMacroFunctions searches functions within a namespace by prefix.
-func (s *SQLiteStore) SearchMacroFunctions(namespace, prefix string) ([]*MacroFunction, error) {
+func (s *SQLiteStore) SearchMacroFunctions(namespace, prefix string) ([]*core.MacroFunction, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -183,7 +184,7 @@ func (s *SQLiteStore) SearchMacroFunctions(namespace, prefix string) ([]*MacroFu
 		return nil, fmt.Errorf("failed to search functions: %w", err)
 	}
 
-	functions := make([]*MacroFunction, 0, len(rows))
+	functions := make([]*core.MacroFunction, 0, len(rows))
 	for _, row := range rows {
 		functions = append(functions, convertMacroFunction(row))
 	}
@@ -218,9 +219,9 @@ func (s *SQLiteStore) ListMacroFilePaths() ([]string, error) {
 	return s.queries.ListMacroFilePaths(ctx())
 }
 
-// convertMacroNamespace converts a sqlcgen.MacroNamespace to a state.MacroNamespace.
-func convertMacroNamespace(row sqlcgen.MacroNamespace) *MacroNamespace {
-	ns := &MacroNamespace{
+// convertMacroNamespace converts a sqlcgen.MacroNamespace to a core.MacroNamespace.
+func convertMacroNamespace(row sqlcgen.MacroNamespace) *core.MacroNamespace {
+	ns := &core.MacroNamespace{
 		Name:     row.Name,
 		FilePath: row.FilePath,
 	}
@@ -235,9 +236,9 @@ func convertMacroNamespace(row sqlcgen.MacroNamespace) *MacroNamespace {
 	return ns
 }
 
-// convertMacroFunction converts a sqlcgen.MacroFunction to a state.MacroFunction.
-func convertMacroFunction(row sqlcgen.MacroFunction) *MacroFunction {
-	fn := &MacroFunction{
+// convertMacroFunction converts a sqlcgen.MacroFunction to a core.MacroFunction.
+func convertMacroFunction(row sqlcgen.MacroFunction) *core.MacroFunction {
+	fn := &core.MacroFunction{
 		Namespace: row.Namespace,
 		Name:      row.Name,
 	}

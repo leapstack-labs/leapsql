@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/testutil"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 
 	// Import adapter packages to ensure adapters are registered via init()
 	_ "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb"
@@ -74,7 +74,7 @@ func copyTestdata(t *testing.T, scenario string) string {
 }
 
 // assertModelInSQLite verifies model exists in state store.
-func assertModelInSQLite(t *testing.T, store state.Store, modelPath string) {
+func assertModelInSQLite(t *testing.T, store core.Store, modelPath string) {
 	t.Helper()
 	model, err := store.GetModelByPath(modelPath)
 	if err != nil || model == nil {
@@ -83,7 +83,7 @@ func assertModelInSQLite(t *testing.T, store state.Store, modelPath string) {
 }
 
 // assertHashInSQLite verifies content hash exists.
-func assertHashInSQLite(t *testing.T, store state.Store, filePath string) {
+func assertHashInSQLite(t *testing.T, store core.Store, filePath string) {
 	t.Helper()
 	hash, err := store.GetContentHash(filePath)
 	if err != nil || hash == "" {

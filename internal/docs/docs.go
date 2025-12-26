@@ -16,6 +16,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/registry"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 //go:embed static/*
@@ -103,7 +104,7 @@ type Catalog struct {
 // Generator generates documentation from parsed models.
 type Generator struct {
 	registry    *registry.ModelRegistry
-	models      []*loader.ModelConfig
+	models      []*core.Model
 	projectName string
 }
 
@@ -265,8 +266,8 @@ func (g *Generator) buildLineage(modelDocs map[string]*ModelDoc, sources []Sourc
 	return lineage
 }
 
-// convertColumns converts loader.ColumnInfo to ColumnDoc.
-func convertColumns(columns []loader.ColumnInfo) []ColumnDoc {
+// convertColumns converts core.ColumnInfo to ColumnDoc.
+func convertColumns(columns []core.ColumnInfo) []ColumnDoc {
 	if columns == nil {
 		return []ColumnDoc{}
 	}
@@ -293,7 +294,7 @@ func convertColumns(columns []loader.ColumnInfo) []ColumnDoc {
 }
 
 // buildColumnLineage constructs the column-level lineage graph.
-func (g *Generator) buildColumnLineage(models []*loader.ModelConfig, _ map[string]*ModelDoc) ColumnLineageDoc {
+func (g *Generator) buildColumnLineage(models []*core.Model, _ map[string]*ModelDoc) ColumnLineageDoc {
 	lineage := ColumnLineageDoc{
 		Nodes: []ColumnLineageNode{},
 		Edges: []ColumnLineageEdge{},

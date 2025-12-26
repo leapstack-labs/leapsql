@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/internal/loader"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
-	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/internal/testutil"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
@@ -188,7 +186,7 @@ func TestBuildSQL(t *testing.T) {
 	defer func() { _ = engine.Close() }()
 
 	// Create a mock model config - LeapSQL uses pure SQL, dependencies are auto-detected
-	modelCfg := &loader.ModelConfig{
+	modelCfg := &core.Model{
 		Path:         "marts.summary",
 		Name:         "summary",
 		Materialized: "table",
@@ -197,7 +195,7 @@ func TestBuildSQL(t *testing.T) {
 		FilePath:     filepath.Join(modelsDir, "marts", "summary.sql"),
 	}
 
-	model := &state.Model{
+	model := &core.PersistedModel{
 		Model: &core.Model{
 			Path: "marts.summary",
 		},
@@ -290,7 +288,7 @@ SELECT id, name FROM users
 	// Run
 	run, err := engine.Run(ctx, "dev")
 	require.NoError(t, err, "Run() failed")
-	assert.Equal(t, state.RunStatus("completed"), run.Status, "Run status should be completed. Error: %s", run.Error)
+	assert.Equal(t, core.RunStatus("completed"), run.Status, "Run status should be completed. Error: %s", run.Error)
 
 	// Verify table was created
 	rows, err := engine.db.Query(ctx, "SELECT COUNT(*) FROM active_users")

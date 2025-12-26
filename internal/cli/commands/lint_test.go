@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
-	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,7 +102,7 @@ func TestBuildLintConfig(t *testing.T) {
 	t.Run("project config rule options", func(t *testing.T) {
 		projectCfg := &config.Config{
 			Lint: &config.LintConfig{
-				Rules: map[string]sharedcfg.RuleOptions{
+				Rules: map[string]config.RuleOptions{
 					"AL06": {"min_length": 3, "max_length": 20},
 				},
 			},

@@ -7,15 +7,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/leapstack-labs/leapsql/internal/loader"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // ModelRegistry maps table names to model paths for dependency resolution.
 type ModelRegistry struct {
 	mu sync.RWMutex
 
-	// byPath maps model paths to their configs: "staging.stg_customers" → *ModelConfig
-	byPath map[string]*loader.ModelConfig
+	// byPath maps model paths to their configs: "staging.stg_customers" → *core.Model
+	byPath map[string]*core.Model
 
 	// byName maps unqualified model names to paths: "stg_customers" → "staging.stg_customers"
 	// Note: if multiple models have the same name, the last registered wins
@@ -34,7 +34,7 @@ type ModelRegistry struct {
 // NewModelRegistry creates a new empty registry.
 func NewModelRegistry() *ModelRegistry {
 	return &ModelRegistry{
-		byPath:          make(map[string]*loader.ModelConfig),
+		byPath:          make(map[string]*core.Model),
 		byName:          make(map[string]string),
 		byTable:         make(map[string]string),
 		externalSources: make(map[string]struct{}),
@@ -43,7 +43,7 @@ func NewModelRegistry() *ModelRegistry {
 
 // Register adds a model to the registry.
 // It registers the model under its path and various table name variants.
-func (r *ModelRegistry) Register(model *loader.ModelConfig) {
+func (r *ModelRegistry) Register(model *core.Model) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -123,7 +123,7 @@ func (r *ModelRegistry) IsExternalSource(tableName string) bool {
 }
 
 // GetModel returns the model config for a given path.
-func (r *ModelRegistry) GetModel(path string) (*loader.ModelConfig, bool) {
+func (r *ModelRegistry) GetModel(path string) (*core.Model, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	model, ok := r.byPath[path]
@@ -131,11 +131,11 @@ func (r *ModelRegistry) GetModel(path string) (*loader.ModelConfig, bool) {
 }
 
 // AllModels returns all registered models.
-func (r *ModelRegistry) AllModels() []*loader.ModelConfig {
+func (r *ModelRegistry) AllModels() []*core.Model {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	models := make([]*loader.ModelConfig, 0, len(r.byPath))
+	models := make([]*core.Model, 0, len(r.byPath))
 	for _, model := range r.byPath {
 		models = append(models, model)
 	}

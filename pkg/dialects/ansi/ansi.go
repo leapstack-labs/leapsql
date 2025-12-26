@@ -6,6 +6,7 @@
 package ansi
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
@@ -89,8 +90,8 @@ var ANSI = dialect.NewDialect("ansi").
 	// Lint rules
 	LintRulesAdd(AllRules...).
 	// Config
-	Identifiers(`"`, `"`, `""`, dialect.NormLowercase).
-	PlaceholderStyle(dialect.PlaceholderQuestion).
+	Identifiers(`"`, `"`, `""`, core.NormLowercase).
+	PlaceholderStyle(core.PlaceholderQuestion).
 	Build()
 
 // ---------- Clause Handlers ----------

@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/loader"
-	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // Run executes all models in topological order.
-func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
+func (e *Engine) Run(ctx context.Context, env string) (*core.Run, error) {
 	e.logger.Info("starting run", "environment", env)
 
 	// Ensure database is connected before execution
@@ -31,7 +30,7 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	// Get topological order
 	sorted, err := e.graph.TopologicalSort()
 	if err != nil {
-		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
+		_ = e.store.CompleteRun(run.ID, core.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
 		return run, err
 	}
 
@@ -40,7 +39,7 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	// Execute each model
 	var runErr error
 	for _, node := range sorted {
-		m := node.Data.(*loader.ModelConfig)
+		m := node.Data.(*core.Model)
 
 		// Get model from state store
 		model, err := e.store.GetModelByPath(m.Path)
@@ -50,10 +49,10 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 		}
 
 		// Record model run start
-		modelRun := &state.ModelRun{
+		modelRun := &core.ModelRun{
 			RunID:   run.ID,
 			ModelID: model.ID,
-			Status:  state.ModelRunStatusRunning,
+			Status:  core.ModelRunStatusRunning,
 		}
 		if err := e.store.RecordModelRun(modelRun); err != nil {
 			runErr = fmt.Errorf("failed to record model run: %w", err)
@@ -68,11 +67,11 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 		// Update model run status
 		if execErr != nil {
 			e.logger.Debug("model execution failed", "model", m.Path, "error", execErr.Error())
-			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
+			_ = e.store.UpdateModelRun(modelRun.ID, core.ModelRunStatusFailed, 0, execErr.Error())
 			runErr = execErr
 		} else {
 			e.logger.Debug("model executed", "model", m.Path, "rows_affected", rowsAffected, "duration_ms", executionMS)
-			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			_ = e.store.UpdateModelRun(modelRun.ID, core.ModelRunStatusSuccess, rowsAffected, "")
 			// Save column snapshot for schema drift detection
 			e.saveModelSnapshot(run.ID, m, model)
 		}
@@ -87,10 +86,10 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 	// Complete the run
 	if runErr != nil {
 		e.logger.Info("run failed", "run_id", run.ID, "error", runErr.Error())
-		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
+		_ = e.store.CompleteRun(run.ID, core.RunStatusFailed, runErr.Error())
 	} else {
 		e.logger.Info("run completed", "run_id", run.ID)
-		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		_ = e.store.CompleteRun(run.ID, core.RunStatusCompleted, "")
 		// Cleanup old snapshots after successful run
 		_ = e.store.DeleteOldSnapshots(5)
 	}
@@ -102,7 +101,7 @@ func (e *Engine) Run(ctx context.Context, env string) (*state.Run, error) {
 
 // RunSelected executes only the specified models and their downstream dependents.
 // Upstream dependencies must already exist in the database.
-func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []string, includeDownstream bool) (*state.Run, error) {
+func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []string, includeDownstream bool) (*core.Run, error) {
 	// Ensure database is connected before execution
 	if err := e.ensureDBConnected(ctx); err != nil {
 		return nil, err
@@ -129,7 +128,7 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	// Get topological order of subgraph
 	sorted, err := subgraph.TopologicalSort()
 	if err != nil {
-		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
+		_ = e.store.CompleteRun(run.ID, core.RunStatusFailed, fmt.Sprintf("failed to sort: %v", err))
 		return run, err
 	}
 
@@ -146,10 +145,10 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 			break
 		}
 
-		modelRun := &state.ModelRun{
+		modelRun := &core.ModelRun{
 			RunID:   run.ID,
 			ModelID: model.ID,
-			Status:  state.ModelRunStatusRunning,
+			Status:  core.ModelRunStatusRunning,
 		}
 		if err := e.store.RecordModelRun(modelRun); err != nil {
 			runErr = fmt.Errorf("failed to record model run: %w", err)
@@ -161,10 +160,10 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 		_ = int64(time.Since(startTime).Milliseconds())
 
 		if execErr != nil {
-			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusFailed, 0, execErr.Error())
+			_ = e.store.UpdateModelRun(modelRun.ID, core.ModelRunStatusFailed, 0, execErr.Error())
 			runErr = execErr
 		} else {
-			_ = e.store.UpdateModelRun(modelRun.ID, state.ModelRunStatusSuccess, rowsAffected, "")
+			_ = e.store.UpdateModelRun(modelRun.ID, core.ModelRunStatusSuccess, rowsAffected, "")
 			// Save column snapshot for schema drift detection
 			e.saveModelSnapshot(run.ID, m, model)
 		}
@@ -175,9 +174,9 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	}
 
 	if runErr != nil {
-		_ = e.store.CompleteRun(run.ID, state.RunStatusFailed, runErr.Error())
+		_ = e.store.CompleteRun(run.ID, core.RunStatusFailed, runErr.Error())
 	} else {
-		_ = e.store.CompleteRun(run.ID, state.RunStatusCompleted, "")
+		_ = e.store.CompleteRun(run.ID, core.RunStatusCompleted, "")
 		// Cleanup old snapshots after successful run
 		_ = e.store.DeleteOldSnapshots(5)
 	}
@@ -187,7 +186,7 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 }
 
 // executeModel executes a single model and returns rows affected.
-func (e *Engine) executeModel(ctx context.Context, m *loader.ModelConfig, model *state.Model) (int64, error) {
+func (e *Engine) executeModel(ctx context.Context, m *core.Model, model *core.PersistedModel) (int64, error) {
 	e.logger.Debug("executing model", "model_path", m.Path, "materialization", m.Materialized)
 
 	sql := e.buildSQL(m, model)
@@ -207,7 +206,7 @@ func (e *Engine) executeModel(ctx context.Context, m *loader.ModelConfig, model 
 // saveModelSnapshot saves column snapshots for models that use SELECT *.
 // This enables schema drift detection (PL05) by storing the current column
 // state of source tables after a successful model run.
-func (e *Engine) saveModelSnapshot(runID string, m *loader.ModelConfig, model *state.Model) {
+func (e *Engine) saveModelSnapshot(runID string, m *core.Model, model *core.PersistedModel) {
 	if !model.UsesSelectStar {
 		return
 	}

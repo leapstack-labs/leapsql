@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 )
 
@@ -89,7 +90,7 @@ func (s *SQLiteStore) InitSchema() error {
 }
 
 // Ensure SQLiteStore implements Store interface
-var _ Store = (*SQLiteStore)(nil)
+var _ core.Store = (*SQLiteStore)(nil)
 
 // --- Helper functions ---
 
@@ -131,7 +132,7 @@ func serializeJSONPtr(v any) *string {
 		if len(val) == 0 {
 			return nil
 		}
-	case []TestConfig:
+	case []core.TestConfig:
 		if len(val) == 0 {
 			return nil
 		}

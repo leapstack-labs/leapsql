@@ -5,6 +5,7 @@
 package dialect
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/ansi"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
@@ -51,9 +52,9 @@ var DuckDB = dialect.NewDialect("duckdb").
 	// Inherit from ANSI base dialect (includes || operator)
 	Extends(ansi.ANSI).
 	// DuckDB-specific configuration
-	Identifiers(`"`, `"`, `""`, dialect.NormCaseInsensitive).
+	Identifiers(`"`, `"`, `""`, core.NormCaseInsensitive).
 	DefaultSchema("main").
-	PlaceholderStyle(dialect.PlaceholderQuestion).
+	PlaceholderStyle(core.PlaceholderQuestion).
 	// Register DuckDB-specific keywords for the lexer
 	AddKeyword("QUALIFY", TokenQualify).
 	AddKeyword("ILIKE", TokenIlike).

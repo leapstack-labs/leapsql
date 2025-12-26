@@ -6,6 +6,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,12 +14,12 @@ import (
 func TestBuildPostgresDSN(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   adapter.Config
+		config   core.AdapterConfig
 		expected string
 	}{
 		{
 			name: "basic connection",
-			config: adapter.Config{
+			config: core.AdapterConfig{
 				Host:     "localhost",
 				Port:     5432,
 				Database: "testdb",
@@ -29,7 +30,7 @@ func TestBuildPostgresDSN(t *testing.T) {
 		},
 		{
 			name: "with custom sslmode",
-			config: adapter.Config{
+			config: core.AdapterConfig{
 				Host:     "prod.example.com",
 				Port:     5432,
 				Database: "proddb",
@@ -40,14 +41,14 @@ func TestBuildPostgresDSN(t *testing.T) {
 		},
 		{
 			name: "defaults",
-			config: adapter.Config{
+			config: core.AdapterConfig{
 				Database: "mydb",
 			},
 			expected: "host=localhost port=5432 dbname=mydb sslmode=disable",
 		},
 		{
 			name: "custom port",
-			config: adapter.Config{
+			config: core.AdapterConfig{
 				Host:     "db.example.com",
 				Port:     5433,
 				Database: "analytics",

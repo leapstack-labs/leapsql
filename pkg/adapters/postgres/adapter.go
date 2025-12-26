@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	pgdialect "github.com/leapstack-labs/leapsql/pkg/adapters/postgres/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
@@ -40,7 +41,7 @@ func (a *Adapter) Dialect() *dialect.Dialect {
 }
 
 // Connect establishes a connection to PostgreSQL.
-func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
+func (a *Adapter) Connect(ctx context.Context, cfg core.AdapterConfig) error {
 	dsn := buildPostgresDSN(cfg)
 
 	a.Logger.Debug("connecting to postgres", slog.String("host", cfg.Host), slog.String("database", cfg.Database))
@@ -61,7 +62,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 }
 
 // buildPostgresDSN constructs a PostgreSQL connection string.
-func buildPostgresDSN(cfg adapter.Config) string {
+func buildPostgresDSN(cfg core.AdapterConfig) string {
 	// Build key=value format: host=localhost port=5432 user=postgres ...
 	host := cfg.Host
 	if host == "" {
@@ -95,7 +96,7 @@ func buildPostgresDSN(cfg adapter.Config) string {
 }
 
 // GetTableMetadata retrieves metadata for a specified table.
-func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*adapter.Metadata, error) {
+func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*core.TableMetadata, error) {
 	return a.GetTableMetadataCommon(ctx, table, a.Dialect())
 }
 

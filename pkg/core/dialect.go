@@ -60,37 +60,3 @@ type IdentifierConfig struct {
 	Escape        string                // Escape sequence: "", ``, ]]
 	Normalization NormalizationStrategy // How to normalize unquoted identifiers
 }
-
-// LineageType classifies how a function affects column lineage.
-type LineageType int
-
-const (
-	// LineagePassthrough means all input columns pass through (default).
-	LineagePassthrough LineageType = iota
-	// LineageAggregate means many rows aggregate to one value.
-	LineageAggregate
-	// LineageGenerator means function generates values with no upstream.
-	LineageGenerator
-	// LineageWindow means function requires OVER clause.
-	LineageWindow
-	// LineageTable means function returns rows as a table source.
-	LineageTable
-)
-
-// String returns the string representation of LineageType.
-func (t LineageType) String() string {
-	switch t {
-	case LineagePassthrough:
-		return "passthrough"
-	case LineageAggregate:
-		return "aggregate"
-	case LineageGenerator:
-		return "generator"
-	case LineageWindow:
-		return "window"
-	case LineageTable:
-		return "table"
-	default:
-		return "unknown"
-	}
-}

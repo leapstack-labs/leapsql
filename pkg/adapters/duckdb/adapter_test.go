@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ func TestAdapter_Connect(t *testing.T) {
 			adp := New(nil)
 
 			dbPath := tt.setupPath(t)
-			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: dbPath}))
+			require.NoError(t, adp.Connect(ctx, core.AdapterConfig{Path: dbPath}))
 			defer func() { _ = adp.Close() }()
 
 			if tt.verify != nil {
@@ -98,7 +98,7 @@ func TestAdapter_Close(t *testing.T) {
 			adp := New(nil)
 
 			if tt.connect {
-				require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
+				require.NoError(t, adp.Connect(ctx, core.AdapterConfig{Path: ":memory:"}))
 			}
 
 			assert.NoError(t, adp.Close())
@@ -204,7 +204,7 @@ func TestAdapter_QueryExecution(t *testing.T) {
 			ctx := context.Background()
 			adp := New(nil)
 
-			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
+			require.NoError(t, adp.Connect(ctx, core.AdapterConfig{Path: ":memory:"}))
 			defer func() { _ = adp.Close() }()
 
 			if tt.setup != nil {
@@ -225,7 +225,7 @@ func TestAdapter_GetTableMetadata(t *testing.T) {
 		wantErr     bool
 		wantColumns int
 		wantRows    int64
-		checkFunc   func(t *testing.T, meta *adapter.Metadata)
+		checkFunc   func(t *testing.T, meta *core.TableMetadata)
 	}{
 		{
 			name: "existing table with data",
@@ -247,7 +247,7 @@ func TestAdapter_GetTableMetadata(t *testing.T) {
 			tableName:   "products",
 			wantColumns: 4,
 			wantRows:    2,
-			checkFunc: func(t *testing.T, meta *adapter.Metadata) {
+			checkFunc: func(t *testing.T, meta *core.TableMetadata) {
 				assert.Equal(t, "products", meta.Name)
 				assert.Equal(t, "main", meta.Schema)
 
@@ -280,7 +280,7 @@ func TestAdapter_GetTableMetadata(t *testing.T) {
 			ctx := context.Background()
 			adp := New(nil)
 
-			require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
+			require.NoError(t, adp.Connect(ctx, core.AdapterConfig{Path: ":memory:"}))
 			defer func() { _ = adp.Close() }()
 
 			if tt.setupTable != nil {
@@ -309,7 +309,7 @@ func TestAdapter_LoadCSV(t *testing.T) {
 	ctx := context.Background()
 	adp := New(nil)
 
-	require.NoError(t, adp.Connect(ctx, adapter.Config{Path: ":memory:"}))
+	require.NoError(t, adp.Connect(ctx, core.AdapterConfig{Path: ":memory:"}))
 	defer func() { _ = adp.Close() }()
 
 	// Create a temporary CSV file
@@ -480,7 +480,7 @@ func TestConnect_WithParams(t *testing.T) {
 	ctx := context.Background()
 	adp := New(nil)
 
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Path: ":memory:",
 		Params: map[string]any{
 			"extensions": []any{"json"},
@@ -509,7 +509,7 @@ func TestConnect_WithSettings(t *testing.T) {
 	ctx := context.Background()
 	adp := New(nil)
 
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Path: ":memory:",
 		Params: map[string]any{
 			"settings": map[string]any{
@@ -537,7 +537,7 @@ func TestConnect_WithNilParams(t *testing.T) {
 	ctx := context.Background()
 	adp := New(nil)
 
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Path:   ":memory:",
 		Params: nil,
 	}
@@ -556,7 +556,7 @@ func TestConnect_WithEmptyParams(t *testing.T) {
 	ctx := context.Background()
 	adp := New(nil)
 
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Path:   ":memory:",
 		Params: map[string]any{},
 	}

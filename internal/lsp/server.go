@@ -16,6 +16,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/internal/provider"
 	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
@@ -39,7 +40,7 @@ type Server struct {
 	initialized bool
 
 	// State store (may be nil if discover not run)
-	store state.Store
+	store core.Store
 
 	// Memory caches for fast lookups
 	macroNamespaceCache map[string]bool

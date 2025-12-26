@@ -9,7 +9,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/spf13/cobra"
 )
 
@@ -136,7 +136,7 @@ func runWithRenderer(eng *engine.Engine, r *output.Renderer, envName string, sel
 	}
 
 	// Run models
-	var result *state.Run
+	var result *core.Run
 	var runErr error
 	if selectModels != "" {
 		downstreamStr := ""
@@ -160,7 +160,7 @@ func runWithRenderer(eng *engine.Engine, r *output.Renderer, envName string, sel
 
 	// Complete progress
 	if progress != nil {
-		if runErr != nil || (result != nil && result.Status == state.RunStatusFailed) {
+		if runErr != nil || (result != nil && result.Status == core.RunStatusFailed) {
 			progress.Fail("Run failed")
 		} else {
 			progress.Complete("Run completed")
@@ -234,7 +234,7 @@ func runWithJSON(eng *engine.Engine, r *output.Renderer, envName string, selectM
 	})
 
 	// Execute the run
-	var result *state.Run
+	var result *core.Run
 	var runErr error
 	if selectModels != "" {
 		selected := strings.Split(selectModels, ",")
@@ -269,9 +269,9 @@ func runWithJSON(eng *engine.Engine, r *output.Renderer, envName string, selectM
 
 				status := string(mr.Status)
 				switch mr.Status {
-				case state.ModelRunStatusSuccess:
+				case core.ModelRunStatusSuccess:
 					successful++
-				case state.ModelRunStatusFailed:
+				case core.ModelRunStatusFailed:
 					failed++
 				}
 
@@ -295,7 +295,7 @@ func runWithJSON(eng *engine.Engine, r *output.Renderer, envName string, selectM
 	// Emit run_complete event
 	totalMS := int64(time.Since(runStartTime).Milliseconds())
 	runStatus := "completed"
-	if runErr != nil || (result != nil && result.Status == state.RunStatusFailed) {
+	if runErr != nil || (result != nil && result.Status == core.RunStatusFailed) {
 		runStatus = "failed"
 	}
 

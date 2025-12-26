@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // CreateRun creates a new pipeline run.
-func (s *SQLiteStore) CreateRun(env string) (*Run, error) {
+func (s *SQLiteStore) CreateRun(env string) (*core.Run, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -24,7 +25,7 @@ func (s *SQLiteStore) CreateRun(env string) (*Run, error) {
 	row, err := s.queries.CreateRun(ctx(), sqlcgen.CreateRunParams{
 		ID:          id,
 		Environment: env,
-		Status:      string(RunStatusRunning),
+		Status:      string(core.RunStatusRunning),
 		StartedAt:   now,
 	})
 	if err != nil {
@@ -35,7 +36,7 @@ func (s *SQLiteStore) CreateRun(env string) (*Run, error) {
 }
 
 // GetRun retrieves a run by ID.
-func (s *SQLiteStore) GetRun(id string) (*Run, error) {
+func (s *SQLiteStore) GetRun(id string) (*core.Run, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -52,7 +53,7 @@ func (s *SQLiteStore) GetRun(id string) (*Run, error) {
 }
 
 // CompleteRun marks a run as completed with the given status.
-func (s *SQLiteStore) CompleteRun(id string, status RunStatus, errMsg string) error {
+func (s *SQLiteStore) CompleteRun(id string, status core.RunStatus, errMsg string) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -72,7 +73,7 @@ func (s *SQLiteStore) CompleteRun(id string, status RunStatus, errMsg string) er
 }
 
 // GetLatestRun retrieves the most recent run for an environment.
-func (s *SQLiteStore) GetLatestRun(env string) (*Run, error) {
+func (s *SQLiteStore) GetLatestRun(env string) (*core.Run, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -88,12 +89,12 @@ func (s *SQLiteStore) GetLatestRun(env string) (*Run, error) {
 	return convertRun(row), nil
 }
 
-// convertRun converts a sqlcgen.Run to a state.Run.
-func convertRun(row sqlcgen.Run) *Run {
-	run := &Run{
+// convertRun converts a sqlcgen.Run to a core.Run.
+func convertRun(row sqlcgen.Run) *core.Run {
+	run := &core.Run{
 		ID:          row.ID,
 		Environment: row.Environment,
-		Status:      RunStatus(row.Status),
+		Status:      core.RunStatus(row.Status),
 		StartedAt:   row.StartedAt,
 		CompletedAt: row.CompletedAt,
 	}

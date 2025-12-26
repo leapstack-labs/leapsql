@@ -11,7 +11,7 @@ import (
 )
 
 // RegisterModel registers a new model or updates an existing one.
-func (s *SQLiteStore) RegisterModel(model *Model) error {
+func (s *SQLiteStore) RegisterModel(model *core.PersistedModel) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -99,7 +99,7 @@ func (s *SQLiteStore) RegisterModel(model *Model) error {
 }
 
 // GetModelByID retrieves a model by ID.
-func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
+func (s *SQLiteStore) GetModelByID(id string) (*core.PersistedModel, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -116,7 +116,7 @@ func (s *SQLiteStore) GetModelByID(id string) (*Model, error) {
 }
 
 // GetModelByPath retrieves a model by its path.
-func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
+func (s *SQLiteStore) GetModelByPath(path string) (*core.PersistedModel, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -133,7 +133,7 @@ func (s *SQLiteStore) GetModelByPath(path string) (*Model, error) {
 }
 
 // GetModelByFilePath retrieves a model by its file system path.
-func (s *SQLiteStore) GetModelByFilePath(filePath string) (*Model, error) {
+func (s *SQLiteStore) GetModelByFilePath(filePath string) (*core.PersistedModel, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -163,7 +163,7 @@ func (s *SQLiteStore) UpdateModelHash(id string, contentHash string) error {
 }
 
 // ListModels retrieves all registered models.
-func (s *SQLiteStore) ListModels() ([]*Model, error) {
+func (s *SQLiteStore) ListModels() ([]*core.PersistedModel, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -173,7 +173,7 @@ func (s *SQLiteStore) ListModels() ([]*Model, error) {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
 
-	models := make([]*Model, 0, len(rows))
+	models := make([]*core.PersistedModel, 0, len(rows))
 	for _, row := range rows {
 		model, err := convertModel(row)
 		if err != nil {
@@ -246,7 +246,7 @@ func (s *SQLiteStore) ListModelFilePaths() ([]string, error) {
 // --- Model run operations ---
 
 // RecordModelRun records a new model execution.
-func (s *SQLiteStore) RecordModelRun(modelRun *ModelRun) error {
+func (s *SQLiteStore) RecordModelRun(modelRun *core.ModelRun) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -274,7 +274,7 @@ func (s *SQLiteStore) RecordModelRun(modelRun *ModelRun) error {
 }
 
 // UpdateModelRun updates the status of a model run.
-func (s *SQLiteStore) UpdateModelRun(id string, status ModelRunStatus, rowsAffected int64, errMsg string) error {
+func (s *SQLiteStore) UpdateModelRun(id string, status core.ModelRunStatus, rowsAffected int64, errMsg string) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -304,7 +304,7 @@ func (s *SQLiteStore) UpdateModelRun(id string, status ModelRunStatus, rowsAffec
 }
 
 // GetModelRunsForRun retrieves all model runs for a given pipeline run.
-func (s *SQLiteStore) GetModelRunsForRun(runID string) ([]*ModelRun, error) {
+func (s *SQLiteStore) GetModelRunsForRun(runID string) ([]*core.ModelRun, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -314,7 +314,7 @@ func (s *SQLiteStore) GetModelRunsForRun(runID string) ([]*ModelRun, error) {
 		return nil, fmt.Errorf("failed to get model runs: %w", err)
 	}
 
-	modelRuns := make([]*ModelRun, 0, len(rows))
+	modelRuns := make([]*core.ModelRun, 0, len(rows))
 	for _, row := range rows {
 		modelRuns = append(modelRuns, convertModelRun(row))
 	}
@@ -323,7 +323,7 @@ func (s *SQLiteStore) GetModelRunsForRun(runID string) ([]*ModelRun, error) {
 }
 
 // GetLatestModelRun retrieves the most recent run for a model.
-func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
+func (s *SQLiteStore) GetLatestModelRun(modelID string) (*core.ModelRun, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -339,8 +339,8 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*ModelRun, error) {
 	return convertModelRun(row), nil
 }
 
-// convertModel converts a sqlcgen.Model to a state.Model (core.PersistedModel).
-func convertModel(row sqlcgen.Model) (*Model, error) {
+// convertModel converts a sqlcgen.Model to a core.PersistedModel.
+func convertModel(row sqlcgen.Model) (*core.PersistedModel, error) {
 	// Create the embedded core.Model first
 	coreModel := &core.Model{
 		Path:         row.Path,
@@ -377,7 +377,7 @@ func convertModel(row sqlcgen.Model) (*Model, error) {
 	}
 
 	// Create the PersistedModel with embedded Model
-	model := &Model{
+	model := &core.PersistedModel{
 		Model:       coreModel,
 		ID:          row.ID,
 		ContentHash: row.ContentHash,
@@ -388,13 +388,13 @@ func convertModel(row sqlcgen.Model) (*Model, error) {
 	return model, nil
 }
 
-// convertModelRun converts a sqlcgen.ModelRun to a state.ModelRun.
-func convertModelRun(row sqlcgen.ModelRun) *ModelRun {
-	mr := &ModelRun{
+// convertModelRun converts a sqlcgen.ModelRun to a core.ModelRun.
+func convertModelRun(row sqlcgen.ModelRun) *core.ModelRun {
+	mr := &core.ModelRun{
 		ID:          row.ID,
 		RunID:       row.RunID,
 		ModelID:     row.ModelID,
-		Status:      ModelRunStatus(row.Status),
+		Status:      core.ModelRunStatus(row.Status),
 		StartedAt:   row.StartedAt,
 		CompletedAt: row.CompletedAt,
 	}

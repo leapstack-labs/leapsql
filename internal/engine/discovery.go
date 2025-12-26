@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/macro"
 	"github.com/leapstack-labs/leapsql/internal/loader"
+	"github.com/leapstack-labs/leapsql/internal/macro"
 	"github.com/leapstack-labs/leapsql/internal/registry"
-	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -224,15 +223,15 @@ func (e *Engine) discoverMacros(opts DiscoveryOptions, result *DiscoveryResult) 
 
 // saveMacroToStore saves a parsed macro namespace to the state store.
 func (e *Engine) saveMacroToStore(parsed *macro.ParsedNamespace, absPath, hash string) error {
-	ns := &state.MacroNamespace{
+	ns := &core.MacroNamespace{
 		Name:     parsed.Name,
 		FilePath: parsed.FilePath,
 		Package:  parsed.Package,
 	}
 
-	var funcs []*state.MacroFunction
+	var funcs []*core.MacroFunction
 	for _, f := range parsed.Functions {
-		funcs = append(funcs, &state.MacroFunction{
+		funcs = append(funcs, &core.MacroFunction{
 			Namespace: parsed.Name,
 			Name:      f.Name,
 			Args:      f.Args,
@@ -269,7 +268,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 	e.logger.Debug("discovering models", "models_dir", absModelsDir)
 
 	// Clear in-memory state for fresh build
-	e.models = make(map[string]*loader.ModelConfig)
+	e.models = make(map[string]*core.Model)
 	e.registry = registry.NewModelRegistry()
 
 	// Track which files we've seen
@@ -288,7 +287,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 
 		needsParse, newHash, content := e.shouldParseFile(absPath, opts.ForceFullRefresh)
 
-		var modelConfig *loader.ModelConfig
+		var modelConfig *core.Model
 
 		if !needsParse {
 			// Try to load from SQLite
@@ -342,7 +341,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 }
 
 // reconstructModelConfig creates a ModelConfig from stored state and file content.
-func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content []byte) *loader.ModelConfig {
+func (e *Engine) reconstructModelConfig(_ *core.PersistedModel, filePath string, content []byte) *core.Model {
 	// We need to re-parse the file to get the full SQL and sources
 	// But we can skip the full parse validation since we know it was valid before
 	scanner := loader.NewScanner(e.modelsDir, e.dialect)
@@ -355,8 +354,8 @@ func (e *Engine) reconstructModelConfig(_ *state.Model, filePath string, content
 }
 
 // saveModelToStore saves a parsed model to the state store.
-func (e *Engine) saveModelToStore(m *loader.ModelConfig, absPath, hash string) error {
-	model := &state.Model{
+func (e *Engine) saveModelToStore(m *core.Model, absPath, hash string) error {
+	model := &core.PersistedModel{
 		Model: &core.Model{
 			Path:           m.Path,
 			Name:           m.Name,
@@ -378,13 +377,13 @@ func (e *Engine) saveModelToStore(m *loader.ModelConfig, absPath, hash string) e
 
 	// Store column lineage if available
 	if len(m.Columns) > 0 {
-		stateColumns := make([]state.ColumnInfo, 0, len(m.Columns))
+		stateColumns := make([]core.ColumnInfo, 0, len(m.Columns))
 		for _, col := range m.Columns {
-			sources := make([]state.SourceRef, 0, len(col.Sources))
+			sources := make([]core.SourceRef, 0, len(col.Sources))
 			for _, src := range col.Sources {
-				sources = append(sources, state.SourceRef(src))
+				sources = append(sources, core.SourceRef(src))
 			}
-			stateColumns = append(stateColumns, state.ColumnInfo{
+			stateColumns = append(stateColumns, core.ColumnInfo{
 				Name:          col.Name,
 				Index:         col.Index,
 				TransformType: col.TransformType,

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
@@ -27,14 +27,14 @@ type Provider struct {
 	projectCtxMu   sync.RWMutex
 
 	// Dependencies
-	store   state.Store
+	store   core.Store
 	config  lint.ProjectHealthConfig
 	dialect *dialect.Dialect
 	logger  *slog.Logger
 }
 
 // New creates a new Provider with the given dependencies.
-func New(store state.Store, d *dialect.Dialect, config lint.ProjectHealthConfig, logger *slog.Logger) *Provider {
+func New(store core.Store, d *dialect.Dialect, config lint.ProjectHealthConfig, logger *slog.Logger) *Provider {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -266,7 +266,7 @@ func (p *Provider) buildProjectContext() *project.Context {
 }
 
 // Store returns the underlying state store.
-func (p *Provider) Store() state.Store {
+func (p *Provider) Store() core.Store {
 	return p.store
 }
 

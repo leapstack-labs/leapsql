@@ -15,30 +15,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-// Type aliases for backward compatibility - these types are now defined in pkg/core.
-// Use core.* types directly in new code.
-type (
-	// NormalizationStrategy is an alias for core.NormalizationStrategy.
-	NormalizationStrategy = core.NormalizationStrategy
-
-	// PlaceholderStyle is an alias for core.PlaceholderStyle.
-	PlaceholderStyle = core.PlaceholderStyle
-
-	// IdentifierConfig is an alias for core.IdentifierConfig.
-	IdentifierConfig = core.IdentifierConfig
-)
-
-// Re-export constants from core for backward compatibility.
-const (
-	NormLowercase       = core.NormLowercase
-	NormUppercase       = core.NormUppercase
-	NormCaseSensitive   = core.NormCaseSensitive
-	NormCaseInsensitive = core.NormCaseInsensitive
-
-	PlaceholderQuestion = core.PlaceholderQuestion
-	PlaceholderDollar   = core.PlaceholderDollar
-)
-
 // Type classifies how a function affects lineage.
 type Type int
 
@@ -117,11 +93,11 @@ type FunctionDoc struct {
 // Dialect represents a SQL dialect configuration.
 type Dialect struct {
 	Name        string
-	Identifiers IdentifierConfig
+	Identifiers core.IdentifierConfig
 
 	// Database-specific settings
-	DefaultSchema string           // Default schema name ("main" for DuckDB, "public" for Postgres)
-	Placeholder   PlaceholderStyle // How to format query parameters
+	DefaultSchema string                // Default schema name ("main" for DuckDB, "public" for Postgres)
+	Placeholder   core.PlaceholderStyle // How to format query parameters
 
 	// Function classifications (normalized to dialect's normalization strategy)
 	aggregates     map[string]struct{}
@@ -225,9 +201,9 @@ func (d *Dialect) FunctionLineageType(name string) Type {
 // NormalizeName normalizes an identifier according to dialect rules.
 func (d *Dialect) NormalizeName(name string) string {
 	switch d.Identifiers.Normalization {
-	case NormUppercase:
+	case core.NormUppercase:
 		return strings.ToUpper(name)
-	case NormLowercase, NormCaseInsensitive:
+	case core.NormLowercase, core.NormCaseInsensitive:
 		return strings.ToLower(name)
 	default: // NormCaseSensitive
 		return name
@@ -327,7 +303,7 @@ func (d *Dialect) DataTypes() []string {
 // Returns "?" for PlaceholderQuestion style, "$1", "$2" etc. for PlaceholderDollar style.
 func (d *Dialect) FormatPlaceholder(index int) string {
 	switch d.Placeholder {
-	case PlaceholderDollar:
+	case core.PlaceholderDollar:
 		return "$" + strconv.Itoa(index)
 	default: // PlaceholderQuestion
 		return "?"
@@ -596,11 +572,11 @@ func NewDialect(name string) *Builder {
 	return &Builder{
 		dialect: &Dialect{
 			Name: name,
-			Identifiers: IdentifierConfig{
+			Identifiers: core.IdentifierConfig{
 				Quote:         `"`,
 				QuoteEnd:      `"`,
 				Escape:        `""`,
-				Normalization: NormLowercase,
+				Normalization: core.NormLowercase,
 			},
 			aggregates:     make(map[string]struct{}),
 			generators:     make(map[string]struct{}),
@@ -626,8 +602,8 @@ func NewDialect(name string) *Builder {
 }
 
 // Identifiers configures identifier quoting and normalization.
-func (b *Builder) Identifiers(quote, quoteEnd, escape string, norm NormalizationStrategy) *Builder {
-	b.dialect.Identifiers = IdentifierConfig{
+func (b *Builder) Identifiers(quote, quoteEnd, escape string, norm core.NormalizationStrategy) *Builder {
+	b.dialect.Identifiers = core.IdentifierConfig{
 		Quote:         quote,
 		QuoteEnd:      quoteEnd,
 		Escape:        escape,
@@ -697,7 +673,7 @@ func (b *Builder) DefaultSchema(schema string) *Builder {
 }
 
 // PlaceholderStyle sets how query parameters are formatted.
-func (b *Builder) PlaceholderStyle(style PlaceholderStyle) *Builder {
+func (b *Builder) PlaceholderStyle(style core.PlaceholderStyle) *Builder {
 	b.dialect.Placeholder = style
 	return b
 }

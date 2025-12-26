@@ -3,14 +3,14 @@ package registry
 import (
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/internal/loader"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestModelRegistry_Register(t *testing.T) {
 	r := NewModelRegistry()
 
-	model := &loader.ModelConfig{
+	model := &core.Model{
 		Path: "staging.stg_customers",
 		Name: "stg_customers",
 	}
@@ -29,9 +29,9 @@ func TestModelRegistry_Resolve(t *testing.T) {
 	r := NewModelRegistry()
 
 	// Register multiple models
-	r.Register(&loader.ModelConfig{Path: "staging.stg_customers", Name: "stg_customers"})
-	r.Register(&loader.ModelConfig{Path: "staging.stg_orders", Name: "stg_orders"})
-	r.Register(&loader.ModelConfig{Path: "marts.customer_summary", Name: "customer_summary"})
+	r.Register(&core.Model{Path: "staging.stg_customers", Name: "stg_customers"})
+	r.Register(&core.Model{Path: "staging.stg_orders", Name: "stg_orders"})
+	r.Register(&core.Model{Path: "marts.customer_summary", Name: "customer_summary"})
 
 	tests := []struct {
 		name      string
@@ -89,8 +89,8 @@ func TestModelRegistry_ResolveDependencies(t *testing.T) {
 	r := NewModelRegistry()
 
 	// Register models
-	r.Register(&loader.ModelConfig{Path: "staging.stg_customers", Name: "stg_customers"})
-	r.Register(&loader.ModelConfig{Path: "staging.stg_orders", Name: "stg_orders"})
+	r.Register(&core.Model{Path: "staging.stg_customers", Name: "stg_customers"})
+	r.Register(&core.Model{Path: "staging.stg_orders", Name: "stg_orders"})
 
 	// Input: mix of model references and external sources
 	tableNames := []string{
@@ -130,8 +130,8 @@ func TestModelRegistry_ExternalSources(t *testing.T) {
 func TestModelRegistry_AllModels(t *testing.T) {
 	r := NewModelRegistry()
 
-	r.Register(&loader.ModelConfig{Path: "staging.stg_customers", Name: "stg_customers"})
-	r.Register(&loader.ModelConfig{Path: "staging.stg_orders", Name: "stg_orders"})
+	r.Register(&core.Model{Path: "staging.stg_customers", Name: "stg_customers"})
+	r.Register(&core.Model{Path: "staging.stg_orders", Name: "stg_orders"})
 
 	models := r.AllModels()
 	assert.Len(t, models, 2, "expected 2 models")
@@ -140,7 +140,7 @@ func TestModelRegistry_AllModels(t *testing.T) {
 func TestModelRegistry_Deduplication(t *testing.T) {
 	r := NewModelRegistry()
 
-	r.Register(&loader.ModelConfig{Path: "staging.stg_customers", Name: "stg_customers"})
+	r.Register(&core.Model{Path: "staging.stg_customers", Name: "stg_customers"})
 
 	// Input with duplicates
 	tableNames := []string{

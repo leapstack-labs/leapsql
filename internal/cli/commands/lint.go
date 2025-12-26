@@ -9,7 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	intparser "github.com/leapstack-labs/leapsql/internal/loader"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // register project rules
@@ -183,8 +183,8 @@ type lintFileResult struct {
 	Diagnostics []lint.Diagnostic
 }
 
-func filterModelsByPath(models map[string]*intparser.ModelConfig, pathFilter string) []*intparser.ModelConfig {
-	result := make([]*intparser.ModelConfig, 0, len(models))
+func filterModelsByPath(models map[string]*core.Model, pathFilter string) []*core.Model {
+	result := make([]*core.Model, 0, len(models))
 
 	if pathFilter == "" {
 		// Return all models
@@ -212,7 +212,7 @@ func filterModelsByPath(models map[string]*intparser.ModelConfig, pathFilter str
 	return result
 }
 
-func analyzeModels(models []*intparser.ModelConfig, analyzer *lint.Analyzer, d lint.DialectInfo, eng *engine.Engine) []lintFileResult {
+func analyzeModels(models []*core.Model, analyzer *lint.Analyzer, d lint.DialectInfo, eng *engine.Engine) []lintFileResult {
 	var results []lintFileResult
 
 	for _, m := range models {
@@ -442,8 +442,8 @@ func buildProjectContext(eng *engine.Engine, cfg *config.Config) *project.Contex
 	return project.NewContextWithStore(models, parents, children, projectCfg, store)
 }
 
-// convertColumns converts parser.ColumnInfo to lint.ColumnInfo.
-func convertColumns(cols []intparser.ColumnInfo) []lint.ColumnInfo {
+// convertColumns converts core.ColumnInfo to lint.ColumnInfo.
+func convertColumns(cols []core.ColumnInfo) []lint.ColumnInfo {
 	result := make([]lint.ColumnInfo, len(cols))
 	for i, c := range cols {
 		sources := make([]lint.SourceRef, len(c.Sources))

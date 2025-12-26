@@ -7,6 +7,7 @@ import (
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // ConfigFileName is the name of the config file.
@@ -18,7 +19,7 @@ const ConfigFileNameAlt = "leapsql.yml"
 // LoadFromDir loads a ProjectConfig from the given directory.
 // It looks for leapsql.yaml or leapsql.yml in the directory.
 // Returns nil, nil if no config file is found (not an error condition).
-func LoadFromDir(dir string) (*ProjectConfig, error) {
+func LoadFromDir(dir string) (*core.ProjectConfig, error) {
 	// Find config file
 	configPath := findConfigFile(dir)
 	if configPath == "" {
@@ -32,7 +33,7 @@ func LoadFromDir(dir string) (*ProjectConfig, error) {
 	}
 
 	// Unmarshal into ProjectConfig
-	var cfg ProjectConfig
+	var cfg core.ProjectConfig
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return nil, err
 	}

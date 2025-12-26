@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/dag"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 
 	// Import duckdb dialect so it registers itself
@@ -48,7 +49,7 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 	}
 
 	// Verify specific models
-	modelMap := make(map[string]*ModelConfig)
+	modelMap := make(map[string]*core.Model)
 	for _, m := range models {
 		modelMap[m.Path] = m
 	}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func TestParser_ParseContent(t *testing.T) {
 		wantMatl      string
 		wantUniqueKey string
 		wantImports   []string
-		checkFunc     func(t *testing.T, config *ModelConfig)
+		checkFunc     func(t *testing.T, config *core.Model)
 	}{
 		{
 			name: "basic model",
@@ -93,7 +94,7 @@ WHERE created_at > '2024-01-01'
 -- #endif`,
 			wantName: "users",
 			wantPath: "marts.users",
-			checkFunc: func(t *testing.T, config *ModelConfig) {
+			checkFunc: func(t *testing.T, config *core.Model) {
 				require.Len(t, config.Conditionals, 1)
 				assert.Equal(t, "env == 'prod'", config.Conditionals[0].Condition)
 				assert.Equal(t, "WHERE created_at > '2024-01-01'\n", config.Conditionals[0].Content)
@@ -108,7 +109,7 @@ FROM staging.users
 WHERE active = true`,
 			wantName: "active_users",
 			wantPath: "active_users",
-			checkFunc: func(t *testing.T, config *ModelConfig) {
+			checkFunc: func(t *testing.T, config *core.Model) {
 				expectedSQL := `SELECT id, name
 FROM staging.users
 WHERE active = true`
@@ -130,7 +131,7 @@ WHERE active = true`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser("/models", testDialect(t))
+			p := NewLoader("/models", testDialect(t))
 			filePath := filePaths[tt.name]
 			config, err := p.ParseContent(filePath, tt.sql)
 			require.NoError(t, err)
@@ -219,7 +220,7 @@ FROM staging.stg_customers`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser("/models", testDialect(t))
+			p := NewLoader("/models", testDialect(t))
 			config, err := p.ParseContent("/models/test.sql", tt.sql)
 			require.NoError(t, err)
 
@@ -255,7 +256,7 @@ func TestParser_filePathToModelPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewParser(tt.baseDir, nil) // dialect not needed for path conversion
+			p := NewLoader(tt.baseDir, nil) // dialect not needed for path conversion
 			result := p.filePathToModelPath(tt.filePath)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -293,7 +294,7 @@ SELECT COUNT(*) FROM staging.users`,
 	require.Len(t, models, 3)
 
 	// Verify models were parsed correctly
-	modelsByPath := make(map[string]*ModelConfig)
+	modelsByPath := make(map[string]*core.Model)
 	for _, m := range models {
 		modelsByPath[m.Path] = m
 	}
@@ -327,7 +328,7 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 }
 
 func TestParser_ParseContent_ColumnLineage(t *testing.T) {
-	p := NewParser("/models", testDialect(t))
+	p := NewLoader("/models", testDialect(t))
 
 	content := `SELECT 
 		c.customer_id,
@@ -344,7 +345,7 @@ func TestParser_ParseContent_ColumnLineage(t *testing.T) {
 	require.Len(t, config.Columns, 3)
 
 	// Find columns by name
-	columnsByName := make(map[string]ColumnInfo)
+	columnsByName := make(map[string]core.ColumnInfo)
 	for _, col := range config.Columns {
 		columnsByName[col.Name] = col
 	}

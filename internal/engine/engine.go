@@ -11,11 +11,11 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/macro"
-	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/registry"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/state"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
@@ -23,7 +23,7 @@ import (
 type Engine struct {
 	// Database adapter (lazy initialized)
 	db          adapter.Adapter
-	dbConfig    adapter.Config
+	dbConfig    core.AdapterConfig
 	dbConnected bool
 	dbMu        sync.Mutex
 
@@ -33,14 +33,14 @@ type Engine struct {
 	// Structured logger
 	logger *slog.Logger
 
-	store         state.Store
+	store         core.Store
 	modelsDir     string
 	seedsDir      string
 	macrosDir     string
 	environment   string
 	target        *starctx.TargetInfo
 	graph         *dag.Graph
-	models        map[string]*loader.ModelConfig
+	models        map[string]*core.Model
 	registry      *registry.ModelRegistry
 	macroRegistry *macro.Registry
 }
@@ -60,7 +60,7 @@ type Config struct {
 	// Target contains adapter/database configuration
 	Target *starctx.TargetInfo
 	// AdapterConfig contains the full adapter configuration
-	AdapterConfig *adapter.Config
+	AdapterConfig *core.AdapterConfig
 	// Logger is the structured logger (optional, uses discard if nil)
 	Logger *slog.Logger
 
@@ -123,12 +123,12 @@ func New(cfg Config) (*Engine, error) {
 	target := cfg.Target
 
 	// Build adapter config
-	var dbConfig adapter.Config
+	var dbConfig core.AdapterConfig
 	if cfg.AdapterConfig != nil {
 		dbConfig = *cfg.AdapterConfig
 	} else {
 		// Build from target info and legacy DatabasePath for backward compatibility
-		dbConfig = adapter.Config{
+		dbConfig = core.AdapterConfig{
 			Type:     target.Type,
 			Path:     cfg.DatabasePath,
 			Database: target.Database,
@@ -166,7 +166,7 @@ func New(cfg Config) (*Engine, error) {
 		environment:   env,
 		target:        target,
 		graph:         dag.NewGraph(),
-		models:        make(map[string]*loader.ModelConfig),
+		models:        make(map[string]*core.Model),
 		registry:      registry.NewModelRegistry(),
 		macroRegistry: macroRegistry,
 	}, nil
@@ -244,12 +244,12 @@ func (e *Engine) GetGraph() *dag.Graph {
 }
 
 // GetModels returns all discovered models.
-func (e *Engine) GetModels() map[string]*loader.ModelConfig {
+func (e *Engine) GetModels() map[string]*core.Model {
 	return e.models
 }
 
 // GetStateStore returns the state store.
-func (e *Engine) GetStateStore() state.Store {
+func (e *Engine) GetStateStore() core.Store {
 	return e.store
 }
 

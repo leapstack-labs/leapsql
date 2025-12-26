@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sort"
 	"sync"
+
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 var (
@@ -30,7 +32,7 @@ func Get(name string) (func(*slog.Logger) Adapter, bool) {
 
 // NewAdapter creates a new adapter instance based on config type.
 // The logger parameter is passed to the adapter constructor (nil uses discard logger).
-func NewAdapter(cfg Config, logger *slog.Logger) (Adapter, error) {
+func NewAdapter(cfg core.AdapterConfig, logger *slog.Logger) (Adapter, error) {
 	if cfg.Type == "" {
 		return nil, fmt.Errorf("adapter type not specified")
 	}

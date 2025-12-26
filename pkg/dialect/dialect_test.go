@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -148,7 +149,7 @@ func TestDataTypes(t *testing.T) {
 func TestBuilderChaining(t *testing.T) {
 	// Test that all builder methods can be chained
 	d := NewDialect("test").
-		Identifiers(`"`, `"`, `""`, NormCaseInsensitive).
+		Identifiers(`"`, `"`, `""`, core.NormCaseInsensitive).
 		Aggregates("sum", "count").
 		Generators("now").
 		Windows("row_number").
@@ -173,14 +174,14 @@ func TestBuilderChaining(t *testing.T) {
 func TestNormalizationStrategies(t *testing.T) {
 	tests := []struct {
 		name  string
-		norm  NormalizationStrategy
+		norm  core.NormalizationStrategy
 		input string
 		want  string
 	}{
-		{"lowercase", NormLowercase, "FooBar", "foobar"},
-		{"uppercase", NormUppercase, "FooBar", "FOOBAR"},
-		{"case sensitive", NormCaseSensitive, "FooBar", "FooBar"},
-		{"case insensitive", NormCaseInsensitive, "FooBar", "foobar"},
+		{"lowercase", core.NormLowercase, "FooBar", "foobar"},
+		{"uppercase", core.NormUppercase, "FooBar", "FOOBAR"},
+		{"case sensitive", core.NormCaseSensitive, "FooBar", "FooBar"},
+		{"case insensitive", core.NormCaseInsensitive, "FooBar", "foobar"},
 	}
 
 	for _, tt := range tests {
@@ -197,15 +198,15 @@ func TestNormalizationStrategies(t *testing.T) {
 func TestFormatPlaceholder(t *testing.T) {
 	tests := []struct {
 		name  string
-		style PlaceholderStyle
+		style core.PlaceholderStyle
 		index int
 		want  string
 	}{
-		{"question style 1", PlaceholderQuestion, 1, "?"},
-		{"question style 2", PlaceholderQuestion, 2, "?"},
-		{"dollar style 1", PlaceholderDollar, 1, "$1"},
-		{"dollar style 2", PlaceholderDollar, 2, "$2"},
-		{"dollar style 10", PlaceholderDollar, 10, "$10"},
+		{"question style 1", core.PlaceholderQuestion, 1, "?"},
+		{"question style 2", core.PlaceholderQuestion, 2, "?"},
+		{"dollar style 1", core.PlaceholderDollar, 1, "$1"},
+		{"dollar style 2", core.PlaceholderDollar, 2, "$2"},
+		{"dollar style 10", core.PlaceholderDollar, 10, "$10"},
 	}
 
 	for _, tt := range tests {
@@ -284,7 +285,7 @@ func TestQuoteIdentifier(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := NewDialect("test").
-				Identifiers(tt.quote, tt.quoteEnd, tt.escape, NormLowercase).
+				Identifiers(tt.quote, tt.quoteEnd, tt.escape, core.NormLowercase).
 				Build()
 
 			assert.Equal(t, tt.want, d.QuoteIdentifier(tt.input))
@@ -294,7 +295,7 @@ func TestQuoteIdentifier(t *testing.T) {
 
 func TestQuoteIdentifierIfNeeded(t *testing.T) {
 	d := NewDialect("test").
-		Identifiers(`"`, `"`, `""`, NormLowercase).
+		Identifiers(`"`, `"`, `""`, core.NormLowercase).
 		WithReservedWords("SELECT", "user", "ORDER").
 		Build()
 
@@ -320,9 +321,9 @@ func TestQuoteIdentifierIfNeeded(t *testing.T) {
 func TestBuilderWithAllNewMethods(t *testing.T) {
 	// Test that all new builder methods can be chained
 	d := NewDialect("postgres").
-		Identifiers(`"`, `"`, `""`, NormLowercase).
+		Identifiers(`"`, `"`, `""`, core.NormLowercase).
 		DefaultSchema("public").
-		PlaceholderStyle(PlaceholderDollar).
+		PlaceholderStyle(core.PlaceholderDollar).
 		Aggregates("sum", "count").
 		Generators("now").
 		Windows("row_number").
@@ -335,7 +336,7 @@ func TestBuilderWithAllNewMethods(t *testing.T) {
 	require.NotNil(t, d)
 	assert.Equal(t, "postgres", d.Name)
 	assert.Equal(t, "public", d.DefaultSchema)
-	assert.Equal(t, PlaceholderDollar, d.Placeholder)
+	assert.Equal(t, core.PlaceholderDollar, d.Placeholder)
 	assert.Equal(t, "$1", d.FormatPlaceholder(1))
 	assert.True(t, d.IsReservedWord("user"))
 	assert.True(t, d.IsReservedWord("ORDER"))

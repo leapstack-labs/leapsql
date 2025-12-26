@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // CreateEnvironment creates a new environment.
-func (s *SQLiteStore) CreateEnvironment(name string) (*Environment, error) {
+func (s *SQLiteStore) CreateEnvironment(name string) (*core.Environment, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -30,7 +31,7 @@ func (s *SQLiteStore) CreateEnvironment(name string) (*Environment, error) {
 }
 
 // GetEnvironment retrieves an environment by name.
-func (s *SQLiteStore) GetEnvironment(name string) (*Environment, error) {
+func (s *SQLiteStore) GetEnvironment(name string) (*core.Environment, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -59,9 +60,9 @@ func (s *SQLiteStore) UpdateEnvironmentRef(name string, commitRef string) error 
 	})
 }
 
-// convertEnvironment converts a sqlcgen.Environment to a state.Environment.
-func convertEnvironment(row sqlcgen.Environment) *Environment {
-	env := &Environment{
+// convertEnvironment converts a sqlcgen.Environment to a core.Environment.
+func convertEnvironment(row sqlcgen.Environment) *core.Environment {
+	env := &core.Environment{
 		Name:      row.Name,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,

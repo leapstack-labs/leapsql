@@ -10,8 +10,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/dag"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	"github.com/leapstack-labs/leapsql/internal/loader"
-	"github.com/leapstack-labs/leapsql/internal/state"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/spf13/cobra"
 )
 
@@ -222,7 +221,7 @@ func listJSON(eng *engine.Engine, r *output.Renderer) error {
 					listOutput.Summary.ByStatus[string(lastRun.Status)]++
 
 					// Check if stale (content hash changed since last run)
-					if lastRun.Status == state.ModelRunStatusFailed {
+					if lastRun.Status == core.ModelRunStatusFailed {
 						modelInfo.IsStale = true
 						listOutput.Summary.StaleCount++
 					}
@@ -269,5 +268,5 @@ func listJSON(eng *engine.Engine, r *output.Renderer) error {
 }
 
 // Unused type aliases kept for reference
-var _ = (*loader.ModelConfig)(nil)
+var _ = (*core.Model)(nil)
 var _ = (*dag.Graph)(nil)

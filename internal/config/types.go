@@ -1,6 +1,9 @@
 // Package config provides shared configuration types for LeapSQL.
 // This package is decoupled from CLI concerns and can be used by the LSP
 // and other tools that need to load project configuration.
+//
+// Note: Core types are now defined in pkg/core. New code should
+// import pkg/core directly for type definitions.
 package config
 
 import (
@@ -11,24 +14,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
-
-// ProjectConfig is an alias for core.ProjectConfig for backward compatibility.
-type ProjectConfig = core.ProjectConfig
-
-// TargetConfig is an alias for core.TargetConfig for backward compatibility.
-type TargetConfig = core.TargetConfig
-
-// LintConfig is an alias for core.LintConfig for backward compatibility.
-type LintConfig = core.LintConfig
-
-// RuleOptions is an alias for core.RuleOptions for backward compatibility.
-type RuleOptions = core.RuleOptions
-
-// ProjectHealthConfig is an alias for core.ProjectHealthConfig for backward compatibility.
-type ProjectHealthConfig = core.ProjectHealthConfig
-
-// ProjectHealthThresholds is an alias for core.ProjectHealthThresholds for backward compatibility.
-type ProjectHealthThresholds = core.ProjectHealthThresholds
 
 // DefaultSchemaForType returns the default schema for a database type.
 // It looks up the dialect in the registry; if not found, returns "main" as fallback.

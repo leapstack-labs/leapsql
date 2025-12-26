@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -56,7 +57,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestNewAdapter_Success(t *testing.T) {
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Type: "duckdb",
 		Path: ":memory:",
 	}
@@ -67,7 +68,7 @@ func TestNewAdapter_Success(t *testing.T) {
 }
 
 func TestNewAdapter_UnknownType(t *testing.T) {
-	cfg := adapter.Config{
+	cfg := core.AdapterConfig{
 		Type: "unknown_adapter",
 	}
 

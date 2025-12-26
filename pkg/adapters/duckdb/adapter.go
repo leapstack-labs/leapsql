@@ -12,6 +12,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/adapters/duckdb/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 
 	_ "github.com/marcboeker/go-duckdb" // duckdb driver
@@ -40,7 +41,7 @@ func (a *Adapter) Dialect() *dialect.Dialect {
 
 // Connect establishes a connection to DuckDB.
 // Use ":memory:" as the path for an in-memory database.
-func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
+func (a *Adapter) Connect(ctx context.Context, cfg core.AdapterConfig) error {
 	path := cfg.Path
 	if path == "" {
 		path = ":memory:"
@@ -78,7 +79,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg adapter.Config) error {
 }
 
 // GetTableMetadata retrieves metadata for a specified table.
-func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*adapter.Metadata, error) {
+func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*core.TableMetadata, error) {
 	return a.GetTableMetadataCommon(ctx, table, a.Dialect())
 }
 
@@ -109,7 +110,7 @@ func (a *Adapter) LoadCSV(ctx context.Context, tableName string, filePath string
 	return nil
 }
 
-// parseParams decodes adapter.Config.Params into Params.
+// parseParams decodes core.AdapterConfig.Params into Params.
 func parseParams(raw map[string]any) (*Params, error) {
 	if raw == nil {
 		return &Params{}, nil

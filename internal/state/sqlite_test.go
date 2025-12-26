@@ -11,6 +11,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Local type aliases for test convenience
+type (
+	Model      = core.PersistedModel
+	Run        = core.Run
+	ModelRun   = core.ModelRun
+	ColumnInfo = core.ColumnInfo
+	SourceRef  = core.SourceRef
+
+	TestConfig           = core.TestConfig
+	AcceptedValuesConfig = core.AcceptedValuesConfig
+)
+
+// Local constant aliases for test convenience
+const (
+	RunStatusRunning   = core.RunStatusRunning
+	RunStatusCompleted = core.RunStatusCompleted
+	RunStatusFailed    = core.RunStatusFailed
+
+	ModelRunStatusRunning = core.ModelRunStatusRunning
+	ModelRunStatusSuccess = core.ModelRunStatusSuccess
+	ModelRunStatusFailed  = core.ModelRunStatusFailed
+)
+
 func setupTestStore(t *testing.T) *SQLiteStore {
 	t.Helper()
 	store := NewSQLiteStore(testutil.NewTestLogger(t))

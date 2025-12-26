@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // BatchGetAllColumns returns all columns for all models in one query.
 // This reduces N+1 query problems when building project context.
-// Returns a map of modelPath -> []ColumnInfo.
-func (s *SQLiteStore) BatchGetAllColumns() (map[string][]ColumnInfo, error) {
+// Returns a map of modelPath -> []core.ColumnInfo.
+func (s *SQLiteStore) BatchGetAllColumns() (map[string][]core.ColumnInfo, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not opened")
 	}
@@ -21,11 +22,11 @@ func (s *SQLiteStore) BatchGetAllColumns() (map[string][]ColumnInfo, error) {
 	}
 
 	// Build column map
-	result := make(map[string][]ColumnInfo)
+	result := make(map[string][]core.ColumnInfo)
 	columnsIdxMap := make(map[string]map[string]int) // modelPath -> columnName -> index in slice
 
 	for _, row := range colRows {
-		col := ColumnInfo{
+		col := core.ColumnInfo{
 			Name:          row.ColumnName,
 			Index:         int(row.ColumnIndex),
 			TransformType: derefString(row.TransformType),
@@ -51,7 +52,7 @@ func (s *SQLiteStore) BatchGetAllColumns() (map[string][]ColumnInfo, error) {
 			if idx, ok := modelIdx[row.ColumnName]; ok {
 				result[row.ModelPath][idx].Sources = append(
 					result[row.ModelPath][idx].Sources,
-					SourceRef{
+					core.SourceRef{
 						Table:  row.SourceTable,
 						Column: row.SourceColumn,
 					},
@@ -105,7 +106,7 @@ func (s *SQLiteStore) BatchGetAllDependents() (map[string][]string, error) {
 
 // Ensure SQLiteStore implements Store interface batch methods
 var _ interface {
-	BatchGetAllColumns() (map[string][]ColumnInfo, error)
+	BatchGetAllColumns() (map[string][]core.ColumnInfo, error)
 	BatchGetAllDependencies() (map[string][]string, error)
 	BatchGetAllDependents() (map[string][]string, error)
 } = (*SQLiteStore)(nil)

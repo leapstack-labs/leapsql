@@ -1,5 +1,8 @@
 // Package loader provides SQL model file parsing with pragma extraction.
 // It handles DBGo-specific pragmas like @config, @import, and #if directives.
+//
+// Note: Types like ModelConfig, Conditional, SourceRef, and ColumnInfo
+// are now defined in pkg/core. New code should import pkg/core directly.
 package loader
 
 import (
@@ -15,31 +18,18 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
-// ModelConfig is a type alias to core.Model for backward compatibility.
-// New code should use core.Model directly.
-type ModelConfig = core.Model
-
-// Conditional is a type alias to core.Conditional for backward compatibility.
-type Conditional = core.Conditional
-
-// SourceRef is a type alias to core.SourceRef for backward compatibility.
-type SourceRef = core.SourceRef
-
-// ColumnInfo is a type alias to core.ColumnInfo for backward compatibility.
-type ColumnInfo = core.ColumnInfo
-
-// Parser parses SQL model files and extracts pragmas.
-type Parser struct {
+// Loader parses SQL model files and extracts pragmas.
+type Loader struct {
 	// BaseDir is the models directory root
 	BaseDir string
 	// Dialect is the SQL dialect for lineage extraction (optional)
 	Dialect *dialect.Dialect
 }
 
-// NewParser creates a new parser with the given base directory and dialect.
+// NewLoader creates a new loader with the given base directory and dialect.
 // If dialect is nil, lineage extraction will be skipped.
-func NewParser(baseDir string, d *dialect.Dialect) *Parser {
-	return &Parser{BaseDir: baseDir, Dialect: d}
+func NewLoader(baseDir string, d *dialect.Dialect) *Loader {
+	return &Loader{BaseDir: baseDir, Dialect: d}
 }
 
 // Pragma patterns
@@ -57,7 +47,7 @@ var (
 )
 
 // ParseFile parses a single SQL model file.
-func (p *Parser) ParseFile(filePath string) (*core.Model, error) {
+func (p *Loader) ParseFile(filePath string) (*core.Model, error) {
 	content, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is validated by filepath.Walk
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -67,7 +57,7 @@ func (p *Parser) ParseFile(filePath string) (*core.Model, error) {
 }
 
 // ParseContent parses SQL content from a file.
-func (p *Parser) ParseContent(filePath string, content string) (*core.Model, error) {
+func (p *Loader) ParseContent(filePath string, content string) (*core.Model, error) {
 	model := &core.Model{
 		FilePath:     filePath,
 		RawContent:   content,
@@ -203,7 +193,7 @@ type lineageResult struct {
 }
 
 // extractLineage uses the lineage parser to extract all table sources and column lineage from SQL.
-func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
+func (p *Loader) extractLineage(sql string) (*lineageResult, error) {
 	if p.Dialect == nil {
 		return nil, fmt.Errorf("dialect is required for lineage extraction")
 	}
@@ -244,7 +234,7 @@ func (p *Parser) extractLineage(sql string) (*lineageResult, error) {
 }
 
 // parseConfig parses config pragma key-value pairs.
-func (p *Parser) parseConfig(configStr string, model *core.Model) {
+func (p *Loader) parseConfig(configStr string, model *core.Model) {
 	matches := kvPattern.FindAllStringSubmatch(configStr, -1)
 	for _, match := range matches {
 		if len(match) >= 3 {
@@ -263,7 +253,7 @@ func (p *Parser) parseConfig(configStr string, model *core.Model) {
 
 // filePathToModelPath converts a file path to a model path.
 // e.g., "/base/staging/customers.sql" -> "staging.customers"
-func (p *Parser) filePathToModelPath(filePath string) string {
+func (p *Loader) filePathToModelPath(filePath string) string {
 	relPath, err := filepath.Rel(p.BaseDir, filePath)
 	if err != nil {
 		// Fallback to just the filename
@@ -280,14 +270,14 @@ func (p *Parser) filePathToModelPath(filePath string) string {
 
 // Scanner scans a directory for SQL model files.
 type Scanner struct {
-	parser *Parser
+	loader *Loader
 }
 
 // NewScanner creates a new directory scanner with the given dialect.
 // If dialect is nil, lineage extraction will be skipped.
 func NewScanner(baseDir string, d *dialect.Dialect) *Scanner {
 	return &Scanner{
-		parser: NewParser(baseDir, d),
+		loader: NewLoader(baseDir, d),
 	}
 }
 
@@ -310,7 +300,7 @@ func (s *Scanner) ScanDir(dir string) ([]*core.Model, error) {
 			return nil
 		}
 
-		model, err := s.parser.ParseFile(path)
+		model, err := s.loader.ParseFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
@@ -329,10 +319,10 @@ func (s *Scanner) ScanDir(dir string) ([]*core.Model, error) {
 // ParseContent parses SQL content from a file path and content bytes.
 // This is useful for incremental parsing when file content is already loaded.
 func (s *Scanner) ParseContent(filePath string, content []byte) (*core.Model, error) {
-	return s.parser.ParseContent(filePath, string(content))
+	return s.loader.ParseContent(filePath, string(content))
 }
 
-// GetParser returns the underlying parser.
-func (s *Scanner) GetParser() *Parser {
-	return s.parser
+// GetLoader returns the underlying loader.
+func (s *Scanner) GetLoader() *Loader {
+	return s.loader
 }

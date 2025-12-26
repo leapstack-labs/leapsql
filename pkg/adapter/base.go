@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
@@ -15,7 +16,7 @@ import (
 // Close, Exec, and Query implementations.
 type BaseSQLAdapter struct {
 	DB     *sql.DB
-	Cfg    Config
+	Cfg    core.AdapterConfig
 	Logger *slog.Logger
 }
 
@@ -43,7 +44,7 @@ func (b *BaseSQLAdapter) Exec(ctx context.Context, sqlStr string) error {
 }
 
 // Query executes a SQL statement that returns rows.
-func (b *BaseSQLAdapter) Query(ctx context.Context, sqlStr string) (*Rows, error) {
+func (b *BaseSQLAdapter) Query(ctx context.Context, sqlStr string) (*core.Rows, error) {
 	if b.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
@@ -52,7 +53,7 @@ func (b *BaseSQLAdapter) Query(ctx context.Context, sqlStr string) (*Rows, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	return &Rows{Rows: rows}, nil
+	return &core.Rows{Rows: rows}, nil
 }
 
 // IsConnected returns true if the database connection is established.
@@ -72,7 +73,7 @@ func ParseQualifiedName(table string, d *dialect.Dialect) (schema, name string) 
 // GetTableMetadataCommon provides a shared implementation of GetTableMetadata.
 // Uses information_schema.columns with dialect-appropriate placeholders.
 // This can be called by concrete adapters to avoid code duplication.
-func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table string, d *dialect.Dialect) (*Metadata, error) {
+func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table string, d *dialect.Dialect) (*core.TableMetadata, error) {
 	if b.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
@@ -99,9 +100,9 @@ func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table strin
 	}
 	defer func() { _ = rows.Close() }()
 
-	var columns []Column
+	var columns []core.Column
 	for rows.Next() {
-		var col Column
+		var col core.Column
 		var nullable string
 		if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Position); err != nil {
 			return nil, fmt.Errorf("failed to scan column metadata: %w", err)
@@ -126,7 +127,7 @@ func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table strin
 		rowCount = 0
 	}
 
-	return &Metadata{
+	return &core.TableMetadata{
 		Schema:   schema,
 		Name:     tableName,
 		Columns:  columns,

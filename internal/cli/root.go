@@ -13,7 +13,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
-	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/spf13/cobra"
 )
 
@@ -197,9 +197,9 @@ func CreateEngine(cfg *config.Config, logger *slog.Logger) (*engine.Engine, erro
 	}
 
 	// Build adapter config from target
-	var adapterConfig *adapter.Config
+	var adapterConfig *core.AdapterConfig
 	if cfg.Target != nil {
-		adapterConfig = &adapter.Config{
+		adapterConfig = &core.AdapterConfig{
 			Type:     cfg.Target.Type,
 			Path:     cfg.Target.Database,
 			Database: cfg.Target.Database,
