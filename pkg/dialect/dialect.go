@@ -649,14 +649,20 @@ func (b *Builder) Build() *Dialect {
 	// ===== Auto-wire clause extensions =====
 
 	// GROUP BY - use standard or ALL-aware handler
-	b.addClauseIfMissing(token.GROUP, GroupBy(GroupByOpts{
-		AllowAll: cfg.SupportsGroupByAll,
-	}))
+	// Replace existing handler if config specifies ALL support
+	if cfg.SupportsGroupByAll {
+		b.replaceOrAddClause(token.GROUP, GroupBy(GroupByOpts{AllowAll: true}))
+	} else {
+		b.addClauseIfMissing(token.GROUP, StandardGroupBy)
+	}
 
 	// ORDER BY - use standard or ALL-aware handler
-	b.addClauseIfMissing(token.ORDER, OrderBy(OrderByOpts{
-		AllowAll: cfg.SupportsOrderByAll,
-	}))
+	// Replace existing handler if config specifies ALL support
+	if cfg.SupportsOrderByAll {
+		b.replaceOrAddClause(token.ORDER, OrderBy(OrderByOpts{AllowAll: true}))
+	} else {
+		b.addClauseIfMissing(token.ORDER, StandardOrderBy)
+	}
 
 	// QUALIFY
 	if cfg.SupportsQualify {
@@ -696,6 +702,25 @@ func (b *Builder) Build() *Dialect {
 	}
 
 	return b.dialect
+}
+
+// replaceOrAddClause replaces an existing clause handler or adds a new one.
+// Use this when a config flag requires a specific handler variant.
+func (b *Builder) replaceOrAddClause(t token.TokenType, def ClauseDef) {
+	def.Token = t
+	b.dialect.clauseDefs[t] = def
+	recordClause(t, t.String())
+	// Ensure the token is in the sequence
+	found := false
+	for _, tok := range b.dialect.clauseSequence {
+		if tok == t {
+			found = true
+			break
+		}
+	}
+	if !found {
+		b.dialect.clauseSequence = append(b.dialect.clauseSequence, t)
+	}
 }
 
 // addClauseIfMissing adds a clause only if not already registered.

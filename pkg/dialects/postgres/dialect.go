@@ -5,21 +5,11 @@
 package postgres
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/spi"
-	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 func init() {
 	dialect.Register(Postgres)
-}
-
-// --- PostgreSQL-specific Operators ---
-
-var postgresOperators = []dialect.OperatorDef{
-	{Token: token.ILIKE, Precedence: spi.PrecedenceComparison},
-	{Token: token.DCOLON, Symbol: "::", Precedence: spi.PrecedencePostfix},
 }
 
 // postgresReservedWords contains common PostgreSQL reserved words.
@@ -42,68 +32,18 @@ var postgresReservedWords = []string{
 	"using", "variadic", "verbose", "when", "window", "with",
 }
 
-// Postgres is the PostgreSQL dialect configuration.
-// Uses explicit composition - no inheritance from ANSI.
-var Postgres = dialect.NewDialect("postgres").
-	// Static Configuration
-	Identifiers(`"`, `"`, `""`, core.NormLowercase). // Postgres normalizes unquoted identifiers to lowercase
-	DefaultSchema("public").
-	PlaceholderStyle(core.PlaceholderDollar).
-	// Register PostgreSQL-specific keywords for the lexer
-	AddKeyword("ILIKE", token.ILIKE).
+// Postgres is the PostgreSQL dialect.
+// Builder reads Config flags and auto-wires standard features:
+// - ILIKE operator (SupportsIlike)
+// - :: cast operator (SupportsCastOperator)
+// - RETURNING clause (SupportsReturning)
+var Postgres = dialect.New(Config).
 	// Clause Sequence - standard ANSI clauses (no QUALIFY)
 	Clauses(dialect.StandardSelectClauses...).
-	// Operators - compose from standard + custom
-	Operators(
-		dialect.ANSIOperators,
-		postgresOperators,
-	).
-	// Join Types - standard ANSI only
+	// Operators - standard ANSI operators (ILIKE and DCOLON are auto-wired)
+	Operators(dialect.ANSIOperators).
+	// Join Types - standard ANSI only (no SEMI/ANTI)
 	JoinTypes(dialect.ANSIJoinTypes).
-	// Function classifications
-	Aggregates(
-		// Standard aggregates
-		"SUM", "COUNT", "AVG", "MIN", "MAX",
-		"STDDEV", "STDDEV_POP", "STDDEV_SAMP",
-		"VARIANCE", "VAR_POP", "VAR_SAMP",
-		// PostgreSQL specific
-		"ARRAY_AGG", "STRING_AGG",
-		"JSONB_AGG", "JSONB_OBJECT_AGG", "JSON_AGG", "JSON_OBJECT_AGG",
-		"BOOL_AND", "BOOL_OR", "EVERY",
-		"BIT_AND", "BIT_OR", "BIT_XOR",
-		"CORR", "COVAR_POP", "COVAR_SAMP",
-		"REGR_AVGX", "REGR_AVGY", "REGR_COUNT", "REGR_INTERCEPT",
-		"REGR_R2", "REGR_SLOPE", "REGR_SXX", "REGR_SXY", "REGR_SYY",
-		"PERCENTILE_CONT", "PERCENTILE_DISC",
-		"MODE",
-		"XMLAGG",
-	).
-	Generators(
-		// Date/time generators
-		"CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME",
-		"NOW", "LOCALTIME", "LOCALTIMESTAMP",
-		"STATEMENT_TIMESTAMP", "TRANSACTION_TIMESTAMP", "CLOCK_TIMESTAMP",
-		// Value generators
-		"GEN_RANDOM_UUID",
-		"RANDOM", "SETSEED",
-		// Constants
-		"PI",
-		// System functions
-		"CURRENT_SCHEMA", "CURRENT_SCHEMAS",
-		"CURRENT_DATABASE", "CURRENT_CATALOG",
-		"CURRENT_USER", "CURRENT_ROLE", "SESSION_USER", "USER",
-		"VERSION",
-		"INET_CLIENT_ADDR", "INET_CLIENT_PORT",
-		"INET_SERVER_ADDR", "INET_SERVER_PORT",
-		"PG_BACKEND_PID", "PG_BLOCKING_PIDS",
-		"TXID_CURRENT", "TXID_CURRENT_IF_ASSIGNED",
-	).
-	Windows(
-		// Ranking functions
-		"ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE",
-		"PERCENT_RANK", "CUME_DIST",
-		// Value functions
-		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
-	).
+	// Reserved words
 	WithReservedWords(postgresReservedWords...).
 	Build()
