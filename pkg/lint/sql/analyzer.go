@@ -1,24 +1,19 @@
-package lint
+package sql
 
-// Analyzer runs lint rules against parsed SQL.
+import (
+	"github.com/leapstack-labs/leapsql/pkg/lint"
+)
+
+// Analyzer runs SQL lint rules against parsed statements.
 type Analyzer struct {
-	config  *Config
+	config  *lint.Config
 	dialect string // Filter rules by dialect (empty = all)
 }
 
-// NewAnalyzer creates a new analyzer with optional configuration.
-func NewAnalyzer(config *Config) *Analyzer {
+// NewAnalyzer creates a new SQL analyzer with optional configuration.
+func NewAnalyzer(config *lint.Config, dialect string) *Analyzer {
 	if config == nil {
-		config = NewConfig()
-	}
-	return &Analyzer{config: config}
-}
-
-// NewAnalyzerWithRegistry creates an analyzer that uses registry rules
-// filtered by dialect.
-func NewAnalyzerWithRegistry(config *Config, dialect string) *Analyzer {
-	if config == nil {
-		config = NewConfig()
+		config = lint.NewConfig()
 	}
 	return &Analyzer{
 		config:  config,
@@ -26,24 +21,24 @@ func NewAnalyzerWithRegistry(config *Config, dialect string) *Analyzer {
 	}
 }
 
-// Analyze runs all rules from the dialect against the statement.
+// Analyze runs all registered SQL rules against the statement.
 // The stmt parameter should be *parser.SelectStmt.
-func (a *Analyzer) Analyze(stmt any, dialect DialectInfo) []Diagnostic {
+func (a *Analyzer) Analyze(stmt any, dialect lint.DialectInfo) []lint.Diagnostic {
 	if stmt == nil {
 		return nil
 	}
 
-	var diagnostics []Diagnostic
+	var diagnostics []lint.Diagnostic
 	dialectName := a.dialect
 	if dialectName == "" && dialect != nil {
 		dialectName = dialect.GetName()
 	}
 
-	var rules []SQLRule
+	var rules []lint.SQLRule
 	if dialectName != "" {
-		rules = GetSQLRulesByDialect(dialectName)
+		rules = lint.GetSQLRulesByDialect(dialectName)
 	} else {
-		rules = GetAllSQLRules()
+		rules = lint.GetAllSQLRules()
 	}
 
 	for _, rule := range rules {
@@ -52,7 +47,7 @@ func (a *Analyzer) Analyze(stmt any, dialect DialectInfo) []Diagnostic {
 			continue
 		}
 
-		// Check dialect filter
+		// Check dialect filter (redundant if we filtered above, but safe)
 		dialects := rule.Dialects()
 		if len(dialects) > 0 && dialectName != "" && !containsDialect(dialects, dialectName) {
 			continue
@@ -75,15 +70,9 @@ func (a *Analyzer) Analyze(stmt any, dialect DialectInfo) []Diagnostic {
 	return diagnostics
 }
 
-// AnalyzeWithRegistryRules runs all registered rules against the statement.
-// This is an alias for Analyze for backward compatibility.
-func (a *Analyzer) AnalyzeWithRegistryRules(stmt any, dialect DialectInfo) []Diagnostic {
-	return a.Analyze(stmt, dialect)
-}
-
 // AnalyzeMultiple runs analysis on multiple statements.
-func (a *Analyzer) AnalyzeMultiple(stmts []any, dialect DialectInfo) []Diagnostic {
-	var diagnostics []Diagnostic
+func (a *Analyzer) AnalyzeMultiple(stmts []any, dialect lint.DialectInfo) []lint.Diagnostic {
+	var diagnostics []lint.Diagnostic
 	for _, stmt := range stmts {
 		diagnostics = append(diagnostics, a.Analyze(stmt, dialect)...)
 	}

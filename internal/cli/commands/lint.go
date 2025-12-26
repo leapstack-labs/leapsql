@@ -13,7 +13,7 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // register project rules
-	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules"         // register rules
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/sql/rules"     // register SQL rules
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/spf13/cobra"
 )
@@ -167,9 +167,9 @@ func buildLintConfig(cfg *config.Config, opts *LintOptions) *lint.Config {
 		for _, id := range opts.Rules {
 			enabledSet[strings.TrimSpace(id)] = true
 		}
-		for _, rule := range lint.GetAll() {
-			if !enabledSet[rule.ID] {
-				lintCfg.Disable(rule.ID)
+		for _, rule := range lint.GetAllSQLRules() {
+			if !enabledSet[rule.ID()] {
+				lintCfg.Disable(rule.ID())
 			}
 		}
 	}

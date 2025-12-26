@@ -57,10 +57,10 @@ func TestBuildLintConfig(t *testing.T) {
 		assert.False(t, cfg.IsDisabled("AM01"))
 		assert.False(t, cfg.IsDisabled("AM02"))
 		// Other rules should be disabled (if registered)
-		allRules := lint.GetAll()
+		allRules := lint.GetAllSQLRules()
 		for _, r := range allRules {
-			if r.ID != "AM01" && r.ID != "AM02" {
-				assert.True(t, cfg.IsDisabled(r.ID), "rule %q should be disabled", r.ID)
+			if r.ID() != "AM01" && r.ID() != "AM02" {
+				assert.True(t, cfg.IsDisabled(r.ID()), "rule %q should be disabled", r.ID())
 			}
 		}
 	})

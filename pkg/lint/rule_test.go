@@ -210,7 +210,7 @@ func TestWrapRuleDef_Unwrap(t *testing.T) {
 
 func TestUnifiedRegistry_SQLRules(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	rule := &mockSQLRule{
 		id:    "REG01",
@@ -245,7 +245,7 @@ func TestUnifiedRegistry_SQLRules(t *testing.T) {
 
 func TestUnifiedRegistry_ProjectRules(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	rule := &mockProjectRule{
 		id:    "PREG01",
@@ -276,7 +276,7 @@ func TestUnifiedRegistry_ProjectRules(t *testing.T) {
 
 func TestAllRules(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	sqlRule := &mockSQLRule{
 		id:       "SQL01",
@@ -325,7 +325,7 @@ func TestAllRules(t *testing.T) {
 
 func TestGetSQLRulesByDialect(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	postgresRule := &mockSQLRule{
 		id:       "PG01",
@@ -362,7 +362,7 @@ func TestGetSQLRulesByDialect(t *testing.T) {
 
 func TestGetSQLRulesByGroup(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	rule1 := &mockSQLRule{id: "GRP01", group: "ambiguous"}
 	rule2 := &mockSQLRule{id: "GRP02", group: "ambiguous"}
@@ -382,7 +382,7 @@ func TestGetSQLRulesByGroup(t *testing.T) {
 
 func TestGetProjectRulesByGroup(t *testing.T) {
 	// Clear registry before test
-	ClearUnified()
+	Clear()
 
 	rule1 := &mockProjectRule{id: "PGRP01", group: "modeling"}
 	rule2 := &mockProjectRule{id: "PGRP02", group: "modeling"}

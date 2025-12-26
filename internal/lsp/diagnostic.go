@@ -11,7 +11,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
-	_ "github.com/leapstack-labs/leapsql/pkg/lint/rules" // Register SQLFluff-style lint rules
+	_ "github.com/leapstack-labs/leapsql/pkg/lint/sql/rules" // Register SQLFluff-style lint rules
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
 

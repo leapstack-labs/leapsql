@@ -2,76 +2,66 @@ package lint
 
 import "sync"
 
-// globalRegistry is the single global registry for all lint rules.
-var globalRegistry = &Registry{
-	rules: make(map[string]RuleDef),
+// registry is the single global registry for all lint rules.
+var registry = &Registry{
+	sqlRules:     make(map[string]SQLRule),
+	projectRules: make(map[string]ProjectRule),
 }
 
-// Registry stores registered lint rules for discovery.
+// Registry stores all registered lint rules (both SQL and project).
 type Registry struct {
-	mu    sync.RWMutex
-	rules map[string]RuleDef // keyed by ID
+	mu           sync.RWMutex
+	sqlRules     map[string]SQLRule
+	projectRules map[string]ProjectRule
 }
 
-// Register adds a rule to the global registry.
+// =============================================================================
+// SQL Rule Registration
+// =============================================================================
+
+// RegisterSQLRule adds an SQL rule to the registry.
 // Call this from init() functions in rule packages.
-func Register(rule RuleDef) {
-	globalRegistry.mu.Lock()
-	defer globalRegistry.mu.Unlock()
-	globalRegistry.rules[rule.ID] = rule
-
-	// Also register in the unified registry
-	RegisterSQLRule(WrapRuleDef(rule))
+func RegisterSQLRule(rule SQLRule) {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.sqlRules[rule.ID()] = rule
 }
 
-// GetAll returns all registered rules.
-func GetAll() []RuleDef {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
+// GetAllSQLRules returns all registered SQL rules.
+func GetAllSQLRules() []SQLRule {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
 
-	rules := make([]RuleDef, 0, len(globalRegistry.rules))
-	for _, rule := range globalRegistry.rules {
+	rules := make([]SQLRule, 0, len(registry.sqlRules))
+	for _, rule := range registry.sqlRules {
 		rules = append(rules, rule)
 	}
 	return rules
 }
 
-// GetByID returns a rule by its ID.
-func GetByID(id string) (RuleDef, bool) {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-	rule, ok := globalRegistry.rules[id]
+// GetSQLRuleByID returns an SQL rule by its ID.
+func GetSQLRuleByID(id string) (SQLRule, bool) {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	rule, ok := registry.sqlRules[id]
 	return rule, ok
 }
 
-// GetByGroup returns all rules in a specific group.
-func GetByGroup(group string) []RuleDef {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
+// GetSQLRulesByDialect returns SQL rules applicable to a specific dialect.
+// Rules with empty/nil Dialects are included (they apply to all dialects).
+func GetSQLRulesByDialect(dialectName string) []SQLRule {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
 
-	var rules []RuleDef
-	for _, rule := range globalRegistry.rules {
-		if rule.Group == group {
-			rules = append(rules, rule)
-		}
-	}
-	return rules
-}
-
-// GetByDialect returns rules applicable to a specific dialect.
-// Rules with empty/nil Dialects field are included (they apply to all dialects).
-func GetByDialect(dialectName string) []RuleDef {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-
-	var rules []RuleDef
-	for _, rule := range globalRegistry.rules {
-		if len(rule.Dialects) == 0 {
+	var rules []SQLRule
+	for _, rule := range registry.sqlRules {
+		dialects := rule.Dialects()
+		if len(dialects) == 0 {
 			// Rule applies to all dialects
 			rules = append(rules, rule)
 			continue
 		}
-		for _, d := range rule.Dialects {
+		for _, d := range dialects {
 			if d == dialectName {
 				rules = append(rules, rule)
 				break
@@ -81,16 +71,121 @@ func GetByDialect(dialectName string) []RuleDef {
 	return rules
 }
 
-// Count returns the number of registered rules.
-func Count() int {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-	return len(globalRegistry.rules)
+// GetSQLRulesByGroup returns SQL rules in a specific group.
+func GetSQLRulesByGroup(group string) []SQLRule {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	var rules []SQLRule
+	for _, rule := range registry.sqlRules {
+		if rule.Group() == group {
+			rules = append(rules, rule)
+		}
+	}
+	return rules
 }
 
-// Clear removes all registered rules. Used for testing.
+// CountSQLRules returns the number of registered SQL rules.
+func CountSQLRules() int {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	return len(registry.sqlRules)
+}
+
+// =============================================================================
+// Project Rule Registration
+// =============================================================================
+
+// RegisterProjectRule adds a project rule to the registry.
+// Call this from init() functions in rule packages.
+func RegisterProjectRule(rule ProjectRule) {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.projectRules[rule.ID()] = rule
+}
+
+// GetAllProjectRules returns all registered project rules.
+func GetAllProjectRules() []ProjectRule {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	rules := make([]ProjectRule, 0, len(registry.projectRules))
+	for _, rule := range registry.projectRules {
+		rules = append(rules, rule)
+	}
+	return rules
+}
+
+// GetProjectRuleByID returns a project rule by its ID.
+func GetProjectRuleByID(id string) (ProjectRule, bool) {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	rule, ok := registry.projectRules[id]
+	return rule, ok
+}
+
+// GetProjectRulesByGroup returns project rules in a specific group.
+func GetProjectRulesByGroup(group string) []ProjectRule {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	var rules []ProjectRule
+	for _, rule := range registry.projectRules {
+		if rule.Group() == group {
+			rules = append(rules, rule)
+		}
+	}
+	return rules
+}
+
+// CountProjectRules returns the number of registered project rules.
+func CountProjectRules() int {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	return len(registry.projectRules)
+}
+
+// =============================================================================
+// Unified Access
+// =============================================================================
+
+// GetRuleByID returns any rule by its ID, checking both SQL and project rules.
+func GetRuleByID(id string) (Rule, bool) {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	if rule, ok := registry.sqlRules[id]; ok {
+		return rule, true
+	}
+	if rule, ok := registry.projectRules[id]; ok {
+		return rule, true
+	}
+	return nil, false
+}
+
+// AllRules returns metadata for all registered rules (both SQL and project).
+func AllRules() []RuleInfo {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	rules := make([]RuleInfo, 0, len(registry.sqlRules)+len(registry.projectRules))
+	for _, rule := range registry.sqlRules {
+		rules = append(rules, GetRuleInfo(rule))
+	}
+	for _, rule := range registry.projectRules {
+		rules = append(rules, GetRuleInfo(rule))
+	}
+	return rules
+}
+
+// =============================================================================
+// Testing Utilities
+// =============================================================================
+
+// Clear removes all rules from the registry. Used for testing.
 func Clear() {
-	globalRegistry.mu.Lock()
-	defer globalRegistry.mu.Unlock()
-	globalRegistry.rules = make(map[string]RuleDef)
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.sqlRules = make(map[string]SQLRule)
+	registry.projectRules = make(map[string]ProjectRule)
 }
