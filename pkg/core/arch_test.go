@@ -13,6 +13,45 @@ const modulePath = "github.com/leapstack-labs/leapsql"
 // PKG LAYER CLASSIFICATION
 // =============================================================================
 
+// namespacePackages are directories that group distinct components (plugins).
+// Subpackages under these are treated as separate components.
+// e.g., pkg/dialects/duckdb and pkg/dialects/postgres are different components.
+var namespacePackages = map[string]bool{
+	"pkg/dialects": true,
+	"pkg/adapters": true,
+}
+
+// getTopLevelComponent returns the logical component for a pkg/* path.
+// For namespace packages (like pkg/dialects), the component is one level deeper.
+// e.g., "pkg/lint/sql/rules" -> "pkg/lint"
+//
+//	"pkg/dialects/duckdb/types" -> "pkg/dialects/duckdb"
+func getTopLevelComponent(path string) string {
+	if !strings.HasPrefix(path, "pkg/") {
+		return ""
+	}
+	rest := strings.TrimPrefix(path, "pkg/")
+	parts := strings.Split(rest, "/")
+	if len(parts) == 0 {
+		return path
+	}
+	candidate := "pkg/" + parts[0]
+	if namespacePackages[candidate] {
+		if len(parts) > 1 {
+			return candidate + "/" + parts[1]
+		}
+		return candidate
+	}
+	return candidate
+}
+
+// isSameComponent checks if two paths belong to the same logical component.
+func isSameComponent(path1, path2 string) bool {
+	c1 := getTopLevelComponent(path1)
+	c2 := getTopLevelComponent(path2)
+	return c1 != "" && c1 == c2
+}
+
 // isFoundation returns true for hub packages that any component can import.
 func isFoundation(path string) bool {
 	foundationPkgs := map[string]bool{
@@ -189,8 +228,13 @@ func checkPkgComponentImports(t *testing.T, pkg *packages.Package, pkgPath, base
 		}
 		depPath := strings.TrimPrefix(imp, base)
 
-		// Self-imports OK
+		// Self-imports OK (same package or subpackages)
 		if strings.HasPrefix(depPath, pkgPath) || strings.HasPrefix(pkgPath, depPath) {
+			continue
+		}
+
+		// Same component OK (e.g., pkg/lint/sql/rules can import pkg/lint/sql/internal/ast)
+		if isSameComponent(pkgPath, depPath) {
 			continue
 		}
 
