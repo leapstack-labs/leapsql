@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -24,12 +25,12 @@ import (
 // When no dialect is set, it falls back to default ANSI precedence.
 
 // parseExpression parses an expression using precedence climbing.
-func (p *Parser) parseExpression() Expr {
+func (p *Parser) parseExpression() core.Expr {
 	return p.parseExpressionWithPrecedence(spi.PrecedenceNone + 1)
 }
 
 // parseExpressionWithPrecedence implements Pratt parsing with dialect-aware precedence.
-func (p *Parser) parseExpressionWithPrecedence(minPrecedence int) Expr {
+func (p *Parser) parseExpressionWithPrecedence(minPrecedence int) core.Expr {
 	// Parse prefix (unary operators and primary expressions)
 	left := p.parsePrefixExpr()
 	if left == nil {
@@ -53,22 +54,22 @@ func (p *Parser) parseExpressionWithPrecedence(minPrecedence int) Expr {
 }
 
 // parsePrefixExpr parses prefix expressions (unary operators and primary expressions).
-func (p *Parser) parsePrefixExpr() Expr {
+func (p *Parser) parsePrefixExpr() core.Expr {
 	switch p.token.Type {
 	case TOKEN_NOT:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceNot)
-		return &UnaryExpr{Op: token.NOT, Expr: expr}
+		return &core.UnaryExpr{Op: token.NOT, Expr: expr}
 
 	case TOKEN_MINUS:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
-		return &UnaryExpr{Op: token.MINUS, Expr: expr}
+		return &core.UnaryExpr{Op: token.MINUS, Expr: expr}
 
 	case TOKEN_PLUS:
 		p.nextToken()
 		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
-		return &UnaryExpr{Op: token.PLUS, Expr: expr}
+		return &core.UnaryExpr{Op: token.PLUS, Expr: expr}
 
 	default:
 		return p.parsePrimary()
@@ -118,7 +119,7 @@ func (p *Parser) defaultPrecedence(t TokenType) int {
 }
 
 // parseInfixExpr parses an infix expression given the left operand and current precedence.
-func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
+func (p *Parser) parseInfixExpr(left core.Expr, prec int) core.Expr {
 	// Handle special infix operators first
 	switch p.token.Type {
 	case TOKEN_NOT:
@@ -165,7 +166,7 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 			}
 			// If handler returned nil, fall through to standard handling
 			// This can happen for operators that need standard binary handling
-			return &BinaryExpr{Left: left, Op: op.Type, Right: p.parseExpressionWithPrecedence(prec + 1)}
+			return &core.BinaryExpr{Left: left, Op: op.Type, Right: p.parseExpressionWithPrecedence(prec + 1)}
 		}
 	}
 
@@ -176,11 +177,11 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 	// Parse right operand with higher precedence (left-associative)
 	right := p.parseExpressionWithPrecedence(prec + 1)
 
-	return &BinaryExpr{Left: left, Op: op.Type, Right: right}
+	return &core.BinaryExpr{Left: left, Op: op.Type, Right: right}
 }
 
 // parseNotInfixExpr handles NOT as an infix modifier (NOT IN, NOT BETWEEN, NOT LIKE).
-func (p *Parser) parseNotInfixExpr(left Expr) Expr {
+func (p *Parser) parseNotInfixExpr(left core.Expr) core.Expr {
 	p.nextToken() // consume NOT
 
 	switch p.token.Type {
@@ -212,7 +213,7 @@ func (p *Parser) parseNotInfixExpr(left Expr) Expr {
 }
 
 // parseIsExpr parses IS [NOT] NULL / IS [NOT] TRUE / IS [NOT] FALSE.
-func (p *Parser) parseIsExpr(left Expr) Expr {
+func (p *Parser) parseIsExpr(left core.Expr) core.Expr {
 	p.nextToken() // consume IS
 
 	isNot := p.match(TOKEN_NOT)
@@ -220,15 +221,15 @@ func (p *Parser) parseIsExpr(left Expr) Expr {
 	switch p.token.Type {
 	case TOKEN_NULL:
 		p.nextToken()
-		return &IsNullExpr{Expr: left, Not: isNot}
+		return &core.IsNullExpr{Expr: left, Not: isNot}
 
 	case TOKEN_TRUE:
 		p.nextToken()
-		return &IsBoolExpr{Expr: left, Not: isNot, Value: true}
+		return &core.IsBoolExpr{Expr: left, Not: isNot, Value: true}
 
 	case TOKEN_FALSE:
 		p.nextToken()
-		return &IsBoolExpr{Expr: left, Not: isNot, Value: false}
+		return &core.IsBoolExpr{Expr: left, Not: isNot, Value: false}
 
 	default:
 		p.addError("expected NULL, TRUE, or FALSE after IS")
@@ -237,9 +238,9 @@ func (p *Parser) parseIsExpr(left Expr) Expr {
 }
 
 // parseInExpr parses an IN expression.
-func (p *Parser) parseInExpr(left Expr, not bool) Expr {
+func (p *Parser) parseInExpr(left core.Expr, not bool) core.Expr {
 	p.expect(TOKEN_LPAREN)
-	in := &InExpr{Expr: left, Not: not}
+	in := &core.InExpr{Expr: left, Not: not}
 
 	// Check if it's a subquery
 	if p.check(TOKEN_SELECT) || p.check(TOKEN_WITH) {
@@ -254,8 +255,8 @@ func (p *Parser) parseInExpr(left Expr, not bool) Expr {
 }
 
 // parseBetweenExpr parses a BETWEEN expression.
-func (p *Parser) parseBetweenExpr(left Expr, not bool) Expr {
-	between := &BetweenExpr{Expr: left, Not: not}
+func (p *Parser) parseBetweenExpr(left core.Expr, not bool) core.Expr {
+	between := &core.BetweenExpr{Expr: left, Not: not}
 	// Parse low bound at addition precedence to avoid capturing AND
 	between.Low = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	p.expect(TOKEN_AND)
@@ -265,8 +266,8 @@ func (p *Parser) parseBetweenExpr(left Expr, not bool) Expr {
 }
 
 // parseLikeExpr parses a LIKE/ILIKE expression.
-func (p *Parser) parseLikeExpr(left Expr, not bool, op token.TokenType) Expr {
-	like := &LikeExpr{Expr: left, Not: not, Op: op}
+func (p *Parser) parseLikeExpr(left core.Expr, not bool, op token.TokenType) core.Expr {
+	like := &core.LikeExpr{Expr: left, Not: not, Op: op}
 	// Parse pattern at addition precedence
 	like.Pattern = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
 	return like

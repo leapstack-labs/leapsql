@@ -473,7 +473,7 @@ func levenshtein(s1, s2 string) int {
 }
 
 // runLinter runs lint rules against a parsed SQL statement.
-func (s *Server) runLinter(uri string, stmt *pkgparser.SelectStmt) []Diagnostic {
+func (s *Server) runLinter(uri string, stmt *core.SelectStmt) []Diagnostic {
 	// Use analyzer with registry to get SQLFluff-style rules in addition to dialect rules
 	analyzer := lint.NewAnalyzerWithRegistry(lint.NewConfig(), s.dialect.GetName())
 	lintDiags := analyzer.Analyze(stmt, s.dialect)

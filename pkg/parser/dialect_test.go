@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -66,7 +67,7 @@ func TestQualifyWithComplexExpression(t *testing.T) {
 
 	// Verify QUALIFY contains a binary expression (AND)
 	qualify := stmt.Body.Left.Qualify
-	binaryExpr, ok := qualify.(*parser.BinaryExpr)
+	binaryExpr, ok := qualify.(*core.BinaryExpr)
 	require.True(t, ok, "QUALIFY should contain binary expression")
 	assert.Equal(t, token.AND, binaryExpr.Op)
 }
@@ -92,7 +93,7 @@ func TestDuckDBAcceptsILIKE(t *testing.T) {
 	require.NotNil(t, stmt.Body.Left.Where)
 
 	// Verify the WHERE clause contains a LIKE expression with ILIKE op
-	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
+	likeExpr, ok := stmt.Body.Left.Where.(*core.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
 	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
@@ -104,7 +105,7 @@ func TestPostgresAcceptsILIKE(t *testing.T) {
 	require.NoError(t, err, "PostgreSQL should accept ILIKE operator")
 	require.NotNil(t, stmt)
 
-	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
+	likeExpr, ok := stmt.Body.Left.Where.(*core.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
 	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 }
@@ -115,7 +116,7 @@ func TestILIKEWithNOT(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdbDialect.DuckDB)
 	require.NoError(t, err, "DuckDB should accept NOT ILIKE")
 
-	likeExpr, ok := stmt.Body.Left.Where.(*parser.LikeExpr)
+	likeExpr, ok := stmt.Body.Left.Where.(*core.LikeExpr)
 	require.True(t, ok, "WHERE should contain LIKE expression")
 	assert.Equal(t, token.ILIKE, likeExpr.Op, "Should be case-insensitive ILIKE")
 	assert.True(t, likeExpr.Not, "Should be negated with NOT")
@@ -132,17 +133,17 @@ func TestILIKEPrecedence(t *testing.T) {
 
 	// The WHERE clause should be: (a ILIKE '%x%') AND (b > 5)
 	// Not: a ILIKE ('%x%' AND b > 5)
-	binExpr, ok := stmt.Body.Left.Where.(*parser.BinaryExpr)
+	binExpr, ok := stmt.Body.Left.Where.(*core.BinaryExpr)
 	require.True(t, ok, "WHERE should be a binary AND expression")
 	assert.Equal(t, token.AND, binExpr.Op)
 
 	// Left side should be ILIKE
-	likeExpr, ok := binExpr.Left.(*parser.LikeExpr)
+	likeExpr, ok := binExpr.Left.(*core.LikeExpr)
 	require.True(t, ok, "Left of AND should be ILIKE")
 	assert.Equal(t, token.ILIKE, likeExpr.Op)
 
 	// Right side should be comparison
-	rightExpr, ok := binExpr.Right.(*parser.BinaryExpr)
+	rightExpr, ok := binExpr.Right.(*core.BinaryExpr)
 	require.True(t, ok, "Right of AND should be comparison")
 	assert.Equal(t, token.GT, rightExpr.Op)
 }
@@ -154,7 +155,7 @@ func TestLIKEPrecedenceWithOR(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should be: (a LIKE '%x%') OR (b LIKE '%y%')
-	binExpr, ok := stmt.Body.Left.Where.(*parser.BinaryExpr)
+	binExpr, ok := stmt.Body.Left.Where.(*core.BinaryExpr)
 	require.True(t, ok)
 	assert.Equal(t, token.OR, binExpr.Op)
 }
@@ -451,7 +452,7 @@ func TestStarExclude(t *testing.T) {
 			item := stmt.Body.Left.Columns[0]
 			require.Len(t, item.Modifiers, 1)
 
-			exclude, ok := item.Modifiers[0].(*parser.ExcludeModifier)
+			exclude, ok := item.Modifiers[0].(*core.ExcludeModifier)
 			require.True(t, ok, "Expected ExcludeModifier")
 			assert.Equal(t, tt.wantCols, exclude.Columns)
 		})
@@ -467,7 +468,7 @@ func TestStarReplace(t *testing.T) {
 	require.True(t, item.Star)
 	require.Len(t, item.Modifiers, 1)
 
-	replace, ok := item.Modifiers[0].(*parser.ReplaceModifier)
+	replace, ok := item.Modifiers[0].(*core.ReplaceModifier)
 	require.True(t, ok, "Expected ReplaceModifier")
 	require.Len(t, replace.Items, 2)
 
@@ -484,7 +485,7 @@ func TestStarRename(t *testing.T) {
 	require.True(t, item.Star)
 	require.Len(t, item.Modifiers, 1)
 
-	rename, ok := item.Modifiers[0].(*parser.RenameModifier)
+	rename, ok := item.Modifiers[0].(*core.RenameModifier)
 	require.True(t, ok, "Expected RenameModifier")
 	require.Len(t, rename.Items, 2)
 
@@ -503,10 +504,10 @@ func TestCombinedModifiers(t *testing.T) {
 	require.True(t, item.Star)
 	require.Len(t, item.Modifiers, 2)
 
-	_, isExclude := item.Modifiers[0].(*parser.ExcludeModifier)
+	_, isExclude := item.Modifiers[0].(*core.ExcludeModifier)
 	assert.True(t, isExclude, "First modifier should be ExcludeModifier")
 
-	_, isReplace := item.Modifiers[1].(*parser.ReplaceModifier)
+	_, isReplace := item.Modifiers[1].(*core.ReplaceModifier)
 	assert.True(t, isReplace, "Second modifier should be ReplaceModifier")
 }
 
@@ -530,10 +531,10 @@ func TestTableStarWithModifiers(t *testing.T) {
 	assert.Equal(t, "u", item.TableStar)
 	require.Len(t, item.Modifiers, 2)
 
-	_, isExclude := item.Modifiers[0].(*parser.ExcludeModifier)
+	_, isExclude := item.Modifiers[0].(*core.ExcludeModifier)
 	assert.True(t, isExclude)
 
-	_, isRename := item.Modifiers[1].(*parser.RenameModifier)
+	_, isRename := item.Modifiers[1].(*core.RenameModifier)
 	assert.True(t, isRename)
 }
 
@@ -552,7 +553,7 @@ func TestStarModifiersWithJoin(t *testing.T) {
 	item1 := stmt.Body.Left.Columns[0]
 	assert.Equal(t, "orders", item1.TableStar)
 	require.Len(t, item1.Modifiers, 1)
-	exclude1, ok := item1.Modifiers[0].(*parser.ExcludeModifier)
+	exclude1, ok := item1.Modifiers[0].(*core.ExcludeModifier)
 	require.True(t, ok)
 	assert.Equal(t, []string{"internal_notes"}, exclude1.Columns)
 
@@ -560,7 +561,7 @@ func TestStarModifiersWithJoin(t *testing.T) {
 	item2 := stmt.Body.Left.Columns[1]
 	assert.Equal(t, "customers", item2.TableStar)
 	require.Len(t, item2.Modifiers, 1)
-	exclude2, ok := item2.Modifiers[0].(*parser.ExcludeModifier)
+	exclude2, ok := item2.Modifiers[0].(*core.ExcludeModifier)
 	require.True(t, ok)
 	assert.Equal(t, []string{"password_hash", "secret_key"}, exclude2.Columns)
 }
@@ -629,49 +630,49 @@ func TestUnionByName(t *testing.T) {
 	tests := []struct {
 		name   string
 		sql    string
-		op     parser.SetOpType
+		op     core.SetOpType
 		all    bool
 		byName bool
 	}{
 		{
 			name:   "union by name",
 			sql:    "SELECT id, name FROM t1 UNION BY NAME SELECT name, id FROM t2",
-			op:     parser.SetOpUnion,
+			op:     core.SetOpUnion,
 			all:    false,
 			byName: true,
 		},
 		{
 			name:   "union all by name",
 			sql:    "SELECT id, name FROM t1 UNION ALL BY NAME SELECT name, id FROM t2",
-			op:     parser.SetOpUnionAll,
+			op:     core.SetOpUnionAll,
 			all:    true,
 			byName: true,
 		},
 		{
 			name:   "intersect by name",
 			sql:    "SELECT id, name FROM t1 INTERSECT BY NAME SELECT name, id FROM t2",
-			op:     parser.SetOpIntersect,
+			op:     core.SetOpIntersect,
 			all:    false,
 			byName: true,
 		},
 		{
 			name:   "except by name",
 			sql:    "SELECT id, name FROM t1 EXCEPT BY NAME SELECT name, id FROM t2",
-			op:     parser.SetOpExcept,
+			op:     core.SetOpExcept,
 			all:    false,
 			byName: true,
 		},
 		{
 			name:   "standard union (no by name)",
 			sql:    "SELECT id, name FROM t1 UNION SELECT name, id FROM t2",
-			op:     parser.SetOpUnion,
+			op:     core.SetOpUnion,
 			all:    false,
 			byName: false,
 		},
 		{
 			name:   "standard union all (no by name)",
 			sql:    "SELECT id FROM t1 UNION ALL SELECT id FROM t2",
-			op:     parser.SetOpUnionAll,
+			op:     core.SetOpUnionAll,
 			all:    true,
 			byName: false,
 		},
@@ -704,13 +705,13 @@ func TestChainedUnionByName(t *testing.T) {
 	require.NoError(t, err)
 
 	// First UNION BY NAME
-	assert.Equal(t, parser.SetOpUnion, stmt.Body.Op)
+	assert.Equal(t, core.SetOpUnion, stmt.Body.Op)
 	assert.True(t, stmt.Body.ByName)
 	assert.False(t, stmt.Body.All)
 
 	// Second UNION ALL BY NAME
 	require.NotNil(t, stmt.Body.Right)
-	assert.Equal(t, parser.SetOpUnionAll, stmt.Body.Right.Op)
+	assert.Equal(t, core.SetOpUnionAll, stmt.Body.Right.Op)
 	assert.True(t, stmt.Body.Right.ByName)
 	assert.True(t, stmt.Body.Right.All)
 }
@@ -727,12 +728,12 @@ func TestMixedByNameAndPositional(t *testing.T) {
 	require.NoError(t, err)
 
 	// First: UNION BY NAME
-	assert.Equal(t, parser.SetOpUnion, stmt.Body.Op)
+	assert.Equal(t, core.SetOpUnion, stmt.Body.Op)
 	assert.True(t, stmt.Body.ByName)
 
 	// Second: plain UNION (positional)
 	require.NotNil(t, stmt.Body.Right)
-	assert.Equal(t, parser.SetOpUnion, stmt.Body.Right.Op)
+	assert.Equal(t, core.SetOpUnion, stmt.Body.Right.Op)
 	assert.False(t, stmt.Body.Right.ByName)
 }
 

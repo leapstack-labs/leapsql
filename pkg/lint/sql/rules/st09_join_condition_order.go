@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -38,7 +37,7 @@ JOIN customers c ON o.customer_id = c.id`,
 }
 
 func checkJoinConditionOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -80,23 +79,23 @@ func checkJoinConditionOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 }
 
 // getTableNamesST09 extracts table name or alias from a TableRef.
-func getTableNamesST09(ref parser.TableRef) []string {
+func getTableNamesST09(ref core.TableRef) []string {
 	if ref == nil {
 		return nil
 	}
 
 	switch t := ref.(type) {
-	case *parser.TableName:
+	case *core.TableName:
 		if t.Alias != "" {
 			return []string{t.Alias}
 		}
 		return []string{t.Name}
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		if t.Alias != "" {
 			return []string{t.Alias}
 		}
 		return nil // Derived tables without alias can't be referenced
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		if t.Alias != "" {
 			return []string{t.Alias}
 		}
@@ -106,14 +105,14 @@ func getTableNamesST09(ref parser.TableRef) []string {
 }
 
 // checkConditionOrderST09 checks if the join condition has the right table column on the left side of equality.
-func checkConditionOrderST09(condition parser.Expr, leftTables, rightTables []string, pos token.Position) *lint.Diagnostic {
-	binExpr, ok := condition.(*parser.BinaryExpr)
+func checkConditionOrderST09(condition core.Expr, leftTables, rightTables []string, pos token.Position) *lint.Diagnostic {
+	binExpr, ok := condition.(*core.BinaryExpr)
 	if !ok || binExpr.Op != token.EQ {
 		return nil
 	}
 
-	leftCol, leftOk := binExpr.Left.(*parser.ColumnRef)
-	rightCol, rightOk := binExpr.Right.(*parser.ColumnRef)
+	leftCol, leftOk := binExpr.Left.(*core.ColumnRef)
+	rightCol, rightOk := binExpr.Right.(*core.ColumnRef)
 
 	if !leftOk || !rightOk {
 		return nil

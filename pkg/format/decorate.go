@@ -1,13 +1,13 @@
 package format
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // Decorate attaches comments to AST nodes based on position.
 // This enables comment preservation even when clauses are reordered.
-func Decorate(stmt *parser.SelectStmt, comments []*token.Comment) *parser.SelectStmt {
+func Decorate(stmt *core.SelectStmt, comments []*token.Comment) *core.SelectStmt {
 	if len(comments) == 0 {
 		return stmt
 	}
@@ -33,7 +33,7 @@ type decorator struct {
 	used     []bool
 }
 
-func (d *decorator) decorateStmt(stmt *parser.SelectStmt) {
+func (d *decorator) decorateStmt(stmt *core.SelectStmt) {
 	if stmt == nil {
 		return
 	}
@@ -49,13 +49,13 @@ func (d *decorator) decorateStmt(stmt *parser.SelectStmt) {
 	}
 }
 
-func (d *decorator) decorateWith(with *parser.WithClause) {
+func (d *decorator) decorateWith(with *core.WithClause) {
 	for _, cte := range with.CTEs {
 		d.decorateStmt(cte.Select)
 	}
 }
 
-func (d *decorator) decorateBody(body *parser.SelectBody) {
+func (d *decorator) decorateBody(body *core.SelectBody) {
 	if body == nil {
 		return
 	}
@@ -69,7 +69,7 @@ func (d *decorator) decorateBody(body *parser.SelectBody) {
 	}
 }
 
-func (d *decorator) decorateCore(core *parser.SelectCore) {
+func (d *decorator) decorateCore(core *core.SelectCore) {
 	if core == nil {
 		return
 	}
@@ -109,7 +109,7 @@ func (d *decorator) decorateCore(core *parser.SelectCore) {
 	}
 }
 
-func (d *decorator) decorateFrom(from *parser.FromClause) {
+func (d *decorator) decorateFrom(from *core.FromClause) {
 	if from == nil {
 		return
 	}
@@ -124,28 +124,28 @@ func (d *decorator) decorateFrom(from *parser.FromClause) {
 	}
 }
 
-func (d *decorator) decorateTableRef(ref parser.TableRef) {
+func (d *decorator) decorateTableRef(ref core.TableRef) {
 	if ref == nil {
 		return
 	}
 
 	switch t := ref.(type) {
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		d.decorateStmt(t.Select)
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		d.decorateStmt(t.Select)
-	case *parser.MacroTable:
+	case *core.MacroTable:
 		d.attachComments(&t.NodeInfo)
 	}
 }
 
-func (d *decorator) decorateExpr(_ parser.Expr) {
+func (d *decorator) decorateExpr(_ core.Expr) {
 	// Expressions with NodeInfo can have comments attached
 	// For now, we only attach to statement-level nodes
 	// Expression-level comment attachment can be added later if needed
 }
 
-func (d *decorator) attachComments(node *parser.NodeInfo) {
+func (d *decorator) attachComments(node *core.NodeInfo) {
 	if node == nil || !node.Span.IsValid() {
 		return
 	}

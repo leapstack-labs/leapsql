@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -48,7 +47,7 @@ FROM tasks`,
 }
 
 func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -69,7 +68,7 @@ func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 	return diagnostics
 }
 
-func hasNestedCaseST04(caseExpr *parser.CaseExpr) bool {
+func hasNestedCaseST04(caseExpr *core.CaseExpr) bool {
 	// Check in WHEN conditions and results
 	for _, when := range caseExpr.Whens {
 		if containsCaseST04(when.Condition) || containsCaseST04(when.Result) {
@@ -83,10 +82,10 @@ func hasNestedCaseST04(caseExpr *parser.CaseExpr) bool {
 	return false
 }
 
-func containsCaseST04(expr parser.Expr) bool {
+func containsCaseST04(expr core.Expr) bool {
 	found := false
 	ast.Walk(expr, func(node any) bool {
-		if _, ok := node.(*parser.CaseExpr); ok {
+		if _, ok := node.(*core.CaseExpr); ok {
 			found = true
 			return false
 		}

@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -39,7 +38,7 @@ WHERE status = 'active'`,
 }
 
 func checkConstantExpression(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -61,11 +60,11 @@ func checkConstantExpression(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 }
 
 // findConstantExpressionsST10 recursively finds constant expressions.
-func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Diagnostic {
+func findConstantExpressionsST10(expr core.Expr, pos token.Position) []lint.Diagnostic {
 	var diagnostics []lint.Diagnostic
 
 	switch e := expr.(type) {
-	case *parser.BinaryExpr:
+	case *core.BinaryExpr:
 		// Check for 1=1, 'a'='a', etc.
 		if isConstantEqualityST10(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
@@ -85,7 +84,7 @@ func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Di
 			diagnostics = append(diagnostics, findConstantExpressionsST10(e.Right, pos)...)
 		}
 
-	case *parser.Literal:
+	case *core.Literal:
 		// Check for WHERE true, WHERE false, WHERE 1, WHERE 0
 		if isConstantBooleanLiteralST10(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
@@ -99,7 +98,7 @@ func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Di
 			})
 		}
 
-	case *parser.ParenExpr:
+	case *core.ParenExpr:
 		// Check inside parentheses
 		diagnostics = append(diagnostics, findConstantExpressionsST10(e.Expr, pos)...)
 	}
@@ -108,13 +107,13 @@ func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Di
 }
 
 // isConstantEqualityST10 checks if a binary expression is a constant equality like 1=1.
-func isConstantEqualityST10(expr *parser.BinaryExpr) bool {
+func isConstantEqualityST10(expr *core.BinaryExpr) bool {
 	if expr.Op != token.EQ {
 		return false
 	}
 
-	leftLit, leftOk := expr.Left.(*parser.Literal)
-	rightLit, rightOk := expr.Right.(*parser.Literal)
+	leftLit, leftOk := expr.Left.(*core.Literal)
+	rightLit, rightOk := expr.Right.(*core.Literal)
 
 	if !leftOk || !rightOk {
 		return false
@@ -130,11 +129,11 @@ func isConstantEqualityST10(expr *parser.BinaryExpr) bool {
 }
 
 // isConstantBooleanLiteralST10 checks if a literal is a constant boolean value.
-func isConstantBooleanLiteralST10(lit *parser.Literal) bool {
+func isConstantBooleanLiteralST10(lit *core.Literal) bool {
 	switch lit.Type {
-	case parser.LiteralBool:
+	case core.LiteralBool:
 		return true
-	case parser.LiteralNumber:
+	case core.LiteralNumber:
 		// 1 and 0 in WHERE context act as true/false
 		return lit.Value == "1" || lit.Value == "0"
 	}
@@ -142,11 +141,11 @@ func isConstantBooleanLiteralST10(lit *parser.Literal) bool {
 }
 
 // boolValueST10 returns the boolean interpretation of a literal.
-func boolValueST10(lit *parser.Literal) string {
+func boolValueST10(lit *core.Literal) string {
 	switch lit.Type {
-	case parser.LiteralBool:
+	case core.LiteralBool:
 		return lit.Value
-	case parser.LiteralNumber:
+	case core.LiteralNumber:
 		if lit.Value == "1" {
 			return "true"
 		}

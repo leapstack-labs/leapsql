@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -37,7 +36,7 @@ JOIN orders o ON o.customer_id = c.id`,
 }
 
 func checkJoinConditionTables(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -80,26 +79,26 @@ func checkJoinConditionTables(stmt any, _ lint.DialectInfo, _ map[string]any) []
 	return diagnostics
 }
 
-func getTableNameAM08(ref parser.TableRef) string {
+func getTableNameAM08(ref core.TableRef) string {
 	switch t := ref.(type) {
-	case *parser.TableName:
+	case *core.TableName:
 		if t.Alias != "" {
 			return t.Alias
 		}
 		return t.Name
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		return t.Alias
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		return t.Alias
 	default:
 		return ""
 	}
 }
 
-func collectColumnRefsInExprAM08(expr parser.Expr) []*parser.ColumnRef {
-	var refs []*parser.ColumnRef
+func collectColumnRefsInExprAM08(expr core.Expr) []*core.ColumnRef {
+	var refs []*core.ColumnRef
 	ast.Walk(expr, func(node any) bool {
-		if cr, ok := node.(*parser.ColumnRef); ok {
+		if cr, ok := node.(*core.ColumnRef); ok {
 			refs = append(refs, cr)
 		}
 		return true

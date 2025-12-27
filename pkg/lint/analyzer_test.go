@@ -31,7 +31,7 @@ func registerTestRule(t *testing.T, id string, checkFunc sql.CheckFunc) {
 func TestAnalyzer_WithRegisteredRule(t *testing.T) {
 	// Register a simple test rule that triggers on DISTINCT
 	registerTestRule(t, "TEST01", func(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-		selectStmt, ok := stmt.(*parser.SelectStmt)
+		selectStmt, ok := stmt.(*core.SelectStmt)
 		if !ok || selectStmt == nil || selectStmt.Body == nil || selectStmt.Body.Left == nil {
 			return nil
 		}

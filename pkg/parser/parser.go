@@ -28,6 +28,7 @@ package parser
 
 import (
 	"fmt"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
@@ -59,7 +60,7 @@ func NewParser(sql string, d *dialect.Dialect) *Parser {
 }
 
 // ParseWithDialect parses the SQL with a specific dialect and returns the AST.
-func ParseWithDialect(sql string, d *dialect.Dialect) (*SelectStmt, error) {
+func ParseWithDialect(sql string, d *dialect.Dialect) (*core.SelectStmt, error) {
 	p := NewParser(sql, d)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {
@@ -312,7 +313,7 @@ func (p *Parser) Comments() []*token.Comment {
 }
 
 // ParseWithDialectAndComments parses SQL and returns both AST and comments.
-func ParseWithDialectAndComments(sql string, d *dialect.Dialect) (*SelectStmt, []*token.Comment, error) {
+func ParseWithDialectAndComments(sql string, d *dialect.Dialect) (*core.SelectStmt, []*token.Comment, error) {
 	p := NewParser(sql, d)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {

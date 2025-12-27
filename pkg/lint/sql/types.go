@@ -7,7 +7,7 @@ import (
 
 // RuleDef is a data-driven SQL rule definition.
 // Rules are stateless - all context comes via the Check function parameters.
-// The Check function receives an `any` type that should be *parser.SelectStmt.
+// The Check function receives an `any` type that should be *core.SelectStmt.
 // This avoids import cycles between lint -> parser -> dialect -> lint.
 type RuleDef struct {
 	ID          string        // Unique identifier, e.g., "AM01" or "ansi/select-star"
@@ -27,7 +27,7 @@ type RuleDef struct {
 }
 
 // CheckFunc analyzes a statement and returns diagnostics.
-// The stmt parameter is *parser.SelectStmt passed as any to avoid import cycles.
+// The stmt parameter is *core.SelectStmt passed as any to avoid import cycles.
 // The opts parameter contains rule-specific options from configuration.
 type CheckFunc func(stmt any, dialect lint.DialectInfo, opts map[string]any) []lint.Diagnostic
 

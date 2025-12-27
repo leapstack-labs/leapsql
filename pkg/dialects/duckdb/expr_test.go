@@ -3,6 +3,7 @@ package duckdb_test
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -64,7 +65,7 @@ func TestListLiteral(t *testing.T) {
 			require.NotEmpty(t, stmt.Body.Left.Columns)
 
 			expr := stmt.Body.Left.Columns[0].Expr
-			list, ok := expr.(*parser.ListLiteral)
+			list, ok := expr.(*core.ListLiteral)
 			require.True(t, ok, "Expected ListLiteral, got %T", expr)
 			assert.Len(t, list.Elements, tt.wantElements)
 		})
@@ -112,7 +113,7 @@ func TestStructLiteral(t *testing.T) {
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			expr := stmt.Body.Left.Columns[0].Expr
-			s, ok := expr.(*parser.StructLiteral)
+			s, ok := expr.(*core.StructLiteral)
 			require.True(t, ok, "Expected StructLiteral, got %T", expr)
 			assert.Len(t, s.Fields, tt.wantFields)
 
@@ -159,11 +160,11 @@ func TestLambdaExpr(t *testing.T) {
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			// The lambda is typically the second argument to a function
-			funcCall, ok := stmt.Body.Left.Columns[0].Expr.(*parser.FuncCall)
+			funcCall, ok := stmt.Body.Left.Columns[0].Expr.(*core.FuncCall)
 			require.True(t, ok, "Expected FuncCall, got %T", stmt.Body.Left.Columns[0].Expr)
 			require.GreaterOrEqual(t, len(funcCall.Args), 2, "Expected at least 2 args")
 
-			lambda, ok := funcCall.Args[1].(*parser.LambdaExpr)
+			lambda, ok := funcCall.Args[1].(*core.LambdaExpr)
 			require.True(t, ok, "Second arg should be LambdaExpr, got %T", funcCall.Args[1])
 			assert.Equal(t, tt.wantParams, lambda.Params)
 		})
@@ -228,7 +229,7 @@ func TestIndexExpr(t *testing.T) {
 			require.NoError(t, err, "Failed to parse: %s", tt.sql)
 
 			expr := stmt.Body.Left.Columns[0].Expr
-			idx, ok := expr.(*parser.IndexExpr)
+			idx, ok := expr.(*core.IndexExpr)
 			require.True(t, ok, "Expected IndexExpr, got %T", expr)
 
 			assert.Equal(t, tt.isSlice, idx.IsSlice, "IsSlice mismatch")

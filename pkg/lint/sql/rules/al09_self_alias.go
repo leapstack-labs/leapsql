@@ -7,7 +7,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -39,14 +38,14 @@ WHERE customers.status = 'active'`,
 }
 
 func checkSelfAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
 
 	var diagnostics []lint.Diagnostic
 	for _, ref := range ast.CollectTableRefs(selectStmt) {
-		tn, ok := ref.(*parser.TableName)
+		tn, ok := ref.(*core.TableName)
 		if !ok || tn.Alias == "" {
 			continue
 		}

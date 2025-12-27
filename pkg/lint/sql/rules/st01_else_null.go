@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -44,7 +43,7 @@ FROM users`,
 }
 
 func checkElseNull(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -55,7 +54,7 @@ func checkElseNull(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagno
 			continue
 		}
 		// Check if ELSE is NULL literal
-		if lit, ok := caseExpr.Else.(*parser.Literal); ok && lit.Type == parser.LiteralNull {
+		if lit, ok := caseExpr.Else.(*core.Literal); ok && lit.Type == core.LiteralNull {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST01",
 				Severity:         core.SeverityHint,

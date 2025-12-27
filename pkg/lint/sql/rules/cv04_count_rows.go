@@ -7,7 +7,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -43,7 +42,7 @@ GROUP BY department`,
 }
 
 func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -55,8 +54,8 @@ func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 		}
 		// Check if COUNT(1) pattern
 		if len(fn.Args) == 1 {
-			if lit, ok := fn.Args[0].(*parser.Literal); ok {
-				if lit.Type == parser.LiteralNumber && lit.Value == "1" {
+			if lit, ok := fn.Args[0].(*core.Literal); ok {
+				if lit.Type == core.LiteralNumber && lit.Value == "1" {
 					diagnostics = append(diagnostics, lint.Diagnostic{
 						RuleID:           "CV04",
 						Severity:         core.SeverityHint,

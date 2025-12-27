@@ -1,17 +1,17 @@
 package format
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // joinInner is the JoinType value for plain INNER join.
 // Defined locally to avoid import cycle with dialect packages.
-const joinInner parser.JoinType = "INNER"
+const joinInner core.JoinType = "INNER"
 
-func (p *Printer) formatSelectStmt(stmt *parser.SelectStmt) {
+func (p *Printer) formatSelectStmt(stmt *core.SelectStmt) {
 	if stmt == nil {
 		return
 	}
@@ -29,7 +29,7 @@ func (p *Printer) formatSelectStmt(stmt *parser.SelectStmt) {
 	p.formatTrailingComments(stmt.TrailingComments)
 }
 
-func (p *Printer) formatWithClause(with *parser.WithClause) {
+func (p *Printer) formatWithClause(with *core.WithClause) {
 	p.kw(token.WITH)
 	if with.Recursive {
 		p.space()
@@ -56,25 +56,25 @@ func (p *Printer) formatWithClause(with *parser.WithClause) {
 	p.dedent()
 }
 
-func (p *Printer) formatSelectBody(body *parser.SelectBody) {
+func (p *Printer) formatSelectBody(body *core.SelectBody) {
 	if body == nil {
 		return
 	}
 
 	p.formatSelectCore(body.Left)
 
-	if body.Op != parser.SetOpNone {
+	if body.Op != core.SetOpNone {
 		// Use token mapping for set operations if possible, otherwise keep string conversion for now
 		// assuming SetOpType string values match keywords
 		// Ideally parser.SetOpType would map to tokens or we use a switch here
 		switch body.Op {
-		case parser.SetOpUnion:
+		case core.SetOpUnion:
 			p.kw(token.UNION)
-		case parser.SetOpUnionAll:
+		case core.SetOpUnionAll:
 			p.kw(token.UNION, token.ALL)
-		case parser.SetOpIntersect:
+		case core.SetOpIntersect:
 			p.kw(token.INTERSECT)
-		case parser.SetOpExcept:
+		case core.SetOpExcept:
 			p.kw(token.EXCEPT)
 		}
 
@@ -91,14 +91,14 @@ func (p *Printer) formatSelectBody(body *parser.SelectBody) {
 	}
 }
 
-func (p *Printer) formatSelectCore(core *parser.SelectCore) {
-	if core == nil {
+func (p *Printer) formatSelectCore(sc *core.SelectCore) {
+	if sc == nil {
 		return
 	}
 
 	// SELECT [DISTINCT]
 	p.kw(token.SELECT)
-	if core.Distinct {
+	if sc.Distinct {
 		p.space()
 		p.kw(token.DISTINCT)
 	}
@@ -106,15 +106,15 @@ func (p *Printer) formatSelectCore(core *parser.SelectCore) {
 
 	// Columns
 	p.indent()
-	p.formatList(len(core.Columns), func(i int) { p.formatSelectItem(core.Columns[i]) }, ",", true)
+	p.formatList(len(sc.Columns), func(i int) { p.formatSelectItem(sc.Columns[i]) }, ",", true)
 	p.writeln()
 	p.dedent()
 
 	// FROM
-	if core.From != nil {
+	if sc.From != nil {
 		p.kw(token.FROM)
 		p.space()
-		p.formatFromClause(core.From)
+		p.formatFromClause(sc.From)
 		p.writeln()
 	}
 
@@ -126,13 +126,13 @@ func (p *Printer) formatSelectCore(core *parser.SelectCore) {
 			continue
 		}
 
-		p.formatClause(clauseType, def, core)
+		p.formatClause(clauseType, def, sc)
 	}
 }
 
-func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *parser.SelectCore) {
+func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, sc *core.SelectCore) {
 	// Handle GROUP BY ALL (DuckDB extension)
-	if def.Slot == spi.SlotGroupBy && core.GroupByAll {
+	if def.Slot == spi.SlotGroupBy && sc.GroupByAll {
 		p.kw(token.GROUP)
 		p.space()
 		p.kw(token.BY)
@@ -143,13 +143,13 @@ func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *p
 	}
 
 	// Handle ORDER BY ALL (DuckDB extension)
-	if def.Slot == spi.SlotOrderBy && core.OrderByAll {
+	if def.Slot == spi.SlotOrderBy && sc.OrderByAll {
 		p.kw(token.ORDER)
 		p.space()
 		p.kw(token.BY)
 		p.space()
 		p.kw(token.ALL)
-		if core.OrderByAllDesc {
+		if sc.OrderByAllDesc {
 			p.space()
 			p.kw(token.DESC)
 		}
@@ -157,7 +157,7 @@ func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, core *p
 		return
 	}
 
-	val := p.getClauseValue(core, def.Slot)
+	val := p.getClauseValue(sc, def.Slot)
 	if !hasValue(val) {
 		return
 	}
@@ -191,36 +191,36 @@ func hasValue(val any) bool {
 		return false
 	}
 	switch v := val.(type) {
-	case []parser.Expr:
+	case []core.Expr:
 		return len(v) > 0
-	case []parser.OrderByItem:
+	case []core.OrderByItem:
 		return len(v) > 0
-	case *parser.FetchClause:
+	case *core.FetchClause:
 		return v != nil
 	}
 	return true
 }
 
-func (p *Printer) getClauseValue(core *parser.SelectCore, slot spi.ClauseSlot) any {
+func (p *Printer) getClauseValue(sc *core.SelectCore, slot spi.ClauseSlot) any {
 	switch slot {
 	case spi.SlotWhere:
-		return core.Where
+		return sc.Where
 	case spi.SlotGroupBy:
-		return core.GroupBy
+		return sc.GroupBy
 	case spi.SlotHaving:
-		return core.Having
+		return sc.Having
 	case spi.SlotWindow:
 		return nil // TODO
 	case spi.SlotOrderBy:
-		return core.OrderBy
+		return sc.OrderBy
 	case spi.SlotLimit:
-		return core.Limit
+		return sc.Limit
 	case spi.SlotOffset:
-		return core.Offset
+		return sc.Offset
 	case spi.SlotQualify:
-		return core.Qualify
+		return sc.Qualify
 	case spi.SlotFetch:
-		return core.Fetch
+		return sc.Fetch
 	}
 	return nil
 }
@@ -228,25 +228,25 @@ func (p *Printer) getClauseValue(core *parser.SelectCore, slot spi.ClauseSlot) a
 func (p *Printer) formatSlotValue(slot spi.ClauseSlot, val any) {
 	switch slot {
 	case spi.SlotWhere, spi.SlotHaving, spi.SlotLimit, spi.SlotOffset, spi.SlotQualify:
-		if expr, ok := val.(parser.Expr); ok {
+		if expr, ok := val.(core.Expr); ok {
 			p.formatExpr(expr)
 		}
 	case spi.SlotGroupBy:
-		if exprs, ok := val.([]parser.Expr); ok {
+		if exprs, ok := val.([]core.Expr); ok {
 			p.formatList(len(exprs), func(i int) { p.formatExpr(exprs[i]) }, ",", true)
 		}
 	case spi.SlotOrderBy:
-		if items, ok := val.([]parser.OrderByItem); ok {
+		if items, ok := val.([]core.OrderByItem); ok {
 			p.formatList(len(items), func(i int) { p.formatOrderByItem(items[i]) }, ",", true)
 		}
 	case spi.SlotFetch:
-		if fetch, ok := val.(*parser.FetchClause); ok {
+		if fetch, ok := val.(*core.FetchClause); ok {
 			p.formatFetchClause(fetch)
 		}
 	}
 }
 
-func (p *Printer) formatSelectItem(item parser.SelectItem) {
+func (p *Printer) formatSelectItem(item core.SelectItem) {
 	if item.Star {
 		p.write("*")
 		p.formatStarModifiers(item.Modifiers)
@@ -269,11 +269,11 @@ func (p *Printer) formatSelectItem(item parser.SelectItem) {
 }
 
 // formatStarModifiers formats EXCLUDE/REPLACE/RENAME modifiers for star expressions.
-func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
+func (p *Printer) formatStarModifiers(mods []core.StarModifier) {
 	for _, mod := range mods {
 		p.space()
 		switch m := mod.(type) {
-		case *parser.ExcludeModifier:
+		case *core.ExcludeModifier:
 			p.keyword("EXCLUDE")
 			p.write(" (")
 			for i, col := range m.Columns {
@@ -284,14 +284,14 @@ func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
 			}
 			p.write(")")
 
-		case *parser.ReplaceModifier:
+		case *core.ReplaceModifier:
 			p.keyword("REPLACE")
 			p.write(" (")
 			for i, item := range m.Items {
 				if i > 0 {
 					p.write(", ")
 				}
-				// item.Expr is already parser.Expr (alias to core.Expr)
+				// item.Expr is already core.Expr
 				p.formatExpr(item.Expr)
 				p.space()
 				p.kw(token.AS)
@@ -300,7 +300,7 @@ func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
 			}
 			p.write(")")
 
-		case *parser.RenameModifier:
+		case *core.RenameModifier:
 			p.keyword("RENAME")
 			p.write(" (")
 			for i, item := range m.Items {
@@ -318,7 +318,7 @@ func (p *Printer) formatStarModifiers(mods []parser.StarModifier) {
 	}
 }
 
-func (p *Printer) formatFromClause(from *parser.FromClause) {
+func (p *Printer) formatFromClause(from *core.FromClause) {
 	if from == nil {
 		return
 	}
@@ -331,28 +331,28 @@ func (p *Printer) formatFromClause(from *parser.FromClause) {
 	}
 }
 
-func (p *Printer) formatTableRef(ref parser.TableRef) {
+func (p *Printer) formatTableRef(ref core.TableRef) {
 	if ref == nil {
 		return
 	}
 
 	switch t := ref.(type) {
-	case *parser.TableName:
+	case *core.TableName:
 		p.formatTableName(t)
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		p.formatDerivedTable(t)
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		p.formatLateralTable(t)
-	case *parser.MacroTable:
+	case *core.MacroTable:
 		p.formatMacroTable(t)
-	case *parser.PivotTable:
+	case *core.PivotTable:
 		p.formatPivotTable(t)
-	case *parser.UnpivotTable:
+	case *core.UnpivotTable:
 		p.formatUnpivotTable(t)
 	}
 }
 
-func (p *Printer) formatTableName(t *parser.TableName) {
+func (p *Printer) formatTableName(t *core.TableName) {
 	if t.Catalog != "" {
 		p.write(t.Catalog)
 		p.write(".")
@@ -368,7 +368,7 @@ func (p *Printer) formatTableName(t *parser.TableName) {
 	}
 }
 
-func (p *Printer) formatDerivedTable(t *parser.DerivedTable) {
+func (p *Printer) formatDerivedTable(t *core.DerivedTable) {
 	p.write("(")
 	p.writeln()
 	p.indent()
@@ -381,7 +381,7 @@ func (p *Printer) formatDerivedTable(t *parser.DerivedTable) {
 	}
 }
 
-func (p *Printer) formatLateralTable(t *parser.LateralTable) {
+func (p *Printer) formatLateralTable(t *core.LateralTable) {
 	p.kw(token.LATERAL)
 	p.write(" (")
 	p.writeln()
@@ -395,7 +395,7 @@ func (p *Printer) formatLateralTable(t *parser.LateralTable) {
 	}
 }
 
-func (p *Printer) formatMacroTable(t *parser.MacroTable) {
+func (p *Printer) formatMacroTable(t *core.MacroTable) {
 	// Macros are preserved exactly as written
 	p.write(t.Content)
 	if t.Alias != "" {
@@ -404,7 +404,7 @@ func (p *Printer) formatMacroTable(t *parser.MacroTable) {
 	}
 }
 
-func (p *Printer) formatPivotTable(t *parser.PivotTable) {
+func (p *Printer) formatPivotTable(t *core.PivotTable) {
 	// Format source table
 	p.formatTableRef(t.Source)
 	p.writeln()
@@ -466,7 +466,7 @@ func (p *Printer) formatPivotTable(t *parser.PivotTable) {
 	}
 }
 
-func (p *Printer) formatUnpivotTable(t *parser.UnpivotTable) {
+func (p *Printer) formatUnpivotTable(t *core.UnpivotTable) {
 	// Format source table
 	p.formatTableRef(t.Source)
 	p.writeln()
@@ -534,7 +534,7 @@ func (p *Printer) formatUnpivotTable(t *parser.UnpivotTable) {
 	}
 }
 
-func (p *Printer) formatJoin(join *parser.Join) {
+func (p *Printer) formatJoin(join *core.Join) {
 	if join == nil {
 		return
 	}
@@ -550,7 +550,7 @@ func (p *Printer) formatJoin(join *parser.Join) {
 	case joinInner:
 		// Plain "JOIN" for inner (most common, cleaner output)
 		p.kw(token.JOIN)
-	case parser.JoinComma:
+	case core.JoinComma:
 		p.write(",")
 	default:
 		// Data-driven: JoinType string IS the keyword
@@ -588,7 +588,7 @@ func (p *Printer) formatJoin(join *parser.Join) {
 	// NATURAL JOIN has neither ON nor USING - nothing to add
 }
 
-func (p *Printer) formatOrderByItem(item parser.OrderByItem) {
+func (p *Printer) formatOrderByItem(item core.OrderByItem) {
 	p.formatExpr(item.Expr)
 	if item.Desc {
 		p.space()
@@ -606,7 +606,7 @@ func (p *Printer) formatOrderByItem(item parser.OrderByItem) {
 	}
 }
 
-func (p *Printer) formatFetchClause(fetch *parser.FetchClause) {
+func (p *Printer) formatFetchClause(fetch *core.FetchClause) {
 	if fetch == nil {
 		return
 	}

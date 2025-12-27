@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"fmt"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
@@ -28,8 +29,8 @@ import (
 // reject unsupported clauses (like QUALIFY in Postgres).
 
 // parseStatement parses a complete SQL statement.
-func (p *Parser) parseStatement() *SelectStmt {
-	stmt := &SelectStmt{}
+func (p *Parser) parseStatement() *core.SelectStmt {
+	stmt := &core.SelectStmt{}
 
 	// Optional WITH clause
 	if p.check(TOKEN_WITH) {
@@ -43,9 +44,9 @@ func (p *Parser) parseStatement() *SelectStmt {
 }
 
 // parseWithClause parses a WITH clause with CTEs.
-func (p *Parser) parseWithClause() *WithClause {
+func (p *Parser) parseWithClause() *core.WithClause {
 	p.expect(TOKEN_WITH)
-	with := &WithClause{}
+	with := &core.WithClause{}
 
 	// Optional RECURSIVE
 	if p.match(TOKEN_RECURSIVE) {
@@ -66,8 +67,8 @@ func (p *Parser) parseWithClause() *WithClause {
 }
 
 // parseCTE parses a single CTE.
-func (p *Parser) parseCTE() *CTE {
-	cte := &CTE{}
+func (p *Parser) parseCTE() *core.CTE {
+	cte := &core.CTE{}
 
 	// CTE name
 	if !p.check(TOKEN_IDENT) {
@@ -89,8 +90,8 @@ func (p *Parser) parseCTE() *CTE {
 }
 
 // parseSelectBody parses a SELECT body with possible set operations.
-func (p *Parser) parseSelectBody() *SelectBody {
-	body := &SelectBody{}
+func (p *Parser) parseSelectBody() *core.SelectBody {
+	body := &core.SelectBody{}
 	body.Left = p.parseSelectCore()
 
 	// Check for set operations
@@ -99,19 +100,19 @@ func (p *Parser) parseSelectBody() *SelectBody {
 		case TOKEN_UNION:
 			p.nextToken()
 			if p.match(TOKEN_ALL) {
-				body.Op = SetOpUnionAll
+				body.Op = core.SetOpUnionAll
 				body.All = true
 			} else {
-				body.Op = SetOpUnion
+				body.Op = core.SetOpUnion
 				p.match(TOKEN_DISTINCT) // optional
 			}
 		case TOKEN_INTERSECT:
 			p.nextToken()
-			body.Op = SetOpIntersect
+			body.Op = core.SetOpIntersect
 			p.match(TOKEN_ALL) // optional
 		case TOKEN_EXCEPT:
 			p.nextToken()
-			body.Op = SetOpExcept
+			body.Op = core.SetOpExcept
 			p.match(TOKEN_ALL) // optional
 		}
 
@@ -133,40 +134,40 @@ func (p *Parser) parseSelectBody() *SelectBody {
 }
 
 // parseSelectCore parses a single SELECT clause.
-func (p *Parser) parseSelectCore() *SelectCore {
+func (p *Parser) parseSelectCore() *core.SelectCore {
 	p.expect(TOKEN_SELECT)
-	core := &SelectCore{}
+	sc := &core.SelectCore{}
 
 	// DISTINCT / ALL
 	if p.match(TOKEN_DISTINCT) {
-		core.Distinct = true
+		sc.Distinct = true
 	} else {
 		p.match(TOKEN_ALL) // optional, consume if present
 	}
 
 	// SELECT list
-	core.Columns = p.parseSelectList()
+	sc.Columns = p.parseSelectList()
 
 	// FROM clause (required for our use case)
 	if p.match(TOKEN_FROM) {
-		core.From = p.parseFromClause()
+		sc.From = p.parseFromClause()
 	}
 
 	// Parse optional clauses using dialect-driven approach
-	p.parseClauses(core)
+	p.parseClauses(sc)
 
-	return core
+	return sc
 }
 
 // parseClauses parses optional clauses using the dialect's clause sequence and handlers.
-func (p *Parser) parseClauses(core *SelectCore) {
-	p.parseClausesWithDialect(core)
+func (p *Parser) parseClauses(sc *core.SelectCore) {
+	p.parseClausesWithDialect(sc)
 }
 
 // parseClausesWithDialect parses clauses using dialect.ClauseDef() for both
 // parsing logic and slot-based assignment. This is fully declarative -
 // no hardcoded clause knowledge in the parser.
-func (p *Parser) parseClausesWithDialect(core *SelectCore) {
+func (p *Parser) parseClausesWithDialect(sc *core.SelectCore) {
 	sequence := p.dialect.ClauseSequence()
 	if sequence == nil {
 		return // No clauses to parse for this dialect
@@ -194,7 +195,7 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 				}
 
 				// Use slot-based assignment (declarative)
-				p.assignToSlot(core, def.Slot, result)
+				p.assignToSlot(sc, def.Slot, result)
 				matched = true
 				break
 			}
@@ -227,39 +228,39 @@ func (p *Parser) parseClausesWithDialect(core *SelectCore) {
 
 // assignToSlot stores the parsed clause result in the appropriate SelectCore field.
 // This uses the declarative ClauseSlot enum to determine where to store data.
-func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any) {
+func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result any) {
 	if result == nil {
 		return
 	}
 
 	switch slot {
 	case spi.SlotWhere:
-		if expr, ok := result.(Expr); ok {
-			core.Where = expr
+		if expr, ok := result.(core.Expr); ok {
+			sc.Where = expr
 		}
 
 	case spi.SlotGroupBy:
 		// Check for GROUP BY ALL marker (DuckDB extension)
 		if marker, ok := result.(spi.GroupByAllMarker); ok && marker.IsGroupByAll() {
-			core.GroupByAll = true
+			sc.GroupByAll = true
 			return
 		}
 		switch v := result.(type) {
-		case []Expr:
-			core.GroupBy = v
+		case []core.Expr:
+			sc.GroupBy = v
 		case []any:
-			exprs := make([]Expr, len(v))
+			exprs := make([]core.Expr, len(v))
 			for i, e := range v {
-				if expr, ok := e.(Expr); ok {
+				if expr, ok := e.(core.Expr); ok {
 					exprs[i] = expr
 				}
 			}
-			core.GroupBy = exprs
+			sc.GroupBy = exprs
 		}
 
 	case spi.SlotHaving:
-		if expr, ok := result.(Expr); ok {
-			core.Having = expr
+		if expr, ok := result.(core.Expr); ok {
+			sc.Having = expr
 		}
 
 	case spi.SlotWindow:
@@ -269,50 +270,50 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 	case spi.SlotOrderBy:
 		// Check for ORDER BY ALL marker (DuckDB extension)
 		if marker, ok := result.(spi.OrderByAllMarker); ok && marker.IsOrderByAll() {
-			core.OrderByAll = true
-			core.OrderByAllDesc = marker.IsDesc()
+			sc.OrderByAll = true
+			sc.OrderByAllDesc = marker.IsDesc()
 			return
 		}
 		switch v := result.(type) {
-		case []OrderByItem:
-			core.OrderBy = v
+		case []core.OrderByItem:
+			sc.OrderBy = v
 		case []any:
-			items := make([]OrderByItem, len(v))
+			items := make([]core.OrderByItem, len(v))
 			for i, item := range v {
-				if obi, ok := item.(OrderByItem); ok {
+				if obi, ok := item.(core.OrderByItem); ok {
 					items[i] = obi
 				}
 			}
-			core.OrderBy = items
+			sc.OrderBy = items
 		}
 
 	case spi.SlotLimit:
-		if expr, ok := result.(Expr); ok {
-			core.Limit = expr
+		if expr, ok := result.(core.Expr); ok {
+			sc.Limit = expr
 		}
 
 	case spi.SlotOffset:
-		if expr, ok := result.(Expr); ok {
-			core.Offset = expr
+		if expr, ok := result.(core.Expr); ok {
+			sc.Offset = expr
 		}
 
 	case spi.SlotQualify:
-		if expr, ok := result.(Expr); ok {
-			core.Qualify = expr
+		if expr, ok := result.(core.Expr); ok {
+			sc.Qualify = expr
 		}
 
 	case spi.SlotFetch:
 		// Handle both parser.FetchClause and dialect-defined FetchClause types
-		if fetch, ok := result.(*FetchClause); ok {
-			core.Fetch = fetch
+		if fetch, ok := result.(*core.FetchClause); ok {
+			sc.Fetch = fetch
 		} else if result != nil {
 			// Handle dialect-defined FetchClause by extracting fields via reflection-free interface
-			core.Fetch = convertToFetchClause(result)
+			sc.Fetch = convertToFetchClause(result)
 		}
 
 	case spi.SlotExtensions:
-		if node, ok := result.(Node); ok {
-			core.Extensions = append(core.Extensions, node)
+		if node, ok := result.(core.Node); ok {
+			sc.Extensions = append(sc.Extensions, node)
 		}
 	}
 }
@@ -326,10 +327,10 @@ type FetchClauseData interface {
 }
 
 // convertToFetchClause converts a dialect-defined FetchClause to parser.FetchClause.
-func convertToFetchClause(result any) *FetchClause {
+func convertToFetchClause(result any) *core.FetchClause {
 	if data, ok := result.(FetchClauseData); ok {
 		count := data.GetCount()
-		return &FetchClause{
+		return &core.FetchClause{
 			First:    data.GetFirst(),
 			Count:    count,
 			Percent:  data.GetPercent(),
@@ -340,8 +341,8 @@ func convertToFetchClause(result any) *FetchClause {
 }
 
 // parseSelectList parses the list of SELECT items.
-func (p *Parser) parseSelectList() []SelectItem {
-	var items []SelectItem
+func (p *Parser) parseSelectList() []core.SelectItem {
+	var items []core.SelectItem
 
 	for {
 		item := p.parseSelectItem()
@@ -356,8 +357,8 @@ func (p *Parser) parseSelectList() []SelectItem {
 }
 
 // parseSelectItem parses a single SELECT item.
-func (p *Parser) parseSelectItem() SelectItem {
-	item := SelectItem{}
+func (p *Parser) parseSelectItem() core.SelectItem {
+	item := core.SelectItem{}
 
 	// Check for * or table.*
 	if p.check(TOKEN_STAR) {
@@ -401,8 +402,8 @@ func (p *Parser) parseSelectItem() SelectItem {
 }
 
 // parseStarModifiers parses optional EXCLUDE/REPLACE/RENAME modifiers after * or table.*.
-func (p *Parser) parseStarModifiers() []StarModifier {
-	var modifiers []StarModifier
+func (p *Parser) parseStarModifiers() []core.StarModifier {
+	var modifiers []core.StarModifier
 
 	for {
 		handler := p.dialect.StarModifierHandler(p.token.Type)
@@ -427,8 +428,8 @@ func (p *Parser) parseStarModifiers() []StarModifier {
 }
 
 // parseOrderByList parses a list of ORDER BY items.
-func (p *Parser) parseOrderByList() []OrderByItem {
-	var items []OrderByItem
+func (p *Parser) parseOrderByList() []core.OrderByItem {
+	var items []core.OrderByItem
 
 	for {
 		item := p.parseOrderByItem()
@@ -443,8 +444,8 @@ func (p *Parser) parseOrderByList() []OrderByItem {
 }
 
 // parseOrderByItem parses a single ORDER BY item.
-func (p *Parser) parseOrderByItem() OrderByItem {
-	item := OrderByItem{}
+func (p *Parser) parseOrderByItem() core.OrderByItem {
+	item := core.OrderByItem{}
 	item.Expr = p.parseExpression()
 
 	// ASC / DESC
@@ -469,8 +470,8 @@ func (p *Parser) parseOrderByItem() OrderByItem {
 }
 
 // parseExpressionList parses a comma-separated list of expressions.
-func (p *Parser) parseExpressionList() []Expr {
-	var exprs []Expr
+func (p *Parser) parseExpressionList() []core.Expr {
+	var exprs []core.Expr
 
 	for {
 		expr := p.parseExpression()

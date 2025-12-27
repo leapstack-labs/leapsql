@@ -1,28 +1,28 @@
 package ast
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 // GetTableRefPosition returns the position of a table reference.
-func GetTableRefPosition(ref parser.TableRef) token.Position {
+func GetTableRefPosition(ref core.TableRef) token.Position {
 	if ref == nil {
 		return token.Position{}
 	}
 	switch t := ref.(type) {
-	case *parser.TableName:
+	case *core.TableName:
 		return t.Span.Start
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		return t.Span.Start
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		return t.Span.Start
 	}
 	return token.Position{}
 }
 
 // GetJoinPosition returns the position of a join.
-func GetJoinPosition(join *parser.Join) token.Position {
+func GetJoinPosition(join *core.Join) token.Position {
 	if join == nil {
 		return token.Position{}
 	}
@@ -30,7 +30,7 @@ func GetJoinPosition(join *parser.Join) token.Position {
 }
 
 // GetSelectCorePosition returns the position of a SelectCore.
-func GetSelectCorePosition(core *parser.SelectCore) token.Position {
+func GetSelectCorePosition(core *core.SelectCore) token.Position {
 	if core == nil {
 		return token.Position{}
 	}
@@ -38,7 +38,7 @@ func GetSelectCorePosition(core *parser.SelectCore) token.Position {
 }
 
 // GetCTEPosition returns the position of a CTE.
-func GetCTEPosition(cte *parser.CTE) token.Position {
+func GetCTEPosition(cte *core.CTE) token.Position {
 	if cte == nil {
 		return token.Position{}
 	}
@@ -46,7 +46,7 @@ func GetCTEPosition(cte *parser.CTE) token.Position {
 }
 
 // GetFromClausePosition returns the position of a FROM clause.
-func GetFromClausePosition(from *parser.FromClause) token.Position {
+func GetFromClausePosition(from *core.FromClause) token.Position {
 	if from == nil {
 		return token.Position{}
 	}
@@ -54,7 +54,7 @@ func GetFromClausePosition(from *parser.FromClause) token.Position {
 }
 
 // GetSelectBodyPosition returns the position of a SelectBody.
-func GetSelectBodyPosition(body *parser.SelectBody) token.Position {
+func GetSelectBodyPosition(body *core.SelectBody) token.Position {
 	if body == nil {
 		return token.Position{}
 	}
@@ -62,7 +62,7 @@ func GetSelectBodyPosition(body *parser.SelectBody) token.Position {
 }
 
 // GetWithClausePosition returns the position of a WITH clause.
-func GetWithClausePosition(with *parser.WithClause) token.Position {
+func GetWithClausePosition(with *core.WithClause) token.Position {
 	if with == nil {
 		return token.Position{}
 	}

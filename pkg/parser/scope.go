@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
@@ -98,7 +99,7 @@ func (s *Scope) RegisterCTEWithSources(name string, columns []string, underlying
 }
 
 // RegisterTable registers a physical table from a FROM clause.
-func (s *Scope) RegisterTable(table *TableName) {
+func (s *Scope) RegisterTable(table *core.TableName) {
 	entry := &ScopeEntry{
 		Type: ScopeTable,
 		Name: table.Name,
@@ -210,7 +211,7 @@ func (s *Scope) AllEntries() []*ScopeEntry {
 //
 // For unqualified columns, it searches all entries in scope.
 // For qualified columns (table.column), it looks up by qualifier.
-func (s *Scope) ResolveColumn(ref *ColumnRef) (*ScopeEntry, bool) {
+func (s *Scope) ResolveColumn(ref *core.ColumnRef) (*ScopeEntry, bool) {
 	if ref.Table != "" {
 		// Qualified reference - lookup by table name/alias
 		return s.Lookup(ref.Table)
@@ -240,7 +241,7 @@ func (s *Scope) ResolveColumn(ref *ColumnRef) (*ScopeEntry, bool) {
 // If tableName is provided, expands only for that table.
 //
 // Returns nil if the table is not found or has no known columns.
-func (s *Scope) ExpandStar(tableName string) []*ColumnRef {
+func (s *Scope) ExpandStar(tableName string) []*core.ColumnRef {
 	if tableName != "" {
 		// Expand table.*
 		entry, ok := s.Lookup(tableName)
@@ -248,9 +249,9 @@ func (s *Scope) ExpandStar(tableName string) []*ColumnRef {
 			return nil
 		}
 
-		refs := make([]*ColumnRef, len(entry.Columns))
+		refs := make([]*core.ColumnRef, len(entry.Columns))
 		for i, col := range entry.Columns {
-			refs[i] = &ColumnRef{
+			refs[i] = &core.ColumnRef{
 				Table:  entry.EffectiveName(),
 				Column: col,
 			}
@@ -259,10 +260,10 @@ func (s *Scope) ExpandStar(tableName string) []*ColumnRef {
 	}
 
 	// Expand * for all tables
-	var refs []*ColumnRef
+	var refs []*core.ColumnRef
 	for _, entry := range s.entries {
 		for _, col := range entry.Columns {
-			refs = append(refs, &ColumnRef{
+			refs = append(refs, &core.ColumnRef{
 				Table:  entry.EffectiveName(),
 				Column: col,
 			})
@@ -291,7 +292,7 @@ type ColumnSource struct {
 }
 
 // ResolveColumnFull resolves a column reference and returns full source information.
-func (s *Scope) ResolveColumnFull(ref *ColumnRef) (*ColumnSource, bool) {
+func (s *Scope) ResolveColumnFull(ref *core.ColumnRef) (*ColumnSource, bool) {
 	entry, ok := s.ResolveColumn(ref)
 	if !ok {
 		// No schema info - return a best-effort resolution

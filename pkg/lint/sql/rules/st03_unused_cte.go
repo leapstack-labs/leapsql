@@ -7,7 +7,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -44,13 +43,13 @@ SELECT * FROM active_customers`,
 }
 
 func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok || selectStmt.With == nil {
 		return nil
 	}
 
 	// Collect all CTE names
-	cteNames := make(map[string]*parser.CTE)
+	cteNames := make(map[string]*core.CTE)
 	for _, cte := range selectStmt.With.CTEs {
 		cteNames[strings.ToLower(cte.Name)] = cte
 	}
@@ -82,13 +81,13 @@ func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagn
 	return diagnostics
 }
 
-func collectTableNamesST03(body *parser.SelectBody, used map[string]bool) {
+func collectTableNamesST03(body *core.SelectBody, used map[string]bool) {
 	if body == nil {
 		return
 	}
 
 	ast.Walk(body, func(node any) bool {
-		if tn, ok := node.(*parser.TableName); ok {
+		if tn, ok := node.(*core.TableName); ok {
 			used[strings.ToLower(tn.Name)] = true
 		}
 		return true

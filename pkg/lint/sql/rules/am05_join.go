@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -37,14 +36,14 @@ JOIN orders o ON c.id = o.customer_id`,
 }
 
 func checkImplicitJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
 
 	var diagnostics []lint.Diagnostic
 	for _, join := range ast.CollectJoins(selectStmt) {
-		if join.Type == parser.JoinComma {
+		if join.Type == core.JoinComma {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM05",
 				Severity:         core.SeverityInfo,

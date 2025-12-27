@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -36,7 +35,7 @@ WHERE shipped_date IS NULL`,
 }
 
 func checkIsNullComparison(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -70,7 +69,7 @@ func checkIsNullComparison(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	return diagnostics
 }
 
-func isNullLiteralCV05(expr parser.Expr) bool {
-	lit, ok := expr.(*parser.Literal)
-	return ok && lit.Type == parser.LiteralNull
+func isNullLiteralCV05(expr core.Expr) bool {
+	lit, ok := expr.(*core.Literal)
+	return ok && lit.Type == core.LiteralNull
 }

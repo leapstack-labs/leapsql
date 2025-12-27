@@ -1,5 +1,9 @@
 package parser
 
+import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
+)
+
 // Window specification parsing: OVER clauses, PARTITION BY, ORDER BY, frame specs.
 //
 // Grammar:
@@ -10,8 +14,8 @@ package parser
 //	frame_bound   → UNBOUNDED PRECEDING | UNBOUNDED FOLLOWING | CURRENT ROW | expr PRECEDING | expr FOLLOWING
 
 // parseWindowSpec parses a window specification.
-func (p *Parser) parseWindowSpec() *WindowSpec {
-	spec := &WindowSpec{}
+func (p *Parser) parseWindowSpec() *core.WindowSpec {
+	spec := &core.WindowSpec{}
 
 	// Named window reference
 	if p.check(TOKEN_IDENT) {
@@ -44,17 +48,17 @@ func (p *Parser) parseWindowSpec() *WindowSpec {
 }
 
 // parseFrameSpec parses a window frame specification.
-func (p *Parser) parseFrameSpec() *FrameSpec {
-	frame := &FrameSpec{}
+func (p *Parser) parseFrameSpec() *core.FrameSpec {
+	frame := &core.FrameSpec{}
 
 	// Frame type
 	switch {
 	case p.match(TOKEN_ROWS):
-		frame.Type = FrameRows
+		frame.Type = core.FrameRows
 	case p.match(TOKEN_RANGE):
-		frame.Type = FrameRange
+		frame.Type = core.FrameRange
 	case p.match(TOKEN_GROUPS):
-		frame.Type = FrameGroups
+		frame.Type = core.FrameGroups
 	}
 
 	// BETWEEN ... AND ...
@@ -71,28 +75,28 @@ func (p *Parser) parseFrameSpec() *FrameSpec {
 }
 
 // parseFrameBound parses a frame bound.
-func (p *Parser) parseFrameBound() *FrameBound {
-	bound := &FrameBound{}
+func (p *Parser) parseFrameBound() *core.FrameBound {
+	bound := &core.FrameBound{}
 
 	switch {
 	case p.match(TOKEN_UNBOUNDED):
 		if p.match(TOKEN_PRECEDING) {
-			bound.Type = FrameUnboundedPreceding
+			bound.Type = core.FrameUnboundedPreceding
 		} else if p.match(TOKEN_FOLLOWING) {
-			bound.Type = FrameUnboundedFollowing
+			bound.Type = core.FrameUnboundedFollowing
 		}
 
 	case p.match(TOKEN_CURRENT):
 		p.expect(TOKEN_ROW)
-		bound.Type = FrameCurrentRow
+		bound.Type = core.FrameCurrentRow
 
 	default:
 		// N PRECEDING or N FOLLOWING
 		bound.Offset = p.parseExpression()
 		if p.match(TOKEN_PRECEDING) {
-			bound.Type = FrameExprPreceding
+			bound.Type = core.FrameExprPreceding
 		} else if p.match(TOKEN_FOLLOWING) {
-			bound.Type = FrameExprFollowing
+			bound.Type = core.FrameExprFollowing
 		}
 	}
 

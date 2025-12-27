@@ -1,105 +1,105 @@
 package format
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
 const complexityThreshold = 5
 
-func (p *Printer) formatExpr(e parser.Expr) {
+func (p *Printer) formatExpr(e core.Expr) {
 	if e == nil {
 		return
 	}
 
 	switch expr := e.(type) {
-	case *parser.Literal:
+	case *core.Literal:
 		p.formatLiteral(expr)
-	case *parser.ColumnRef:
+	case *core.ColumnRef:
 		p.formatColumnRef(expr)
-	case *parser.BinaryExpr:
+	case *core.BinaryExpr:
 		p.formatBinaryExpr(expr)
-	case *parser.UnaryExpr:
+	case *core.UnaryExpr:
 		p.formatUnaryExpr(expr)
-	case *parser.FuncCall:
+	case *core.FuncCall:
 		p.formatFuncCall(expr)
-	case *parser.CaseExpr:
+	case *core.CaseExpr:
 		p.formatCaseExpr(expr)
-	case *parser.CastExpr:
+	case *core.CastExpr:
 		p.formatCastExpr(expr)
-	case *parser.InExpr:
+	case *core.InExpr:
 		p.formatInExpr(expr)
-	case *parser.BetweenExpr:
+	case *core.BetweenExpr:
 		p.formatBetweenExpr(expr)
-	case *parser.IsNullExpr:
+	case *core.IsNullExpr:
 		p.formatIsNullExpr(expr)
-	case *parser.IsBoolExpr:
+	case *core.IsBoolExpr:
 		p.formatIsBoolExpr(expr)
-	case *parser.LikeExpr:
+	case *core.LikeExpr:
 		p.formatLikeExpr(expr)
-	case *parser.ParenExpr:
+	case *core.ParenExpr:
 		p.formatParenExpr(expr)
-	case *parser.SubqueryExpr:
+	case *core.SubqueryExpr:
 		p.formatSubqueryExpr(expr)
-	case *parser.ExistsExpr:
+	case *core.ExistsExpr:
 		p.formatExistsExpr(expr)
-	case *parser.StarExpr:
+	case *core.StarExpr:
 		p.formatStarExpr(expr)
-	case *parser.MacroExpr:
+	case *core.MacroExpr:
 		p.formatMacroExpr(expr)
 	// DuckDB expression extensions (Phase 3)
-	case *parser.LambdaExpr:
+	case *core.LambdaExpr:
 		p.formatLambdaExpr(expr)
-	case *parser.StructLiteral:
+	case *core.StructLiteral:
 		p.formatStructLiteral(expr)
-	case *parser.ListLiteral:
+	case *core.ListLiteral:
 		p.formatListLiteral(expr)
-	case *parser.IndexExpr:
+	case *core.IndexExpr:
 		p.formatIndexExpr(expr)
 	}
 }
 
-func (p *Printer) exprComplexity(e parser.Expr) int {
+func (p *Printer) exprComplexity(e core.Expr) int {
 	if e == nil {
 		return 0
 	}
 
 	switch expr := e.(type) {
-	case *parser.Literal, *parser.ColumnRef, *parser.StarExpr, *parser.MacroExpr:
+	case *core.Literal, *core.ColumnRef, *core.StarExpr, *core.MacroExpr:
 		return 1
-	case *parser.BinaryExpr:
+	case *core.BinaryExpr:
 		return 1 + p.exprComplexity(expr.Left) + p.exprComplexity(expr.Right)
-	case *parser.UnaryExpr:
+	case *core.UnaryExpr:
 		return 1 + p.exprComplexity(expr.Expr)
-	case *parser.FuncCall:
+	case *core.FuncCall:
 		score := 2
 		for _, arg := range expr.Args {
 			score += p.exprComplexity(arg)
 		}
 		return score
-	case *parser.ParenExpr:
+	case *core.ParenExpr:
 		return p.exprComplexity(expr.Expr)
-	case *parser.CaseExpr:
+	case *core.CaseExpr:
 		score := 2
 		for _, w := range expr.Whens {
 			score += p.exprComplexity(w.Condition) + p.exprComplexity(w.Result)
 		}
 		return score
-	case *parser.LambdaExpr:
+	case *core.LambdaExpr:
 		return 1 + p.exprComplexity(expr.Body)
-	case *parser.StructLiteral:
+	case *core.StructLiteral:
 		score := 1
 		for _, f := range expr.Fields {
 			score += p.exprComplexity(f.Value)
 		}
 		return score
-	case *parser.ListLiteral:
+	case *core.ListLiteral:
 		score := 1
 		for _, elem := range expr.Elements {
 			score += p.exprComplexity(elem)
 		}
 		return score
-	case *parser.IndexExpr:
+	case *core.IndexExpr:
 		score := 1 + p.exprComplexity(expr.Expr)
 		if expr.Index != nil {
 			score += p.exprComplexity(expr.Index)
@@ -120,26 +120,26 @@ func isLogicalOp(op token.TokenType) bool {
 	return op == token.AND || op == token.OR
 }
 
-func (p *Printer) formatLiteral(lit *parser.Literal) {
+func (p *Printer) formatLiteral(lit *core.Literal) {
 	switch lit.Type {
-	case parser.LiteralString:
+	case core.LiteralString:
 		p.write("'")
 		p.write(lit.Value)
 		p.write("'")
-	case parser.LiteralBool:
+	case core.LiteralBool:
 		if lit.Value == "TRUE" || lit.Value == "true" {
 			p.kw(token.TRUE)
 		} else {
 			p.kw(token.FALSE)
 		}
-	case parser.LiteralNull:
+	case core.LiteralNull:
 		p.kw(token.NULL)
 	default:
 		p.write(lit.Value)
 	}
 }
 
-func (p *Printer) formatColumnRef(col *parser.ColumnRef) {
+func (p *Printer) formatColumnRef(col *core.ColumnRef) {
 	if col.Table != "" {
 		p.write(col.Table)
 		p.write(".")
@@ -147,7 +147,7 @@ func (p *Printer) formatColumnRef(col *parser.ColumnRef) {
 	p.write(col.Column)
 }
 
-func (p *Printer) formatBinaryExpr(expr *parser.BinaryExpr) {
+func (p *Printer) formatBinaryExpr(expr *core.BinaryExpr) {
 	shouldBreak := p.exprComplexity(expr) > complexityThreshold && isLogicalOp(expr.Op)
 
 	p.formatExpr(expr.Left)
@@ -165,7 +165,7 @@ func (p *Printer) formatBinaryExpr(expr *parser.BinaryExpr) {
 	p.formatExpr(expr.Right)
 }
 
-func (p *Printer) formatUnaryExpr(expr *parser.UnaryExpr) {
+func (p *Printer) formatUnaryExpr(expr *core.UnaryExpr) {
 	p.kw(expr.Op)
 	if expr.Op == token.NOT {
 		p.space()
@@ -173,7 +173,7 @@ func (p *Printer) formatUnaryExpr(expr *parser.UnaryExpr) {
 	p.formatExpr(expr.Expr)
 }
 
-func (p *Printer) formatFuncCall(fn *parser.FuncCall) {
+func (p *Printer) formatFuncCall(fn *core.FuncCall) {
 	p.write(fn.Name)
 	p.write("(")
 
@@ -208,7 +208,7 @@ func (p *Printer) formatFuncCall(fn *parser.FuncCall) {
 	}
 }
 
-func (p *Printer) formatWindowSpec(w *parser.WindowSpec) {
+func (p *Printer) formatWindowSpec(w *core.WindowSpec) {
 	p.kw(token.OVER)
 	p.write(" (")
 
@@ -248,7 +248,7 @@ func (p *Printer) formatWindowSpec(w *parser.WindowSpec) {
 	p.write(")")
 }
 
-func (p *Printer) formatFrameSpec(f *parser.FrameSpec) {
+func (p *Printer) formatFrameSpec(f *core.FrameSpec) {
 	p.keyword(string(f.Type))
 	p.space()
 	p.kw(token.BETWEEN)
@@ -260,35 +260,35 @@ func (p *Printer) formatFrameSpec(f *parser.FrameSpec) {
 	p.formatFrameBound(f.End)
 }
 
-func (p *Printer) formatFrameBound(b *parser.FrameBound) {
+func (p *Printer) formatFrameBound(b *core.FrameBound) {
 	if b == nil {
 		return
 	}
 	switch b.Type {
-	case parser.FrameUnboundedPreceding:
+	case core.FrameUnboundedPreceding:
 		p.kw(token.UNBOUNDED)
 		p.space()
 		p.kw(token.PRECEDING)
-	case parser.FrameUnboundedFollowing:
+	case core.FrameUnboundedFollowing:
 		p.kw(token.UNBOUNDED)
 		p.space()
 		p.kw(token.FOLLOWING)
-	case parser.FrameCurrentRow:
+	case core.FrameCurrentRow:
 		p.kw(token.CURRENT)
 		p.space()
 		p.kw(token.ROW)
-	case parser.FrameExprPreceding:
+	case core.FrameExprPreceding:
 		p.formatExpr(b.Offset)
 		p.space()
 		p.kw(token.PRECEDING)
-	case parser.FrameExprFollowing:
+	case core.FrameExprFollowing:
 		p.formatExpr(b.Offset)
 		p.space()
 		p.kw(token.FOLLOWING)
 	}
 }
 
-func (p *Printer) formatCaseExpr(c *parser.CaseExpr) {
+func (p *Printer) formatCaseExpr(c *core.CaseExpr) {
 	p.kw(token.CASE)
 
 	if c.Operand != nil {
@@ -321,7 +321,7 @@ func (p *Printer) formatCaseExpr(c *parser.CaseExpr) {
 	p.kw(token.END)
 }
 
-func (p *Printer) formatCastExpr(c *parser.CastExpr) {
+func (p *Printer) formatCastExpr(c *core.CastExpr) {
 	p.kw(token.CAST)
 	p.write("(")
 	p.formatExpr(c.Expr)
@@ -332,7 +332,7 @@ func (p *Printer) formatCastExpr(c *parser.CastExpr) {
 	p.write(")")
 }
 
-func (p *Printer) formatInExpr(in *parser.InExpr) {
+func (p *Printer) formatInExpr(in *core.InExpr) {
 	p.formatExpr(in.Expr)
 	if in.Not {
 		p.space()
@@ -354,7 +354,7 @@ func (p *Printer) formatInExpr(in *parser.InExpr) {
 	p.write(")")
 }
 
-func (p *Printer) formatBetweenExpr(b *parser.BetweenExpr) {
+func (p *Printer) formatBetweenExpr(b *core.BetweenExpr) {
 	p.formatExpr(b.Expr)
 	if b.Not {
 		p.space()
@@ -370,7 +370,7 @@ func (p *Printer) formatBetweenExpr(b *parser.BetweenExpr) {
 	p.formatExpr(b.High)
 }
 
-func (p *Printer) formatIsNullExpr(is *parser.IsNullExpr) {
+func (p *Printer) formatIsNullExpr(is *core.IsNullExpr) {
 	p.formatExpr(is.Expr)
 	p.space()
 	p.kw(token.IS)
@@ -382,7 +382,7 @@ func (p *Printer) formatIsNullExpr(is *parser.IsNullExpr) {
 	p.kw(token.NULL)
 }
 
-func (p *Printer) formatIsBoolExpr(is *parser.IsBoolExpr) {
+func (p *Printer) formatIsBoolExpr(is *core.IsBoolExpr) {
 	p.formatExpr(is.Expr)
 	p.space()
 	p.kw(token.IS)
@@ -398,7 +398,7 @@ func (p *Printer) formatIsBoolExpr(is *parser.IsBoolExpr) {
 	}
 }
 
-func (p *Printer) formatLikeExpr(like *parser.LikeExpr) {
+func (p *Printer) formatLikeExpr(like *core.LikeExpr) {
 	p.formatExpr(like.Expr)
 	if like.Not {
 		p.space()
@@ -410,13 +410,13 @@ func (p *Printer) formatLikeExpr(like *parser.LikeExpr) {
 	p.formatExpr(like.Pattern)
 }
 
-func (p *Printer) formatParenExpr(paren *parser.ParenExpr) {
+func (p *Printer) formatParenExpr(paren *core.ParenExpr) {
 	p.write("(")
 	p.formatExpr(paren.Expr)
 	p.write(")")
 }
 
-func (p *Printer) formatSubqueryExpr(sq *parser.SubqueryExpr) {
+func (p *Printer) formatSubqueryExpr(sq *core.SubqueryExpr) {
 	p.write("(")
 	p.writeln()
 	p.indent()
@@ -425,7 +425,7 @@ func (p *Printer) formatSubqueryExpr(sq *parser.SubqueryExpr) {
 	p.write(")")
 }
 
-func (p *Printer) formatExistsExpr(ex *parser.ExistsExpr) {
+func (p *Printer) formatExistsExpr(ex *core.ExistsExpr) {
 	if ex.Not {
 		p.kw(token.NOT)
 		p.space()
@@ -439,7 +439,7 @@ func (p *Printer) formatExistsExpr(ex *parser.ExistsExpr) {
 	p.write(")")
 }
 
-func (p *Printer) formatStarExpr(star *parser.StarExpr) {
+func (p *Printer) formatStarExpr(star *core.StarExpr) {
 	if star.Table != "" {
 		p.write(star.Table)
 		p.write(".")
@@ -447,14 +447,14 @@ func (p *Printer) formatStarExpr(star *parser.StarExpr) {
 	p.write("*")
 }
 
-func (p *Printer) formatMacroExpr(m *parser.MacroExpr) {
+func (p *Printer) formatMacroExpr(m *core.MacroExpr) {
 	// Macros are preserved exactly as written
 	p.write(m.Content)
 }
 
 // ---------- DuckDB Expression Extensions (Phase 3) ----------
 
-func (p *Printer) formatLambdaExpr(lambda *parser.LambdaExpr) {
+func (p *Printer) formatLambdaExpr(lambda *core.LambdaExpr) {
 	if len(lambda.Params) == 1 {
 		p.write(lambda.Params[0])
 	} else {
@@ -471,7 +471,7 @@ func (p *Printer) formatLambdaExpr(lambda *parser.LambdaExpr) {
 	p.formatExpr(lambda.Body)
 }
 
-func (p *Printer) formatStructLiteral(s *parser.StructLiteral) {
+func (p *Printer) formatStructLiteral(s *core.StructLiteral) {
 	p.write("{")
 	for i, field := range s.Fields {
 		if i > 0 {
@@ -487,7 +487,7 @@ func (p *Printer) formatStructLiteral(s *parser.StructLiteral) {
 	p.write("}")
 }
 
-func (p *Printer) formatListLiteral(list *parser.ListLiteral) {
+func (p *Printer) formatListLiteral(list *core.ListLiteral) {
 	p.write("[")
 	for i, elem := range list.Elements {
 		if i > 0 {
@@ -498,7 +498,7 @@ func (p *Printer) formatListLiteral(list *parser.ListLiteral) {
 	p.write("]")
 }
 
-func (p *Printer) formatIndexExpr(idx *parser.IndexExpr) {
+func (p *Printer) formatIndexExpr(idx *core.IndexExpr) {
 	p.formatExpr(idx.Expr)
 	p.write("[")
 	if idx.IsSlice {

@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -38,7 +37,7 @@ JOIN customers c USING (customer_id)`,
 }
 
 func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -66,14 +65,14 @@ func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Dia
 	return diagnostics
 }
 
-func canUseUsingST07(condition parser.Expr) bool {
-	binExpr, ok := condition.(*parser.BinaryExpr)
+func canUseUsingST07(condition core.Expr) bool {
+	binExpr, ok := condition.(*core.BinaryExpr)
 	if !ok || binExpr.Op != token.EQ {
 		return false
 	}
 
-	leftCol, leftOk := binExpr.Left.(*parser.ColumnRef)
-	rightCol, rightOk := binExpr.Right.(*parser.ColumnRef)
+	leftCol, leftOk := binExpr.Left.(*core.ColumnRef)
+	rightCol, rightOk := binExpr.Right.(*core.ColumnRef)
 
 	if !leftOk || !rightOk {
 		return false

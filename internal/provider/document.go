@@ -7,6 +7,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/template"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
@@ -29,7 +30,7 @@ type ParsedDocument struct {
 	SQLContent    string // Content with templates replaced
 
 	// SQL parsing result
-	SQL      *pkgparser.SelectStmt
+	SQL      *core.SelectStmt
 	SQLError error
 
 	// Metadata

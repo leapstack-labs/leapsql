@@ -7,7 +7,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -39,7 +38,7 @@ WHERE c.status = 'active'`,
 }
 
 func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -49,15 +48,15 @@ func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	for _, ref := range ast.CollectTableRefs(selectStmt) {
 		var alias string
 		switch t := ref.(type) {
-		case *parser.TableName:
+		case *core.TableName:
 			if t.Alias != "" {
 				alias = strings.ToLower(t.Alias)
 			}
-		case *parser.DerivedTable:
+		case *core.DerivedTable:
 			if t.Alias != "" {
 				alias = strings.ToLower(t.Alias)
 			}
-		case *parser.LateralTable:
+		case *core.LateralTable:
 			if t.Alias != "" {
 				alias = strings.ToLower(t.Alias)
 			}

@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -43,7 +42,7 @@ GROUP BY 1, 2`,
 }
 
 func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -62,10 +61,10 @@ func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint
 
 		// Check if expression is more complex than a column ref
 		switch col.Expr.(type) {
-		case *parser.ColumnRef:
+		case *core.ColumnRef:
 			// Simple column reference - no alias needed
 			continue
-		case *parser.FuncCall, *parser.CaseExpr, *parser.BinaryExpr, *parser.CastExpr:
+		case *core.FuncCall, *core.CaseExpr, *core.BinaryExpr, *core.CastExpr:
 			// Complex expressions should have aliases
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AL03",

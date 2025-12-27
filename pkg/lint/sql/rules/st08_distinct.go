@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -36,7 +35,7 @@ GROUP BY department, location`,
 }
 
 func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -60,9 +59,9 @@ func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 		}
 		// Check if expression is a column ref or function call
 		switch col.Expr.(type) {
-		case *parser.ColumnRef:
+		case *core.ColumnRef:
 			// Simple column ref - OK
-		case *parser.FuncCall:
+		case *core.FuncCall:
 			// If there are aggregate functions, this is a hint
 			return nil
 		default:

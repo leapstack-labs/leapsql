@@ -8,7 +8,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -53,7 +52,7 @@ var defaultForbiddenPatterns = []string{
 }
 
 func checkForbidAlias(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -83,11 +82,11 @@ func checkForbidAlias(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 		var alias string
 		pos := ast.GetTableRefPosition(ref)
 		switch t := ref.(type) {
-		case *parser.TableName:
+		case *core.TableName:
 			alias = t.Alias
-		case *parser.DerivedTable:
+		case *core.DerivedTable:
 			alias = t.Alias
-		case *parser.LateralTable:
+		case *core.LateralTable:
 			alias = t.Alias
 		}
 		if alias != "" {

@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/leapstack-labs/leapsql/pkg/dialect"
+import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
+)
 
 // Resolver walks the AST and resolves:
 // - CTE definitions (names and columns)
@@ -26,7 +29,7 @@ func NewResolver(d *dialect.Dialect, schema Schema) (*Resolver, error) {
 }
 
 // Resolve builds scopes for a SELECT statement and returns the root scope.
-func (r *Resolver) Resolve(stmt *SelectStmt) (*Scope, error) {
+func (r *Resolver) Resolve(stmt *core.SelectStmt) (*Scope, error) {
 	if stmt == nil {
 		return nil, &ResolveError{Message: "nil statement"}
 	}
@@ -53,7 +56,7 @@ func (r *Resolver) Resolve(stmt *SelectStmt) (*Scope, error) {
 
 // resolveCTEs resolves all CTEs in a WITH clause.
 // CTEs can reference previously defined CTEs (forward references not allowed).
-func (r *Resolver) resolveCTEs(scope *Scope, with *WithClause) error {
+func (r *Resolver) resolveCTEs(scope *Scope, with *core.WithClause) error {
 	for _, cte := range with.CTEs {
 		// Create a child scope for the CTE that can see previously defined CTEs
 		cteScope := scope.Child()
@@ -118,7 +121,7 @@ func (r *Resolver) collectUnderlyingSources(scope *Scope) []string {
 }
 
 // resolveSelectBody resolves a SELECT body (may include set operations).
-func (r *Resolver) resolveSelectBody(scope *Scope, body *SelectBody) error {
+func (r *Resolver) resolveSelectBody(scope *Scope, body *core.SelectBody) error {
 	if body == nil {
 		return nil
 	}
@@ -143,14 +146,14 @@ func (r *Resolver) resolveSelectBody(scope *Scope, body *SelectBody) error {
 }
 
 // resolveSelectCore resolves a single SELECT clause.
-func (r *Resolver) resolveSelectCore(scope *Scope, core *SelectCore) error {
-	if core == nil {
+func (r *Resolver) resolveSelectCore(scope *Scope, sc *core.SelectCore) error {
+	if sc == nil {
 		return nil
 	}
 
 	// Resolve FROM clause first (defines available tables)
-	if core.From != nil {
-		if err := r.resolveFromClause(scope, core.From); err != nil {
+	if sc.From != nil {
+		if err := r.resolveFromClause(scope, sc.From); err != nil {
 			return err
 		}
 	}
@@ -162,7 +165,7 @@ func (r *Resolver) resolveSelectCore(scope *Scope, core *SelectCore) error {
 }
 
 // resolveFromClause resolves tables and joins in a FROM clause.
-func (r *Resolver) resolveFromClause(scope *Scope, from *FromClause) error {
+func (r *Resolver) resolveFromClause(scope *Scope, from *core.FromClause) error {
 	// Resolve the main table reference
 	if err := r.resolveTableRef(scope, from.Source); err != nil {
 		return err
@@ -179,13 +182,13 @@ func (r *Resolver) resolveFromClause(scope *Scope, from *FromClause) error {
 }
 
 // resolveTableRef resolves a table reference and registers it in scope.
-func (r *Resolver) resolveTableRef(scope *Scope, ref TableRef) error {
+func (r *Resolver) resolveTableRef(scope *Scope, ref core.TableRef) error {
 	if ref == nil {
 		return nil
 	}
 
 	switch t := ref.(type) {
-	case *TableName:
+	case *core.TableName:
 		// Check if this references a CTE
 		if cte, ok := scope.LookupCTE(t.Name); ok {
 			// Register as alias to CTE, propagating underlying sources
@@ -203,7 +206,7 @@ func (r *Resolver) resolveTableRef(scope *Scope, ref TableRef) error {
 			scope.RegisterTable(t)
 		}
 
-	case *DerivedTable:
+	case *core.DerivedTable:
 		// Derived table (subquery in FROM)
 		subScope := scope.Child()
 
@@ -230,7 +233,7 @@ func (r *Resolver) resolveTableRef(scope *Scope, ref TableRef) error {
 			}
 		}
 
-	case *LateralTable:
+	case *core.LateralTable:
 		// LATERAL subquery - can reference tables from outer scope
 		// We use the current scope (not a child) so it can see outer tables
 		if t.Select != nil {
@@ -257,7 +260,7 @@ func (r *Resolver) resolveTableRef(scope *Scope, ref TableRef) error {
 
 // extractSelectColumns extracts column names from a SELECT list.
 // Returns the list of output column names.
-func (r *Resolver) extractSelectColumns(scope *Scope, body *SelectBody) []string {
+func (r *Resolver) extractSelectColumns(scope *Scope, body *core.SelectBody) []string {
 	if body == nil || body.Left == nil {
 		return nil
 	}
@@ -274,7 +277,7 @@ func (r *Resolver) extractSelectColumns(scope *Scope, body *SelectBody) []string
 }
 
 // extractColumnName extracts the output name for a SELECT item.
-func (r *Resolver) extractColumnName(_ *Scope, item SelectItem, index int) string {
+func (r *Resolver) extractColumnName(_ *Scope, item core.SelectItem, index int) string {
 	// Explicit alias takes precedence
 	if item.Alias != "" {
 		return item.Alias
@@ -302,32 +305,32 @@ func (r *Resolver) extractColumnName(_ *Scope, item SelectItem, index int) strin
 }
 
 // inferColumnName tries to infer a column name from an expression.
-func (r *Resolver) inferColumnName(expr Expr, index int) string {
+func (r *Resolver) inferColumnName(expr core.Expr, index int) string {
 	switch e := expr.(type) {
-	case *ColumnRef:
+	case *core.ColumnRef:
 		return e.Column
 
-	case *FuncCall:
+	case *core.FuncCall:
 		// Use function name as column name
 		return r.dialect.NormalizeName(e.Name)
 
-	case *CastExpr:
+	case *core.CastExpr:
 		// Use the inner expression's name
 		return r.inferColumnName(e.Expr, index)
 
-	case *ParenExpr:
+	case *core.ParenExpr:
 		// Use the inner expression's name
 		return r.inferColumnName(e.Expr, index)
 
-	case *CaseExpr:
+	case *core.CaseExpr:
 		// CASE expressions typically need explicit aliases
 		return r.generateColumnName(index)
 
-	case *Literal:
+	case *core.Literal:
 		// Literals need explicit aliases
 		return r.generateColumnName(index)
 
-	case *BinaryExpr, *UnaryExpr:
+	case *core.BinaryExpr, *core.UnaryExpr:
 		// Complex expressions need explicit aliases
 		return r.generateColumnName(index)
 	}
@@ -370,30 +373,30 @@ func NewColumnResolver(scope *Scope, d *dialect.Dialect) (*ColumnResolver, error
 }
 
 // CollectColumns collects all column references from an expression.
-func (cr *ColumnResolver) CollectColumns(expr Expr) []*ColumnRef {
-	var refs []*ColumnRef
+func (cr *ColumnResolver) CollectColumns(expr core.Expr) []*core.ColumnRef {
+	var refs []*core.ColumnRef
 	cr.collectColumnsRecursive(expr, &refs)
 	return refs
 }
 
 // collectColumnsRecursive recursively collects column references.
-func (cr *ColumnResolver) collectColumnsRecursive(expr Expr, refs *[]*ColumnRef) {
+func (cr *ColumnResolver) collectColumnsRecursive(expr core.Expr, refs *[]*core.ColumnRef) {
 	if expr == nil {
 		return
 	}
 
 	switch e := expr.(type) {
-	case *ColumnRef:
+	case *core.ColumnRef:
 		*refs = append(*refs, e)
 
-	case *BinaryExpr:
+	case *core.BinaryExpr:
 		cr.collectColumnsRecursive(e.Left, refs)
 		cr.collectColumnsRecursive(e.Right, refs)
 
-	case *UnaryExpr:
+	case *core.UnaryExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 
-	case *FuncCall:
+	case *core.FuncCall:
 		for _, arg := range e.Args {
 			cr.collectColumnsRecursive(arg, refs)
 		}
@@ -409,7 +412,7 @@ func (cr *ColumnResolver) collectColumnsRecursive(expr Expr, refs *[]*ColumnRef)
 			}
 		}
 
-	case *CaseExpr:
+	case *core.CaseExpr:
 		if e.Operand != nil {
 			cr.collectColumnsRecursive(e.Operand, refs)
 		}
@@ -421,49 +424,49 @@ func (cr *ColumnResolver) collectColumnsRecursive(expr Expr, refs *[]*ColumnRef)
 			cr.collectColumnsRecursive(e.Else, refs)
 		}
 
-	case *CastExpr:
+	case *core.CastExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 
-	case *InExpr:
+	case *core.InExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 		for _, v := range e.Values {
 			cr.collectColumnsRecursive(v, refs)
 		}
 		// Note: We don't recurse into IN subqueries - they're separate lineage
 
-	case *BetweenExpr:
+	case *core.BetweenExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 		cr.collectColumnsRecursive(e.Low, refs)
 		cr.collectColumnsRecursive(e.High, refs)
 
-	case *IsNullExpr:
+	case *core.IsNullExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 
-	case *LikeExpr:
+	case *core.LikeExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 		cr.collectColumnsRecursive(e.Pattern, refs)
 
-	case *ParenExpr:
+	case *core.ParenExpr:
 		cr.collectColumnsRecursive(e.Expr, refs)
 
-	case *StarExpr:
+	case *core.StarExpr:
 		// Star expressions are handled specially during lineage extraction
 		// We don't collect them as regular column refs
 
-	case *Literal:
+	case *core.Literal:
 		// Literals have no column references
 
-	case *SubqueryExpr, *ExistsExpr:
+	case *core.SubqueryExpr, *core.ExistsExpr:
 		// Subqueries have their own scope and lineage
 	}
 }
 
 // ResolveColumnRef resolves a column reference to its source.
-func (cr *ColumnResolver) ResolveColumnRef(ref *ColumnRef) (*ColumnSource, bool) {
+func (cr *ColumnResolver) ResolveColumnRef(ref *core.ColumnRef) (*ColumnSource, bool) {
 	return cr.scope.ResolveColumnFull(ref)
 }
 
 // ExpandStar expands a star expression to individual column references.
-func (cr *ColumnResolver) ExpandStar(tableName string) []*ColumnRef {
+func (cr *ColumnResolver) ExpandStar(tableName string) []*core.ColumnRef {
 	return cr.scope.ExpandStar(tableName)
 }

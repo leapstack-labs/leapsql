@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -45,7 +44,7 @@ FROM orders`,
 }
 
 func checkSimpleCaseConversion(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok {
 		return nil
 	}
@@ -72,7 +71,7 @@ func checkSimpleCaseConversion(stmt any, _ lint.DialectInfo, _ map[string]any) [
 	return diagnostics
 }
 
-func canConvertToSimpleCaseST02(caseExpr *parser.CaseExpr) bool {
+func canConvertToSimpleCaseST02(caseExpr *core.CaseExpr) bool {
 	if len(caseExpr.Whens) < 2 {
 		return false
 	}
@@ -81,7 +80,7 @@ func canConvertToSimpleCaseST02(caseExpr *parser.CaseExpr) bool {
 
 	for _, when := range caseExpr.Whens {
 		// Check if condition is an equality comparison
-		binExpr, ok := when.Condition.(*parser.BinaryExpr)
+		binExpr, ok := when.Condition.(*core.BinaryExpr)
 		if !ok {
 			return false
 		}
@@ -92,15 +91,15 @@ func canConvertToSimpleCaseST02(caseExpr *parser.CaseExpr) bool {
 		}
 
 		// One side should be a column ref, the other a literal
-		var colRef *parser.ColumnRef
+		var colRef *core.ColumnRef
 		var hasLiteral bool
 
-		if cr, ok := binExpr.Left.(*parser.ColumnRef); ok {
+		if cr, ok := binExpr.Left.(*core.ColumnRef); ok {
 			colRef = cr
-			_, hasLiteral = binExpr.Right.(*parser.Literal)
-		} else if cr, ok := binExpr.Right.(*parser.ColumnRef); ok {
+			_, hasLiteral = binExpr.Right.(*core.Literal)
+		} else if cr, ok := binExpr.Right.(*core.ColumnRef); ok {
 			colRef = cr
-			_, hasLiteral = binExpr.Left.(*parser.Literal)
+			_, hasLiteral = binExpr.Left.(*core.Literal)
 		}
 
 		if colRef == nil || !hasLiteral {

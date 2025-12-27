@@ -3,6 +3,7 @@ package duckdb_test
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/format"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
@@ -25,7 +26,7 @@ func TestPivotBasic(t *testing.T) {
 	require.NotNil(t, stmt.Body.Left)
 	require.NotNil(t, stmt.Body.Left.From)
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok, "Expected PivotTable, got %T", stmt.Body.Left.From.Source)
 
 	assert.Equal(t, "month", pivot.ForColumn)
@@ -47,7 +48,7 @@ func TestPivotMultipleAggregates(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with multiple aggregates")
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	assert.Len(t, pivot.Aggregates, 2)
@@ -65,7 +66,7 @@ func TestPivotInStar(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with IN *")
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	assert.True(t, pivot.InStar)
@@ -82,7 +83,7 @@ func TestPivotWithAlias(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with alias")
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	assert.Equal(t, "pivoted", pivot.Alias)
@@ -98,7 +99,7 @@ func TestPivotWithAliasNoAS(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT with alias (no AS)")
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	assert.Equal(t, "p", pivot.Alias)
@@ -116,7 +117,7 @@ func TestUnpivotBasic(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT")
 
-	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
+	unpivot, ok := stmt.Body.Left.From.Source.(*core.UnpivotTable)
 	require.True(t, ok, "Expected UnpivotTable, got %T", stmt.Body.Left.From.Source)
 
 	assert.Equal(t, []string{"value"}, unpivot.ValueColumns)
@@ -134,7 +135,7 @@ func TestUnpivotMultipleValueColumns(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with multiple value columns")
 
-	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
+	unpivot, ok := stmt.Body.Left.From.Source.(*core.UnpivotTable)
 	require.True(t, ok)
 
 	assert.Equal(t, []string{"revenue", "cost"}, unpivot.ValueColumns)
@@ -153,7 +154,7 @@ func TestUnpivotWithAliases(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with column aliases")
 
-	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
+	unpivot, ok := stmt.Body.Left.From.Source.(*core.UnpivotTable)
 	require.True(t, ok)
 
 	assert.Equal(t, "Q1 2024", unpivot.InColumns[0].Alias)
@@ -170,7 +171,7 @@ func TestUnpivotWithTableAlias(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse UNPIVOT with table alias")
 
-	unpivot, ok := stmt.Body.Left.From.Source.(*parser.UnpivotTable)
+	unpivot, ok := stmt.Body.Left.From.Source.(*core.UnpivotTable)
 	require.True(t, ok)
 
 	assert.Equal(t, "u", unpivot.Alias)
@@ -188,7 +189,7 @@ func TestPivotWithJoin(t *testing.T) {
 	require.NoError(t, err, "Failed to parse PIVOT with JOIN")
 
 	from := stmt.Body.Left.From
-	_, ok := from.Source.(*parser.PivotTable)
+	_, ok := from.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	assert.Len(t, from.Joins, 1)
@@ -206,11 +207,11 @@ func TestPivotAfterSubquery(t *testing.T) {
 	stmt, err := parser.ParseWithDialect(sql, duckdb.DuckDB)
 	require.NoError(t, err, "Failed to parse PIVOT after subquery")
 
-	pivot, ok := stmt.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := stmt.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok)
 
 	// Source should be a DerivedTable
-	_, derivedOk := pivot.Source.(*parser.DerivedTable)
+	_, derivedOk := pivot.Source.(*core.DerivedTable)
 	assert.True(t, derivedOk, "PIVOT source should be DerivedTable")
 }
 
@@ -283,7 +284,7 @@ func TestPivotUnpivotInCTE(t *testing.T) {
 	require.Len(t, stmt.With.CTEs, 1)
 
 	cte := stmt.With.CTEs[0]
-	pivot, ok := cte.Select.Body.Left.From.Source.(*parser.PivotTable)
+	pivot, ok := cte.Select.Body.Left.From.Source.(*core.PivotTable)
 	require.True(t, ok, "CTE should contain PivotTable")
 	assert.Equal(t, "month", pivot.ForColumn)
 }

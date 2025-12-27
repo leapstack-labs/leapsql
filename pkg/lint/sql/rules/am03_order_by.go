@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -39,7 +38,7 @@ ORDER BY 1`,
 }
 
 func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil
 	}
@@ -48,7 +47,7 @@ func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	bodies := ast.CollectSelectBodies(selectStmt)
 	hasSetOp := false
 	for _, body := range bodies {
-		if body != nil && body.Op != parser.SetOpNone {
+		if body != nil && body.Op != core.SetOpNone {
 			hasSetOp = true
 			break
 		}
@@ -66,7 +65,7 @@ func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 	var diagnostics []lint.Diagnostic
 	for _, item := range selectCore.OrderBy {
 		// If ORDER BY uses a column reference without table qualifier, it's ambiguous
-		if colRef, ok := item.Expr.(*parser.ColumnRef); ok && colRef.Table == "" {
+		if colRef, ok := item.Expr.(*core.ColumnRef); ok && colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM03",
 				Severity:         core.SeverityWarning,

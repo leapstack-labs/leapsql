@@ -1,5 +1,9 @@
 package parser
 
+import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
+)
+
 // FROM clause parsing: table references, derived tables, lateral joins, JOINs.
 //
 // Grammar:
@@ -15,11 +19,11 @@ package parser
 // joinInner is the default join type for "plain JOIN" syntax.
 // This is defined locally to avoid import cycles with dialect packages.
 // The value matches what ANSI dialect registers for token.INNER.
-const joinInner JoinType = "INNER"
+const joinInner core.JoinType = "INNER"
 
 // parseFromClause parses the FROM clause.
-func (p *Parser) parseFromClause() *FromClause {
-	from := &FromClause{}
+func (p *Parser) parseFromClause() *core.FromClause {
+	from := &core.FromClause{}
 	from.Source = p.parseTableRef()
 
 	// Check for PIVOT/UNPIVOT extensions (transforms the source)
@@ -38,7 +42,7 @@ func (p *Parser) parseFromClause() *FromClause {
 }
 
 // parseFromItemExtensions checks for dialect-specific FROM extensions (e.g., PIVOT, UNPIVOT).
-func (p *Parser) parseFromItemExtensions(source TableRef) TableRef {
+func (p *Parser) parseFromItemExtensions(source core.TableRef) core.TableRef {
 	if p.dialect == nil {
 		return source
 	}
@@ -64,7 +68,7 @@ func (p *Parser) parseFromItemExtensions(source TableRef) TableRef {
 }
 
 // parseTableRef parses a table reference.
-func (p *Parser) parseTableRef() TableRef {
+func (p *Parser) parseTableRef() core.TableRef {
 	// LATERAL subquery
 	if p.match(TOKEN_LATERAL) {
 		return p.parseLateralTable()
@@ -85,8 +89,8 @@ func (p *Parser) parseTableRef() TableRef {
 }
 
 // parseTableName parses a table name with optional schema/catalog.
-func (p *Parser) parseTableName() *TableName {
-	table := &TableName{}
+func (p *Parser) parseTableName() *core.TableName {
+	table := &core.TableName{}
 
 	if !p.check(TOKEN_IDENT) {
 		p.addError("expected table name")
@@ -131,9 +135,9 @@ func (p *Parser) parseTableName() *TableName {
 }
 
 // parseDerivedTable parses a derived table (subquery in FROM).
-func (p *Parser) parseDerivedTable() *DerivedTable {
+func (p *Parser) parseDerivedTable() *core.DerivedTable {
 	p.expect(TOKEN_LPAREN)
-	derived := &DerivedTable{}
+	derived := &core.DerivedTable{}
 	derived.Select = p.parseStatement()
 	p.expect(TOKEN_RPAREN)
 
@@ -152,9 +156,9 @@ func (p *Parser) parseDerivedTable() *DerivedTable {
 }
 
 // parseLateralTable parses a LATERAL subquery.
-func (p *Parser) parseLateralTable() *LateralTable {
+func (p *Parser) parseLateralTable() *core.LateralTable {
 	p.expect(TOKEN_LPAREN)
-	lateral := &LateralTable{}
+	lateral := &core.LateralTable{}
 	lateral.Select = p.parseStatement()
 	p.expect(TOKEN_RPAREN)
 
@@ -173,8 +177,8 @@ func (p *Parser) parseLateralTable() *LateralTable {
 }
 
 // parseMacroTable parses a macro used as a table reference.
-func (p *Parser) parseMacroTable() *MacroTable {
-	macro := &MacroTable{
+func (p *Parser) parseMacroTable() *core.MacroTable {
+	macro := &core.MacroTable{
 		Content: p.token.Literal,
 	}
 	macro.Span = p.makeSpan(p.token.Pos)
@@ -195,12 +199,12 @@ func (p *Parser) parseMacroTable() *MacroTable {
 }
 
 // parseJoin parses a JOIN clause.
-func (p *Parser) parseJoin() *Join {
-	join := &Join{}
+func (p *Parser) parseJoin() *core.Join {
+	join := &core.Join{}
 
 	// Comma join (implicit cross join) - hardcoded special case
 	if p.match(TOKEN_COMMA) {
-		join.Type = JoinComma
+		join.Type = core.JoinComma
 		join.Right = p.parseTableRef()
 		return join
 	}
@@ -213,7 +217,7 @@ func (p *Parser) parseJoin() *Join {
 	// Try dialect join type lookup (covers standard + extensions)
 	if p.dialect != nil {
 		if def, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
-			join.Type = JoinType(def.Type)
+			join.Type = core.JoinType(def.Type)
 			p.nextToken()
 
 			// Handle optional modifier (OUTER for LEFT/RIGHT/FULL)
@@ -223,7 +227,7 @@ func (p *Parser) parseJoin() *Join {
 
 			// Check for compound syntax (LEFT SEMI, LEFT ANTI)
 			if subDef, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
-				join.Type = JoinType(subDef.Type)
+				join.Type = core.JoinType(subDef.Type)
 				p.nextToken()
 			}
 
@@ -258,7 +262,7 @@ func (p *Parser) parseJoin() *Join {
 }
 
 // parseJoinCondition handles ON/USING/NATURAL validation.
-func (p *Parser) parseJoinCondition(join *Join) {
+func (p *Parser) parseJoinCondition(join *core.Join) {
 	switch {
 	case join.Natural:
 		// NATURAL JOIN cannot have ON or USING

@@ -5,7 +5,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
-	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
 func init() {
@@ -47,7 +46,7 @@ UNION ALL
 }
 
 func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
-	selectStmt, ok := stmt.(*parser.SelectStmt)
+	selectStmt, ok := stmt.(*core.SelectStmt)
 	if !ok || selectStmt == nil {
 		return nil
 	}
@@ -56,7 +55,7 @@ func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) 
 	bodies := ast.CollectSelectBodies(selectStmt)
 	hasSetOp := false
 	for _, body := range bodies {
-		if body != nil && body.Op != parser.SetOpNone {
+		if body != nil && body.Op != core.SetOpNone {
 			hasSetOp = true
 			break
 		}

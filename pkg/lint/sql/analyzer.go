@@ -22,7 +22,7 @@ func NewAnalyzer(config *lint.Config, dialect string) *Analyzer {
 }
 
 // Analyze runs all registered SQL rules against the statement.
-// The stmt parameter should be *parser.SelectStmt.
+// The stmt parameter should be *core.SelectStmt.
 func (a *Analyzer) Analyze(stmt any, dialect lint.DialectInfo) []lint.Diagnostic {
 	if stmt == nil {
 		return nil

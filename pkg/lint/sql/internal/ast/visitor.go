@@ -2,7 +2,7 @@
 package ast
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // Walk traverses an AST depth-first and calls fn for each node.
@@ -19,14 +19,14 @@ func Walk(node any, fn func(node any) bool) {
 
 func walkNode(node any, fn func(node any) bool) {
 	switch n := node.(type) {
-	case *parser.SelectStmt:
+	case *core.SelectStmt:
 		if n == nil {
 			return
 		}
 		Walk(n.With, fn)
 		Walk(n.Body, fn)
 
-	case *parser.WithClause:
+	case *core.WithClause:
 		if n == nil {
 			return
 		}
@@ -34,20 +34,20 @@ func walkNode(node any, fn func(node any) bool) {
 			Walk(cte, fn)
 		}
 
-	case *parser.CTE:
+	case *core.CTE:
 		if n == nil {
 			return
 		}
 		Walk(n.Select, fn)
 
-	case *parser.SelectBody:
+	case *core.SelectBody:
 		if n == nil {
 			return
 		}
 		Walk(n.Left, fn)
 		Walk(n.Right, fn)
 
-	case *parser.SelectCore:
+	case *core.SelectCore:
 		if n == nil {
 			return
 		}
@@ -67,7 +67,7 @@ func walkNode(node any, fn func(node any) bool) {
 		Walk(n.Limit, fn)
 		Walk(n.Offset, fn)
 
-	case *parser.FromClause:
+	case *core.FromClause:
 		if n == nil {
 			return
 		}
@@ -76,42 +76,42 @@ func walkNode(node any, fn func(node any) bool) {
 			Walk(join, fn)
 		}
 
-	case *parser.Join:
+	case *core.Join:
 		if n == nil {
 			return
 		}
 		Walk(n.Right, fn)
 		Walk(n.Condition, fn)
 
-	case *parser.TableName:
+	case *core.TableName:
 		// Leaf node
 
-	case *parser.DerivedTable:
+	case *core.DerivedTable:
 		if n == nil {
 			return
 		}
 		Walk(n.Select, fn)
 
-	case *parser.LateralTable:
+	case *core.LateralTable:
 		if n == nil {
 			return
 		}
 		Walk(n.Select, fn)
 
-	case *parser.BinaryExpr:
+	case *core.BinaryExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Left, fn)
 		Walk(n.Right, fn)
 
-	case *parser.UnaryExpr:
+	case *core.UnaryExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 
-	case *parser.FuncCall:
+	case *core.FuncCall:
 		if n == nil {
 			return
 		}
@@ -120,7 +120,7 @@ func walkNode(node any, fn func(node any) bool) {
 		}
 		Walk(n.Filter, fn)
 
-	case *parser.CaseExpr:
+	case *core.CaseExpr:
 		if n == nil {
 			return
 		}
@@ -131,13 +131,13 @@ func walkNode(node any, fn func(node any) bool) {
 		}
 		Walk(n.Else, fn)
 
-	case *parser.CastExpr:
+	case *core.CastExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 
-	case *parser.InExpr:
+	case *core.InExpr:
 		if n == nil {
 			return
 		}
@@ -147,7 +147,7 @@ func walkNode(node any, fn func(node any) bool) {
 		}
 		Walk(n.Query, fn)
 
-	case *parser.BetweenExpr:
+	case *core.BetweenExpr:
 		if n == nil {
 			return
 		}
@@ -155,44 +155,44 @@ func walkNode(node any, fn func(node any) bool) {
 		Walk(n.Low, fn)
 		Walk(n.High, fn)
 
-	case *parser.IsNullExpr:
+	case *core.IsNullExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 
-	case *parser.IsBoolExpr:
+	case *core.IsBoolExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 
-	case *parser.LikeExpr:
+	case *core.LikeExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 		Walk(n.Pattern, fn)
 
-	case *parser.ParenExpr:
+	case *core.ParenExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Expr, fn)
 
-	case *parser.SubqueryExpr:
+	case *core.SubqueryExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Select, fn)
 
-	case *parser.ExistsExpr:
+	case *core.ExistsExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Select, fn)
 
-	case *parser.IndexExpr:
+	case *core.IndexExpr:
 		if n == nil {
 			return
 		}
@@ -201,7 +201,7 @@ func walkNode(node any, fn func(node any) bool) {
 		Walk(n.Start, fn)
 		Walk(n.Stop, fn)
 
-	case *parser.ListLiteral:
+	case *core.ListLiteral:
 		if n == nil {
 			return
 		}
@@ -209,7 +209,7 @@ func walkNode(node any, fn func(node any) bool) {
 			Walk(elem, fn)
 		}
 
-	case *parser.StructLiteral:
+	case *core.StructLiteral:
 		if n == nil {
 			return
 		}
@@ -217,23 +217,23 @@ func walkNode(node any, fn func(node any) bool) {
 			Walk(field.Value, fn)
 		}
 
-	case *parser.LambdaExpr:
+	case *core.LambdaExpr:
 		if n == nil {
 			return
 		}
 		Walk(n.Body, fn)
 
 	// Leaf nodes - no children to walk
-	case *parser.ColumnRef, *parser.Literal, *parser.StarExpr, *parser.MacroExpr, *parser.MacroTable:
+	case *core.ColumnRef, *core.Literal, *core.StarExpr, *core.MacroExpr, *core.MacroTable:
 		// Nothing to traverse
 	}
 }
 
 // WalkExprs walks all expressions in a statement and calls fn for each.
 // Returns early if fn returns false.
-func WalkExprs(stmt *parser.SelectStmt, fn func(expr parser.Expr) bool) {
+func WalkExprs(stmt *core.SelectStmt, fn func(expr core.Expr) bool) {
 	Walk(stmt, func(node any) bool {
-		if expr, ok := node.(parser.Expr); ok {
+		if expr, ok := node.(core.Expr); ok {
 			return fn(expr)
 		}
 		return true
@@ -241,10 +241,10 @@ func WalkExprs(stmt *parser.SelectStmt, fn func(expr parser.Expr) bool) {
 }
 
 // CollectFuncCalls returns all function calls in a statement.
-func CollectFuncCalls(stmt *parser.SelectStmt) []*parser.FuncCall {
-	var funcs []*parser.FuncCall
+func CollectFuncCalls(stmt *core.SelectStmt) []*core.FuncCall {
+	var funcs []*core.FuncCall
 	Walk(stmt, func(node any) bool {
-		if fc, ok := node.(*parser.FuncCall); ok {
+		if fc, ok := node.(*core.FuncCall); ok {
 			funcs = append(funcs, fc)
 		}
 		return true
@@ -253,10 +253,10 @@ func CollectFuncCalls(stmt *parser.SelectStmt) []*parser.FuncCall {
 }
 
 // CollectColumnRefs returns all column references in a statement.
-func CollectColumnRefs(stmt *parser.SelectStmt) []*parser.ColumnRef {
-	var refs []*parser.ColumnRef
+func CollectColumnRefs(stmt *core.SelectStmt) []*core.ColumnRef {
+	var refs []*core.ColumnRef
 	Walk(stmt, func(node any) bool {
-		if cr, ok := node.(*parser.ColumnRef); ok {
+		if cr, ok := node.(*core.ColumnRef); ok {
 			refs = append(refs, cr)
 		}
 		return true
@@ -265,10 +265,10 @@ func CollectColumnRefs(stmt *parser.SelectStmt) []*parser.ColumnRef {
 }
 
 // CollectTableRefs returns all table references in a statement.
-func CollectTableRefs(stmt *parser.SelectStmt) []parser.TableRef {
-	var refs []parser.TableRef
+func CollectTableRefs(stmt *core.SelectStmt) []core.TableRef {
+	var refs []core.TableRef
 	Walk(stmt, func(node any) bool {
-		if tr, ok := node.(parser.TableRef); ok {
+		if tr, ok := node.(core.TableRef); ok {
 			refs = append(refs, tr)
 		}
 		return true
@@ -277,10 +277,10 @@ func CollectTableRefs(stmt *parser.SelectStmt) []parser.TableRef {
 }
 
 // CollectCaseExprs returns all CASE expressions in a statement.
-func CollectCaseExprs(stmt *parser.SelectStmt) []*parser.CaseExpr {
-	var cases []*parser.CaseExpr
+func CollectCaseExprs(stmt *core.SelectStmt) []*core.CaseExpr {
+	var cases []*core.CaseExpr
 	Walk(stmt, func(node any) bool {
-		if ce, ok := node.(*parser.CaseExpr); ok {
+		if ce, ok := node.(*core.CaseExpr); ok {
 			cases = append(cases, ce)
 		}
 		return true
@@ -289,10 +289,10 @@ func CollectCaseExprs(stmt *parser.SelectStmt) []*parser.CaseExpr {
 }
 
 // CollectBinaryExprs returns all binary expressions in a statement.
-func CollectBinaryExprs(stmt *parser.SelectStmt) []*parser.BinaryExpr {
-	var exprs []*parser.BinaryExpr
+func CollectBinaryExprs(stmt *core.SelectStmt) []*core.BinaryExpr {
+	var exprs []*core.BinaryExpr
 	Walk(stmt, func(node any) bool {
-		if be, ok := node.(*parser.BinaryExpr); ok {
+		if be, ok := node.(*core.BinaryExpr); ok {
 			exprs = append(exprs, be)
 		}
 		return true
@@ -301,10 +301,10 @@ func CollectBinaryExprs(stmt *parser.SelectStmt) []*parser.BinaryExpr {
 }
 
 // HasWindowFunction checks if any function call in the statement has a window spec.
-func HasWindowFunction(stmt *parser.SelectStmt) bool {
+func HasWindowFunction(stmt *core.SelectStmt) bool {
 	found := false
 	Walk(stmt, func(node any) bool {
-		if fc, ok := node.(*parser.FuncCall); ok && fc.Window != nil {
+		if fc, ok := node.(*core.FuncCall); ok && fc.Window != nil {
 			found = true
 			return false // Stop walking
 		}
@@ -314,7 +314,7 @@ func HasWindowFunction(stmt *parser.SelectStmt) bool {
 }
 
 // GetSelectCore extracts the SelectCore from a SelectStmt, handling nil checks.
-func GetSelectCore(stmt *parser.SelectStmt) *parser.SelectCore {
+func GetSelectCore(stmt *core.SelectStmt) *core.SelectCore {
 	if stmt == nil || stmt.Body == nil || stmt.Body.Left == nil {
 		return nil
 	}
@@ -322,7 +322,7 @@ func GetSelectCore(stmt *parser.SelectStmt) *parser.SelectCore {
 }
 
 // CollectCTENames returns the names of all CTEs defined in a statement.
-func CollectCTENames(stmt *parser.SelectStmt) []string {
+func CollectCTENames(stmt *core.SelectStmt) []string {
 	if stmt == nil || stmt.With == nil {
 		return nil
 	}
@@ -335,21 +335,21 @@ func CollectCTENames(stmt *parser.SelectStmt) []string {
 
 // CollectReferencedTables returns names of tables referenced in FROM clauses.
 // Returns a map of table name/alias -> true.
-func CollectReferencedTables(stmt *parser.SelectStmt) map[string]bool {
+func CollectReferencedTables(stmt *core.SelectStmt) map[string]bool {
 	refs := make(map[string]bool)
 	Walk(stmt, func(node any) bool {
 		switch n := node.(type) {
-		case *parser.TableName:
+		case *core.TableName:
 			if n.Alias != "" {
 				refs[n.Alias] = true
 			} else {
 				refs[n.Name] = true
 			}
-		case *parser.DerivedTable:
+		case *core.DerivedTable:
 			if n.Alias != "" {
 				refs[n.Alias] = true
 			}
-		case *parser.LateralTable:
+		case *core.LateralTable:
 			if n.Alias != "" {
 				refs[n.Alias] = true
 			}
@@ -360,10 +360,10 @@ func CollectReferencedTables(stmt *parser.SelectStmt) map[string]bool {
 }
 
 // CollectJoins returns all joins in a statement.
-func CollectJoins(stmt *parser.SelectStmt) []*parser.Join {
-	var joins []*parser.Join
+func CollectJoins(stmt *core.SelectStmt) []*core.Join {
+	var joins []*core.Join
 	Walk(stmt, func(node any) bool {
-		if j, ok := node.(*parser.Join); ok {
+		if j, ok := node.(*core.Join); ok {
 			joins = append(joins, j)
 		}
 		return true
@@ -372,10 +372,10 @@ func CollectJoins(stmt *parser.SelectStmt) []*parser.Join {
 }
 
 // CollectSelectCores returns all SelectCore nodes in a statement (for unions).
-func CollectSelectCores(stmt *parser.SelectStmt) []*parser.SelectCore {
-	var cores []*parser.SelectCore
+func CollectSelectCores(stmt *core.SelectStmt) []*core.SelectCore {
+	var cores []*core.SelectCore
 	Walk(stmt, func(node any) bool {
-		if sc, ok := node.(*parser.SelectCore); ok {
+		if sc, ok := node.(*core.SelectCore); ok {
 			cores = append(cores, sc)
 		}
 		return true
@@ -384,10 +384,10 @@ func CollectSelectCores(stmt *parser.SelectStmt) []*parser.SelectCore {
 }
 
 // CollectSelectBodies returns all SelectBody nodes (for finding set operations).
-func CollectSelectBodies(stmt *parser.SelectStmt) []*parser.SelectBody {
-	var bodies []*parser.SelectBody
+func CollectSelectBodies(stmt *core.SelectStmt) []*core.SelectBody {
+	var bodies []*core.SelectBody
 	Walk(stmt, func(node any) bool {
-		if sb, ok := node.(*parser.SelectBody); ok {
+		if sb, ok := node.(*core.SelectBody); ok {
 			bodies = append(bodies, sb)
 		}
 		return true

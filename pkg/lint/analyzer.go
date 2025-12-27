@@ -27,7 +27,7 @@ func NewAnalyzerWithRegistry(config *Config, dialect string) *Analyzer {
 }
 
 // Analyze runs all rules from the dialect against the statement.
-// The stmt parameter should be *parser.SelectStmt.
+// The stmt parameter should be *core.SelectStmt.
 func (a *Analyzer) Analyze(stmt any, dialect DialectInfo) []Diagnostic {
 	if stmt == nil {
 		return nil

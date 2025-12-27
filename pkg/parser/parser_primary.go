@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 //	func_call     → identifier "(" [DISTINCT] [expr_list | "*"] ")" [FILTER "(" WHERE expr ")"] [OVER window_spec]
 
 // parsePrimary parses primary expressions.
-func (p *Parser) parsePrimary() Expr {
+func (p *Parser) parsePrimary() core.Expr {
 	// Check for dialect-specific prefix handlers first
 	if p.dialect != nil {
 		if handler := p.dialect.PrefixHandler(p.token.Type); handler != nil {
@@ -36,26 +37,26 @@ func (p *Parser) parsePrimary() Expr {
 
 	switch p.token.Type {
 	case TOKEN_NUMBER:
-		lit := &Literal{Type: LiteralNumber, Value: p.token.Literal}
+		lit := &core.Literal{Type: core.LiteralNumber, Value: p.token.Literal}
 		p.nextToken()
 		return lit
 
 	case TOKEN_STRING:
-		lit := &Literal{Type: LiteralString, Value: p.token.Literal}
+		lit := &core.Literal{Type: core.LiteralString, Value: p.token.Literal}
 		p.nextToken()
 		return lit
 
 	case TOKEN_TRUE:
 		p.nextToken()
-		return &Literal{Type: LiteralBool, Value: "true"}
+		return &core.Literal{Type: core.LiteralBool, Value: "true"}
 
 	case TOKEN_FALSE:
 		p.nextToken()
-		return &Literal{Type: LiteralBool, Value: "false"}
+		return &core.Literal{Type: core.LiteralBool, Value: "false"}
 
 	case TOKEN_NULL:
 		p.nextToken()
-		return &Literal{Type: LiteralNull, Value: "null"}
+		return &core.Literal{Type: core.LiteralNull, Value: "null"}
 
 	case TOKEN_CASE:
 		return p.parseCaseExpr()
@@ -71,7 +72,7 @@ func (p *Parser) parsePrimary() Expr {
 		}
 		// Regular NOT expression
 		p.nextToken()
-		return &UnaryExpr{Op: token.NOT, Expr: p.parsePrimary()}
+		return &core.UnaryExpr{Op: token.NOT, Expr: p.parsePrimary()}
 
 	case TOKEN_EXISTS:
 		return p.parseExistsExpr(false)
@@ -85,10 +86,10 @@ func (p *Parser) parsePrimary() Expr {
 	case TOKEN_STAR:
 		// SELECT * context
 		p.nextToken()
-		return &StarExpr{}
+		return &core.StarExpr{}
 
 	case TOKEN_MACRO:
-		macro := &MacroExpr{
+		macro := &core.MacroExpr{
 			Content: p.token.Literal,
 		}
 		macro.Span = token.Span{
@@ -106,7 +107,7 @@ func (p *Parser) parsePrimary() Expr {
 }
 
 // parseIdentifierExpr parses an identifier which could be a column ref or function call.
-func (p *Parser) parseIdentifierExpr() Expr {
+func (p *Parser) parseIdentifierExpr() core.Expr {
 	name := p.token.Literal
 	p.nextToken()
 
@@ -121,18 +122,18 @@ func (p *Parser) parseIdentifierExpr() Expr {
 	}
 
 	// Simple column reference
-	return &ColumnRef{Column: name}
+	return &core.ColumnRef{Column: name}
 }
 
 // parseQualifiedColumnRef parses a qualified column reference.
-func (p *Parser) parseQualifiedColumnRef(firstPart string) Expr {
+func (p *Parser) parseQualifiedColumnRef(firstPart string) core.Expr {
 	parts := []string{firstPart}
 
 	for p.match(TOKEN_DOT) {
 		// Check for table.*
 		if p.check(TOKEN_STAR) {
 			p.nextToken()
-			return &StarExpr{Table: firstPart}
+			return &core.StarExpr{Table: firstPart}
 		}
 
 		if p.check(TOKEN_IDENT) {
@@ -142,7 +143,7 @@ func (p *Parser) parseQualifiedColumnRef(firstPart string) Expr {
 	}
 
 	// Build column reference
-	ref := &ColumnRef{}
+	ref := &core.ColumnRef{}
 	switch len(parts) {
 	case 2:
 		ref.Table = parts[0]
@@ -159,8 +160,8 @@ func (p *Parser) parseQualifiedColumnRef(firstPart string) Expr {
 }
 
 // parseFuncCall parses a function call.
-func (p *Parser) parseFuncCall(name string) Expr {
-	fn := &FuncCall{Name: strings.ToUpper(name)}
+func (p *Parser) parseFuncCall(name string) core.Expr {
+	fn := &core.FuncCall{Name: strings.ToUpper(name)}
 
 	p.expect(TOKEN_LPAREN)
 
