@@ -292,38 +292,71 @@ graph TD
 
 ## 8. Verification
 
-Architecture rules are enforced via tests in `pkg/core/arch_test.go`.
+Architecture rules are enforced via tests in `pkg/core/arch_test.go` and `pkg/core/governance_test.go`.
+
+### Test Tiers
+
+| Tier | Tests | Speed | When to Run |
+|------|-------|-------|-------------|
+| **Fast (Tier 1)** | Star Topology, Internal Tiers | <1s | Every `task test`, CI |
+| **Slow (Tier 2)** | Cohesion, Purity | ~5s | Pre-commit, CI |
 
 ### Run Architecture Tests
 
-```bash
-# Run all architecture tests
-go test ./pkg/core/... -run TestArchitecture -v
+Architecture tests run automatically as part of the standard test suite:
 
-# Run specific checks
-go test ./pkg/core/... -run TestCoreOnlyImportsToken -v
-go test ./pkg/core/... -run TestAdapterDoesNotImportDialect -v
-go test ./pkg/core/... -run TestPkgDoesNotImportInternal -v
+```bash
+task test
+```
+
+### Run Governance Tests
+
+```bash
+# Slow tests (type analysis)
+task governance
+
+# Or directly:
+go test -tags=governance ./pkg/core/... -v
 ```
 
 ### Test Coverage
 
+#### Tier 1: Fast Architecture Tests (included in `task test`)
+
 | Test | Enforces |
 |------|----------|
-| `TestArchitectureAllowlist` | Full import graph validation |
-| `TestPkgDoesNotImportInternal` | `pkg/*` cannot import `internal/*` |
-| `TestCoreOnlyImportsToken` | Golden rule: `pkg/core` → `pkg/token` only |
-| `TestAdapterDoesNotImportDialect` | Microkernel: `pkg/adapter` → `pkg/core` only |
-| `TestDialectsDoNotImportParser` | Prevents circular: `pkg/dialects/*` ↛ `pkg/parser` |
+| `TestArchitecture_StarTopology` | Components cannot import peer components |
+| `TestArchitecture_InternalTiers` | Utilities cannot import peer utilities or orchestrators |
+| `TestArchitecture_CoreOnlyImportsToken` | Golden rule: `pkg/core` → `pkg/token` only |
+| `TestArchitecture_PkgDoesNotImportInternal` | `pkg/*` cannot import `internal/*` |
 
-### Known Violations
+#### Tier 2: Governance Tests (Build Tag: `governance`)
 
-| Package | Violation | Status |
-|---------|-----------|--------|
-| `pkg/dialects/duckdb` | imports `pkg/parser` | Phase 0 fix: move AST types to `pkg/core` |
+| Test | Enforces |
+|------|----------|
+| `TestGovernance_CoreCohesion` | Core types must be used by >1 package |
+| `TestGovernance_NoTypeAliasReexports` | No re-exporting core types as aliases |
+
+### Architecture Layers
+
+#### pkg/* Layers
+
+| Layer | Packages | Can Import |
+|-------|----------|------------|
+| Foundation | `core`, `token`, `spi`, `adapter` | Lower foundation only |
+| Components | `parser`, `format`, `lint`, `dialect`, `dialects/*` | Foundation only |
+| Infrastructure | `adapters/*` | Foundation + Dialects |
+
+#### internal/* Layers
+
+| Layer | Packages | Can Import |
+|-------|----------|------------|
+| Entrypoints | `cli`, `cli/commands` | Everything |
+| Orchestrators | `engine`, `lsp`, `provider`, `docs` | Utilities + pkg/* |
+| Utilities | `loader`, `lineage`, `state`, `dag`, etc. | pkg/* only |
 
 ### Run Full Check
 
 ```bash
-task check
+task check && task governance
 ```

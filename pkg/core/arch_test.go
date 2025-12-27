@@ -9,174 +9,365 @@ import (
 
 const modulePath = "github.com/leapstack-labs/leapsql"
 
-// architectureRules defines allowed imports for each package prefix.
-// Keys are package prefixes (relative to module path).
-// Values are allowed import prefixes (relative to module path).
-//
-// Rules:
-// - Self-imports are always allowed (pkg/lint can import pkg/lint/sql)
-// - Stdlib imports are always allowed
-// - Only project imports (github.com/leapstack-labs/leapsql/*) are checked
-//
-// The most specific matching rule wins (pkg/lint/sql uses pkg/lint rule, not pkg rule).
-var architectureRules = map[string][]string{
-	// ============================================
-	// Foundation Layer
-	// ============================================
+// =============================================================================
+// PKG LAYER CLASSIFICATION
+// =============================================================================
 
-	// pkg/token: No project imports allowed (foundational)
-	"pkg/token": {},
-
-	// pkg/core: Only imports pkg/token (the hub)
-	"pkg/core": {"pkg/token"},
-
-	// ============================================
-	// Libraries Layer
-	// ============================================
-
-	// pkg/spi: Interfaces using Core AST types
-	"pkg/spi": {"pkg/core", "pkg/token"},
-
-	// pkg/dialect: The framework for building dialects
-	"pkg/dialect": {"pkg/core", "pkg/spi", "pkg/token"},
-
-	// pkg/parser: The parser engine
-	"pkg/parser": {"pkg/core", "pkg/dialect", "pkg/dialects", "pkg/spi", "pkg/token"},
-
-	// pkg/format: AST formatter
-	"pkg/format": {"pkg/core", "pkg/dialect", "pkg/parser", "pkg/spi", "pkg/token"},
-
-	// ============================================
-	// Lint Layer
-	// ============================================
-
-	// pkg/lint: Linting framework and rules
-	// Needs parser for AST analysis, core for resource types
-	"pkg/lint": {"pkg/core", "pkg/lint", "pkg/parser", "pkg/spi", "pkg/token"},
-
-	// ============================================
-	// Dialects Layer (Language Libraries)
-	// ============================================
-
-	// pkg/dialects/*: Dialect-specific configurations
-	// NOT allowed to import pkg/parser (would create circular risk)
-	"pkg/dialects": {"pkg/core", "pkg/dialect", "pkg/spi", "pkg/token"},
-
-	// ============================================
-	// Microkernel Layer
-	// ============================================
-
-	// pkg/adapter: Registry only - STRICT
-	// Must NOT import pkg/dialect (heavy framework)
-	"pkg/adapter": {"pkg/core"},
-
-	// pkg/adapters/*: Database drivers
-	"pkg/adapters": {"pkg/adapter", "pkg/core", "pkg/dialect", "pkg/dialects"},
-}
-
-// knownViolations lists packages with known architecture violations
-// that are documented and scheduled to be fixed.
-// Key: package path (relative to module), Value: forbidden import (relative to module)
-//
-// NOTE: These violations FAIL the test intentionally. Fix them or remove the rule.
-//
-//nolint:unused // Kept for documentation; uncomment violations during migrations
-var knownViolations = map[string]string{
-	// TODO: Phase 0 - Move DuckDB AST types (ListLiteral, StructLiteral, IndexExpr, LambdaExpr)
-	// from pkg/parser to pkg/core/ast_extensions.go
-	// "pkg/dialects/duckdb": "pkg/parser",  // UNCOMMENT TO TEMPORARILY ALLOW
-}
-
-// TestArchitectureAllowlist validates that all pkg/* packages only import
-// allowed packages according to architectureRules.
-//
-// This enforces the Golden Rule: Dependencies must flow inwards toward pkg/core.
-func TestArchitectureAllowlist(t *testing.T) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports,
+// isFoundation returns true for hub packages that any component can import.
+func isFoundation(path string) bool {
+	foundationPkgs := map[string]bool{
+		"pkg/core":    true,
+		"pkg/token":   true,
+		"pkg/spi":     true,
+		"pkg/adapter": true,
 	}
+	if foundationPkgs[path] {
+		return true
+	}
+	for f := range foundationPkgs {
+		if strings.HasPrefix(path, f+"/") {
+			return true
+		}
+	}
+	return false
+}
 
+// isInfrastructure returns true for adapter implementations (outer layer).
+func isInfrastructure(path string) bool {
+	return strings.HasPrefix(path, "pkg/adapters/")
+}
+
+// isPkgComponent returns true for pure logic packages (spokes) in pkg/.
+func isPkgComponent(path string) bool {
+	return strings.HasPrefix(path, "pkg/") &&
+		!isFoundation(path) &&
+		!isInfrastructure(path)
+}
+
+// =============================================================================
+// INTERNAL LAYER CLASSIFICATION
+// =============================================================================
+
+// isEntrypoint returns true for top-level application entry points.
+func isEntrypoint(path string) bool {
+	entrypoints := map[string]bool{
+		"internal/cli":          true,
+		"internal/cli/commands": true,
+		"internal/cli/output":   true,
+		"internal/cli/testutil": true,
+	}
+	return entrypoints[path]
+}
+
+// isOrchestrator returns true for business logic coordinators.
+func isOrchestrator(path string) bool {
+	orchestrators := map[string]bool{
+		"internal/engine":   true,
+		"internal/lsp":      true,
+		"internal/provider": true,
+		"internal/docs":     true,
+	}
+	return orchestrators[path]
+}
+
+// isUtility returns true for specialized worker packages.
+func isUtility(path string) bool {
+	utilities := map[string]bool{
+		"internal/loader":        true,
+		"internal/lineage":       true,
+		"internal/state":         true,
+		"internal/state/sqlcgen": true,
+		"internal/dag":           true,
+		"internal/template":      true,
+		"internal/starlark":      true,
+		"internal/config":        true,
+		"internal/macro":         true,
+		"internal/registry":      true,
+		"internal/testutil":      true,
+		"internal/cli/config":    true,
+	}
+	return utilities[path]
+}
+
+// isAllowedUtilityException returns true for explicitly allowed utility-to-utility imports.
+func isAllowedUtilityException(from, to string) bool {
+	exceptions := map[string]map[string]bool{
+		// template -> starlark: Composition - template system is Starlark-based
+		"internal/template": {"internal/starlark": true},
+	}
+	if allowed, exists := exceptions[from]; exists {
+		return allowed[to]
+	}
+	return false
+}
+
+// =============================================================================
+// STAR TOPOLOGY TEST - pkg/* Components
+// =============================================================================
+
+// TestArchitecture_StarTopology enforces that pkg components (spokes) only import
+// foundation packages (hub), never each other. This dynamically forces shared
+// types to migrate to pkg/core.
+func TestArchitecture_StarTopology(t *testing.T) {
+	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedImports}
 	pkgs, err := packages.Load(cfg, modulePath+"/pkg/...")
 	if err != nil {
-		t.Fatalf("failed to load packages: %v", err)
+		t.Fatalf("Failed to load packages: %v", err)
 	}
 
-	for _, pkg := range pkgs {
-		if len(pkg.Errors) > 0 {
-			// Skip packages with load errors (may be due to build tags)
-			continue
-		}
-
-		relPath := strings.TrimPrefix(pkg.PkgPath, modulePath+"/")
-		allowed := findAllowedImports(relPath)
-		if allowed == nil {
-			// No rule for this package prefix - this is a bug in the test
-			t.Errorf("no architecture rule defined for %s", relPath)
-			continue
-		}
-
-		for imp := range pkg.Imports {
-			// Only check project imports
-			if !strings.HasPrefix(imp, modulePath) {
-				continue
-			}
-			relImp := strings.TrimPrefix(imp, modulePath+"/")
-
-			// Self-imports always allowed (pkg/lint can import pkg/lint/sql)
-			if strings.HasPrefix(relImp, relPath) || strings.HasPrefix(relPath, relImp) {
-				continue
-			}
-
-			if !isAllowed(relImp, allowed) {
-				t.Errorf("ARCHITECTURE VIOLATION: %s imports %s\n"+
-					"  Allowed imports: %v\n"+
-					"  See spec/architecture.md for dependency rules",
-					relPath, relImp, allowed)
-			}
-		}
-	}
-}
-
-// TestPkgDoesNotImportInternal ensures no pkg/* package imports any internal/* package.
-// This is a strict rule: libraries must never depend on application code.
-func TestPkgDoesNotImportInternal(t *testing.T) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports,
-	}
-
-	pkgs, err := packages.Load(cfg, modulePath+"/pkg/...")
-	if err != nil {
-		t.Fatalf("failed to load packages: %v", err)
-	}
+	base := modulePath + "/"
 
 	for _, pkg := range pkgs {
 		if len(pkg.Errors) > 0 {
 			continue
 		}
 
-		relPath := strings.TrimPrefix(pkg.PkgPath, modulePath+"/")
+		pkgPath := strings.TrimPrefix(pkg.PkgPath, base)
 
-		for imp := range pkg.Imports {
-			if strings.Contains(imp, modulePath+"/internal/") {
-				t.Errorf("ARCHITECTURE VIOLATION: %s imports internal package %s\n"+
-					"  pkg/* must never import internal/*\n"+
-					"  See spec/architecture.md for dependency rules",
-					relPath, imp)
+		if strings.HasSuffix(pkgPath, "_test") {
+			continue
+		}
+
+		switch {
+		case isFoundation(pkgPath):
+			checkFoundationImports(t, pkg, pkgPath, base)
+		case isInfrastructure(pkgPath):
+			checkInfrastructureImports(t, pkg, pkgPath, base)
+		case isPkgComponent(pkgPath):
+			checkPkgComponentImports(t, pkg, pkgPath, base)
+		}
+	}
+}
+
+// checkFoundationImports ensures foundation packages follow strict rules.
+func checkFoundationImports(t *testing.T, pkg *packages.Package, pkgPath, base string) {
+	t.Helper()
+
+	foundationRules := map[string][]string{
+		"pkg/token":   {},
+		"pkg/core":    {"pkg/token"},
+		"pkg/spi":     {"pkg/core", "pkg/token"},
+		"pkg/adapter": {"pkg/core"},
+	}
+
+	allowed := foundationRules[pkgPath]
+	if allowed == nil {
+		for parent, rules := range foundationRules {
+			if strings.HasPrefix(pkgPath, parent+"/") {
+				allowed = rules
+				break
+			}
+		}
+	}
+
+	for imp := range pkg.Imports {
+		if !strings.HasPrefix(imp, base) {
+			continue
+		}
+		depPath := strings.TrimPrefix(imp, base)
+
+		if strings.HasPrefix(depPath, pkgPath) || strings.HasPrefix(pkgPath, depPath) {
+			continue
+		}
+
+		if !isAllowedImport(depPath, allowed) {
+			t.Errorf("FOUNDATION VIOLATION: '%s' imports '%s'.\n"+
+				"   Foundation packages have strict import rules.\n"+
+				"   Allowed: %v",
+				pkgPath, depPath, allowed)
+		}
+	}
+}
+
+// checkPkgComponentImports enforces Star Topology - no horizontal dependencies.
+func checkPkgComponentImports(t *testing.T, pkg *packages.Package, pkgPath, base string) {
+	t.Helper()
+
+	for imp := range pkg.Imports {
+		if !strings.HasPrefix(imp, base) {
+			continue
+		}
+		depPath := strings.TrimPrefix(imp, base)
+
+		// Self-imports OK
+		if strings.HasPrefix(depPath, pkgPath) || strings.HasPrefix(pkgPath, depPath) {
+			continue
+		}
+
+		// Foundation OK
+		if isFoundation(depPath) {
+			continue
+		}
+
+		// Internal packages NOT OK
+		if strings.HasPrefix(depPath, "internal/") {
+			t.Errorf("BOUNDARY VIOLATION: Component '%s' imports internal '%s'.\n"+
+				"   pkg/* must never import internal/*.",
+				pkgPath, depPath)
+			continue
+		}
+
+		// Infrastructure NOT OK
+		if isInfrastructure(depPath) {
+			t.Errorf("LAYER VIOLATION: Component '%s' imports infrastructure '%s'.\n"+
+				"   Components cannot depend on adapter implementations.",
+				pkgPath, depPath)
+			continue
+		}
+
+		// Another component - HORIZONTAL VIOLATION
+		if isPkgComponent(depPath) {
+			t.Errorf("HORIZONTAL VIOLATION: Component '%s' imports peer component '%s'.\n"+
+				"   Components (spokes) cannot import each other.\n"+
+				"   Fix: Move shared types/contracts from '%s' to pkg/core.",
+				pkgPath, depPath, depPath)
+		}
+	}
+}
+
+// checkInfrastructureImports enforces microkernel rules for adapters.
+func checkInfrastructureImports(t *testing.T, pkg *packages.Package, pkgPath, base string) {
+	t.Helper()
+
+	forbiddenForAdapters := map[string]bool{
+		"pkg/parser": true,
+		"pkg/format": true,
+		"pkg/lint":   true,
+	}
+
+	for imp := range pkg.Imports {
+		if !strings.HasPrefix(imp, base) {
+			continue
+		}
+		depPath := strings.TrimPrefix(imp, base)
+
+		if strings.HasPrefix(depPath, pkgPath) || strings.HasPrefix(pkgPath, depPath) {
+			continue
+		}
+
+		for forbidden := range forbiddenForAdapters {
+			if depPath == forbidden || strings.HasPrefix(depPath, forbidden+"/") {
+				t.Errorf("MICROKERNEL VIOLATION: Adapter '%s' imports heavy library '%s'.\n"+
+					"   Adapters should only use pkg/core interfaces and pkg/dialects config.\n"+
+					"   Fix: Move required functionality to pkg/core or use dependency injection.",
+					pkgPath, depPath)
 			}
 		}
 	}
 }
 
-// TestCoreOnlyImportsToken is a focused test for the most critical rule.
-// pkg/core is the hub and must only import pkg/token.
-func TestCoreOnlyImportsToken(t *testing.T) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports,
+// =============================================================================
+// INTERNAL TIERS TEST
+// =============================================================================
+
+// TestArchitecture_InternalTiers enforces the 3-layer internal architecture:
+// Entrypoints -> Orchestrators -> Utilities
+func TestArchitecture_InternalTiers(t *testing.T) {
+	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedImports}
+	pkgs, err := packages.Load(cfg, modulePath+"/internal/...")
+	if err != nil {
+		t.Fatalf("Failed to load packages: %v", err)
 	}
 
+	base := modulePath + "/"
+
+	for _, pkg := range pkgs {
+		if len(pkg.Errors) > 0 {
+			continue
+		}
+
+		pkgPath := strings.TrimPrefix(pkg.PkgPath, base)
+
+		if strings.HasSuffix(pkgPath, "_test") {
+			continue
+		}
+
+		for imp := range pkg.Imports {
+			if !strings.HasPrefix(imp, base) {
+				continue
+			}
+			depPath := strings.TrimPrefix(imp, base)
+
+			// Self-imports OK (including subpackages)
+			if strings.HasPrefix(depPath, pkgPath+"/") || strings.HasPrefix(pkgPath, depPath+"/") {
+				continue
+			}
+			if depPath == pkgPath {
+				continue
+			}
+
+			// pkg/* imports always OK for internal packages
+			if strings.HasPrefix(depPath, "pkg/") {
+				continue
+			}
+
+			// Check internal -> internal dependencies based on tiers
+			checkInternalTierImport(t, pkgPath, depPath)
+		}
+	}
+}
+
+func checkInternalTierImport(t *testing.T, from, to string) {
+	t.Helper()
+
+	// Entrypoints can import anything
+	if isEntrypoint(from) {
+		return
+	}
+
+	// Orchestrators can import utilities and other orchestrators
+	if isOrchestrator(from) {
+		if isEntrypoint(to) {
+			t.Errorf("INTERNAL LAYER VIOLATION: Orchestrator '%s' imports Entrypoint '%s'.\n"+
+				"   Orchestrators cannot depend on CLI/entrypoint code.\n"+
+				"   Fix: Extract shared logic to a utility or pkg/*.",
+				from, to)
+		}
+		return
+	}
+
+	// Utilities have strict rules
+	if isUtility(from) {
+		// Check for allowed exceptions
+		if isAllowedUtilityException(from, to) {
+			return
+		}
+
+		if isEntrypoint(to) {
+			t.Errorf("INTERNAL LAYER VIOLATION: Utility '%s' imports Entrypoint '%s'.\n"+
+				"   Utilities cannot depend on CLI/entrypoint code.",
+				from, to)
+			return
+		}
+
+		if isOrchestrator(to) {
+			t.Errorf("INTERNAL LAYER VIOLATION: Utility '%s' imports Orchestrator '%s'.\n"+
+				"   Utilities cannot depend on orchestrators.\n"+
+				"   Fix: Move orchestration logic to internal/engine.",
+				from, to)
+			return
+		}
+
+		if isUtility(to) {
+			t.Errorf("INTERNAL LAYER VIOLATION: Utility '%s' imports peer Utility '%s'.\n"+
+				"   Utilities cannot import other utilities (horizontal dependency).\n"+
+				"   Fix: Move orchestration logic to internal/engine, or extract shared code to pkg/*.",
+				from, to)
+			return
+		}
+	}
+}
+
+// =============================================================================
+// FOCUSED TESTS
+// =============================================================================
+
+// TestArchitecture_CoreOnlyImportsToken is a focused test for the most critical rule.
+func TestArchitecture_CoreOnlyImportsToken(t *testing.T) {
+	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedImports}
 	pkgs, err := packages.Load(cfg, modulePath+"/pkg/core")
 	if err != nil {
-		t.Fatalf("failed to load pkg/core: %v", err)
+		t.Fatalf("Failed to load pkg/core: %v", err)
 	}
 
 	if len(pkgs) == 0 {
@@ -184,110 +375,57 @@ func TestCoreOnlyImportsToken(t *testing.T) {
 	}
 
 	pkg := pkgs[0]
-	allowedExternal := modulePath + "/pkg/token"
+	base := modulePath + "/"
+	allowed := modulePath + "/pkg/token"
 
 	for imp := range pkg.Imports {
-		if !strings.HasPrefix(imp, modulePath) {
-			continue // stdlib or external, OK
+		if !strings.HasPrefix(imp, base) {
+			continue
 		}
-
-		if imp != allowedExternal {
-			t.Errorf("GOLDEN RULE VIOLATION: pkg/core imports %s\n"+
-				"  pkg/core may ONLY import pkg/token (and stdlib)\n"+
-				"  This is the foundation of the architecture",
-				imp)
+		if imp != allowed {
+			t.Errorf("GOLDEN RULE VIOLATION: pkg/core imports %s.\n"+
+				"   pkg/core may ONLY import pkg/token (and stdlib).\n"+
+				"   This is the foundation of the architecture.",
+				strings.TrimPrefix(imp, base))
 		}
 	}
 }
 
-// TestAdapterDoesNotImportDialect is a focused test for a critical microkernel rule.
-// pkg/adapter (the registry) must not import pkg/dialect (the framework).
-func TestAdapterDoesNotImportDialect(t *testing.T) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports,
-	}
-
-	pkgs, err := packages.Load(cfg, modulePath+"/pkg/adapter")
+// TestArchitecture_PkgDoesNotImportInternal ensures libraries don't depend on application code.
+func TestArchitecture_PkgDoesNotImportInternal(t *testing.T) {
+	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedImports}
+	pkgs, err := packages.Load(cfg, modulePath+"/pkg/...")
 	if err != nil {
-		t.Fatalf("failed to load pkg/adapter: %v", err)
+		t.Fatalf("Failed to load packages: %v", err)
 	}
 
-	if len(pkgs) == 0 {
-		t.Fatal("pkg/adapter not found")
-	}
-
-	pkg := pkgs[0]
-	forbidden := modulePath + "/pkg/dialect"
-
-	for imp := range pkg.Imports {
-		if imp == forbidden {
-			t.Errorf("MICROKERNEL VIOLATION: pkg/adapter imports pkg/dialect\n" +
-				"  The adapter registry must only know about core.Adapter and core.DialectConfig\n" +
-				"  It must NOT import the heavy dialect framework\n" +
-				"  Fix: Change Adapter.Dialect() to return *core.DialectConfig")
-		}
-	}
-}
-
-// TestDialectsDoNotImportParser ensures dialect definitions don't create
-// circular dependency risk with the parser.
-//
-// This is a strict test - violations FAIL. Fix them by moving AST types to pkg/core.
-func TestDialectsDoNotImportParser(t *testing.T) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports,
-	}
-
-	pkgs, err := packages.Load(cfg, modulePath+"/pkg/dialects/...")
-	if err != nil {
-		t.Fatalf("failed to load pkg/dialects: %v", err)
-	}
+	base := modulePath + "/"
 
 	for _, pkg := range pkgs {
 		if len(pkg.Errors) > 0 {
 			continue
 		}
 
-		relPath := strings.TrimPrefix(pkg.PkgPath, modulePath+"/")
-		forbidden := modulePath + "/pkg/parser"
+		pkgPath := strings.TrimPrefix(pkg.PkgPath, base)
 
 		for imp := range pkg.Imports {
-			if imp == forbidden {
-				t.Errorf("CIRCULAR DEPENDENCY RISK: %s imports pkg/parser\n"+
-					"  Dialect definitions must not import the parser.\n"+
-					"  Fix: Move required AST types (ListLiteral, StructLiteral, etc.) to pkg/core/ast_extensions.go",
-					relPath)
+			if strings.Contains(imp, modulePath+"/internal/") {
+				t.Errorf("BOUNDARY VIOLATION: '%s' imports internal package '%s'.\n"+
+					"   pkg/* must never import internal/*.\n"+
+					"   Fix: Move shared code to pkg/core or use interfaces.",
+					pkgPath, strings.TrimPrefix(imp, base))
 			}
 		}
 	}
 }
 
-// findAllowedImports returns the allowed imports for a package path.
-// It finds the most specific matching rule.
-func findAllowedImports(pkgPath string) []string {
-	var bestMatch string
-	var allowed []string
+// =============================================================================
+// HELPERS
+// =============================================================================
 
-	for prefix, imports := range architectureRules {
-		if strings.HasPrefix(pkgPath, prefix) {
-			if len(prefix) > len(bestMatch) {
-				bestMatch = prefix
-				allowed = imports
-			}
-		}
-	}
-
-	if bestMatch == "" {
-		return nil
-	}
-	return allowed
-}
-
-// isAllowed checks if an import is in the allowed list.
-// It uses prefix matching (pkg/dialects allows pkg/dialects/duckdb).
-func isAllowed(imp string, allowed []string) bool {
+func isAllowedImport(imp string, allowed []string) bool {
 	for _, prefix := range allowed {
-		if strings.HasPrefix(imp, prefix) {
+		if imp == prefix || strings.HasPrefix(imp, prefix+"/") {
 			return true
 		}
 	}
