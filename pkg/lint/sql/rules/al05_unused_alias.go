@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var UnusedTableAlias = sql.RuleDef{
 	Name:        "aliasing.unused",
 	Group:       "aliasing",
 	Description: "Table alias is defined but not referenced.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkUnusedTableAlias,
 
 	Rationale: `Unused table aliases add noise without providing clarity. They may indicate 
@@ -79,7 +80,7 @@ func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 		if !used {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AL05",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "Table alias '" + alias + "' is defined but never referenced",
 				DocumentationURL: lint.BuildDocURL("AL05"),
 				ImpactScore:      lint.ImpactMedium.Int(),

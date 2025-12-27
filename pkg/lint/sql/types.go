@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 )
 
@@ -13,7 +14,7 @@ type RuleDef struct {
 	Name        string        // Human-readable name, e.g., "ambiguous.distinct"
 	Group       string        // Category, e.g., "ambiguous", "structure", "convention"
 	Description string        // Human-readable description
-	Severity    lint.Severity // Default severity
+	Severity    core.Severity // Default severity
 	Check       CheckFunc     // The check function
 	ConfigKeys  []string      // Configuration keys this rule accepts (for rule-specific options)
 	Dialects    []string      // Restrict to specific dialects; nil/empty means all dialects
@@ -45,7 +46,7 @@ func (w *wrappedRuleDef) ID() string                     { return w.def.ID }
 func (w *wrappedRuleDef) Name() string                   { return w.def.Name }
 func (w *wrappedRuleDef) Group() string                  { return w.def.Group }
 func (w *wrappedRuleDef) Description() string            { return w.def.Description }
-func (w *wrappedRuleDef) DefaultSeverity() lint.Severity { return w.def.Severity }
+func (w *wrappedRuleDef) DefaultSeverity() core.Severity { return w.def.Severity }
 func (w *wrappedRuleDef) ConfigKeys() []string           { return w.def.ConfigKeys }
 func (w *wrappedRuleDef) Dialects() []string             { return w.def.Dialects }
 

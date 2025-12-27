@@ -14,7 +14,7 @@ func init() {
 		Name:        "staging-depends-staging",
 		Group:       "modeling",
 		Description: "Staging model references another staging model",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkStagingDependsStaging,
 
 		Rationale: `Staging models should only reference raw sources, not other staging models. When staging models 
@@ -60,7 +60,7 @@ func checkStagingDependsStaging(ctx *project.Context) []project.Diagnostic {
 			if sourceModel.Type == core.ModelTypeStaging {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:   "PM03",
-					Severity: lint.SeverityWarning,
+					Severity: core.SeverityWarning,
 					Message: fmt.Sprintf(
 						"Staging model '%s' depends on staging model '%s'; staging should only reference raw sources",
 						model.Name, sourceModel.Name),

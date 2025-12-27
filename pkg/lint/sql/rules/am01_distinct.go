@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var DistinctWithGroupBy = sql.RuleDef{
 	Name:        "ambiguous.distinct",
 	Group:       "ambiguous",
 	Description: "Using DISTINCT with GROUP BY is redundant.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkDistinctWithGroupBy,
 
 	Rationale: `GROUP BY already guarantees unique rows for the grouped columns. 
@@ -41,17 +42,17 @@ func checkDistinctWithGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []
 		return nil
 	}
 
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil {
 		return nil
 	}
 
-	if core.Distinct && len(core.GroupBy) > 0 {
+	if selectCore.Distinct && len(selectCore.GroupBy) > 0 {
 		return []lint.Diagnostic{{
 			RuleID:           "AM01",
-			Severity:         lint.SeverityWarning,
+			Severity:         core.SeverityWarning,
 			Message:          "Using DISTINCT with GROUP BY is redundant; GROUP BY already produces unique rows",
-			Pos:              core.Span.Start,
+			Pos:              selectCore.Span.Start,
 			DocumentationURL: lint.BuildDocURL("AM01"),
 			ImpactScore:      lint.ImpactMedium.Int(),
 			AutoFixable:      false,

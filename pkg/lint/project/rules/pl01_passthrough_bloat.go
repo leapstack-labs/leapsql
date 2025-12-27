@@ -14,7 +14,7 @@ func init() {
 		Name:        "passthrough-bloat",
 		Group:       "lineage",
 		Description: "Model has too many passthrough columns",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkPassthroughBloat,
 		ConfigKeys:  []string{"threshold"},
 
@@ -74,7 +74,7 @@ func checkPassthroughBloat(ctx *project.Context) []project.Diagnostic {
 			totalColumns := len(model.Columns)
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PL01",
-				Severity: lint.SeverityWarning,
+				Severity: core.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Model '%s' has %d/%d passthrough columns (threshold: %d); consider explicit column selection",
 					model.Name, passthroughCount, totalColumns, threshold),

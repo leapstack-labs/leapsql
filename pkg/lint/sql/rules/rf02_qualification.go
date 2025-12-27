@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var QualifyColumns = sql.RuleDef{
 	Name:        "references.qualification",
 	Group:       "references",
 	Description: "Qualify column references in queries with multiple tables.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkQualifyColumns,
 
 	Rationale: `In queries involving multiple tables, unqualified column names can be ambiguous. 
@@ -41,14 +42,14 @@ func checkQualifyColumns(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 		return nil
 	}
 
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil || core.From == nil {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil || selectCore.From == nil {
 		return nil
 	}
 
 	// Count table sources
 	tableCount := 1
-	tableCount += len(core.From.Joins)
+	tableCount += len(selectCore.From.Joins)
 
 	// If single table, don't require qualification
 	if tableCount < 2 {
@@ -61,7 +62,7 @@ func checkQualifyColumns(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 		if colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "RF02",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "Column '" + colRef.Column + "' should be qualified with table name in multi-table query",
 				DocumentationURL: lint.BuildDocURL("RF02"),
 				ImpactScore:      lint.ImpactMedium.Int(),

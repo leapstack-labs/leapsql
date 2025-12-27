@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var ExpressionAlias = sql.RuleDef{
 	Name:        "aliasing.expression",
 	Group:       "aliasing",
 	Description: "Expression columns should have explicit aliases.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkExpressionAlias,
 
 	Rationale: `Expressions without aliases produce auto-generated column names that vary 
@@ -47,13 +48,13 @@ func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint
 		return nil
 	}
 
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil {
 		return nil
 	}
 
 	var diagnostics []lint.Diagnostic
-	for _, col := range core.Columns {
+	for _, col := range selectCore.Columns {
 		// Skip if it's a star, has an alias, or is a simple column ref
 		if col.Star || col.TableStar != "" || col.Alias != "" {
 			continue
@@ -68,9 +69,9 @@ func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint
 			// Complex expressions should have aliases
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AL03",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "Expression column should have an explicit alias for clarity",
-				Pos:              core.Span.Start,
+				Pos:              selectCore.Span.Start,
 				DocumentationURL: lint.BuildDocURL("AL03"),
 				ImpactScore:      lint.ImpactMedium.Int(),
 				AutoFixable:      false,

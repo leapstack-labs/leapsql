@@ -3,6 +3,7 @@ package project
 import (
 	"sync"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 )
 
@@ -23,7 +24,7 @@ type RuleDef struct {
 	Name        string        // Human-readable name, e.g., "root-models"
 	Group       string        // Category: "modeling", "structure", "lineage"
 	Description string        // Human-readable description
-	Severity    lint.Severity // Default severity (uses unified lint.Severity)
+	Severity    core.Severity // Default severity (uses unified core.Severity)
 	Check       Check         // The check function
 	ConfigKeys  []string      // Configuration keys this rule accepts
 
@@ -40,7 +41,7 @@ type Check func(ctx *Context) []Diagnostic
 // Diagnostic represents a project-level lint finding.
 type Diagnostic struct {
 	RuleID   string
-	Severity lint.Severity
+	Severity core.Severity
 	Message  string
 	Model    string // Model path that triggered this diagnostic
 	FilePath string // File path for LSP integration
@@ -124,7 +125,7 @@ func (w *wrappedProjectRule) ID() string                     { return w.def.ID }
 func (w *wrappedProjectRule) Name() string                   { return w.def.Name }
 func (w *wrappedProjectRule) Group() string                  { return w.def.Group }
 func (w *wrappedProjectRule) Description() string            { return w.def.Description }
-func (w *wrappedProjectRule) DefaultSeverity() lint.Severity { return w.def.Severity }
+func (w *wrappedProjectRule) DefaultSeverity() core.Severity { return w.def.Severity }
 func (w *wrappedProjectRule) ConfigKeys() []string           { return w.def.ConfigKeys }
 
 // Documentation methods

@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var AliasLength = sql.RuleDef{
 	Name:        "aliasing.length",
 	Group:       "aliasing",
 	Description: "Alias length should be between min and max characters.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	ConfigKeys:  []string{"min_length", "max_length"},
 	Check:       checkAliasLength,
 
@@ -70,7 +71,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 			if len(alias) < minLen {
 				diagnostics = append(diagnostics, lint.Diagnostic{
 					RuleID:           "AL06",
-					Severity:         lint.SeverityInfo,
+					Severity:         core.SeverityInfo,
 					Message:          "Table alias '" + alias + "' is too short; minimum length is " + string(rune('0'+minLen)),
 					Pos:              pos,
 					DocumentationURL: lint.BuildDocURL("AL06"),
@@ -81,7 +82,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 			if len(alias) > maxLen {
 				diagnostics = append(diagnostics, lint.Diagnostic{
 					RuleID:           "AL06",
-					Severity:         lint.SeverityInfo,
+					Severity:         core.SeverityInfo,
 					Message:          "Table alias '" + alias + "' is too long; maximum length is " + string(rune('0'+maxLen)),
 					Pos:              pos,
 					DocumentationURL: lint.BuildDocURL("AL06"),
@@ -93,16 +94,16 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 	}
 
 	// Check column aliases
-	core := ast.GetSelectCore(selectStmt)
-	if core != nil {
-		corePos := ast.GetSelectCorePosition(core)
-		for _, col := range core.Columns {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore != nil {
+		corePos := ast.GetSelectCorePosition(selectCore)
+		for _, col := range selectCore.Columns {
 			if col.Alias != "" {
 				alias := strings.TrimSpace(col.Alias)
 				if len(alias) < minLen {
 					diagnostics = append(diagnostics, lint.Diagnostic{
 						RuleID:           "AL06",
-						Severity:         lint.SeverityInfo,
+						Severity:         core.SeverityInfo,
 						Message:          "Column alias '" + alias + "' is too short",
 						Pos:              corePos,
 						DocumentationURL: lint.BuildDocURL("AL06"),
@@ -113,7 +114,7 @@ func checkAliasLength(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 				if len(alias) > maxLen {
 					diagnostics = append(diagnostics, lint.Diagnostic{
 						RuleID:           "AL06",
-						Severity:         lint.SeverityInfo,
+						Severity:         core.SeverityInfo,
 						Message:          "Column alias '" + alias + "' is too long",
 						Pos:              corePos,
 						DocumentationURL: lint.BuildDocURL("AL06"),

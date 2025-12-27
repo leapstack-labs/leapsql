@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -18,7 +19,7 @@ var ConstantExpression = sql.RuleDef{
 	Name:        "structure.constant_expression",
 	Group:       "structure",
 	Description: "Unnecessary constant expressions like WHERE 1=1 or WHERE true.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkConstantExpression,
 
 	Rationale: `Constant expressions like WHERE 1=1 or WHERE true are often artifacts of dynamic SQL 
@@ -46,13 +47,13 @@ func checkConstantExpression(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 	var diagnostics []lint.Diagnostic
 
 	// Check WHERE clauses in all SELECT cores
-	for _, core := range ast.CollectSelectCores(selectStmt) {
-		if core.Where == nil {
+	for _, selectCore := range ast.CollectSelectCores(selectStmt) {
+		if selectCore.Where == nil {
 			continue
 		}
 
 		// Check the WHERE expression for constant patterns
-		diags := findConstantExpressionsST10(core.Where, core.Span.Start)
+		diags := findConstantExpressionsST10(selectCore.Where, selectCore.Span.Start)
 		diagnostics = append(diagnostics, diags...)
 	}
 
@@ -69,7 +70,7 @@ func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Di
 		if isConstantEqualityST10(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST10",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "Unnecessary constant expression; this condition is always true",
 				Pos:              pos,
 				DocumentationURL: lint.BuildDocURL("ST10"),
@@ -89,7 +90,7 @@ func findConstantExpressionsST10(expr parser.Expr, pos token.Position) []lint.Di
 		if isConstantBooleanLiteralST10(e) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST10",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "Unnecessary constant expression; this condition is always " + boolValueST10(e),
 				Pos:              pos,
 				DocumentationURL: lint.BuildDocURL("ST10"),

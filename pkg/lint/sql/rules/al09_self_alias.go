@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var SelfAlias = sql.RuleDef{
 	Name:        "aliasing.self_alias",
 	Group:       "aliasing",
 	Description: "Table aliased to its own name is redundant.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkSelfAlias,
 
 	Rationale: `Aliasing a table to its own name (e.g., customers AS customers) adds 
@@ -54,7 +55,7 @@ func checkSelfAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagn
 		if strings.EqualFold(tn.Name, tn.Alias) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AL09",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "Table '" + tn.Name + "' is aliased to its own name; this is redundant",
 				Pos:              tn.Span.Start,
 				DocumentationURL: lint.BuildDocURL("AL09"),

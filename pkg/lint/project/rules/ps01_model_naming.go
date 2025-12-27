@@ -15,7 +15,7 @@ func init() {
 		Name:        "model-naming",
 		Group:       "structure",
 		Description: "Model naming convention mismatch",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkModelNaming,
 
 		Rationale: `Consistent naming conventions make it easy to identify model types at a glance. Models in specific 
@@ -52,7 +52,7 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 			if !strings.HasPrefix(nameLower, "stg_") {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PS01",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          fmt.Sprintf("Model '%s' is in staging directory but doesn't have 'stg_' prefix", model.Name),
 					Model:            model.Path,
 					FilePath:         model.FilePath,
@@ -68,7 +68,7 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 			if !strings.HasPrefix(nameLower, "int_") {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PS01",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          fmt.Sprintf("Model '%s' is in intermediate directory but doesn't have 'int_' prefix", model.Name),
 					Model:            model.Path,
 					FilePath:         model.FilePath,
@@ -91,7 +91,7 @@ func checkModelNaming(ctx *project.Context) []project.Diagnostic {
 				if model.Type == core.ModelTypeMarts {
 					diagnostics = append(diagnostics, project.Diagnostic{
 						RuleID:           "PS01",
-						Severity:         lint.SeverityWarning,
+						Severity:         core.SeverityWarning,
 						Message:          fmt.Sprintf("Model '%s' is in marts directory but doesn't have 'fct_' or 'dim_' prefix", model.Name),
 						Model:            model.Path,
 						FilePath:         model.FilePath,

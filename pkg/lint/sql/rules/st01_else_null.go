@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var ElseNull = sql.RuleDef{
 	Name:        "structure.else_null",
 	Group:       "structure",
 	Description: "ELSE NULL is redundant in CASE expressions.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkElseNull,
 
 	Rationale: `CASE expressions implicitly return NULL when no WHEN clause matches and no ELSE is specified. 
@@ -57,7 +58,7 @@ func checkElseNull(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagno
 		if lit, ok := caseExpr.Else.(*parser.Literal); ok && lit.Type == parser.LiteralNull {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST01",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "ELSE NULL is redundant; CASE expressions return NULL by default when no ELSE is specified",
 				DocumentationURL: lint.BuildDocURL("ST01"),
 				ImpactScore:      lint.ImpactLow.Int(),

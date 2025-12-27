@@ -265,7 +265,7 @@ func TestPL05_SchemaDrift(t *testing.T) {
 			assert.Len(t, diags, tt.wantDiags)
 			if tt.wantDiags > 0 {
 				assert.Equal(t, "PL05", diags[0].RuleID)
-				assert.Equal(t, lint.SeverityWarning, diags[0].Severity)
+				assert.Equal(t, core.SeverityWarning, diags[0].Severity)
 				if tt.wantMsg != "" {
 					assert.Contains(t, diags[0].Message, tt.wantMsg)
 				}

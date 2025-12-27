@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var ConsistentQualification = sql.RuleDef{
 	Name:        "references.consistent",
 	Group:       "references",
 	Description: "Column qualification style should be consistent.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkConsistentQualification,
 
 	Rationale: `Mixing qualified and unqualified column references in the same query reduces readability. 
@@ -61,7 +62,7 @@ func checkConsistentQualification(stmt any, _ lint.DialectInfo, _ map[string]any
 	if qualified > 0 && unqualified > 0 {
 		return []lint.Diagnostic{{
 			RuleID:           "RF03",
-			Severity:         lint.SeverityInfo,
+			Severity:         core.SeverityInfo,
 			Message:          "Mixed column qualification style; some columns are qualified, others are not",
 			DocumentationURL: lint.BuildDocURL("RF03"),
 			ImpactScore:      lint.ImpactLow.Int(),

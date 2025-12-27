@@ -6,41 +6,6 @@ import (
 )
 
 // =============================================================================
-// Severity
-// =============================================================================
-
-// Severity indicates the importance of a diagnostic.
-type Severity int
-
-// Severity levels for diagnostics.
-const (
-	// SeverityError indicates a critical issue that should be fixed.
-	SeverityError Severity = iota
-	// SeverityWarning indicates a potential issue that should be reviewed.
-	SeverityWarning
-	// SeverityInfo indicates informational feedback.
-	SeverityInfo
-	// SeverityHint indicates a suggestion for improvement.
-	SeverityHint
-)
-
-// String returns the string representation of the severity.
-func (s Severity) String() string {
-	switch s {
-	case SeverityError:
-		return "error"
-	case SeverityWarning:
-		return "warning"
-	case SeverityInfo:
-		return "info"
-	case SeverityHint:
-		return "hint"
-	default:
-		return "unknown"
-	}
-}
-
-// =============================================================================
 // Dialect Interface
 // =============================================================================
 
@@ -62,14 +27,14 @@ type DialectInfo interface {
 // The Check function receives an `any` type that should be *parser.SelectStmt.
 // This avoids import cycles between lint -> parser -> dialect -> lint.
 type RuleDef struct {
-	ID          string    // Unique identifier, e.g., "AM01" or "ansi/select-star"
-	Name        string    // Human-readable name, e.g., "ambiguous.distinct"
-	Group       string    // Category, e.g., "ambiguous", "structure", "convention"
-	Description string    // Human-readable description
-	Severity    Severity  // Default severity
-	Check       CheckFunc // The check function
-	ConfigKeys  []string  // Configuration keys this rule accepts (for rule-specific options)
-	Dialects    []string  // Restrict to specific dialects; nil/empty means all dialects
+	ID          string        // Unique identifier, e.g., "AM01" or "ansi/select-star"
+	Name        string        // Human-readable name, e.g., "ambiguous.distinct"
+	Group       string        // Category, e.g., "ambiguous", "structure", "convention"
+	Description string        // Human-readable description
+	Severity    core.Severity // Default severity
+	Check       CheckFunc     // The check function
+	ConfigKeys  []string      // Configuration keys this rule accepts (for rule-specific options)
+	Dialects    []string      // Restrict to specific dialects; nil/empty means all dialects
 
 	// Documentation fields for richer rule documentation
 	Rationale   string // Why this rule exists, what problems it prevents
@@ -90,7 +55,7 @@ type CheckFunc func(stmt any, dialect DialectInfo, opts map[string]any) []Diagno
 // Diagnostic represents a lint finding.
 type Diagnostic struct {
 	RuleID   string
-	Severity Severity
+	Severity core.Severity
 	Message  string
 	Pos      token.Position
 	EndPos   token.Position // Optional: end of the problematic range
@@ -143,7 +108,7 @@ type Rule interface {
 	Description() string
 
 	// DefaultSeverity returns the default severity for this rule
-	DefaultSeverity() Severity
+	DefaultSeverity() core.Severity
 
 	// ConfigKeys returns configuration keys this rule accepts
 	ConfigKeys() []string
@@ -178,27 +143,9 @@ type ProjectRule interface {
 	CheckProject(ctx ProjectContext) []Diagnostic
 }
 
-// RuleInfo provides metadata about a rule for documentation/tooling.
-type RuleInfo struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Group           string   `json:"group"`
-	Description     string   `json:"description"`
-	DefaultSeverity Severity `json:"default_severity"`
-	ConfigKeys      []string `json:"config_keys,omitempty"`
-	Dialects        []string `json:"dialects,omitempty"` // Only for SQL rules
-	Type            string   `json:"type"`               // "sql" or "project"
-
-	// Documentation fields
-	Rationale   string `json:"rationale,omitempty"`
-	BadExample  string `json:"bad_example,omitempty"`
-	GoodExample string `json:"good_example,omitempty"`
-	Fix         string `json:"fix,omitempty"`
-}
-
 // GetRuleInfo extracts metadata from a Rule for documentation/tooling.
-func GetRuleInfo(r Rule) RuleInfo {
-	info := RuleInfo{
+func GetRuleInfo(r Rule) core.RuleInfo {
+	info := core.RuleInfo{
 		ID:              r.ID(),
 		Name:            r.Name(),
 		Group:           r.Group(),
@@ -236,13 +183,13 @@ func WrapRuleDef(def RuleDef) SQLRule {
 	return &wrappedRuleDef{def: def}
 }
 
-func (w *wrappedRuleDef) ID() string                { return w.def.ID }
-func (w *wrappedRuleDef) Name() string              { return w.def.Name }
-func (w *wrappedRuleDef) Group() string             { return w.def.Group }
-func (w *wrappedRuleDef) Description() string       { return w.def.Description }
-func (w *wrappedRuleDef) DefaultSeverity() Severity { return w.def.Severity }
-func (w *wrappedRuleDef) ConfigKeys() []string      { return w.def.ConfigKeys }
-func (w *wrappedRuleDef) Dialects() []string        { return w.def.Dialects }
+func (w *wrappedRuleDef) ID() string                     { return w.def.ID }
+func (w *wrappedRuleDef) Name() string                   { return w.def.Name }
+func (w *wrappedRuleDef) Group() string                  { return w.def.Group }
+func (w *wrappedRuleDef) Description() string            { return w.def.Description }
+func (w *wrappedRuleDef) DefaultSeverity() core.Severity { return w.def.Severity }
+func (w *wrappedRuleDef) ConfigKeys() []string           { return w.def.ConfigKeys }
+func (w *wrappedRuleDef) Dialects() []string             { return w.def.Dialects }
 
 // Documentation methods
 func (w *wrappedRuleDef) Rationale() string   { return w.def.Rationale }

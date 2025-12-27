@@ -3,6 +3,7 @@ package lint
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,18 +14,18 @@ type mockSQLRule struct {
 	name        string
 	group       string
 	description string
-	severity    Severity
+	severity    core.Severity
 	configKeys  []string
 	dialects    []string
 }
 
-func (m *mockSQLRule) ID() string                { return m.id }
-func (m *mockSQLRule) Name() string              { return m.name }
-func (m *mockSQLRule) Group() string             { return m.group }
-func (m *mockSQLRule) Description() string       { return m.description }
-func (m *mockSQLRule) DefaultSeverity() Severity { return m.severity }
-func (m *mockSQLRule) ConfigKeys() []string      { return m.configKeys }
-func (m *mockSQLRule) Dialects() []string        { return m.dialects }
+func (m *mockSQLRule) ID() string                     { return m.id }
+func (m *mockSQLRule) Name() string                   { return m.name }
+func (m *mockSQLRule) Group() string                  { return m.group }
+func (m *mockSQLRule) Description() string            { return m.description }
+func (m *mockSQLRule) DefaultSeverity() core.Severity { return m.severity }
+func (m *mockSQLRule) ConfigKeys() []string           { return m.configKeys }
+func (m *mockSQLRule) Dialects() []string             { return m.dialects }
 
 // Documentation methods (return empty for mocks)
 func (m *mockSQLRule) Rationale() string   { return "" }
@@ -42,16 +43,16 @@ type mockProjectRule struct {
 	name        string
 	group       string
 	description string
-	severity    Severity
+	severity    core.Severity
 	configKeys  []string
 }
 
-func (m *mockProjectRule) ID() string                { return m.id }
-func (m *mockProjectRule) Name() string              { return m.name }
-func (m *mockProjectRule) Group() string             { return m.group }
-func (m *mockProjectRule) Description() string       { return m.description }
-func (m *mockProjectRule) DefaultSeverity() Severity { return m.severity }
-func (m *mockProjectRule) ConfigKeys() []string      { return m.configKeys }
+func (m *mockProjectRule) ID() string                     { return m.id }
+func (m *mockProjectRule) Name() string                   { return m.name }
+func (m *mockProjectRule) Group() string                  { return m.group }
+func (m *mockProjectRule) Description() string            { return m.description }
+func (m *mockProjectRule) DefaultSeverity() core.Severity { return m.severity }
+func (m *mockProjectRule) ConfigKeys() []string           { return m.configKeys }
 
 // Documentation methods (return empty for mocks)
 func (m *mockProjectRule) Rationale() string   { return "" }
@@ -69,7 +70,7 @@ func TestSQLRuleInterface(t *testing.T) {
 		name:        "test-rule",
 		group:       "testing",
 		description: "A test SQL rule",
-		severity:    SeverityWarning,
+		severity:    core.SeverityWarning,
 		configKeys:  []string{"max_count"},
 		dialects:    []string{"postgres", "duckdb"},
 	}
@@ -85,7 +86,7 @@ func TestSQLRuleInterface(t *testing.T) {
 	assert.Equal(t, "test-rule", rule.Name())
 	assert.Equal(t, "testing", rule.Group())
 	assert.Equal(t, "A test SQL rule", rule.Description())
-	assert.Equal(t, SeverityWarning, rule.DefaultSeverity())
+	assert.Equal(t, core.SeverityWarning, rule.DefaultSeverity())
 	assert.Equal(t, []string{"max_count"}, rule.ConfigKeys())
 	assert.Equal(t, []string{"postgres", "duckdb"}, rule.Dialects())
 
@@ -100,7 +101,7 @@ func TestProjectRuleInterface(t *testing.T) {
 		name:        "project-rule",
 		group:       "modeling",
 		description: "A test project rule",
-		severity:    SeverityError,
+		severity:    core.SeverityError,
 		configKeys:  []string{"threshold"},
 	}
 
@@ -115,7 +116,7 @@ func TestProjectRuleInterface(t *testing.T) {
 	assert.Equal(t, "project-rule", rule.Name())
 	assert.Equal(t, "modeling", rule.Group())
 	assert.Equal(t, "A test project rule", rule.Description())
-	assert.Equal(t, SeverityError, rule.DefaultSeverity())
+	assert.Equal(t, core.SeverityError, rule.DefaultSeverity())
 	assert.Equal(t, []string{"threshold"}, rule.ConfigKeys())
 
 	// Test CheckProject returns empty diagnostics
@@ -129,7 +130,7 @@ func TestGetRuleInfo_SQLRule(t *testing.T) {
 		name:        "test-rule",
 		group:       "testing",
 		description: "A test SQL rule",
-		severity:    SeverityWarning,
+		severity:    core.SeverityWarning,
 		configKeys:  []string{"opt1"},
 		dialects:    []string{"postgres"},
 	}
@@ -140,7 +141,7 @@ func TestGetRuleInfo_SQLRule(t *testing.T) {
 	assert.Equal(t, "test-rule", info.Name)
 	assert.Equal(t, "testing", info.Group)
 	assert.Equal(t, "A test SQL rule", info.Description)
-	assert.Equal(t, SeverityWarning, info.DefaultSeverity)
+	assert.Equal(t, core.SeverityWarning, info.DefaultSeverity)
 	assert.Equal(t, []string{"opt1"}, info.ConfigKeys)
 	assert.Equal(t, []string{"postgres"}, info.Dialects)
 	assert.Equal(t, "sql", info.Type)
@@ -152,7 +153,7 @@ func TestGetRuleInfo_ProjectRule(t *testing.T) {
 		name:        "project-rule",
 		group:       "modeling",
 		description: "A test project rule",
-		severity:    SeverityError,
+		severity:    core.SeverityError,
 		configKeys:  []string{"threshold"},
 	}
 
@@ -162,7 +163,7 @@ func TestGetRuleInfo_ProjectRule(t *testing.T) {
 	assert.Equal(t, "project-rule", info.Name)
 	assert.Equal(t, "modeling", info.Group)
 	assert.Equal(t, "A test project rule", info.Description)
-	assert.Equal(t, SeverityError, info.DefaultSeverity)
+	assert.Equal(t, core.SeverityError, info.DefaultSeverity)
 	assert.Equal(t, []string{"threshold"}, info.ConfigKeys)
 	assert.Nil(t, info.Dialects) // Project rules don't have dialects
 	assert.Equal(t, "project", info.Type)
@@ -174,7 +175,7 @@ func TestWrapRuleDef(t *testing.T) {
 		Name:        "wrapped-rule",
 		Group:       "wrapper",
 		Description: "A wrapped rule",
-		Severity:    SeverityInfo,
+		Severity:    core.SeverityInfo,
 		ConfigKeys:  []string{"key1", "key2"},
 		Dialects:    []string{"ansi"},
 		Check: func(_ any, _ DialectInfo, _ map[string]any) []Diagnostic {
@@ -192,7 +193,7 @@ func TestWrapRuleDef(t *testing.T) {
 	assert.Equal(t, "wrapped-rule", wrapped.Name())
 	assert.Equal(t, "wrapper", wrapped.Group())
 	assert.Equal(t, "A wrapped rule", wrapped.Description())
-	assert.Equal(t, SeverityInfo, wrapped.DefaultSeverity())
+	assert.Equal(t, core.SeverityInfo, wrapped.DefaultSeverity())
 	assert.Equal(t, []string{"key1", "key2"}, wrapped.ConfigKeys())
 	assert.Equal(t, []string{"ansi"}, wrapped.Dialects())
 
@@ -294,7 +295,7 @@ func TestAllRules(t *testing.T) {
 		id:       "SQL01",
 		name:     "sql-test",
 		group:    "sql",
-		severity: SeverityWarning,
+		severity: core.SeverityWarning,
 		dialects: []string{"postgres"},
 	}
 
@@ -302,7 +303,7 @@ func TestAllRules(t *testing.T) {
 		id:       "PRJ01",
 		name:     "project-test",
 		group:    "project",
-		severity: SeverityError,
+		severity: core.SeverityError,
 	}
 
 	RegisterSQLRule(sqlRule)
@@ -313,7 +314,7 @@ func TestAllRules(t *testing.T) {
 	require.Len(t, allRules, 2)
 
 	// Find by type
-	var sqlInfo, projectInfo *RuleInfo
+	var sqlInfo, projectInfo *core.RuleInfo
 	for i := range allRules {
 		switch allRules[i].Type {
 		case "sql":

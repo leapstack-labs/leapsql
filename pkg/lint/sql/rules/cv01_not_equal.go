@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 )
@@ -25,7 +26,7 @@ var NotEqualOperator = sql.RuleDef{
 	Name:        "convention.not_equal",
 	Group:       "convention",
 	Description: "Prefer != over <> for not equal operator (NOT IMPLEMENTED: AST normalizes both operators).",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkNotEqualOperator,
 
 	Rationale: `Using a consistent not-equal operator (either != or <>) throughout a 

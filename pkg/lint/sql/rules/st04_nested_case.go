@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var NestedCase = sql.RuleDef{
 	Name:        "structure.nested_case",
 	Group:       "structure",
 	Description: "Nested CASE expressions reduce readability.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkNestedCase,
 
 	Rationale: `Nested CASE expressions are difficult to read and understand. They often indicate complex 
@@ -57,7 +58,7 @@ func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 		if hasNestedCaseST04(caseExpr) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST04",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "Nested CASE expressions reduce readability; consider refactoring",
 				DocumentationURL: lint.BuildDocURL("ST04"),
 				ImpactScore:      lint.ImpactMedium.Int(),

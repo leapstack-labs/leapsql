@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -14,7 +15,7 @@ func init() {
 		Name:        "schema-drift",
 		Group:       "lineage",
 		Description: "SELECT * from source with changed schema since last run",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkSchemaDrift,
 
 		Rationale: `When using SELECT *, upstream schema changes silently propagate to your model. Added columns 
@@ -82,7 +83,7 @@ func checkSchemaDrift(ctx *project.Context) []project.Diagnostic {
 
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PL05",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          msg,
 					Model:            model.Path,
 					FilePath:         model.FilePath,

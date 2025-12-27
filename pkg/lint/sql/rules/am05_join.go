@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var ImplicitJoin = sql.RuleDef{
 	Name:        "ambiguous.join",
 	Group:       "ambiguous",
 	Description: "Comma-separated tables create an implicit cross join.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkImplicitJoin,
 
 	Rationale: `The old-style comma join syntax (FROM a, b WHERE a.id = b.id) is harder 
@@ -46,7 +47,7 @@ func checkImplicitJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Di
 		if join.Type == parser.JoinComma {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM05",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "Comma-separated tables create an implicit cross join; consider using explicit JOIN syntax",
 				Pos:              join.Span.Start,
 				DocumentationURL: lint.BuildDocURL("AM05"),

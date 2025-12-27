@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	_ "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb" // Register DuckDB dialect
 	"github.com/leapstack-labs/leapsql/pkg/lint"
@@ -322,13 +323,13 @@ func TestDiagnosticCodes(t *testing.T) {
 
 func TestProjectSeverityToLSP(t *testing.T) {
 	tests := []struct {
-		input    lint.Severity
+		input    core.Severity
 		expected DiagnosticSeverity
 	}{
-		{lint.SeverityError, DiagnosticSeverityError},
-		{lint.SeverityWarning, DiagnosticSeverityWarning},
-		{lint.SeverityInfo, DiagnosticSeverityInformation},
-		{lint.SeverityHint, DiagnosticSeverityHint},
+		{core.SeverityError, DiagnosticSeverityError},
+		{core.SeverityWarning, DiagnosticSeverityWarning},
+		{core.SeverityInfo, DiagnosticSeverityInformation},
+		{core.SeverityHint, DiagnosticSeverityHint},
 	}
 
 	for _, tt := range tests {

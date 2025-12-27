@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var PreferCoalesce = sql.RuleDef{
 	Name:        "convention.coalesce",
 	Group:       "convention",
 	Description: "Prefer COALESCE over IFNULL/NVL for better portability.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkPreferCoalesce,
 
 	Rationale: `COALESCE is ANSI SQL standard and works across all major databases. IFNULL 
@@ -51,7 +52,7 @@ func checkPreferCoalesce(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 		if name == "IFNULL" || name == "NVL" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "CV02",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "Prefer COALESCE over " + name + " for better SQL portability",
 				DocumentationURL: lint.BuildDocURL("CV02"),
 				ImpactScore:      lint.ImpactLow.Int(),

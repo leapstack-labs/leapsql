@@ -16,7 +16,7 @@ func init() {
 		Name:        "source-fanout",
 		Group:       "modeling",
 		Description: "Source referenced by multiple non-staging models",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkSourceFanout,
 
 		Rationale: `Each raw source should be referenced by exactly one staging model, which then provides a clean 
@@ -71,7 +71,7 @@ func checkSourceFanout(ctx *project.Context) []project.Diagnostic {
 			sort.Strings(consumers)
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PM02",
-				Severity: lint.SeverityWarning,
+				Severity: core.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Source '%s' is referenced by %d non-staging models (%s); consider creating a staging model",
 					source, len(consumers), strings.Join(consumers, ", ")),

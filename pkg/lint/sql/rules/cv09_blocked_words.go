@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var BlockedWords = sql.RuleDef{
 	Name:        "convention.blocked_words",
 	Group:       "convention",
 	Description: "Block dangerous SQL keywords like DELETE, DROP, TRUNCATE.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	ConfigKeys:  []string{"blocked_words"},
 	Check:       checkBlockedWords,
 
@@ -68,7 +69,7 @@ func checkBlockedWords(stmt any, _ lint.DialectInfo, opts map[string]any) []lint
 		if blocked[strings.ToUpper(fn.Name)] {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "CV09",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "Use of blocked word '" + strings.ToUpper(fn.Name) + "' detected",
 				DocumentationURL: lint.BuildDocURL("CV09"),
 				ImpactScore:      lint.ImpactHigh.Int(),

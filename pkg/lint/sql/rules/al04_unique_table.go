@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var UniqueTableAlias = sql.RuleDef{
 	Name:        "aliasing.unique_table",
 	Group:       "aliasing",
 	Description: "Table aliases should be unique within a query.",
-	Severity:    lint.SeverityError,
+	Severity:    core.SeverityError,
 	Check:       checkUniqueTableAlias,
 
 	Rationale: `Duplicate table aliases cause ambiguity when referencing columns. Most 
@@ -72,7 +73,7 @@ func checkUniqueTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 		if count > 1 {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AL04",
-				Severity:         lint.SeverityError,
+				Severity:         core.SeverityError,
 				Message:          "Table alias '" + alias + "' is used " + string(rune('0'+count)) + " times; aliases must be unique",
 				DocumentationURL: lint.BuildDocURL("AL04"),
 				ImpactScore:      lint.ImpactCritical.Int(),

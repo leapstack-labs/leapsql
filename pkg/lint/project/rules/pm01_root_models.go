@@ -14,7 +14,7 @@ func init() {
 		Name:        "root-models",
 		Group:       "modeling",
 		Description: "Models with no sources (broken DAG lineage)",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkRootModels,
 
 		Rationale: `Non-staging models without upstream dependencies indicate broken lineage. These "root" models 
@@ -52,7 +52,7 @@ func checkRootModels(ctx *project.Context) []project.Diagnostic {
 		if len(model.Sources) == 0 {
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:           "PM01",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          fmt.Sprintf("Model '%s' has no upstream dependencies (broken lineage)", model.Name),
 				Model:            model.Path,
 				FilePath:         model.FilePath,

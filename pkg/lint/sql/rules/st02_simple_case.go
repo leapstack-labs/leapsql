@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var SimpleCaseConversion = sql.RuleDef{
 	Name:        "structure.simple_case",
 	Group:       "structure",
 	Description: "Searched CASE can be simplified to simple CASE expression.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkSimpleCaseConversion,
 
 	Rationale: `When all WHEN conditions compare the same column to different literal values using equality, 
@@ -60,7 +61,7 @@ func checkSimpleCaseConversion(stmt any, _ lint.DialectInfo, _ map[string]any) [
 		if canConvertToSimpleCaseST02(caseExpr) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST02",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "Searched CASE expression can be converted to simple CASE for better readability",
 				DocumentationURL: lint.BuildDocURL("ST02"),
 				ImpactScore:      lint.ImpactLow.Int(),

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var AmbiguousColumnRef = sql.RuleDef{
 	Name:        "ambiguous.column_refs",
 	Group:       "ambiguous",
 	Description: "Unqualified column reference may be ambiguous with multiple tables.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkAmbiguousColumnRef,
 
 	Rationale: `When multiple tables are joined, unqualified column names may exist in 
@@ -41,14 +42,14 @@ func checkAmbiguousColumnRef(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 		return nil
 	}
 
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil || core.From == nil {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil || selectCore.From == nil {
 		return nil
 	}
 
 	// Count table sources (including joins)
 	tableCount := 1 // Start with the main source
-	tableCount += len(core.From.Joins)
+	tableCount += len(selectCore.From.Joins)
 
 	// If only one table, no ambiguity possible
 	if tableCount < 2 {
@@ -61,7 +62,7 @@ func checkAmbiguousColumnRef(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 		if colRef.Table == "" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM06",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "Column '" + colRef.Column + "' is unqualified and may be ambiguous with multiple tables; consider adding table qualifier",
 				DocumentationURL: lint.BuildDocURL("AM06"),
 				ImpactScore:      lint.ImpactMedium.Int(),

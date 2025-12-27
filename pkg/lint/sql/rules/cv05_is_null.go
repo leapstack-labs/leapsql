@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -18,7 +19,7 @@ var IsNullComparison = sql.RuleDef{
 	Name:        "convention.is_null",
 	Group:       "convention",
 	Description: "Use IS NULL instead of = NULL for NULL comparisons.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkIsNullComparison,
 
 	Rationale: `In SQL, NULL represents unknown, and comparing anything to NULL with = 
@@ -58,7 +59,7 @@ func checkIsNullComparison(stmt any, _ lint.DialectInfo, _ map[string]any) []lin
 			}
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "CV05",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          msg + "; = NULL always evaluates to NULL, not true or false",
 				DocumentationURL: lint.BuildDocURL("CV05"),
 				ImpactScore:      lint.ImpactHigh.Int(),

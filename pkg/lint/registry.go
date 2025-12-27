@@ -1,6 +1,10 @@
 package lint
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/leapstack-labs/leapsql/pkg/core"
+)
 
 // registry is the single global registry for all lint rules.
 var registry = &Registry{
@@ -164,11 +168,11 @@ func GetRuleByID(id string) (Rule, bool) {
 }
 
 // AllRules returns metadata for all registered rules (both SQL and project).
-func AllRules() []RuleInfo {
+func AllRules() []core.RuleInfo {
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
 
-	rules := make([]RuleInfo, 0, len(registry.sqlRules)+len(registry.projectRules))
+	rules := make([]core.RuleInfo, 0, len(registry.sqlRules)+len(registry.projectRules))
 	for _, rule := range registry.sqlRules {
 		rules = append(rules, GetRuleInfo(rule))
 	}

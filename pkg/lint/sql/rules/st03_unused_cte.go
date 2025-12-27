@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var UnusedCTE = sql.RuleDef{
 	Name:        "structure.unused_cte",
 	Group:       "structure",
 	Description: "CTE is defined but never referenced.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkUnusedCTE,
 
 	Rationale: `Unused CTEs add complexity without benefit. They consume mental overhead 
@@ -69,7 +70,7 @@ func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagn
 		if !usedTables[strings.ToLower(cte.Name)] {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST03",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "CTE '" + cte.Name + "' is defined but never referenced",
 				Pos:              cte.Span.Start,
 				DocumentationURL: lint.BuildDocURL("ST03"),

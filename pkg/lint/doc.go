@@ -52,7 +52,7 @@
 //
 //	config := lint.NewConfig()
 //	config.Disable("AM01")
-//	config.SetSeverity("CV05", lint.SeverityError)
+//	config.SetSeverity("CV05", core.SeverityError)
 //	config.SetRuleOptions("AL06", map[string]any{"min_length": 3})
 //
 // # Creating Custom Rules
@@ -64,7 +64,7 @@
 //		Name:        "my.custom_rule",
 //		Group:       "custom",
 //		Description: "My custom rule description",
-//		Severity:    lint.SeverityWarning,
+//		Severity:    core.SeverityWarning,
 //		Check:       checkMyRule,
 //	}
 //

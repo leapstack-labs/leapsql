@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -14,7 +15,7 @@ func init() {
 		Name:        "model-directory",
 		Group:       "structure",
 		Description: "Model directory mismatch",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkModelDirectory,
 
 		Rationale: `A model's name prefix should match its directory location. When a model is named 'stg_orders' but 
@@ -49,7 +50,7 @@ func checkModelDirectory(ctx *project.Context) []project.Diagnostic {
 			if !strings.Contains(pathLower, "/staging/") {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PS02",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          fmt.Sprintf("Model '%s' has 'stg_' prefix but is not in staging directory", model.Name),
 					Model:            model.Path,
 					FilePath:         model.FilePath,
@@ -65,7 +66,7 @@ func checkModelDirectory(ctx *project.Context) []project.Diagnostic {
 			if !strings.Contains(pathLower, "/intermediate/") {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PS02",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          fmt.Sprintf("Model '%s' has 'int_' prefix but is not in intermediate directory", model.Name),
 					Model:            model.Path,
 					FilePath:         model.FilePath,
@@ -81,7 +82,7 @@ func checkModelDirectory(ctx *project.Context) []project.Diagnostic {
 			if !strings.Contains(pathLower, "/marts/") {
 				diagnostics = append(diagnostics, project.Diagnostic{
 					RuleID:           "PS02",
-					Severity:         lint.SeverityWarning,
+					Severity:         core.SeverityWarning,
 					Message:          fmt.Sprintf("Model '%s' has 'fct_' or 'dim_' prefix but is not in marts directory", model.Name),
 					Model:            model.Path,
 					FilePath:         model.FilePath,

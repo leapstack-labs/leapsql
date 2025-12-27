@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var UnionDistinct = sql.RuleDef{
 	Name:        "ambiguous.union",
 	Group:       "ambiguous",
 	Description: "UNION without ALL performs implicit DISTINCT which may be unintended.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkUnionDistinct,
 
 	Rationale: `UNION (without ALL) automatically removes duplicate rows, which has 
@@ -56,7 +57,7 @@ func checkUnionDistinct(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.D
 		if body.Op == parser.SetOpUnion && !body.All {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM02",
-				Severity:         lint.SeverityInfo,
+				Severity:         core.SeverityInfo,
 				Message:          "UNION without ALL performs implicit DISTINCT; use UNION ALL if duplicates are acceptable",
 				Pos:              body.Span.Start,
 				DocumentationURL: lint.BuildDocURL("AM02"),

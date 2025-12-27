@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var CountStyle = sql.RuleDef{
 	Name:        "convention.count_rows",
 	Group:       "convention",
 	Description: "Prefer COUNT(*) over COUNT(1) for counting rows.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkCountStyle,
 
 	Rationale: `COUNT(*) is the standard and most readable way to count rows. COUNT(1) 
@@ -58,7 +59,7 @@ func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diag
 				if lit.Type == parser.LiteralNumber && lit.Value == "1" {
 					diagnostics = append(diagnostics, lint.Diagnostic{
 						RuleID:           "CV04",
-						Severity:         lint.SeverityHint,
+						Severity:         core.SeverityHint,
 						Message:          "Prefer COUNT(*) over COUNT(1) for counting rows",
 						DocumentationURL: lint.BuildDocURL("CV04"),
 						ImpactScore:      lint.ImpactLow.Int(),

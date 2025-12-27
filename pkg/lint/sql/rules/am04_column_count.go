@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var ColumnCountMismatch = sql.RuleDef{
 	Name:        "ambiguous.column_count",
 	Group:       "ambiguous",
 	Description: "Mismatched column counts in set operation.",
-	Severity:    lint.SeverityError,
+	Severity:    core.SeverityError,
 	Check:       checkColumnCountMismatch,
 
 	Rationale: `Set operations (UNION, INTERSECT, EXCEPT) require all queries to have the 
@@ -58,7 +59,7 @@ func checkColumnCountMismatch(stmt any, _ lint.DialectInfo, _ map[string]any) []
 		if count != firstCount {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM04",
-				Severity:         lint.SeverityError,
+				Severity:         core.SeverityError,
 				Message:          fmt.Sprintf("Column count mismatch in set operation: first query has %d columns, query %d has %d columns", firstCount, i+1, count),
 				Pos:              cores[i].Span.Start,
 				DocumentationURL: lint.BuildDocURL("AM04"),

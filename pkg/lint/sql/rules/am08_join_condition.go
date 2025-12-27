@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var JoinConditionTables = sql.RuleDef{
 	Name:        "ambiguous.join_condition",
 	Group:       "ambiguous",
 	Description: "Join condition should reference both tables being joined.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkJoinConditionTables,
 
 	Rationale: `A JOIN condition that doesn't reference the joined table is likely a bug. 
@@ -67,7 +68,7 @@ func checkJoinConditionTables(stmt any, _ lint.DialectInfo, _ map[string]any) []
 		if !hasRightRef && len(refs) > 0 {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "AM08",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          "Join condition does not appear to reference the joined table '" + rightTable + "'",
 				Pos:              join.Span.Start,
 				DocumentationURL: lint.BuildDocURL("AM08"),

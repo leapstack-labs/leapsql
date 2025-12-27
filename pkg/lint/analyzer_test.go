@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
@@ -19,7 +20,7 @@ func registerTestRule(t *testing.T, id string, checkFunc sql.CheckFunc) {
 		ID:       id,
 		Name:     "test-" + id,
 		Group:    "test",
-		Severity: lint.SeverityWarning,
+		Severity: core.SeverityWarning,
 		Check:    checkFunc,
 	})
 	t.Cleanup(func() {
@@ -37,7 +38,7 @@ func TestAnalyzer_WithRegisteredRule(t *testing.T) {
 		if selectStmt.Body.Left.Distinct {
 			return []lint.Diagnostic{{
 				RuleID:   "TEST01",
-				Severity: lint.SeverityWarning,
+				Severity: core.SeverityWarning,
 				Message:  "Found DISTINCT",
 			}}
 		}
@@ -91,7 +92,7 @@ func TestAnalyzer_DisableRule(t *testing.T) {
 	registerTestRule(t, "DISABLE01", func(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 		return []lint.Diagnostic{{
 			RuleID:   "DISABLE01",
-			Severity: lint.SeverityWarning,
+			Severity: core.SeverityWarning,
 			Message:  "Always triggers",
 		}}
 	})
@@ -116,12 +117,12 @@ func TestAnalyzer_SeverityOverride(t *testing.T) {
 	registerTestRule(t, "SEV01", func(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 		return []lint.Diagnostic{{
 			RuleID:   "SEV01",
-			Severity: lint.SeverityWarning,
+			Severity: core.SeverityWarning,
 			Message:  "Test severity",
 		}}
 	})
 
-	cfg := lint.NewConfig().SetSeverity("SEV01", lint.SeverityError)
+	cfg := lint.NewConfig().SetSeverity("SEV01", core.SeverityError)
 
 	sql := "SELECT a FROM t"
 	stmt, err := parser.ParseWithDialect(sql, duckdbdialect.DuckDB)
@@ -133,21 +134,21 @@ func TestAnalyzer_SeverityOverride(t *testing.T) {
 	require.NotEmpty(t, diags)
 	for _, d := range diags {
 		if d.RuleID == "SEV01" {
-			assert.Equal(t, lint.SeverityError, d.Severity, "severity should be overridden to error")
+			assert.Equal(t, core.SeverityError, d.Severity, "severity should be overridden to error")
 		}
 	}
 }
 
 func TestSeverity_String(t *testing.T) {
 	tests := []struct {
-		sev  lint.Severity
+		sev  core.Severity
 		want string
 	}{
-		{lint.SeverityError, "error"},
-		{lint.SeverityWarning, "warning"},
-		{lint.SeverityInfo, "info"},
-		{lint.SeverityHint, "hint"},
-		{lint.Severity(99), "unknown"},
+		{core.SeverityError, "error"},
+		{core.SeverityWarning, "warning"},
+		{core.SeverityInfo, "info"},
+		{core.SeverityHint, "hint"},
+		{core.Severity(99), "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -168,7 +169,7 @@ func TestAnalyzer_NilConfig(t *testing.T) {
 	registerTestRule(t, "NIL01", func(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 		return []lint.Diagnostic{{
 			RuleID:   "NIL01",
-			Severity: lint.SeverityWarning,
+			Severity: core.SeverityWarning,
 			Message:  "Test nil config",
 		}}
 	})
@@ -194,7 +195,7 @@ func TestAnalyzer_DialectFilter(t *testing.T) {
 		ID:       "PG01",
 		Name:     "postgres-only",
 		Group:    "test",
-		Severity: lint.SeverityWarning,
+		Severity: core.SeverityWarning,
 		Dialects: []string{"postgres"},
 		Check: func(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 			return []lint.Diagnostic{{RuleID: "PG01", Message: "postgres rule"}}
@@ -205,7 +206,7 @@ func TestAnalyzer_DialectFilter(t *testing.T) {
 		ID:       "UNI01",
 		Name:     "universal",
 		Group:    "test",
-		Severity: lint.SeverityWarning,
+		Severity: core.SeverityWarning,
 		Dialects: nil, // All dialects
 		Check: func(_ any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
 			return []lint.Diagnostic{{RuleID: "UNI01", Message: "universal rule"}}

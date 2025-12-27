@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -21,7 +22,7 @@ var ForbidAlias = sql.RuleDef{
 	Name:        "aliasing.forbid",
 	Group:       "aliasing",
 	Description: "Forbidden alias patterns (e.g., single letters, t1/t2).",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	ConfigKeys:  []string{"forbidden_patterns", "forbidden_names"},
 	Check:       checkForbidAlias,
 
@@ -97,10 +98,10 @@ func checkForbidAlias(stmt any, _ lint.DialectInfo, opts map[string]any) []lint.
 	}
 
 	// Check column aliases
-	core := ast.GetSelectCore(selectStmt)
-	if core != nil {
-		corePos := ast.GetSelectCorePosition(core)
-		for _, col := range core.Columns {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore != nil {
+		corePos := ast.GetSelectCorePosition(selectCore)
+		for _, col := range selectCore.Columns {
 			if col.Alias != "" {
 				alias := strings.TrimSpace(col.Alias)
 				if diag := checkForbiddenAlias(alias, "Column", compiledPatterns, forbiddenSet, corePos); diag != nil {
@@ -120,7 +121,7 @@ func checkForbiddenAlias(alias, aliasType string, patterns []*regexp.Regexp, for
 	if forbiddenSet[lowerAlias] {
 		return &lint.Diagnostic{
 			RuleID:           "AL07",
-			Severity:         lint.SeverityWarning,
+			Severity:         core.SeverityWarning,
 			Message:          aliasType + " alias '" + alias + "' is forbidden; use a more descriptive name",
 			Pos:              pos,
 			DocumentationURL: lint.BuildDocURL("AL07"),
@@ -134,7 +135,7 @@ func checkForbiddenAlias(alias, aliasType string, patterns []*regexp.Regexp, for
 		if re.MatchString(lowerAlias) {
 			return &lint.Diagnostic{
 				RuleID:           "AL07",
-				Severity:         lint.SeverityWarning,
+				Severity:         core.SeverityWarning,
 				Message:          aliasType + " alias '" + alias + "' matches forbidden pattern; use a more descriptive name",
 				Pos:              pos,
 				DocumentationURL: lint.BuildDocURL("AL07"),

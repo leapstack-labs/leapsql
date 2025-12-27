@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -15,7 +16,7 @@ func init() {
 		Name:        "too-many-joins",
 		Group:       "modeling",
 		Description: "Model references too many upstream models",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkTooManyJoins,
 		ConfigKeys:  []string{"threshold"},
 
@@ -68,7 +69,7 @@ func checkTooManyJoins(ctx *project.Context) []project.Diagnostic {
 
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PM05",
-				Severity: lint.SeverityWarning,
+				Severity: core.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Model '%s' references %d upstream sources (threshold: %d): %s; consider creating intermediate models",
 					model.Name, len(model.Sources), threshold, strings.Join(sortedSources, ", ")),

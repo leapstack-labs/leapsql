@@ -146,7 +146,7 @@ func buildLintConfig(cfg *config.Config, opts *LintOptions) *lint.Config {
 		}
 		// Apply severity overrides from project config
 		for id, sev := range projectLint.Severity {
-			if s, ok := lint.ParseSeverity(sev); ok {
+			if s, ok := core.ParseSeverity(sev); ok {
 				lintCfg.SetSeverity(id, s)
 			}
 		}
@@ -246,9 +246,9 @@ func analyzeModels(models []*core.Model, analyzer *lint.Analyzer, d lint.Dialect
 }
 
 func filterBySeverity(results []lintFileResult, severityThreshold string) []lintFileResult {
-	threshold, ok := lint.ParseSeverity(severityThreshold)
+	threshold, ok := core.ParseSeverity(severityThreshold)
 	if !ok {
-		threshold = lint.SeverityWarning
+		threshold = core.SeverityWarning
 	}
 
 	var filtered []lintFileResult
@@ -285,13 +285,13 @@ func renderLintResults(r *output.Renderer, results []lintFileResult) bool {
 		summary.TotalIssues += len(res.Diagnostics)
 		for _, d := range res.Diagnostics {
 			switch d.Severity {
-			case lint.SeverityError:
+			case core.SeverityError:
 				summary.Errors++
-			case lint.SeverityWarning:
+			case core.SeverityWarning:
 				summary.Warnings++
-			case lint.SeverityInfo:
+			case core.SeverityInfo:
 				summary.Info++
-			case lint.SeverityHint:
+			case core.SeverityHint:
 				summary.Hints++
 			}
 		}
@@ -359,15 +359,15 @@ func renderLintResults(r *output.Renderer, results []lintFileResult) bool {
 	return true
 }
 
-func severityStyle(r *output.Renderer, sev lint.Severity) string {
+func severityStyle(r *output.Renderer, sev core.Severity) string {
 	switch sev {
-	case lint.SeverityError:
+	case core.SeverityError:
 		return r.Styles().Error.Render("error  ")
-	case lint.SeverityWarning:
+	case core.SeverityWarning:
 		return r.Styles().Warning.Render("warning")
-	case lint.SeverityInfo:
+	case core.SeverityInfo:
 		return r.Styles().Info.Render("info   ")
-	case lint.SeverityHint:
+	case core.SeverityHint:
 		return r.Styles().Muted.Render("hint   ")
 	default:
 		return r.Styles().Muted.Render("unknown")
@@ -485,13 +485,13 @@ func buildProjectAnalyzerConfig(cfg *config.Config, opts *LintOptions) *project.
 				// Parse severity override
 				switch strings.ToLower(sev) {
 				case "error":
-					analyzerCfg.SeverityOverrides[id] = lint.SeverityError
+					analyzerCfg.SeverityOverrides[id] = core.SeverityError
 				case "warning":
-					analyzerCfg.SeverityOverrides[id] = lint.SeverityWarning
+					analyzerCfg.SeverityOverrides[id] = core.SeverityWarning
 				case "info":
-					analyzerCfg.SeverityOverrides[id] = lint.SeverityInfo
+					analyzerCfg.SeverityOverrides[id] = core.SeverityInfo
 				case "hint":
-					analyzerCfg.SeverityOverrides[id] = lint.SeverityHint
+					analyzerCfg.SeverityOverrides[id] = core.SeverityHint
 				}
 			}
 		}
@@ -513,19 +513,19 @@ func filterProjectBySeverity(diags []project.Diagnostic, severityThreshold strin
 	return filtered
 }
 
-// parseSeverityThreshold converts a severity string to lint.Severity.
-func parseSeverityThreshold(s string) lint.Severity {
+// parseSeverityThreshold converts a severity string to core.Severity.
+func parseSeverityThreshold(s string) core.Severity {
 	switch strings.ToLower(s) {
 	case "error":
-		return lint.SeverityError
+		return core.SeverityError
 	case "warning":
-		return lint.SeverityWarning
+		return core.SeverityWarning
 	case "info":
-		return lint.SeverityInfo
+		return core.SeverityInfo
 	case "hint":
-		return lint.SeverityHint
+		return core.SeverityHint
 	default:
-		return lint.SeverityWarning
+		return core.SeverityWarning
 	}
 }
 
@@ -552,15 +552,15 @@ func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic) 
 }
 
 // projectSeverityStyle returns the styled severity string for project diagnostics.
-func projectSeverityStyle(r *output.Renderer, sev lint.Severity) string {
+func projectSeverityStyle(r *output.Renderer, sev core.Severity) string {
 	switch sev {
-	case lint.SeverityError:
+	case core.SeverityError:
 		return r.Styles().Error.Render("error  ")
-	case lint.SeverityWarning:
+	case core.SeverityWarning:
 		return r.Styles().Warning.Render("warning")
-	case lint.SeverityInfo:
+	case core.SeverityInfo:
 		return r.Styles().Info.Render("info   ")
-	case lint.SeverityHint:
+	case core.SeverityHint:
 		return r.Styles().Muted.Render("hint   ")
 	default:
 		return r.Styles().Muted.Render("unknown")

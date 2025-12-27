@@ -16,7 +16,7 @@ func init() {
 		Name:        "implicit-cross-join",
 		Group:       "lineage",
 		Description: "JOINs with no visible join keys in column lineage",
-		Severity:    lint.SeverityWarning,
+		Severity:    core.SeverityWarning,
 		Check:       checkImplicitCrossJoin,
 
 		Rationale: `When a model references multiple tables but no column expression bridges them, it may indicate 
@@ -87,7 +87,7 @@ func checkImplicitCrossJoin(ctx *project.Context) []project.Diagnostic {
 
 			diagnostics = append(diagnostics, project.Diagnostic{
 				RuleID:   "PL04",
-				Severity: lint.SeverityWarning,
+				Severity: core.SeverityWarning,
 				Message: fmt.Sprintf(
 					"Model '%s' may have implicit cross-join: no columns bridge sources %s; verify JOIN conditions",
 					model.Name, strings.Join(pairStrs, ", ")),

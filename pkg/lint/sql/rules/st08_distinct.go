@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var DistinctVsGroupBy = sql.RuleDef{
 	Name:        "structure.distinct",
 	Group:       "structure",
 	Description: "Consider GROUP BY instead of DISTINCT when selecting columns for aggregation.",
-	Severity:    lint.SeverityInfo,
+	Severity:    core.SeverityInfo,
 	Check:       checkDistinctVsGroupBy,
 
 	Rationale: `Using GROUP BY instead of DISTINCT on simple column selections makes the query's intent 
@@ -40,19 +41,19 @@ func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 		return nil
 	}
 
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil || !core.Distinct {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil || !selectCore.Distinct {
 		return nil
 	}
 
 	// If DISTINCT is used without GROUP BY and all selected columns
 	// are simple column references, suggest GROUP BY
-	if len(core.GroupBy) > 0 {
+	if len(selectCore.GroupBy) > 0 {
 		return nil
 	}
 
 	allSimpleColumns := true
-	for _, col := range core.Columns {
+	for _, col := range selectCore.Columns {
 		if col.Star || col.TableStar != "" {
 			allSimpleColumns = false
 			break
@@ -69,12 +70,12 @@ func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []li
 		}
 	}
 
-	if allSimpleColumns && len(core.Columns) > 0 {
+	if allSimpleColumns && len(selectCore.Columns) > 0 {
 		return []lint.Diagnostic{{
 			RuleID:           "ST08",
-			Severity:         lint.SeverityInfo,
+			Severity:         core.SeverityInfo,
 			Message:          "DISTINCT on simple columns could be expressed as GROUP BY for clarity",
-			Pos:              core.Span.Start,
+			Pos:              selectCore.Span.Start,
 			DocumentationURL: lint.BuildDocURL("ST08"),
 			ImpactScore:      lint.ImpactLow.Int(),
 			AutoFixable:      false,

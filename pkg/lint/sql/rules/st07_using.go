@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -18,7 +19,7 @@ var PreferUsing = sql.RuleDef{
 	Name:        "structure.using",
 	Group:       "structure",
 	Description: "Prefer USING clause for simple equality joins on same-named columns.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkPreferUsing,
 
 	Rationale: `The USING clause is more concise than ON when joining tables on columns with identical names. 
@@ -53,7 +54,7 @@ func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Dia
 		if canUseUsingST07(join.Condition) {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "ST07",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "Consider using USING clause for join on same-named columns",
 				Pos:              join.Span.Start,
 				DocumentationURL: lint.BuildDocURL("ST07"),

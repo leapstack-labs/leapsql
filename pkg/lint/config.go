@@ -1,6 +1,6 @@
 package lint
 
-import "strings"
+import "github.com/leapstack-labs/leapsql/pkg/core"
 
 // Config controls which rules are enabled and their severity.
 type Config struct {
@@ -8,7 +8,7 @@ type Config struct {
 	DisabledRules map[string]bool
 
 	// SeverityOverrides changes the default severity of rules
-	SeverityOverrides map[string]Severity
+	SeverityOverrides map[string]core.Severity
 
 	// RuleOptions contains rule-specific configuration
 	RuleOptions map[string]map[string]any
@@ -18,7 +18,7 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{
 		DisabledRules:     make(map[string]bool),
-		SeverityOverrides: make(map[string]Severity),
+		SeverityOverrides: make(map[string]core.Severity),
 		RuleOptions:       make(map[string]map[string]any),
 	}
 }
@@ -32,7 +32,7 @@ func (c *Config) IsDisabled(ruleID string) bool {
 }
 
 // GetSeverity returns the severity for a rule, applying any override.
-func (c *Config) GetSeverity(ruleID string, defaultSeverity Severity) Severity {
+func (c *Config) GetSeverity(ruleID string, defaultSeverity core.Severity) core.Severity {
 	if c != nil {
 		if sev, ok := c.SeverityOverrides[ruleID]; ok {
 			return sev
@@ -48,7 +48,7 @@ func (c *Config) Disable(ruleID string) *Config {
 }
 
 // SetSeverity overrides the severity for a rule.
-func (c *Config) SetSeverity(ruleID string, severity Severity) *Config {
+func (c *Config) SetSeverity(ruleID string, severity core.Severity) *Config {
 	c.SeverityOverrides[ruleID] = severity
 	return c
 }
@@ -68,20 +68,4 @@ func (c *Config) SetRuleOptions(ruleID string, opts map[string]any) *Config {
 	}
 	c.RuleOptions[ruleID] = opts
 	return c
-}
-
-// ParseSeverity converts a string to a Severity value.
-func ParseSeverity(s string) (Severity, bool) {
-	switch strings.ToLower(s) {
-	case "error":
-		return SeverityError, true
-	case "warning":
-		return SeverityWarning, true
-	case "info":
-		return SeverityInfo, true
-	case "hint":
-		return SeverityHint, true
-	default:
-		return SeverityWarning, false
-	}
 }

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -17,7 +18,7 @@ var OrderByLimitWithUnion = sql.RuleDef{
 	Name:        "ambiguous.order_by_limit",
 	Group:       "ambiguous",
 	Description: "ORDER BY/LIMIT with set operation may have unexpected scope.",
-	Severity:    lint.SeverityWarning,
+	Severity:    core.SeverityWarning,
 	Check:       checkOrderByLimitWithUnion,
 
 	Rationale: `In set operations, ORDER BY and LIMIT without parentheses apply to the 
@@ -65,18 +66,18 @@ func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) 
 	}
 
 	// Get the main core
-	core := ast.GetSelectCore(selectStmt)
-	if core == nil {
+	selectCore := ast.GetSelectCore(selectStmt)
+	if selectCore == nil {
 		return nil
 	}
 
 	var diagnostics []lint.Diagnostic
 
 	// ORDER BY without parentheses applies to entire set operation
-	if len(core.OrderBy) > 0 {
+	if len(selectCore.OrderBy) > 0 {
 		diagnostics = append(diagnostics, lint.Diagnostic{
 			RuleID:           "AM09",
-			Severity:         lint.SeverityWarning,
+			Severity:         core.SeverityWarning,
 			Message:          "ORDER BY in set operation applies to the entire result; use parentheses if you intend to order individual queries",
 			DocumentationURL: lint.BuildDocURL("AM09"),
 			ImpactScore:      lint.ImpactMedium.Int(),
@@ -85,10 +86,10 @@ func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) 
 	}
 
 	// LIMIT without parentheses applies to entire set operation
-	if core.Limit != nil {
+	if selectCore.Limit != nil {
 		diagnostics = append(diagnostics, lint.Diagnostic{
 			RuleID:           "AM09",
-			Severity:         lint.SeverityWarning,
+			Severity:         core.SeverityWarning,
 			Message:          "LIMIT in set operation applies to the entire result; use parentheses if you intend to limit individual queries",
 			DocumentationURL: lint.BuildDocURL("AM09"),
 			ImpactScore:      lint.ImpactMedium.Int(),

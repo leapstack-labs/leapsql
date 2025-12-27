@@ -10,7 +10,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	"github.com/leapstack-labs/leapsql/pkg/lint"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/project/rules" // register project rules
 	"github.com/spf13/cobra"
@@ -151,7 +151,7 @@ func buildDoctorOutput(eng *engine.Engine, _ *project.Context, diags []project.D
 		ruleDiags := diagsByRule[rule.ID]
 		status := "pass"
 		if len(ruleDiags) > 0 {
-			if rule.Severity == lint.SeverityError {
+			if rule.Severity == core.SeverityError {
 				status = "error"
 			} else {
 				status = "warn"

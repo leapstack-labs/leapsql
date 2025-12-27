@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -19,7 +20,7 @@ var PreferLeftJoin = sql.RuleDef{
 	Name:        "convention.left_join",
 	Group:       "convention",
 	Description: "Prefer LEFT JOIN over RIGHT JOIN for consistency.",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkPreferLeftJoin,
 
 	Rationale: `LEFT JOIN is more intuitive because it preserves all rows from the table 
@@ -48,7 +49,7 @@ func checkPreferLeftJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.
 		if strings.ToUpper(string(join.Type)) == "RIGHT" {
 			diagnostics = append(diagnostics, lint.Diagnostic{
 				RuleID:           "CV08",
-				Severity:         lint.SeverityHint,
+				Severity:         core.SeverityHint,
 				Message:          "Consider using LEFT JOIN instead of RIGHT JOIN for better readability",
 				Pos:              join.Span.Start,
 				DocumentationURL: lint.BuildDocURL("CV08"),

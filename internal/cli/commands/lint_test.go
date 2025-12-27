@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,10 +94,10 @@ func TestBuildLintConfig(t *testing.T) {
 		cfg := buildLintConfig(projectCfg, opts)
 
 		require.NotNil(t, cfg)
-		assert.Equal(t, lint.SeverityError, cfg.GetSeverity("AM01", lint.SeverityWarning))
-		assert.Equal(t, lint.SeverityHint, cfg.GetSeverity("ST01", lint.SeverityWarning))
+		assert.Equal(t, core.SeverityError, cfg.GetSeverity("AM01", core.SeverityWarning))
+		assert.Equal(t, core.SeverityHint, cfg.GetSeverity("ST01", core.SeverityWarning))
 		// Rule without override should return default
-		assert.Equal(t, lint.SeverityWarning, cfg.GetSeverity("AM02", lint.SeverityWarning))
+		assert.Equal(t, core.SeverityWarning, cfg.GetSeverity("AM02", core.SeverityWarning))
 	})
 
 	t.Run("project config rule options", func(t *testing.T) {
@@ -140,9 +141,9 @@ func TestFilterBySeverity(t *testing.T) {
 		{
 			Path: "test.sql",
 			Diagnostics: []lint.Diagnostic{
-				{RuleID: "AM01", Severity: lint.SeverityError, Message: "error"},
-				{RuleID: "AM02", Severity: lint.SeverityWarning, Message: "warning"},
-				{RuleID: "ST01", Severity: lint.SeverityHint, Message: "hint"},
+				{RuleID: "AM01", Severity: core.SeverityError, Message: "error"},
+				{RuleID: "AM02", Severity: core.SeverityWarning, Message: "warning"},
+				{RuleID: "ST01", Severity: core.SeverityHint, Message: "hint"},
 			},
 		},
 	}
@@ -151,7 +152,7 @@ func TestFilterBySeverity(t *testing.T) {
 		filtered := filterBySeverity(results, "error")
 		require.Len(t, filtered, 1)
 		assert.Len(t, filtered[0].Diagnostics, 1)
-		assert.Equal(t, lint.SeverityError, filtered[0].Diagnostics[0].Severity)
+		assert.Equal(t, core.SeverityError, filtered[0].Diagnostics[0].Severity)
 	})
 
 	t.Run("warning threshold", func(t *testing.T) {
@@ -171,7 +172,7 @@ func TestFilterBySeverity(t *testing.T) {
 			{
 				Path: "test.sql",
 				Diagnostics: []lint.Diagnostic{
-					{RuleID: "ST01", Severity: lint.SeverityHint, Message: "hint"},
+					{RuleID: "ST01", Severity: core.SeverityHint, Message: "hint"},
 				},
 			},
 		}
@@ -185,11 +186,11 @@ func TestSeverityStyle(t *testing.T) {
 	// Create a renderer (it doesn't matter for this test since we just check output)
 
 	// Test that severityStyle returns different values for different severities
-	testCases := []lint.Severity{
-		lint.SeverityError,
-		lint.SeverityWarning,
-		lint.SeverityInfo,
-		lint.SeverityHint,
+	testCases := []core.Severity{
+		core.SeverityError,
+		core.SeverityWarning,
+		core.SeverityInfo,
+		core.SeverityHint,
 	}
 
 	for _, sev := range testCases {

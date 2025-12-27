@@ -9,6 +9,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/provider"
 	"github.com/leapstack-labs/leapsql/internal/template"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 	_ "github.com/leapstack-labs/leapsql/pkg/lint/sql/rules" // Register SQLFluff-style lint rules
@@ -523,16 +524,16 @@ func (s *Server) runLinter(uri string, stmt *pkgparser.SelectStmt) []Diagnostic 
 	return result
 }
 
-// toLSPSeverity converts lint.Severity to LSP DiagnosticSeverity.
-func toLSPSeverity(s lint.Severity) DiagnosticSeverity {
+// toLSPSeverity converts core.Severity to LSP DiagnosticSeverity.
+func toLSPSeverity(s core.Severity) DiagnosticSeverity {
 	switch s {
-	case lint.SeverityError:
+	case core.SeverityError:
 		return DiagnosticSeverityError
-	case lint.SeverityWarning:
+	case core.SeverityWarning:
 		return DiagnosticSeverityWarning
-	case lint.SeverityInfo:
+	case core.SeverityInfo:
 		return DiagnosticSeverityInformation
-	case lint.SeverityHint:
+	case core.SeverityHint:
 		return DiagnosticSeverityHint
 	default:
 		return DiagnosticSeverityWarning
@@ -582,16 +583,16 @@ func (s *Server) runProjectHealthDiagnostics() map[string][]Diagnostic {
 	return byFile
 }
 
-// projectSeverityToLSP converts lint.Severity to LSP DiagnosticSeverity.
-func projectSeverityToLSP(s lint.Severity) DiagnosticSeverity {
+// projectSeverityToLSP converts core.Severity to LSP DiagnosticSeverity.
+func projectSeverityToLSP(s core.Severity) DiagnosticSeverity {
 	switch s {
-	case lint.SeverityError:
+	case core.SeverityError:
 		return DiagnosticSeverityError
-	case lint.SeverityWarning:
+	case core.SeverityWarning:
 		return DiagnosticSeverityWarning
-	case lint.SeverityInfo:
+	case core.SeverityInfo:
 		return DiagnosticSeverityInformation
-	case lint.SeverityHint:
+	case core.SeverityHint:
 		return DiagnosticSeverityHint
 	default:
 		return DiagnosticSeverityWarning

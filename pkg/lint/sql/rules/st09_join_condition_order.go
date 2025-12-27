@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql"
 	"github.com/leapstack-labs/leapsql/pkg/lint/sql/internal/ast"
@@ -18,7 +19,7 @@ var JoinConditionOrder = sql.RuleDef{
 	Name:        "structure.join_condition_order",
 	Group:       "structure",
 	Description: "Join condition should reference left table first (e.g., a.id = b.id, not b.id = a.id).",
-	Severity:    lint.SeverityHint,
+	Severity:    core.SeverityHint,
 	Check:       checkJoinConditionOrder,
 
 	Rationale: `Consistently ordering join conditions with the left (existing) table first improves readability. 
@@ -45,8 +46,8 @@ func checkJoinConditionOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 	var diagnostics []lint.Diagnostic
 
 	// Process each SelectCore to find joins
-	for _, core := range ast.CollectSelectCores(selectStmt) {
-		if core.From == nil {
+	for _, selectCore := range ast.CollectSelectCores(selectStmt) {
+		if selectCore.From == nil {
 			continue
 		}
 
@@ -54,11 +55,11 @@ func checkJoinConditionOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []l
 		tableOrder := make([]string, 0)
 
 		// Get the source table(s)
-		sourceNames := getTableNamesST09(core.From.Source)
+		sourceNames := getTableNamesST09(selectCore.From.Source)
 		tableOrder = append(tableOrder, sourceNames...)
 
 		// Process each join
-		for _, join := range core.From.Joins {
+		for _, join := range selectCore.From.Joins {
 			// Get the right table name/alias
 			rightNames := getTableNamesST09(join.Right)
 
@@ -139,7 +140,7 @@ func checkConditionOrderST09(condition parser.Expr, leftTables, rightTables []st
 	if rightSet[leftCol.Table] && leftSet[rightCol.Table] {
 		return &lint.Diagnostic{
 			RuleID:           "ST09",
-			Severity:         lint.SeverityHint,
+			Severity:         core.SeverityHint,
 			Message:          "Join condition should reference left table first; consider rewriting as '" + rightCol.Table + "." + rightCol.Column + " = " + leftCol.Table + "." + leftCol.Column + "'",
 			Pos:              pos,
 			DocumentationURL: lint.BuildDocURL("ST09"),

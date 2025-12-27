@@ -4,6 +4,7 @@
 //   - Domain entities (Model, DialectConfig, Run, etc.)
 //   - Service interfaces (Adapter, Store)
 //   - Configuration types (ProjectConfig, TargetConfig)
+//   - Lint types (Severity, RuleInfo)
 //   - Base AST interface (Node)
 //
 // The Golden Rule: pkg/core imports ONLY pkg/token and stdlib.

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 )
 
@@ -16,7 +17,7 @@ type AnalyzerConfig struct {
 	DisabledRules map[string]bool
 
 	// SeverityOverrides changes the default severity of rules
-	SeverityOverrides map[string]lint.Severity
+	SeverityOverrides map[string]core.Severity
 
 	// ProjectHealth contains thresholds and settings
 	ProjectHealth lint.ProjectHealthConfig
@@ -26,7 +27,7 @@ type AnalyzerConfig struct {
 func NewAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
 		DisabledRules:     make(map[string]bool),
-		SeverityOverrides: make(map[string]lint.Severity),
+		SeverityOverrides: make(map[string]core.Severity),
 		ProjectHealth:     lint.DefaultProjectHealthConfig(),
 	}
 }
@@ -102,7 +103,7 @@ func (a *Analyzer) isDisabled(ruleID string) bool {
 	return a.disabledRules[ruleID]
 }
 
-func (a *Analyzer) getSeverity(ruleID string, defaultSev lint.Severity) lint.Severity {
+func (a *Analyzer) getSeverity(ruleID string, defaultSev core.Severity) core.Severity {
 	if a.config != nil {
 		if sev, ok := a.config.SeverityOverrides[ruleID]; ok {
 			return sev
