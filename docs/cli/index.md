@@ -36,6 +36,7 @@ leapsql <command> [options]
 | [`list`](/cli/list) | List all models and their dependencies |
 | [`lsp`](/cli/lsp) | Start the Language Server Protocol server |
 | [`render`](/cli/render) | Render SQL for a model with templates expanded |
+| [`rules`](/cli/rules) | List available lint rules |
 | [`run`](/cli/run) | Run all models or specific models |
 | [`seed`](/cli/seed) | Load seed data from CSV files |
 | [`version`](/cli/version) | Show version information |

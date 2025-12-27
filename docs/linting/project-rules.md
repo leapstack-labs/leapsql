@@ -13,33 +13,491 @@ LeapSQL includes 13 project lint rules organized into 3 categories.
 
 Rules about model structure and DAG organization.
 
-| ID | Name | Description | Severity | Config |
-|--------|--------|--------|--------|--------|
-| `PM01` | root-models | Models with no sources (broken DAG lineage) | `warning` |  |
-| `PM02` | source-fanout | Source referenced by multiple non-staging models | `warning` |  |
-| `PM03` | staging-depends-staging | Staging model references another staging model | `warning` |  |
-| `PM04` | model-fanout | Model has too many direct downstream consumers | `warning` | `threshold` |
-| `PM05` | too-many-joins | Model references too many upstream models | `warning` | `threshold` |
-| `PM06` | downstream-on-source | Marts or intermediate model depends directly on source (not staging) | `warning` |  |
-| `PM07` | rejoining-upstream | Unnecessary intermediate model in a fan-in pattern (A→B, A→C, B→C where B has no other consumers) | `warning` |  |
+### PM01 - root-models {#PM01}
+
+**Severity:** `warning`
+
+Models with no sources (broken DAG lineage)
+
+#### Why This Matters
+
+Non-staging models without upstream dependencies indicate broken lineage. These "root" models 
+don't reference any tables, suggesting either a configuration error, a model that should be a seed, 
+or missing FROM/JOIN clauses. Proper DAG lineage is essential for understanding data flow.
+
+#### Bad
+
+```sql
+-- models/marts/fct_orders.sql
+SELECT 1 AS id, 'test' AS name  -- No FROM clause, no sources
+```
+
+#### Good
+
+```sql
+-- models/marts/fct_orders.sql
+SELECT id, name
+FROM {{ ref('stg_orders') }}
+```
+
+#### How to Fix
+
+Add appropriate FROM/JOIN clauses to reference upstream models or sources, or convert to a seed if this is static data.
+
+---
+
+### PM02 - source-fanout {#PM02}
+
+**Severity:** `warning`
+
+Source referenced by multiple non-staging models
+
+#### Why This Matters
+
+Each raw source should be referenced by exactly one staging model, which then provides a clean 
+interface for downstream models. When multiple non-staging models reference the same source directly, 
+transformation logic gets duplicated and changes to the source require updates in multiple places.
+
+#### Bad
+
+```sql
+-- models/marts/fct_orders.sql
+SELECT * FROM raw_orders  -- Direct source reference
+
+-- models/marts/fct_revenue.sql  
+SELECT * FROM raw_orders  -- Same source, duplicated reference
+```
+
+#### Good
+
+```sql
+-- models/staging/stg_orders.sql
+SELECT * FROM raw_orders  -- Single staging model for source
+
+-- models/marts/fct_orders.sql
+SELECT * FROM {{ ref('stg_orders') }}  -- Reference staging model
+```
+
+#### How to Fix
+
+Create a staging model for the source and have all downstream models reference the staging model instead.
+
+---
+
+### PM03 - staging-depends-staging {#PM03}
+
+**Severity:** `warning`
+
+Staging model references another staging model
+
+#### Why This Matters
+
+Staging models should only reference raw sources, not other staging models. When staging models 
+depend on each other, it blurs the boundary between data cleaning (staging) and data transformation 
+(intermediate/marts). If you need to combine staging models, create an intermediate model instead.
+
+#### Bad
+
+```sql
+-- models/staging/stg_orders_enhanced.sql
+SELECT o.*, c.name
+FROM {{ ref('stg_orders') }} o  -- Staging depending on staging
+JOIN {{ ref('stg_customers') }} c ON o.customer_id = c.id
+```
+
+#### Good
+
+```sql
+-- models/intermediate/int_orders_with_customers.sql
+SELECT o.*, c.name
+FROM {{ ref('stg_orders') }} o
+JOIN {{ ref('stg_customers') }} c ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Move the model to the intermediate layer if it combines staging models, or reference raw sources directly if it's truly staging.
+
+---
+
+### PM04 - model-fanout {#PM04}
+
+**Severity:** `warning`
+
+Model has too many direct downstream consumers
+
+#### Why This Matters
+
+Models with many downstream consumers become bottlenecks for changes. A "God Model" that many 
+models depend on makes refactoring risky since changes affect many downstream models. Consider whether 
+the model should be split into focused models or if an abstraction layer is needed.
+
+#### Bad
+
+```sql
+-- stg_orders is consumed by 10+ models directly
+-- Any change to stg_orders requires checking all consumers
+```
+
+#### Good
+
+```sql
+-- Create focused intermediate models
+-- int_order_metrics, int_order_dates, int_order_status
+-- Each downstream model references only what it needs
+```
+
+#### How to Fix
+
+Split the model into smaller, focused models, or create intermediate abstraction layers to reduce direct dependencies.
+
+#### Configuration
+
+This rule accepts the following configuration options: `threshold`
+
+---
+
+### PM05 - too-many-joins {#PM05}
+
+**Severity:** `warning`
+
+Model references too many upstream models
+
+#### Why This Matters
+
+High join counts often indicate a "God Model" that tries to do too much in a single query. 
+These models are hard to understand, slow to execute, and difficult to maintain. Breaking complex 
+queries into smaller intermediate models improves readability and allows for incremental processing.
+
+#### Bad
+
+```sql
+-- fct_comprehensive_report.sql with 8+ JOINs
+SELECT * FROM stg_orders
+JOIN stg_customers ON ...
+JOIN stg_products ON ...
+JOIN stg_payments ON ...
+JOIN stg_shipments ON ...
+-- ... more joins
+```
+
+#### Good
+
+```sql
+-- Break into focused intermediate models
+-- int_order_details.sql (orders + customers + products)
+-- int_order_fulfillment.sql (orders + shipments + payments)
+-- fct_report.sql (join intermediates)
+```
+
+#### How to Fix
+
+Create intermediate models that pre-join related tables, then compose them in the final model.
+
+#### Configuration
+
+This rule accepts the following configuration options: `threshold`
+
+---
+
+### PM06 - downstream-on-source {#PM06}
+
+**Severity:** `warning`
+
+Marts or intermediate model depends directly on source (not staging)
+
+#### Why This Matters
+
+The recommended transformation pattern is Sources → Staging → Intermediate → Marts. When marts 
+or intermediate models reference sources directly, they bypass data cleaning in staging, leading to 
+duplicated transformation logic and making lineage harder to understand.
+
+#### Bad
+
+```sql
+-- models/marts/fct_orders.sql
+SELECT * FROM raw.orders  -- Direct source reference in marts
+```
+
+#### Good
+
+```sql
+-- models/staging/stg_orders.sql
+SELECT * FROM raw.orders
+
+-- models/marts/fct_orders.sql  
+SELECT * FROM {{ ref('stg_orders') }}  -- Reference staging
+```
+
+#### How to Fix
+
+Create a staging model for the source and reference it instead of the raw source.
+
+---
+
+### PM07 - rejoining-upstream {#PM07}
+
+**Severity:** `warning`
+
+Unnecessary intermediate model in a fan-in pattern (A→B, A→C, B→C where B has no other consumers)
+
+#### Why This Matters
+
+When model B has exactly one consumer (C), and B's upstream (A) is also a direct upstream of C, 
+model B serves no purpose as a reusable abstraction. The pattern A→B→C with A→C means B's logic could 
+be inlined into C, eliminating an unnecessary model and simplifying the DAG.
+
+#### Bad
+
+```sql
+-- stg_orders (A) → int_order_totals (B) → fct_report (C)
+-- stg_orders (A) → fct_report (C)
+-- int_order_totals only has one consumer and doesn't add reusable value
+```
+
+#### Good
+
+```sql
+-- Either inline B into C:
+-- stg_orders → fct_report (with B's logic inlined)
+
+-- Or give B more consumers to justify its existence:
+-- stg_orders → int_order_totals → fct_report
+-- stg_orders → int_order_totals → fct_dashboard
+```
+
+#### How to Fix
+
+Either inline the intermediate model's logic into its single consumer, or add more consumers to justify it as a reusable abstraction.
+
+---
 
 ## Lineage {#lineage}
 
 Rules about data lineage and column dependencies.
 
-| ID | Name | Description | Severity | Config |
-|--------|--------|--------|--------|--------|
-| `PL01` | passthrough-bloat | Model has too many passthrough columns | `warning` | `threshold` |
-| `PL02` | orphaned-columns | Columns not used by any downstream model | `info` |  |
-| `PL04` | implicit-cross-join | JOINs with no visible join keys in column lineage | `warning` |  |
-| `PL05` | schema-drift | SELECT * from source with changed schema since last run | `warning` |  |
+### PL01 - passthrough-bloat {#PL01}
+
+**Severity:** `warning`
+
+Model has too many passthrough columns
+
+#### Why This Matters
+
+Models with many passthrough columns (direct copies without transformation) indicate a "SELECT *" 
+style that doesn't add value and increases data movement. Explicit column selection ensures only 
+necessary data is processed and makes dependencies clear.
+
+#### Bad
+
+```sql
+SELECT
+  id, name, email, phone, address,  -- All passthrough
+  created_at, updated_at, deleted_at,
+  field1, field2, field3, field4, field5  -- 20+ columns just copied
+FROM {{ ref('stg_customers') }}
+```
+
+#### Good
+
+```sql
+SELECT
+  id,
+  name,
+  email,
+  COALESCE(phone, 'N/A') AS phone,  -- Actual transformation
+  created_at
+FROM {{ ref('stg_customers') }}
+```
+
+#### How to Fix
+
+Remove unnecessary passthrough columns and only select the columns that are actually needed or transformed.
+
+#### Configuration
+
+This rule accepts the following configuration options: `threshold`
+
+---
+
+### PL02 - orphaned-columns {#PL02}
+
+**Severity:** `info`
+
+Columns not used by any downstream model
+
+#### Why This Matters
+
+Columns that are computed but never used by downstream models represent wasted compute and storage. 
+These "orphan" columns often accumulate over time as requirements change but models aren't cleaned up. 
+Removing them reduces costs and simplifies the data model.
+
+#### Bad
+
+```sql
+-- int_orders.sql outputs: id, amount, tax, discount, shipping, notes
+-- fct_revenue.sql only uses: id, amount, tax
+-- 'discount', 'shipping', 'notes' are orphaned
+```
+
+#### Good
+
+```sql
+-- int_orders.sql outputs: id, amount, tax
+-- fct_revenue.sql uses: id, amount, tax
+-- All columns are consumed downstream
+```
+
+#### How to Fix
+
+Remove columns that are not consumed by any downstream model, or document why they should be retained.
+
+---
+
+### PL04 - implicit-cross-join {#PL04}
+
+**Severity:** `warning`
+
+JOINs with no visible join keys in column lineage
+
+#### Why This Matters
+
+When a model references multiple tables but no column expression bridges them, it may indicate 
+a missing JOIN condition (Cartesian product). Cross joins are rarely intentional and can cause 
+massive data explosion. This rule uses column lineage to detect potential cross-join scenarios.
+
+#### Bad
+
+```sql
+SELECT 
+  o.id,
+  o.amount,
+  c.name  -- No column references both 'o' and 'c' tables
+FROM orders o, customers c  -- Implicit cross join
+```
+
+#### Good
+
+```sql
+SELECT 
+  o.id,
+  o.amount,
+  c.name
+FROM orders o
+JOIN customers c ON o.customer_id = c.id  -- Explicit join condition
+```
+
+#### How to Fix
+
+Add explicit JOIN conditions between all referenced tables, or confirm that a cross join is intentional.
+
+---
+
+### PL05 - schema-drift {#PL05}
+
+**Severity:** `warning`
+
+SELECT * from source with changed schema since last run
+
+#### Why This Matters
+
+When using SELECT *, upstream schema changes silently propagate to your model. Added columns 
+may break downstream processes, while removed columns cause runtime errors. This rule compares 
+current source schemas against snapshots from the last run to catch breaking changes early.
+
+#### Bad
+
+```sql
+-- Model uses SELECT * and upstream added a breaking column
+SELECT *
+FROM {{ source('raw', 'orders') }}
+-- raw.orders added 'internal_notes' column that shouldn't be exposed
+```
+
+#### Good
+
+```sql
+-- Explicit column selection protects against schema drift
+SELECT
+  id,
+  customer_id,
+  amount,
+  created_at
+FROM {{ source('raw', 'orders') }}
+```
+
+#### How to Fix
+
+Replace SELECT * with explicit column selection, or review and accept the schema changes if they are expected.
+
+---
 
 ## Structure {#structure}
 
 Rules about project structure and naming conventions.
 
-| ID | Name | Description | Severity | Config |
-|--------|--------|--------|--------|--------|
-| `PS01` | model-naming | Model naming convention mismatch | `warning` |  |
-| `PS02` | model-directory | Model directory mismatch | `warning` |  |
+### PS01 - model-naming {#PS01}
+
+**Severity:** `warning`
+
+Model naming convention mismatch
+
+#### Why This Matters
+
+Consistent naming conventions make it easy to identify model types at a glance. Models in specific 
+directories should follow the expected prefix convention: staging models use 'stg_', intermediate 
+models use 'int_', and marts models use 'fct_' or 'dim_'.
+
+#### Bad
+
+```sql
+-- models/staging/orders.sql (missing stg_ prefix)
+-- models/marts/order_metrics.sql (missing fct_ or dim_ prefix)
+```
+
+#### Good
+
+```sql
+-- models/staging/stg_orders.sql
+-- models/marts/fct_order_metrics.sql
+-- models/marts/dim_customers.sql
+```
+
+#### How to Fix
+
+Rename the model to include the appropriate prefix for its directory location.
+
+---
+
+### PS02 - model-directory {#PS02}
+
+**Severity:** `warning`
+
+Model directory mismatch
+
+#### Why This Matters
+
+A model's name prefix should match its directory location. When a model is named 'stg_orders' but 
+placed in 'marts/', it creates confusion about the model's purpose and breaks organizational 
+conventions that teams rely on for navigation.
+
+#### Bad
+
+```sql
+-- models/marts/stg_orders.sql (stg_ model in marts directory)
+-- models/staging/fct_revenue.sql (fct_ model in staging directory)
+```
+
+#### Good
+
+```sql
+-- models/staging/stg_orders.sql
+-- models/marts/fct_revenue.sql
+```
+
+#### How to Fix
+
+Move the model to the directory that matches its name prefix, or rename it to match its current location.
+
+---
 

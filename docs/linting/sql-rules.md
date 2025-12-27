@@ -13,66 +13,1181 @@ LeapSQL includes 32 SQL lint rules organized into 5 categories.
 
 Rules about alias usage and naming conventions.
 
-| ID | Name | Description | Severity | Dialects |
-|--------|--------|--------|--------|--------|
-| `AL03` | aliasing.expression | Expression columns should have explicit aliases. | `info` | all |
-| `AL04` | aliasing.unique_table | Table aliases should be unique within a query. | `error` | all |
-| `AL05` | aliasing.unused | Table alias is defined but not referenced. | `warning` | all |
-| `AL06` | aliasing.length | Alias length should be between min and max characters. | `info` | all |
-| `AL07` | aliasing.forbid | Forbidden alias patterns (e.g., single letters, t1/t2). | `warning` | all |
-| `AL08` | aliasing.unique_column | Column aliases should be unique within SELECT clause. | `warning` | all |
-| `AL09` | aliasing.self_alias | Table aliased to its own name is redundant. | `hint` | all |
+### AL03 - aliasing.expression {#AL03}
+
+**Severity:** `info`
+
+Expression columns should have explicit aliases.
+
+#### Why This Matters
+
+Expressions without aliases produce auto-generated column names that vary 
+by database (e.g., "?column?", "expr0", "count(*)"). Explicit aliases make query results 
+predictable and self-documenting, improving usability for downstream consumers.
+
+#### Bad
+
+```sql
+SELECT
+    first_name || ' ' || last_name,
+    UPPER(email),
+    COUNT(*)
+FROM users
+GROUP BY 1, 2
+```
+
+#### Good
+
+```sql
+SELECT
+    first_name || ' ' || last_name AS full_name,
+    UPPER(email) AS email_upper,
+    COUNT(*) AS user_count
+FROM users
+GROUP BY 1, 2
+```
+
+#### How to Fix
+
+Add an explicit alias using AS to give the expression a meaningful name.
+
+---
+
+### AL04 - aliasing.unique_table {#AL04}
+
+**Severity:** `error`
+
+Table aliases should be unique within a query.
+
+#### Why This Matters
+
+Duplicate table aliases cause ambiguity when referencing columns. Most 
+databases will reject queries with duplicate aliases. Even if accepted, it makes the 
+query confusing and error-prone. Each table reference should have a unique alias.
+
+#### Bad
+
+```sql
+SELECT a.id, a.name
+FROM customers a
+JOIN orders a ON a.customer_id = a.id
+```
+
+#### Good
+
+```sql
+SELECT c.id, c.name
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Rename one of the duplicate aliases to be unique within the query.
+
+---
+
+### AL05 - aliasing.unused {#AL05}
+
+**Severity:** `warning`
+
+Table alias is defined but not referenced.
+
+#### Why This Matters
+
+Unused table aliases add noise without providing clarity. They may indicate 
+incomplete refactoring or copy-paste errors. If you alias a table, use that alias 
+consistently to improve query readability.
+
+#### Bad
+
+```sql
+SELECT id, name, email
+FROM customers c
+WHERE status = 'active'
+```
+
+#### Good
+
+```sql
+SELECT c.id, c.name, c.email
+FROM customers c
+WHERE c.status = 'active'
+```
+
+#### How to Fix
+
+Either use the alias when referencing columns from this table, or remove the alias if it's not needed.
+
+---
+
+### AL06 - aliasing.length {#AL06}
+
+**Severity:** `info`
+
+Alias length should be between min and max characters.
+
+#### Why This Matters
+
+Overly short aliases (single letters) lack meaning and make queries 
+harder to understand. Overly long aliases add verbosity without improving clarity 
+and may exceed database identifier limits. Balance brevity with descriptiveness.
+
+#### Bad
+
+```sql
+SELECT a.customer_name, b.order_total
+FROM customers_with_active_subscriptions_table a
+JOIN order_history_last_30_days b ON b.customer_id = a.id
+```
+
+#### Good
+
+```sql
+SELECT cust.customer_name, orders.order_total
+FROM customers_with_active_subscriptions_table cust
+JOIN order_history_last_30_days orders ON orders.customer_id = cust.id
+```
+
+#### How to Fix
+
+Choose aliases that are descriptive but concise, typically 2-10 characters. Use meaningful abbreviations.
+
+#### Configuration
+
+This rule accepts the following configuration options: `min_length, max_length`
+
+---
+
+### AL07 - aliasing.forbid {#AL07}
+
+**Severity:** `warning`
+
+Forbidden alias patterns (e.g., single letters, t1/t2).
+
+#### Why This Matters
+
+Generic aliases like single letters (a, b, c) or numbered tables (t1, t2) 
+provide no semantic meaning. They make queries harder to understand and maintain, 
+especially in complex queries with multiple joins. Use descriptive aliases instead.
+
+#### Bad
+
+```sql
+SELECT a.name, b.total, c.date
+FROM customers a
+JOIN orders b ON b.customer_id = a.id
+JOIN shipments c ON c.order_id = b.id
+```
+
+#### Good
+
+```sql
+SELECT cust.name, ord.total, ship.date
+FROM customers cust
+JOIN orders ord ON ord.customer_id = cust.id
+JOIN shipments ship ON ship.order_id = ord.id
+```
+
+#### How to Fix
+
+Replace forbidden aliases with meaningful names that describe what the table represents in this query context.
+
+#### Configuration
+
+This rule accepts the following configuration options: `forbidden_patterns, forbidden_names`
+
+---
+
+### AL08 - aliasing.unique_column {#AL08}
+
+**Severity:** `warning`
+
+Column aliases should be unique within SELECT clause.
+
+#### Why This Matters
+
+Duplicate column aliases create ambiguity in the result set. Downstream 
+consumers (reports, APIs, other queries) may not be able to reliably reference the 
+correct column. Some databases will error, others will silently pick one column.
+
+#### Bad
+
+```sql
+SELECT
+    first_name AS name,
+    last_name AS name,
+    company_name AS name
+FROM contacts
+```
+
+#### Good
+
+```sql
+SELECT
+    first_name AS first_name,
+    last_name AS last_name,
+    company_name AS company_name
+FROM contacts
+```
+
+#### How to Fix
+
+Rename column aliases to be unique within the SELECT clause.
+
+---
+
+### AL09 - aliasing.self_alias {#AL09}
+
+**Severity:** `hint`
+
+Table aliased to its own name is redundant.
+
+#### Why This Matters
+
+Aliasing a table to its own name (e.g., customers AS customers) adds 
+verbosity without any benefit. It may indicate copy-paste errors or incomplete 
+refactoring. Either use a shorter alias or remove the redundant alias entirely.
+
+#### Bad
+
+```sql
+SELECT customers.id, customers.name
+FROM customers AS customers
+WHERE customers.status = 'active'
+```
+
+#### Good
+
+```sql
+SELECT customers.id, customers.name
+FROM customers
+WHERE customers.status = 'active'
+```
+
+#### How to Fix
+
+Remove the redundant alias, or use a shorter meaningful alias if abbreviation is desired.
+
+---
 
 ## Ambiguous {#ambiguous}
 
 Rules about ambiguous SQL constructs that may cause confusion or errors.
 
-| ID | Name | Description | Severity | Dialects |
-|--------|--------|--------|--------|--------|
-| `AM01` | ambiguous.distinct | Using DISTINCT with GROUP BY is redundant. | `warning` | all |
-| `AM02` | ambiguous.union | UNION without ALL performs implicit DISTINCT which may be unintended. | `info` | all |
-| `AM03` | ambiguous.order_by | ORDER BY column may be ambiguous in set operation. | `warning` | all |
-| `AM04` | ambiguous.column_count | Mismatched column counts in set operation. | `error` | all |
-| `AM05` | ambiguous.join | Comma-separated tables create an implicit cross join. | `info` | all |
-| `AM06` | ambiguous.column_refs | Unqualified column reference may be ambiguous with multiple tables. | `warning` | all |
-| `AM08` | ambiguous.join_condition | Join condition should reference both tables being joined. | `warning` | all |
-| `AM09` | ambiguous.order_by_limit | ORDER BY/LIMIT with set operation may have unexpected scope. | `warning` | all |
+### AM01 - ambiguous.distinct {#AM01}
+
+**Severity:** `warning`
+
+Using DISTINCT with GROUP BY is redundant.
+
+#### Why This Matters
+
+GROUP BY already guarantees unique rows for the grouped columns. 
+Adding DISTINCT is redundant and may confuse readers about the query's intent. 
+It can also mislead developers into thinking DISTINCT is needed for correctness.
+
+#### Bad
+
+```sql
+SELECT DISTINCT department, COUNT(*)
+FROM employees
+GROUP BY department
+```
+
+#### Good
+
+```sql
+SELECT department, COUNT(*)
+FROM employees
+GROUP BY department
+```
+
+#### How to Fix
+
+Remove the DISTINCT keyword when using GROUP BY.
+
+---
+
+### AM02 - ambiguous.union {#AM02}
+
+**Severity:** `info`
+
+UNION without ALL performs implicit DISTINCT which may be unintended.
+
+#### Why This Matters
+
+UNION (without ALL) automatically removes duplicate rows, which has 
+performance implications and may not be the intended behavior. Explicitly using 
+UNION ALL or UNION DISTINCT makes the intent clear and avoids accidental deduplication.
+
+#### Bad
+
+```sql
+SELECT name FROM customers
+UNION
+SELECT name FROM suppliers
+```
+
+#### Good
+
+```sql
+-- If duplicates should be removed:
+SELECT name FROM customers
+UNION DISTINCT
+SELECT name FROM suppliers
+
+-- If duplicates should be kept:
+SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers
+```
+
+#### How to Fix
+
+Use UNION ALL if duplicates are acceptable, or UNION DISTINCT to make deduplication explicit.
+
+---
+
+### AM03 - ambiguous.order_by {#AM03}
+
+**Severity:** `warning`
+
+ORDER BY column may be ambiguous in set operation.
+
+#### Why This Matters
+
+In set operations (UNION, INTERSECT, EXCEPT), column names from different 
+queries may differ. Using column names in ORDER BY can be ambiguous and may behave 
+differently across databases. Column positions (1, 2, 3) are unambiguous.
+
+#### Bad
+
+```sql
+SELECT name, email FROM customers
+UNION ALL
+SELECT company_name, contact_email FROM suppliers
+ORDER BY name
+```
+
+#### Good
+
+```sql
+SELECT name, email FROM customers
+UNION ALL
+SELECT company_name, contact_email FROM suppliers
+ORDER BY 1
+```
+
+#### How to Fix
+
+Use column positions (1, 2, etc.) instead of column names in ORDER BY for set operations.
+
+---
+
+### AM04 - ambiguous.column_count {#AM04}
+
+**Severity:** `error`
+
+Mismatched column counts in set operation.
+
+#### Why This Matters
+
+Set operations (UNION, INTERSECT, EXCEPT) require all queries to have the 
+same number of columns. A mismatch will cause a runtime error. This rule catches 
+the issue at development time.
+
+#### Bad
+
+```sql
+SELECT id, name, email FROM customers
+UNION ALL
+SELECT id, name FROM suppliers
+```
+
+#### Good
+
+```sql
+SELECT id, name, email FROM customers
+UNION ALL
+SELECT id, name, contact_email FROM suppliers
+```
+
+#### How to Fix
+
+Ensure all queries in the set operation have the same number of columns.
+
+---
+
+### AM05 - ambiguous.join {#AM05}
+
+**Severity:** `info`
+
+Comma-separated tables create an implicit cross join.
+
+#### Why This Matters
+
+The old-style comma join syntax (FROM a, b WHERE a.id = b.id) is harder 
+to read than explicit JOIN syntax. It's easy to accidentally create a cross join 
+by forgetting the WHERE condition. Explicit JOINs make intent clear.
+
+#### Bad
+
+```sql
+SELECT c.name, o.total
+FROM customers c, orders o
+WHERE c.id = o.customer_id
+```
+
+#### Good
+
+```sql
+SELECT c.name, o.total
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+```
+
+#### How to Fix
+
+Replace comma-separated tables with explicit JOIN syntax (INNER JOIN, LEFT JOIN, etc.).
+
+---
+
+### AM06 - ambiguous.column_refs {#AM06}
+
+**Severity:** `warning`
+
+Unqualified column reference may be ambiguous with multiple tables.
+
+#### Why This Matters
+
+When multiple tables are joined, unqualified column names may exist in 
+more than one table. The database may pick an unexpected source, or error out. 
+Qualifying columns prevents ambiguity and makes the query self-documenting.
+
+#### Bad
+
+```sql
+SELECT name, email, created_at
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+```
+
+#### Good
+
+```sql
+SELECT c.name, c.email, o.created_at
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Prefix column references with the table alias (e.g., c.name instead of name).
+
+---
+
+### AM08 - ambiguous.join_condition {#AM08}
+
+**Severity:** `warning`
+
+Join condition should reference both tables being joined.
+
+#### Why This Matters
+
+A JOIN condition that doesn't reference the joined table is likely a bug. 
+It effectively creates a cross join filtered by the condition, which is rarely intended. 
+Each JOIN's ON clause should reference both the preceding and joining tables.
+
+#### Bad
+
+```sql
+SELECT c.name, o.total
+FROM customers c
+JOIN orders o ON c.status = 'active'
+```
+
+#### Good
+
+```sql
+SELECT c.name, o.total
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Ensure the JOIN condition references columns from both the left and right tables.
+
+---
+
+### AM09 - ambiguous.order_by_limit {#AM09}
+
+**Severity:** `warning`
+
+ORDER BY/LIMIT with set operation may have unexpected scope.
+
+#### Why This Matters
+
+In set operations, ORDER BY and LIMIT without parentheses apply to the 
+entire combined result, not individual queries. This behavior may be surprising. 
+Use parentheses to make the intended scope explicit.
+
+#### Bad
+
+```sql
+SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers
+ORDER BY name
+LIMIT 10
+```
+
+#### Good
+
+```sql
+-- To order/limit the final result:
+(SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers)
+ORDER BY name
+LIMIT 10
+
+-- To order/limit individual queries:
+(SELECT name FROM customers ORDER BY name LIMIT 10)
+UNION ALL
+(SELECT name FROM suppliers ORDER BY name LIMIT 10)
+```
+
+#### How to Fix
+
+Use parentheses to clarify whether ORDER BY/LIMIT applies to individual queries or the combined result.
+
+---
 
 ## Convention {#convention}
 
 Rules about SQL coding conventions and style consistency.
 
-| ID | Name | Description | Severity | Dialects |
-|--------|--------|--------|--------|--------|
-| `CV01` | convention.not_equal | Prefer != over <> for not equal operator (NOT IMPLEMENTED: AST normalizes both operators). | `hint` | all |
-| `CV02` | convention.coalesce | Prefer COALESCE over IFNULL/NVL for better portability. | `hint` | all |
-| `CV04` | convention.count_rows | Prefer COUNT(*) over COUNT(1) for counting rows. | `hint` | all |
-| `CV05` | convention.is_null | Use IS NULL instead of = NULL for NULL comparisons. | `warning` | all |
-| `CV08` | convention.left_join | Prefer LEFT JOIN over RIGHT JOIN for consistency. | `hint` | all |
-| `CV09` | convention.blocked_words | Block dangerous SQL keywords like DELETE, DROP, TRUNCATE. | `warning` | all |
+### CV01 - convention.not_equal {#CV01}
+
+**Severity:** `hint`
+
+Prefer != over <> for not equal operator (NOT IMPLEMENTED: AST normalizes both operators).
+
+#### Why This Matters
+
+Using a consistent not-equal operator (either != or <>) throughout a 
+codebase improves readability. The != operator is more common in modern programming 
+languages, while <> is standard SQL. Pick one and use it consistently.
+
+#### Bad
+
+```sql
+SELECT * FROM orders
+WHERE status <> 'cancelled'
+  AND type != 'test'
+```
+
+#### Good
+
+```sql
+SELECT * FROM orders
+WHERE status != 'cancelled'
+  AND type != 'test'
+```
+
+#### How to Fix
+
+Use a consistent not-equal operator throughout your queries. This rule is not currently enforced due to AST limitations.
+
+---
+
+### CV02 - convention.coalesce {#CV02}
+
+**Severity:** `hint`
+
+Prefer COALESCE over IFNULL/NVL for better portability.
+
+#### Why This Matters
+
+COALESCE is ANSI SQL standard and works across all major databases. IFNULL 
+(MySQL) and NVL (Oracle) are database-specific. Using COALESCE improves query 
+portability and is more flexible as it can handle multiple arguments.
+
+#### Bad
+
+```sql
+SELECT
+    IFNULL(phone, 'N/A') AS phone,
+    NVL(email, 'unknown') AS email
+FROM contacts
+```
+
+#### Good
+
+```sql
+SELECT
+    COALESCE(phone, 'N/A') AS phone,
+    COALESCE(email, 'unknown') AS email
+FROM contacts
+```
+
+#### How to Fix
+
+Replace IFNULL or NVL with COALESCE for better SQL portability.
+
+---
+
+### CV04 - convention.count_rows {#CV04}
+
+**Severity:** `hint`
+
+Prefer COUNT(*) over COUNT(1) for counting rows.
+
+#### Why This Matters
+
+COUNT(*) is the standard and most readable way to count rows. COUNT(1) 
+achieves the same result but is less intuitive. Modern query optimizers treat them 
+identically, so there's no performance benefit to COUNT(1). Use COUNT(*) for clarity.
+
+#### Bad
+
+```sql
+SELECT
+    department,
+    COUNT(1) AS employee_count
+FROM employees
+GROUP BY department
+```
+
+#### Good
+
+```sql
+SELECT
+    department,
+    COUNT(*) AS employee_count
+FROM employees
+GROUP BY department
+```
+
+#### How to Fix
+
+Replace COUNT(1) with COUNT(*) for counting rows.
+
+---
+
+### CV05 - convention.is_null {#CV05}
+
+**Severity:** `warning`
+
+Use IS NULL instead of = NULL for NULL comparisons.
+
+#### Why This Matters
+
+In SQL, NULL represents unknown, and comparing anything to NULL with = 
+or != always yields NULL (unknown), not true or false. This is a common source of 
+bugs. Use IS NULL or IS NOT NULL for correct NULL handling.
+
+#### Bad
+
+```sql
+SELECT * FROM orders
+WHERE shipped_date = NULL
+```
+
+#### Good
+
+```sql
+SELECT * FROM orders
+WHERE shipped_date IS NULL
+```
+
+#### How to Fix
+
+Replace = NULL with IS NULL, and != NULL with IS NOT NULL.
+
+---
+
+### CV08 - convention.left_join {#CV08}
+
+**Severity:** `hint`
+
+Prefer LEFT JOIN over RIGHT JOIN for consistency.
+
+#### Why This Matters
+
+LEFT JOIN is more intuitive because it preserves all rows from the table 
+you naturally read first (left to right). RIGHT JOIN can always be rewritten as 
+LEFT JOIN by swapping table order. Consistently using LEFT JOIN improves readability.
+
+#### Bad
+
+```sql
+SELECT o.id, c.name
+FROM orders o
+RIGHT JOIN customers c ON c.id = o.customer_id
+```
+
+#### Good
+
+```sql
+SELECT o.id, c.name
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Swap the table order and use LEFT JOIN instead of RIGHT JOIN.
+
+---
+
+### CV09 - convention.blocked_words {#CV09}
+
+**Severity:** `warning`
+
+Block dangerous SQL keywords like DELETE, DROP, TRUNCATE.
+
+#### Why This Matters
+
+In data transformation pipelines (dbt, LeapSQL), destructive operations 
+like DELETE, DROP, and TRUNCATE are usually mistakes. Models should be declarative 
+transformations, not imperative modifications. Block these keywords to prevent accidents.
+
+#### Bad
+
+```sql
+-- This could accidentally delete production data
+DELETE FROM customers WHERE status = 'inactive'
+```
+
+#### Good
+
+```sql
+-- Use a filter in your SELECT instead
+SELECT * FROM customers
+WHERE status != 'inactive'
+```
+
+#### How to Fix
+
+Remove or refactor destructive SQL statements. For data pipelines, use incremental logic or WHERE filters instead of DELETE/TRUNCATE.
+
+#### Configuration
+
+This rule accepts the following configuration options: `blocked_words`
+
+---
 
 ## References {#references}
 
 Rules about column and table references in queries.
 
-| ID | Name | Description | Severity | Dialects |
-|--------|--------|--------|--------|--------|
-| `RF02` | references.qualification | Qualify column references in queries with multiple tables. | `warning` | all |
-| `RF03` | references.consistent | Column qualification style should be consistent. | `info` | all |
+### RF02 - references.qualification {#RF02}
+
+**Severity:** `warning`
+
+Qualify column references in queries with multiple tables.
+
+#### Why This Matters
+
+In queries involving multiple tables, unqualified column names can be ambiguous. 
+If two tables have a column with the same name, the query may fail or return unexpected results. 
+Qualifying columns with table names or aliases makes the query explicit and prevents errors when schemas change.
+
+#### Bad
+
+```sql
+SELECT name, amount
+FROM customers
+JOIN orders ON customers.id = orders.customer_id
+```
+
+#### Good
+
+```sql
+SELECT customers.name, orders.amount
+FROM customers
+JOIN orders ON customers.id = orders.customer_id
+```
+
+#### How to Fix
+
+Prefix each column reference with its table name or alias.
+
+---
+
+### RF03 - references.consistent {#RF03}
+
+**Severity:** `info`
+
+Column qualification style should be consistent.
+
+#### Why This Matters
+
+Mixing qualified and unqualified column references in the same query reduces readability. 
+A consistent style makes it easier to understand which table each column comes from and helps 
+reviewers quickly verify query correctness.
+
+#### Bad
+
+```sql
+SELECT customers.name, amount, customers.email
+FROM customers
+JOIN orders ON customers.id = orders.customer_id
+```
+
+#### Good
+
+```sql
+SELECT customers.name, orders.amount, customers.email
+FROM customers
+JOIN orders ON customers.id = orders.customer_id
+```
+
+#### How to Fix
+
+Use the same qualification style (qualified or unqualified) for all column references.
+
+---
 
 ## Structure {#structure}
 
 Rules about SQL query structure and organization.
 
-| ID | Name | Description | Severity | Dialects |
-|--------|--------|--------|--------|--------|
-| `ST01` | structure.else_null | ELSE NULL is redundant in CASE expressions. | `hint` | all |
-| `ST02` | structure.simple_case | Searched CASE can be simplified to simple CASE expression. | `hint` | all |
-| `ST03` | structure.unused_cte | CTE is defined but never referenced. | `warning` | all |
-| `ST04` | structure.nested_case | Nested CASE expressions reduce readability. | `info` | all |
-| `ST06` | structure.column_order | Wildcards should appear last in SELECT clause. | `hint` | all |
-| `ST07` | structure.using | Prefer USING clause for simple equality joins on same-named columns. | `hint` | all |
-| `ST08` | structure.distinct | Consider GROUP BY instead of DISTINCT when selecting columns for aggregation. | `info` | all |
-| `ST09` | structure.join_condition_order | Join condition should reference left table first (e.g., a.id = b.id, not b.id = a.id). | `hint` | all |
-| `ST10` | structure.constant_expression | Unnecessary constant expressions like WHERE 1=1 or WHERE true. | `info` | all |
+### ST01 - structure.else_null {#ST01}
+
+**Severity:** `hint`
+
+ELSE NULL is redundant in CASE expressions.
+
+#### Why This Matters
+
+CASE expressions implicitly return NULL when no WHEN clause matches and no ELSE is specified. 
+Writing ELSE NULL explicitly adds verbosity without changing behavior. Removing it keeps the query concise 
+while maintaining the same semantics.
+
+#### Bad
+
+```sql
+SELECT
+  CASE status
+    WHEN 'active' THEN 1
+    WHEN 'inactive' THEN 0
+    ELSE NULL
+  END AS status_code
+FROM users
+```
+
+#### Good
+
+```sql
+SELECT
+  CASE status
+    WHEN 'active' THEN 1
+    WHEN 'inactive' THEN 0
+  END AS status_code
+FROM users
+```
+
+#### How to Fix
+
+Remove the ELSE NULL clause from the CASE expression.
+
+---
+
+### ST02 - structure.simple_case {#ST02}
+
+**Severity:** `hint`
+
+Searched CASE can be simplified to simple CASE expression.
+
+#### Why This Matters
+
+When all WHEN conditions compare the same column to different literal values using equality, 
+a searched CASE can be rewritten as a simple CASE. Simple CASE expressions are more concise and clearly 
+communicate the intent of mapping values from a single column.
+
+#### Bad
+
+```sql
+SELECT
+  CASE
+    WHEN status = 'A' THEN 'Active'
+    WHEN status = 'I' THEN 'Inactive'
+    WHEN status = 'P' THEN 'Pending'
+  END AS status_label
+FROM orders
+```
+
+#### Good
+
+```sql
+SELECT
+  CASE status
+    WHEN 'A' THEN 'Active'
+    WHEN 'I' THEN 'Inactive'
+    WHEN 'P' THEN 'Pending'
+  END AS status_label
+FROM orders
+```
+
+#### How to Fix
+
+Convert to simple CASE by moving the common column after CASE and removing it from WHEN clauses.
+
+---
+
+### ST03 - structure.unused_cte {#ST03}
+
+**Severity:** `warning`
+
+CTE is defined but never referenced.
+
+#### Why This Matters
+
+Unused CTEs add complexity without benefit. They consume mental overhead 
+for readers trying to understand the query, and may indicate incomplete refactoring 
+or copy-paste errors. Removing them improves query clarity.
+
+#### Bad
+
+```sql
+WITH unused_cte AS (
+    SELECT * FROM orders
+),
+active_customers AS (
+    SELECT * FROM customers WHERE active = true
+)
+SELECT * FROM active_customers
+```
+
+#### Good
+
+```sql
+WITH active_customers AS (
+    SELECT * FROM customers WHERE active = true
+)
+SELECT * FROM active_customers
+```
+
+#### How to Fix
+
+Remove the unused CTE definition, or reference it in your query if it was intended to be used.
+
+---
+
+### ST04 - structure.nested_case {#ST04}
+
+**Severity:** `info`
+
+Nested CASE expressions reduce readability.
+
+#### Why This Matters
+
+Nested CASE expressions are difficult to read and understand. They often indicate complex 
+business logic that could be simplified by restructuring the query, using CTEs, or extracting the logic 
+into a separate model or view.
+
+#### Bad
+
+```sql
+SELECT
+  CASE
+    WHEN status = 'A' THEN
+      CASE
+        WHEN priority = 1 THEN 'High Active'
+        ELSE 'Low Active'
+      END
+    ELSE 'Inactive'
+  END AS label
+FROM tasks
+```
+
+#### Good
+
+```sql
+SELECT
+  CASE
+    WHEN status = 'A' AND priority = 1 THEN 'High Active'
+    WHEN status = 'A' THEN 'Low Active'
+    ELSE 'Inactive'
+  END AS label
+FROM tasks
+```
+
+#### How to Fix
+
+Flatten nested CASE expressions by combining conditions, or extract complex logic into a CTE or separate model.
+
+---
+
+### ST06 - structure.column_order {#ST06}
+
+**Severity:** `hint`
+
+Wildcards should appear last in SELECT clause.
+
+#### Why This Matters
+
+Placing explicit columns before wildcards improves readability and makes the query's output 
+structure clearer. The explicitly named columns are typically the most important ones, so listing them 
+first highlights their significance.
+
+#### Bad
+
+```sql
+SELECT *, created_at, updated_at
+FROM orders
+```
+
+#### Good
+
+```sql
+SELECT created_at, updated_at, *
+FROM orders
+```
+
+#### How to Fix
+
+Move wildcard expressions (* or table.*) to the end of the SELECT clause.
+
+---
+
+### ST07 - structure.using {#ST07}
+
+**Severity:** `hint`
+
+Prefer USING clause for simple equality joins on same-named columns.
+
+#### Why This Matters
+
+The USING clause is more concise than ON when joining tables on columns with identical names. 
+It clearly communicates that the join is on matching column names and automatically deduplicates the join 
+column in the result set.
+
+#### Bad
+
+```sql
+SELECT *
+FROM orders o
+JOIN customers c ON o.customer_id = c.customer_id
+```
+
+#### Good
+
+```sql
+SELECT *
+FROM orders o
+JOIN customers c USING (customer_id)
+```
+
+#### How to Fix
+
+Replace ON with USING when joining on columns that have the same name in both tables.
+
+---
+
+### ST08 - structure.distinct {#ST08}
+
+**Severity:** `info`
+
+Consider GROUP BY instead of DISTINCT when selecting columns for aggregation.
+
+#### Why This Matters
+
+Using GROUP BY instead of DISTINCT on simple column selections makes the query's intent 
+clearer and positions the code better for future aggregation needs. GROUP BY explicitly shows which 
+columns define the unique rows, while DISTINCT can be ambiguous in complex queries.
+
+#### Bad
+
+```sql
+SELECT DISTINCT department, location
+FROM employees
+```
+
+#### Good
+
+```sql
+SELECT department, location
+FROM employees
+GROUP BY department, location
+```
+
+#### How to Fix
+
+Replace SELECT DISTINCT with GROUP BY on the same columns.
+
+---
+
+### ST09 - structure.join_condition_order {#ST09}
+
+**Severity:** `hint`
+
+Join condition should reference left table first (e.g., a.id = b.id, not b.id = a.id).
+
+#### Why This Matters
+
+Consistently ordering join conditions with the left (existing) table first improves readability. 
+It follows the natural reading order of the query: FROM table_a JOIN table_b ON table_a.col = table_b.col. 
+This convention makes it easier to trace relationships through the query.
+
+#### Bad
+
+```sql
+SELECT *
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+```
+
+#### Good
+
+```sql
+SELECT *
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+```
+
+#### How to Fix
+
+Reorder the join condition to reference the left table first.
+
+---
+
+### ST10 - structure.constant_expression {#ST10}
+
+**Severity:** `info`
+
+Unnecessary constant expressions like WHERE 1=1 or WHERE true.
+
+#### Why This Matters
+
+Constant expressions like WHERE 1=1 or WHERE true are often artifacts of dynamic SQL 
+generation. In static SQL models, they add noise without affecting results. Removing them makes the 
+query cleaner and easier to understand.
+
+#### Bad
+
+```sql
+SELECT *
+FROM orders
+WHERE 1=1
+  AND status = 'active'
+```
+
+#### Good
+
+```sql
+SELECT *
+FROM orders
+WHERE status = 'active'
+```
+
+#### How to Fix
+
+Remove constant expressions from WHERE clauses.
+
+---
 
