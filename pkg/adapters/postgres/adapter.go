@@ -22,6 +22,7 @@ import (
 // Adapter implements the adapter.Adapter interface for PostgreSQL.
 type Adapter struct {
 	adapter.BaseSQLAdapter
+	dialect *dialect.Dialect // internal reference for full dialect functionality
 }
 
 // New creates a new PostgreSQL adapter instance.
@@ -32,12 +33,13 @@ func New(logger *slog.Logger) *Adapter {
 	}
 	return &Adapter{
 		BaseSQLAdapter: adapter.BaseSQLAdapter{Logger: logger},
+		dialect:        pgdialect.Postgres,
 	}
 }
 
-// Dialect returns the SQL dialect configuration for this adapter.
-func (a *Adapter) Dialect() *dialect.Dialect {
-	return pgdialect.Postgres
+// DialectConfig returns the SQL dialect configuration for this adapter.
+func (a *Adapter) DialectConfig() *core.DialectConfig {
+	return a.dialect.Config()
 }
 
 // Connect establishes a connection to PostgreSQL.
@@ -97,7 +99,7 @@ func buildPostgresDSN(cfg core.AdapterConfig) string {
 
 // GetTableMetadata retrieves metadata for a specified table.
 func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*core.TableMetadata, error) {
-	return a.GetTableMetadataCommon(ctx, table, a.Dialect())
+	return a.GetTableMetadataCommon(ctx, table, a.DialectConfig())
 }
 
 // LoadCSV loads data from a CSV file into a table using COPY FROM STDIN.
@@ -157,7 +159,7 @@ func (a *Adapter) createTextTable(ctx context.Context, tableName string, columns
 	var colDefs []string
 	for _, col := range columns {
 		// Sanitize column name using dialect
-		safeName := sanitizeIdentifier(col, a.Dialect())
+		safeName := sanitizeIdentifier(col, a.dialect)
 		colDefs = append(colDefs, fmt.Sprintf("%s TEXT", safeName))
 	}
 

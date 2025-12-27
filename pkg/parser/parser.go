@@ -251,27 +251,21 @@ func (p *Parser) ParseExpression() (spi.Expr, error) {
 // ParseExpressionList parses a comma-separated list of expressions (implements spi.ParserOps).
 func (p *Parser) ParseExpressionList() ([]spi.Expr, error) {
 	exprs := p.parseExpressionList()
-	result := make([]spi.Expr, len(exprs))
-	for i, e := range exprs {
-		result[i] = e
-	}
 	if len(p.errors) > 0 {
 		return nil, p.errors[len(p.errors)-1]
 	}
-	return result, nil
+	// []Expr and []spi.Expr are the same type (both alias to []core.Expr)
+	return exprs, nil
 }
 
 // ParseOrderByList parses an ORDER BY list (implements spi.ParserOps).
 func (p *Parser) ParseOrderByList() ([]spi.OrderByItem, error) {
 	items := p.parseOrderByList()
-	result := make([]spi.OrderByItem, len(items))
-	for i, item := range items {
-		result[i] = item
-	}
 	if len(p.errors) > 0 {
 		return nil, p.errors[len(p.errors)-1]
 	}
-	return result, nil
+	// []OrderByItem and []spi.OrderByItem are the same type (both alias to []core.OrderByItem)
+	return items, nil
 }
 
 // ParseIdentifier parses an identifier (implements spi.ParserOps).

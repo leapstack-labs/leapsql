@@ -160,10 +160,8 @@ func (p *Parser) parseInfixExpr(left Expr, prec int) Expr {
 				return left
 			}
 			if result != nil {
-				// Type assert back to Expr
-				if expr, ok := result.(Expr); ok {
-					return expr
-				}
+				// result is already Expr type (spi.Expr = core.Expr = Expr)
+				return result
 			}
 			// If handler returned nil, fall through to standard handling
 			// This can happen for operators that need standard binary handling

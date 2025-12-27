@@ -23,3 +23,42 @@ type Stmt interface {
 	Node
 	stmtNode() // Marker method to distinguish statements
 }
+
+// TableRef is a marker interface for table reference nodes.
+type TableRef interface {
+	Node
+	tableRefNode() // Marker method to distinguish table references
+}
+
+// NodeInfo provides common fields for all AST nodes.
+// Embed this in node types that need position/comment tracking.
+type NodeInfo struct {
+	Span             token.Span
+	LeadingComments  []*token.Comment
+	TrailingComments []*token.Comment
+}
+
+// Pos returns the position of the first character of the node.
+func (n *NodeInfo) Pos() token.Position {
+	return n.Span.Start
+}
+
+// End returns the position of the character immediately after the node.
+func (n *NodeInfo) End() token.Position {
+	return n.Span.End
+}
+
+// GetSpan returns the node's source span.
+func (n *NodeInfo) GetSpan() token.Span {
+	return n.Span
+}
+
+// AddLeadingComment adds a leading comment to the node.
+func (n *NodeInfo) AddLeadingComment(c *token.Comment) {
+	n.LeadingComments = append(n.LeadingComments, c)
+}
+
+// AddTrailingComment adds a trailing comment to the node.
+func (n *NodeInfo) AddTrailingComment(c *token.Comment) {
+	n.TrailingComments = append(n.TrailingComments, c)
+}

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // BaseSQLAdapter provides common database/sql functionality for adapters.
@@ -63,26 +62,26 @@ func (b *BaseSQLAdapter) IsConnected() bool {
 
 // ParseQualifiedName splits a table reference into schema and name.
 // Uses the dialect's default schema if not specified.
-func ParseQualifiedName(table string, d *dialect.Dialect) (schema, name string) {
+func ParseQualifiedName(table string, cfg *core.DialectConfig) (schema, name string) {
 	if parts := strings.Split(table, "."); len(parts) == 2 {
 		return parts[0], parts[1]
 	}
-	return d.DefaultSchema, table
+	return cfg.DefaultSchema, table
 }
 
 // GetTableMetadataCommon provides a shared implementation of GetTableMetadata.
 // Uses information_schema.columns with dialect-appropriate placeholders.
 // This can be called by concrete adapters to avoid code duplication.
-func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table string, d *dialect.Dialect) (*core.TableMetadata, error) {
+func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table string, cfg *core.DialectConfig) (*core.TableMetadata, error) {
 	if b.DB == nil {
 		return nil, fmt.Errorf("database connection not established")
 	}
 
-	schema, tableName := ParseQualifiedName(table, d)
+	schema, tableName := ParseQualifiedName(table, cfg)
 
 	// Build query with appropriate placeholders
 	// The placeholders come from the dialect and are safe (? or $N)
-	//nolint:gosec // Placeholders are safe - they come from dialect.FormatPlaceholder
+	//nolint:gosec // Placeholders are safe - they come from PlaceholderStyle.FormatPlaceholder
 	query := fmt.Sprintf(`
 		SELECT 
 			column_name,
@@ -92,7 +91,7 @@ func (b *BaseSQLAdapter) GetTableMetadataCommon(ctx context.Context, table strin
 		FROM information_schema.columns 
 		WHERE table_schema = %s AND table_name = %s
 		ORDER BY ordinal_position
-	`, d.FormatPlaceholder(1), d.FormatPlaceholder(2))
+	`, cfg.Placeholder.FormatPlaceholder(1), cfg.Placeholder.FormatPlaceholder(2))
 
 	rows, err := b.DB.QueryContext(ctx, query, schema, tableName)
 	if err != nil {

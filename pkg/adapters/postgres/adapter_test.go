@@ -128,7 +128,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, adp, "New() should return non-nil adapter")
 	assert.Nil(t, adp.DB, "DB should be nil before Connect")
 	assert.False(t, adp.IsConnected(), "should not be connected initially")
-	assert.Equal(t, "postgres", adp.Dialect().Name, "dialect name should be postgres")
+	assert.Equal(t, "postgres", adp.DialectConfig().Name, "dialect name should be postgres")
 
 	// Verify interface compliance
 	var _ adapter.Adapter = (*Adapter)(nil)
@@ -197,7 +197,7 @@ func TestAdapter_Registry(t *testing.T) {
 	pg, ok := adp.(*Adapter)
 	assert.True(t, ok, "factory should return *Adapter")
 	assert.NotNil(t, pg)
-	assert.Equal(t, "postgres", pg.Dialect().Name)
+	assert.Equal(t, "postgres", pg.DialectConfig().Name)
 }
 
 func TestAdapter_Close(t *testing.T) {

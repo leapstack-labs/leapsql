@@ -1,7 +1,7 @@
 # Architecture Specification
 
 **Pattern:** Hybrid Core-Library + Microkernel (Hexagonal)
-**Status:** Planned (see [migration plan](../plans/todo/hexagonal-architecture-overview.md))
+**Status:** Enforced via `go test ./pkg/core/... -run TestArchitecture`
 
 ## 1. The Golden Rule
 
@@ -55,16 +55,17 @@ pkg/core/
 
 **Scope:** Reusable, stateless toolkits.
 
-| Package | Purpose |
-|---------|---------|
-| `pkg/parser` | SQL parsing → AST |
-| `pkg/format` | AST → formatted SQL |
-| `pkg/lint` | SQL linting rules + analyzer |
-| `pkg/dialect` | Dialect builder + registry |
-| `pkg/token` | Lexical tokens |
-| `pkg/spi` | Service provider interface (handler types) |
+| Package | Purpose | Allowed Imports |
+|---------|---------|-----------------|
+| `pkg/token` | Lexical tokens | (none) |
+| `pkg/spi` | Service provider interface | `core`, `token` |
+| `pkg/dialect` | Dialect builder + registry | `core`, `spi`, `token` |
+| `pkg/parser` | SQL parsing → AST | `core`, `dialect`, `dialects/*`, `spi`, `token` |
+| `pkg/format` | AST → formatted SQL | `core`, `dialect`, `parser`, `spi`, `token` |
+| `pkg/lint` | SQL linting rules + analyzer | `core`, `lint/*`, `parser`, `spi`, `token` |
+| `pkg/dialects/*` | Dialect-specific configurations | `core`, `dialect`, `spi`, `token` |
 
-**Rule:** Must accept/return `pkg/core` types. Must not depend on CLI or Engine.
+**Rule:** Must accept/return `pkg/core` types. Must not depend on CLI or Engine (`internal/*`).
 
 ### C. The Microkernel: `pkg/adapter` & `pkg/adapters/*`
 
@@ -81,12 +82,21 @@ pkg/adapter/
 
 pkg/adapters/
 ├── duckdb/
-│   ├── adapter.go   # Implements core.Adapter
-│   └── dialect/     # Builds *core.Dialect
-└── postgres/
-    ├── adapter.go   # Implements core.Adapter
-    └── dialect/     # Builds *core.Dialect
+│   └── adapter.go   # Implements adapter.Adapter
+├── postgres/
+│   └── adapter.go   # Implements adapter.Adapter
+└── databricks/
+    └── init.go      # Registers dialect (stub)
+
+pkg/dialects/
+├── duckdb/          # DuckDB dialect definition
+├── postgres/        # PostgreSQL dialect definition
+└── databricks/      # Databricks dialect definition
 ```
+
+**Import Rules:**
+- `pkg/adapter`: Only imports `pkg/core` (strict - registry only)
+- `pkg/adapters/*`: Can import `adapter`, `core`, `dialect`, `dialects/*`
 
 **Rule:** Plugins register via `init()`. Engine uses registry, never imports plugins directly.
 
@@ -176,8 +186,13 @@ graph TD
 
     subgraph "Microkernel"
         AdapterReg[pkg/adapter]
-        DuckDB[pkg/adapters/duckdb]
-        Postgres[pkg/adapters/postgres]
+        DuckDBAdapter[pkg/adapters/duckdb]
+        PostgresAdapter[pkg/adapters/postgres]
+    end
+
+    subgraph "Dialects"
+        DuckDBDialect[pkg/dialects/duckdb]
+        PostgresDialect[pkg/dialects/postgres]
     end
 
     subgraph "Libraries"
@@ -200,6 +215,7 @@ graph TD
     Engine --> State
     Engine --> AdapterReg
     Engine --> Core
+    Engine --> DialectPkg
     Loader --> Core
     Loader --> Parser
     State --> Core
@@ -211,26 +227,47 @@ graph TD
     Parser --> SPI
     Parser --> Token
     Format --> Core
+    Format --> DialectPkg
     Format --> Parser
+    Format --> SPI
+    Format --> Token
     DialectPkg --> Core
     DialectPkg --> SPI
+    DialectPkg --> Token
+    Lint --> Core
+    Lint --> Parser
     Lint --> Token
+    SPI --> Core
     SPI --> Token
 
-    %% Microkernel → Core
-    AdapterReg --> Core
-    DuckDB --> Core
-    DuckDB --> AdapterReg
-    DuckDB --> DialectPkg
-    Postgres --> Core
-    Postgres --> AdapterReg
-    Postgres --> DialectPkg
+    %% Dialects → Core/Dialect/SPI (NOT Parser)
+    DuckDBDialect --> Core
+    DuckDBDialect --> DialectPkg
+    DuckDBDialect --> SPI
+    DuckDBDialect --> Token
+    PostgresDialect --> Core
+    PostgresDialect --> DialectPkg
 
-    %% Core → Foundation ONLY (NOT SPI!)
+    %% Microkernel → Core (adapter registry is strict)
+    AdapterReg --> Core
+    DuckDBAdapter --> Core
+    DuckDBAdapter --> AdapterReg
+    DuckDBAdapter --> DuckDBDialect
+    PostgresAdapter --> Core
+    PostgresAdapter --> AdapterReg
+    PostgresAdapter --> DialectPkg
+    PostgresAdapter --> PostgresDialect
+
+    %% Core → Foundation ONLY
     Core --> Token
 ```
 
-**Key:** `pkg/core` imports ONLY `pkg/token`. `pkg/spi` is imported by `pkg/dialect` and `pkg/parser`, NOT by `pkg/core`.
+**Key Rules:**
+1. `pkg/core` imports ONLY `pkg/token`
+2. `pkg/adapter` imports ONLY `pkg/core` (strict microkernel)
+3. `pkg/spi` imports `pkg/core` and `pkg/token` (interfaces using Core AST)
+4. `pkg/dialects/*` must NOT import `pkg/parser` (prevents circular deps)
+5. `internal/*` can import any `pkg/*` but `pkg/*` cannot import `internal/*`
 
 ## 7. Adding New Components
 
@@ -255,13 +292,37 @@ graph TD
 
 ## 8. Verification
 
-Run architecture test to verify no forbidden imports in core:
+Architecture rules are enforced via tests in `pkg/core/arch_test.go`.
+
+### Run Architecture Tests
 
 ```bash
-go test ./pkg/core/... -run TestCoreImports
+# Run all architecture tests
+go test ./pkg/core/... -run TestArchitecture -v
+
+# Run specific checks
+go test ./pkg/core/... -run TestCoreOnlyImportsToken -v
+go test ./pkg/core/... -run TestAdapterDoesNotImportDialect -v
+go test ./pkg/core/... -run TestPkgDoesNotImportInternal -v
 ```
 
-Run full check:
+### Test Coverage
+
+| Test | Enforces |
+|------|----------|
+| `TestArchitectureAllowlist` | Full import graph validation |
+| `TestPkgDoesNotImportInternal` | `pkg/*` cannot import `internal/*` |
+| `TestCoreOnlyImportsToken` | Golden rule: `pkg/core` → `pkg/token` only |
+| `TestAdapterDoesNotImportDialect` | Microkernel: `pkg/adapter` → `pkg/core` only |
+| `TestDialectsDoNotImportParser` | Prevents circular: `pkg/dialects/*` ↛ `pkg/parser` |
+
+### Known Violations
+
+| Package | Violation | Status |
+|---------|-----------|--------|
+| `pkg/dialects/duckdb` | imports `pkg/parser` | Phase 0 fix: move AST types to `pkg/core` |
+
+### Run Full Check
 
 ```bash
 task check

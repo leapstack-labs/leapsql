@@ -107,8 +107,8 @@ func (p *Printer) exprComplexity(e parser.Expr) int {
 		if expr.Start != nil {
 			score += p.exprComplexity(expr.Start)
 		}
-		if expr.End != nil {
-			score += p.exprComplexity(expr.End)
+		if expr.Stop != nil {
+			score += p.exprComplexity(expr.Stop)
 		}
 		return score
 	default:
@@ -506,8 +506,8 @@ func (p *Printer) formatIndexExpr(idx *parser.IndexExpr) {
 			p.formatExpr(idx.Start)
 		}
 		p.write(":")
-		if idx.End != nil {
-			p.formatExpr(idx.End)
+		if idx.Stop != nil {
+			p.formatExpr(idx.Stop)
 		}
 	} else {
 		p.formatExpr(idx.Index)

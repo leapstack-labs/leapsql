@@ -3,7 +3,7 @@ package duckdb
 import (
 	"fmt"
 
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -11,7 +11,7 @@ import (
 // parseListLiteral handles [expr, expr, ...].
 // The opening [ has already been consumed.
 func parseListLiteral(p spi.ParserOps) (spi.Expr, error) {
-	list := &parser.ListLiteral{}
+	list := &core.ListLiteral{}
 
 	if !p.Check(token.RBRACKET) {
 		for {
@@ -19,7 +19,7 @@ func parseListLiteral(p spi.ParserOps) (spi.Expr, error) {
 			if err != nil {
 				return nil, fmt.Errorf("list literal: %w", err)
 			}
-			list.Elements = append(list.Elements, elem.(parser.Expr))
+			list.Elements = append(list.Elements, elem)
 
 			if !p.Match(token.COMMA) {
 				break
@@ -37,7 +37,7 @@ func parseListLiteral(p spi.ParserOps) (spi.Expr, error) {
 // parseStructLiteral handles {'key': value, ...}.
 // The opening { has already been consumed.
 func parseStructLiteral(p spi.ParserOps) (spi.Expr, error) {
-	s := &parser.StructLiteral{}
+	s := &core.StructLiteral{}
 
 	if !p.Check(token.RBRACE) {
 		for {
@@ -64,9 +64,9 @@ func parseStructLiteral(p spi.ParserOps) (spi.Expr, error) {
 				return nil, fmt.Errorf("struct literal: %w", err)
 			}
 
-			s.Fields = append(s.Fields, parser.StructField{
+			s.Fields = append(s.Fields, core.StructField{
 				Key:   key,
-				Value: value.(parser.Expr),
+				Value: value,
 			})
 
 			if !p.Match(token.COMMA) {
@@ -86,8 +86,8 @@ func parseStructLiteral(p spi.ParserOps) (spi.Expr, error) {
 // This is an infix handler - left is the expression being indexed.
 // The opening [ has already been consumed.
 func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
-	idx := &parser.IndexExpr{
-		Expr: left.(parser.Expr),
+	idx := &core.IndexExpr{
+		Expr: left,
 	}
 
 	// Check for empty slice [:end]
@@ -100,7 +100,7 @@ func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 			if err != nil {
 				return nil, fmt.Errorf("array slice: %w", err)
 			}
-			idx.End = end.(parser.Expr)
+			idx.Stop = end
 		}
 	} else if !p.Check(token.RBRACKET) {
 		// Parse start/index
@@ -112,18 +112,18 @@ func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 		if p.Match(token.COLON) {
 			// It's a slice
 			idx.IsSlice = true
-			idx.Start = start.(parser.Expr)
+			idx.Start = start
 
 			if !p.Check(token.RBRACKET) {
 				end, err := p.ParseExpression()
 				if err != nil {
 					return nil, fmt.Errorf("array slice: %w", err)
 				}
-				idx.End = end.(parser.Expr)
+				idx.Stop = end
 			}
 		} else {
 			// Simple index
-			idx.Index = start.(parser.Expr)
+			idx.Index = start
 		}
 	}
 
@@ -138,10 +138,10 @@ func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 // The -> has already been consumed.
 // left is the parameter(s) - either ColumnRef or ParenExpr containing params.
 func parseLambdaBody(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
-	lambda := &parser.LambdaExpr{}
+	lambda := &core.LambdaExpr{}
 
 	// Extract parameter names from left
-	params, err := extractLambdaParams(left.(parser.Expr))
+	params, err := extractLambdaParams(left)
 	if err != nil {
 		return nil, err
 	}
@@ -152,35 +152,48 @@ func parseLambdaBody(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 	if err != nil {
 		return nil, fmt.Errorf("lambda body: %w", err)
 	}
-	lambda.Body = body.(parser.Expr)
+	lambda.Body = body
 
 	return lambda, nil
 }
 
 // extractLambdaParams extracts parameter names from a lambda parameter expression.
-func extractLambdaParams(expr parser.Expr) ([]string, error) {
+// Uses type assertions on the underlying AST types via interface checks.
+func extractLambdaParams(expr spi.Expr) ([]string, error) {
+	// Use interface checks to extract parameter info without importing parser
+	type columnRef interface {
+		GetTable() string
+		GetColumn() string
+	}
+	type parenExpr interface {
+		GetExpr() spi.Expr
+	}
+	type binaryExpr interface {
+		GetLeft() spi.Expr
+		GetRight() spi.Expr
+		GetOp() token.TokenType
+	}
+
 	switch e := expr.(type) {
-	case *parser.ColumnRef:
+	case columnRef:
 		// Single parameter: x -> expr
-		if e.Table != "" {
+		if e.GetTable() != "" {
 			return nil, fmt.Errorf("invalid lambda parameter: qualified name not allowed")
 		}
-		return []string{e.Column}, nil
+		return []string{e.GetColumn()}, nil
 
-	case *parser.ParenExpr:
+	case parenExpr:
 		// Parenthesized - could be (x) or need to handle (x, y) differently
-		// In our parser, (x, y) would be parsed as x comma y which isn't a standard expr
-		// Let's handle the single param case first
-		return extractLambdaParams(e.Expr)
+		return extractLambdaParams(e.GetExpr())
 
-	case *parser.BinaryExpr:
-		// For (x, y), the comma might create a binary expression depending on parsing
-		if e.Op == token.COMMA {
-			leftParams, err := extractLambdaParams(e.Left)
+	case binaryExpr:
+		// For (x, y), the comma might create a binary expression
+		if e.GetOp() == token.COMMA {
+			leftParams, err := extractLambdaParams(e.GetLeft())
 			if err != nil {
 				return nil, err
 			}
-			rightParams, err := extractLambdaParams(e.Right)
+			rightParams, err := extractLambdaParams(e.GetRight())
 			if err != nil {
 				return nil, err
 			}

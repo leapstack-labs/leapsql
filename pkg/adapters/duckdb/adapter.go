@@ -12,7 +12,6 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 
 	_ "github.com/marcboeker/go-duckdb" // duckdb driver
@@ -34,9 +33,9 @@ func New(logger *slog.Logger) *Adapter {
 	}
 }
 
-// Dialect returns the SQL dialect configuration for this adapter.
-func (a *Adapter) Dialect() *dialect.Dialect {
-	return duckdbdialect.DuckDB
+// DialectConfig returns the SQL dialect configuration for this adapter.
+func (a *Adapter) DialectConfig() *core.DialectConfig {
+	return duckdbdialect.DuckDB.Config()
 }
 
 // Connect establishes a connection to DuckDB.
@@ -80,7 +79,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg core.AdapterConfig) error {
 
 // GetTableMetadata retrieves metadata for a specified table.
 func (a *Adapter) GetTableMetadata(ctx context.Context, table string) (*core.TableMetadata, error) {
-	return a.GetTableMetadataCommon(ctx, table, a.Dialect())
+	return a.GetTableMetadataCommon(ctx, table, a.DialectConfig())
 }
 
 // LoadCSV loads data from a CSV file into a table.

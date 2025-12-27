@@ -199,7 +199,7 @@ func walkNode(node any, fn func(node any) bool) {
 		Walk(n.Expr, fn)
 		Walk(n.Index, fn)
 		Walk(n.Start, fn)
-		Walk(n.End, fn)
+		Walk(n.Stop, fn)
 
 	case *parser.ListLiteral:
 		if n == nil {

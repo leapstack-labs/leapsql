@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Adapter defines the interface that all database adapters must implement.
@@ -35,8 +34,10 @@ type Adapter interface {
 	// If the table doesn't exist, it will be created with inferred schema.
 	LoadCSV(ctx context.Context, tableName string, filePath string) error
 
-	// Dialect returns the SQL dialect configuration for this adapter.
+	// DialectConfig returns the SQL dialect configuration for this adapter.
 	// This is used to select the appropriate SQL dialect for lineage analysis,
 	// get reserved words, format placeholders, and access dialect-specific settings.
-	Dialect() *dialect.Dialect
+	//
+	// Use dialect.Get(cfg.Name) to obtain the full dialect with parsing capabilities.
+	DialectConfig() *core.DialectConfig
 }

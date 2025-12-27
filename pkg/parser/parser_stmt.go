@@ -247,14 +247,6 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 		switch v := result.(type) {
 		case []Expr:
 			core.GroupBy = v
-		case []spi.Expr:
-			exprs := make([]Expr, len(v))
-			for i, e := range v {
-				if expr, ok := e.(Expr); ok {
-					exprs[i] = expr
-				}
-			}
-			core.GroupBy = exprs
 		case []any:
 			exprs := make([]Expr, len(v))
 			for i, e := range v {
@@ -284,14 +276,6 @@ func (p *Parser) assignToSlot(core *SelectCore, slot spi.ClauseSlot, result any)
 		switch v := result.(type) {
 		case []OrderByItem:
 			core.OrderBy = v
-		case []spi.OrderByItem:
-			items := make([]OrderByItem, len(v))
-			for i, item := range v {
-				if obi, ok := item.(OrderByItem); ok {
-					items[i] = obi
-				}
-			}
-			core.OrderBy = items
 		case []any:
 			items := make([]OrderByItem, len(v))
 			for i, item := range v {
@@ -344,7 +328,7 @@ type FetchClauseData interface {
 // convertToFetchClause converts a dialect-defined FetchClause to parser.FetchClause.
 func convertToFetchClause(result any) *FetchClause {
 	if data, ok := result.(FetchClauseData); ok {
-		count, _ := data.GetCount().(Expr)
+		count := data.GetCount()
 		return &FetchClause{
 			First:    data.GetFirst(),
 			Count:    count,
@@ -435,7 +419,7 @@ func (p *Parser) parseStarModifiers() []StarModifier {
 		}
 
 		if mod != nil {
-			modifiers = append(modifiers, mod.(StarModifier))
+			modifiers = append(modifiers, mod)
 		}
 	}
 

@@ -56,21 +56,25 @@ type StarModifierHandler func(p ParserOps) (StarModifier, error)
 // The sourceTable parameter is the already-parsed left-hand table.
 type FromItemHandler func(p ParserOps, sourceTable TableRef) (TableRef, error)
 
-// TableRef is a table reference node (opaque to avoid circular deps).
-type TableRef interface{}
+// TableRef is a table reference node.
+// This is an alias to core.TableRef for use in handler signatures.
+type TableRef = core.TableRef
 
 // StarModifier is the parsed result for star expression modifiers.
 // This is an alias to core.StarModifier for use in handler signatures.
 type StarModifier = core.StarModifier
 
-// Node is the parsed result (opaque to avoid circular deps).
+// Node is the parsed result (opaque to allow returning slices and markers).
+// Handlers can return core.Node implementations, slices, or marker types.
 type Node interface{}
 
 // Expr is an expression node.
-type Expr interface{}
+// This is an alias to core.Expr for use in handler signatures.
+type Expr = core.Expr
 
 // OrderByItem represents an ORDER BY item.
-type OrderByItem interface{}
+// This is an alias to core.OrderByItem for use in handler signatures.
+type OrderByItem = core.OrderByItem
 
 // Precedence constants for operator precedence parsing.
 const (

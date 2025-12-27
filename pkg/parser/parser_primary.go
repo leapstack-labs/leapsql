@@ -28,7 +28,7 @@ func (p *Parser) parsePrimary() Expr {
 				return nil
 			}
 			if expr != nil {
-				return expr.(Expr)
+				return expr
 			}
 			return nil
 		}

@@ -15,7 +15,7 @@ func (*ExcludeModifier) starModifier() {}
 
 // ReplaceItem represents a single replacement in REPLACE modifier.
 type ReplaceItem struct {
-	Expr  any    // Expression to use (parser.Expr)
+	Expr  Expr   // Expression to use
 	Alias string // Column name to replace
 }
 

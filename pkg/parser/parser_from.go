@@ -57,7 +57,7 @@ func (p *Parser) parseFromItemExtensions(source TableRef) TableRef {
 			break
 		}
 
-		source = result.(TableRef)
+		source = result
 	}
 
 	return source

@@ -68,6 +68,33 @@ const (
 	PlaceholderDollar
 )
 
+// FormatPlaceholder returns a placeholder for the given parameter index (1-based).
+// Returns "?" for PlaceholderQuestion style, "$1", "$2" etc. for PlaceholderDollar style.
+func (p PlaceholderStyle) FormatPlaceholder(index int) string {
+	switch p {
+	case PlaceholderDollar:
+		return "$" + formatInt(index)
+	default: // PlaceholderQuestion
+		return "?"
+	}
+}
+
+// formatInt converts an integer to a string without importing strconv.
+func formatInt(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	if n < 0 {
+		return "-" + formatInt(-n)
+	}
+	var digits []byte
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+	return string(digits)
+}
+
 // IdentifierConfig defines how identifiers are quoted and normalized.
 type IdentifierConfig struct {
 	Quote         string                // Quote character: ", `, [

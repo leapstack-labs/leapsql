@@ -3,7 +3,7 @@ package duckdb
 import (
 	"fmt"
 
-	"github.com/leapstack-labs/leapsql/pkg/parser"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -11,8 +11,8 @@ import (
 // parsePivot handles PIVOT (aggregates FOR column IN (values)).
 // The PIVOT keyword has already been consumed.
 func parsePivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
-	pivot := &parser.PivotTable{
-		Source: source.(parser.TableRef),
+	pivot := &core.PivotTable{
+		Source: source, // spi.TableRef = core.TableRef
 	}
 
 	if err := p.Expect(token.LPAREN); err != nil {
@@ -99,8 +99,8 @@ func parsePivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
 }
 
 // parsePivotAggregate parses an aggregate function in PIVOT.
-func parsePivotAggregate(p spi.ParserOps) (parser.PivotAggregate, error) {
-	agg := parser.PivotAggregate{}
+func parsePivotAggregate(p spi.ParserOps) (core.PivotAggregate, error) {
+	agg := core.PivotAggregate{}
 
 	// Parse the aggregate function call
 	expr, err := p.ParseExpression()
@@ -108,7 +108,7 @@ func parsePivotAggregate(p spi.ParserOps) (parser.PivotAggregate, error) {
 		return agg, fmt.Errorf("PIVOT aggregate: %w", err)
 	}
 
-	fn, ok := expr.(*parser.FuncCall)
+	fn, ok := expr.(*core.FuncCall)
 	if !ok {
 		return agg, fmt.Errorf("PIVOT: expected aggregate function, got %T", expr)
 	}
@@ -127,15 +127,15 @@ func parsePivotAggregate(p spi.ParserOps) (parser.PivotAggregate, error) {
 }
 
 // parsePivotInValue parses a value in PIVOT ... IN (...).
-func parsePivotInValue(p spi.ParserOps) (parser.PivotInValue, error) {
-	val := parser.PivotInValue{}
+func parsePivotInValue(p spi.ParserOps) (core.PivotInValue, error) {
+	val := core.PivotInValue{}
 
 	// Parse value (could be literal, identifier, or expression)
 	expr, err := p.ParseExpression()
 	if err != nil {
 		return val, fmt.Errorf("PIVOT IN value: %w", err)
 	}
-	val.Value = expr.(parser.Expr)
+	val.Value = expr // spi.Expr = core.Expr
 
 	// Optional alias
 	if p.Match(token.AS) {
@@ -152,8 +152,8 @@ func parsePivotInValue(p spi.ParserOps) (parser.PivotInValue, error) {
 // parseUnpivot handles UNPIVOT (value FOR name IN (columns)).
 // The UNPIVOT keyword has already been consumed.
 func parseUnpivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
-	unpivot := &parser.UnpivotTable{
-		Source: source.(parser.TableRef),
+	unpivot := &core.UnpivotTable{
+		Source: source, // spi.TableRef = core.TableRef
 	}
 
 	if err := p.Expect(token.LPAREN); err != nil {
@@ -245,8 +245,8 @@ func parseUnpivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
 }
 
 // parseUnpivotInGroup parses a column group in UNPIVOT ... IN (...).
-func parseUnpivotInGroup(p spi.ParserOps, expectedCols int) (parser.UnpivotInGroup, error) {
-	group := parser.UnpivotInGroup{}
+func parseUnpivotInGroup(p spi.ParserOps, expectedCols int) (core.UnpivotInGroup, error) {
+	group := core.UnpivotInGroup{}
 
 	if expectedCols > 1 && p.Check(token.LPAREN) {
 		// Multiple columns: (col1, col2)

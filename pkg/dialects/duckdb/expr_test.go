@@ -235,7 +235,7 @@ func TestIndexExpr(t *testing.T) {
 
 			if tt.isSlice {
 				assert.Equal(t, tt.hasStart, idx.Start != nil, "hasStart mismatch")
-				assert.Equal(t, tt.hasEnd, idx.End != nil, "hasEnd mismatch")
+				assert.Equal(t, tt.hasEnd, idx.Stop != nil, "hasEnd mismatch")
 			} else {
 				assert.Equal(t, tt.hasIndex, idx.Index != nil, "hasIndex mismatch")
 			}

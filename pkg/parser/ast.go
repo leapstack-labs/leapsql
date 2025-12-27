@@ -5,547 +5,178 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
+// =============================================================================
+// TYPE ALIASES - All AST types are now defined in pkg/core
+// These aliases provide backwards compatibility for existing code.
+// =============================================================================
+
+// SelectStmt and related statement types are aliased from core.
+//
+//nolint:revive // Type alias group - comment documents the group
+type (
+	SelectStmt  = core.SelectStmt
+	WithClause  = core.WithClause
+	CTE         = core.CTE
+	SelectBody  = core.SelectBody
+	SelectCore  = core.SelectCore
+	FetchClause = core.FetchClause
+	WindowDef   = core.WindowDef
+	SelectItem  = core.SelectItem
+	FromClause  = core.FromClause
+	Join        = core.Join
+	OrderByItem = core.OrderByItem
+)
+
+// SetOpType represents set operation types (UNION, INTERSECT, EXCEPT).
+type SetOpType = core.SetOpType
+
+// Set operation constants
+const (
+	SetOpNone      = core.SetOpNone
+	SetOpUnion     = core.SetOpUnion
+	SetOpUnionAll  = core.SetOpUnionAll
+	SetOpIntersect = core.SetOpIntersect
+	SetOpExcept    = core.SetOpExcept
+)
+
+// JoinType represents the type of JOIN operation.
+type JoinType = core.JoinType
+
+// JoinComma constant
+const JoinComma = core.JoinComma
+
+// ColumnRef and related expression types are aliased from core.
+//
+//nolint:revive // Type alias group - comment documents the group
+type (
+	ColumnRef     = core.ColumnRef
+	Literal       = core.Literal
+	BinaryExpr    = core.BinaryExpr
+	UnaryExpr     = core.UnaryExpr
+	FuncCall      = core.FuncCall
+	WindowSpec    = core.WindowSpec
+	FrameSpec     = core.FrameSpec
+	FrameBound    = core.FrameBound
+	CaseExpr      = core.CaseExpr
+	WhenClause    = core.WhenClause
+	CastExpr      = core.CastExpr
+	InExpr        = core.InExpr
+	BetweenExpr   = core.BetweenExpr
+	IsNullExpr    = core.IsNullExpr
+	IsBoolExpr    = core.IsBoolExpr
+	LikeExpr      = core.LikeExpr
+	ParenExpr     = core.ParenExpr
+	StarExpr      = core.StarExpr
+	SubqueryExpr  = core.SubqueryExpr
+	ExistsExpr    = core.ExistsExpr
+	MacroExpr     = core.MacroExpr
+	LambdaExpr    = core.LambdaExpr
+	StructLiteral = core.StructLiteral
+	StructField   = core.StructField
+	ListLiteral   = core.ListLiteral
+	IndexExpr     = core.IndexExpr
+)
+
+// LiteralType represents the type of a literal value.
+type LiteralType = core.LiteralType
+
+// Literal type constants
+const (
+	LiteralNumber = core.LiteralNumber
+	LiteralString = core.LiteralString
+	LiteralBool   = core.LiteralBool
+	LiteralNull   = core.LiteralNull
+)
+
+// FrameType represents window frame types (ROWS, RANGE, GROUPS).
+type FrameType = core.FrameType
+
+// FrameBoundType represents window frame bound types.
+type FrameBoundType = core.FrameBoundType
+
+// Frame type constants
+const (
+	FrameRows   = core.FrameRows
+	FrameRange  = core.FrameRange
+	FrameGroups = core.FrameGroups
+)
+
+// Frame bound type constants
+const (
+	FrameUnboundedPreceding = core.FrameUnboundedPreceding
+	FrameUnboundedFollowing = core.FrameUnboundedFollowing
+	FrameCurrentRow         = core.FrameCurrentRow
+	FrameExprPreceding      = core.FrameExprPreceding
+	FrameExprFollowing      = core.FrameExprFollowing
+)
+
+// TableName and related table reference types are aliased from core.
+//
+//nolint:revive // Type alias group - comment documents the group
+type (
+	TableName      = core.TableName
+	DerivedTable   = core.DerivedTable
+	LateralTable   = core.LateralTable
+	MacroTable     = core.MacroTable
+	PivotTable     = core.PivotTable
+	PivotAggregate = core.PivotAggregate
+	PivotInValue   = core.PivotInValue
+	UnpivotTable   = core.UnpivotTable
+	UnpivotInGroup = core.UnpivotInGroup
+)
+
+// NodeInfo and related node types/interfaces are aliased from core.
+//
+//nolint:revive // Type alias group - comment documents the group
+type (
+	NodeInfo = core.NodeInfo
+	Node     = core.Node
+	Expr     = core.Expr
+	Stmt     = core.Stmt
+	TableRef = core.TableRef
+)
+
+// StarModifier and related star modifier types are aliased from core.
+//
+//nolint:revive // Type alias group - comment documents the group
+type (
+	StarModifier    = core.StarModifier
+	ExcludeModifier = core.ExcludeModifier
+	ReplaceItem     = core.ReplaceItem
+	ReplaceModifier = core.ReplaceModifier
+	RenameItem      = core.RenameItem
+	RenameModifier  = core.RenameModifier
+)
+
+// =============================================================================
+// INTERFACES - These define what types implement for compatibility checks
+// =============================================================================
+
 // Statement represents a SQL statement.
+//
+// Deprecated: Use core.Stmt instead.
 type Statement interface {
 	stmtNode()
 }
 
-// Expr represents an expression in SQL.
-type Expr interface {
-	exprNode()
-}
-
-// TableRef represents a table reference in FROM clause.
-type TableRef interface {
-	tableRefNode()
-}
-
-// NodeInfo provides common fields for all AST nodes.
-// Embed this in node types that need position/comment tracking.
-type NodeInfo struct {
-	Span             token.Span
-	LeadingComments  []*token.Comment
-	TrailingComments []*token.Comment
-}
+// =============================================================================
+// HELPER FUNCTIONS - Position/span helpers for NodeInfo
+// =============================================================================
 
 // GetSpan returns the node's source span.
-func (n *NodeInfo) GetSpan() token.Span {
-	return n.Span
+// Note: This is now a method on NodeInfo in core, but kept for compatibility.
+func GetSpan(n *NodeInfo) token.Span {
+	return n.GetSpan()
 }
 
 // AddLeadingComment adds a leading comment to the node.
-func (n *NodeInfo) AddLeadingComment(c *token.Comment) {
-	n.LeadingComments = append(n.LeadingComments, c)
+// Note: This is now a method on NodeInfo in core, but kept for compatibility.
+func AddLeadingComment(n *NodeInfo, c *token.Comment) {
+	n.AddLeadingComment(c)
 }
 
 // AddTrailingComment adds a trailing comment to the node.
-func (n *NodeInfo) AddTrailingComment(c *token.Comment) {
-	n.TrailingComments = append(n.TrailingComments, c)
-}
-
-// ---------- Statement Types ----------
-
-// SelectStmt represents a complete SELECT statement with optional WITH clause.
-type SelectStmt struct {
-	NodeInfo
-	With *WithClause
-	Body *SelectBody
-}
-
-func (*SelectStmt) stmtNode() {}
-
-// WithClause represents a WITH clause with CTEs.
-type WithClause struct {
-	NodeInfo
-	Recursive bool
-	CTEs      []*CTE
-}
-
-// CTE represents a Common Table Expression.
-type CTE struct {
-	NodeInfo
-	Name   string
-	Select *SelectStmt
-}
-
-// SelectBody represents the body of a SELECT with possible set operations.
-type SelectBody struct {
-	NodeInfo
-	Left   *SelectCore
-	Op     SetOpType   // UNION, INTERSECT, EXCEPT, or empty
-	All    bool        // UNION ALL
-	ByName bool        // DuckDB: BY NAME (match columns by name, not position)
-	Right  *SelectBody // For chained set operations
-}
-
-// SetOpType represents the type of set operation.
-type SetOpType string
-
-// SetOpType constants for set operations in queries.
-const (
-	SetOpNone      SetOpType = ""
-	SetOpUnion     SetOpType = "UNION"
-	SetOpUnionAll  SetOpType = "UNION ALL"
-	SetOpIntersect SetOpType = "INTERSECT"
-	SetOpExcept    SetOpType = "EXCEPT"
-)
-
-// SelectCore represents the core SELECT clause.
-type SelectCore struct {
-	NodeInfo
-	Distinct       bool
-	Columns        []SelectItem
-	From           *FromClause
-	Where          Expr
-	GroupBy        []Expr
-	GroupByAll     bool // DuckDB: GROUP BY ALL (auto-group by non-aggregate columns)
-	Having         Expr
-	Windows        []WindowDef // Named window definitions (WINDOW clause)
-	Qualify        Expr        // DuckDB/Snowflake window function filter
-	OrderBy        []OrderByItem
-	OrderByAll     bool // DuckDB: ORDER BY ALL (order by all select columns)
-	OrderByAllDesc bool // DuckDB: Direction for ORDER BY ALL (true = DESC)
-	Limit          Expr
-	Offset         Expr
-	Fetch          *FetchClause // FETCH FIRST/NEXT support (SQL:2008)
-
-	// Extensions holds rare/custom dialect-specific nodes (e.g., CONNECT BY, SAMPLE).
-	// Use this for dialect features that are too specialized to warrant typed fields.
-	Extensions []Node
-}
-
-// Node is a generic AST node interface for extensions.
-type Node interface {
-	node()
-}
-
-// FetchClause represents FETCH FIRST/NEXT n ROWS ONLY/WITH TIES (SQL:2008).
-type FetchClause struct {
-	First    bool // true = FIRST, false = NEXT (semantically identical)
-	Count    Expr // Number of rows (nil = 1 row implied)
-	Percent  bool // FETCH FIRST n PERCENT ROWS
-	WithTies bool // true = WITH TIES, false = ONLY
-}
-
-func (*FetchClause) node() {}
-
-// WindowDef represents a named window definition in the WINDOW clause.
-// Example: WINDOW w AS (PARTITION BY x ORDER BY y)
-type WindowDef struct {
-	Name string
-	Spec *WindowSpec
-}
-
-func (WindowDef) node() {}
-
-// SelectItem represents an item in the SELECT list.
-type SelectItem struct {
-	Star      bool                // SELECT *
-	TableStar string              // SELECT t.*
-	Expr      Expr                // Expression
-	Alias     string              // AS alias
-	Modifiers []core.StarModifier // DuckDB: EXCLUDE, REPLACE, RENAME modifiers
-}
-
-// StarModifier is an alias to core.StarModifier for backwards compatibility.
-// Deprecated: Use core.StarModifier directly.
-type StarModifier = core.StarModifier
-
-// ExcludeModifier is an alias to core.ExcludeModifier for backwards compatibility.
-// Deprecated: Use core.ExcludeModifier directly.
-type ExcludeModifier = core.ExcludeModifier
-
-// ReplaceItem is an alias to core.ReplaceItem for backwards compatibility.
-// Deprecated: Use core.ReplaceItem directly.
-type ReplaceItem = core.ReplaceItem
-
-// ReplaceModifier is an alias to core.ReplaceModifier for backwards compatibility.
-// Deprecated: Use core.ReplaceModifier directly.
-type ReplaceModifier = core.ReplaceModifier
-
-// RenameItem is an alias to core.RenameItem for backwards compatibility.
-// Deprecated: Use core.RenameItem directly.
-type RenameItem = core.RenameItem
-
-// RenameModifier is an alias to core.RenameModifier for backwards compatibility.
-// Deprecated: Use core.RenameModifier directly.
-type RenameModifier = core.RenameModifier
-
-// FromClause represents the FROM clause.
-type FromClause struct {
-	NodeInfo
-	Source TableRef
-	Joins  []*Join
-}
-
-// Join represents a JOIN clause.
-type Join struct {
-	NodeInfo
-	Type      JoinType
-	Natural   bool // NATURAL JOIN modifier
-	Right     TableRef
-	Condition Expr     // ON clause (mutually exclusive with Using)
-	Using     []string // USING (col1, col2) columns
-}
-
-// JoinType represents the type of join.
-// The value is the SQL keyword (e.g., "LEFT", "INNER", "SEMI").
-// Join type constants are defined in their respective dialect packages:
-//   - Standard joins (INNER, LEFT, RIGHT, FULL, CROSS): pkg/dialect/joins.go
-//   - DuckDB joins (SEMI, ANTI, ASOF, POSITIONAL): pkg/dialects/duckdb/join_types.go
-type JoinType string
-
-// JoinComma represents an implicit cross join using comma syntax.
-// This is kept in the parser package because it's syntactically unique
-// (not a TYPE JOIN keyword pattern) and universal across all SQL dialects.
-const JoinComma JoinType = ","
-
-// OrderByItem represents an item in ORDER BY clause.
-type OrderByItem struct {
-	Expr       Expr
-	Desc       bool
-	NullsFirst *bool // nil means default, true = NULLS FIRST, false = NULLS LAST
-}
-
-// ---------- Table Reference Types ----------
-
-// TableName represents a table name reference.
-type TableName struct {
-	NodeInfo
-	Catalog string
-	Schema  string
-	Name    string
-	Alias   string
-}
-
-func (*TableName) tableRefNode() {}
-
-// DerivedTable represents a subquery in FROM clause.
-type DerivedTable struct {
-	NodeInfo
-	Select *SelectStmt
-	Alias  string
-}
-
-func (*DerivedTable) tableRefNode() {}
-
-// LateralTable represents a LATERAL subquery.
-type LateralTable struct {
-	NodeInfo
-	Select *SelectStmt
-	Alias  string
-}
-
-func (*LateralTable) tableRefNode() {}
-
-// MacroTable represents a macro used as a table reference (e.g., {{ ref('table') }}).
-type MacroTable struct {
-	NodeInfo
-	Content string // raw {{ ... }} content including delimiters
-	Alias   string
-}
-
-func (*MacroTable) tableRefNode() {}
-
-// ---------- Expression Types ----------
-
-// ColumnRef represents a column reference (possibly qualified).
-type ColumnRef struct {
-	Table  string // optional table/alias qualifier
-	Column string
-}
-
-func (*ColumnRef) exprNode() {}
-
-// Literal represents a literal value.
-type Literal struct {
-	Type  LiteralType
-	Value string
-}
-
-func (*Literal) exprNode() {}
-
-// LiteralType represents the type of a literal.
-type LiteralType int
-
-// LiteralType constants for SQL literal value types.
-const (
-	LiteralNumber LiteralType = iota
-	LiteralString
-	LiteralBool
-	LiteralNull
-)
-
-// BinaryExpr represents a binary expression.
-type BinaryExpr struct {
-	Left  Expr
-	Op    token.TokenType
-	Right Expr
-}
-
-func (*BinaryExpr) exprNode() {}
-
-// UnaryExpr represents a unary expression.
-type UnaryExpr struct {
-	Op   token.TokenType
-	Expr Expr
-}
-
-func (*UnaryExpr) exprNode() {}
-
-// FuncCall represents a function call.
-type FuncCall struct {
-	Name     string
-	Distinct bool
-	Args     []Expr
-	Star     bool        // COUNT(*)
-	Window   *WindowSpec // OVER clause
-	Filter   Expr        // FILTER (WHERE ...) clause
-}
-
-func (*FuncCall) exprNode() {}
-
-// WindowSpec represents a window specification (OVER clause).
-type WindowSpec struct {
-	Name        string // Named window reference
-	PartitionBy []Expr
-	OrderBy     []OrderByItem
-	Frame       *FrameSpec
-}
-
-// FrameSpec represents a window frame specification.
-type FrameSpec struct {
-	Type  FrameType
-	Start *FrameBound
-	End   *FrameBound
-}
-
-// FrameType represents the type of window frame.
-type FrameType string
-
-// FrameType constants for window frame specification types.
-const (
-	FrameRows   FrameType = "ROWS"
-	FrameRange  FrameType = "RANGE"
-	FrameGroups FrameType = "GROUPS"
-)
-
-// FrameBound represents a window frame bound.
-type FrameBound struct {
-	Type   FrameBoundType
-	Offset Expr // for N PRECEDING/FOLLOWING
-}
-
-// FrameBoundType represents the type of frame bound.
-type FrameBoundType string
-
-// FrameBoundType constants for window frame bound types.
-const (
-	FrameUnboundedPreceding FrameBoundType = "UNBOUNDED PRECEDING"
-	FrameUnboundedFollowing FrameBoundType = "UNBOUNDED FOLLOWING"
-	FrameCurrentRow         FrameBoundType = "CURRENT ROW"
-	FrameExprPreceding      FrameBoundType = "EXPR PRECEDING"
-	FrameExprFollowing      FrameBoundType = "EXPR FOLLOWING"
-)
-
-// CaseExpr represents a CASE expression.
-type CaseExpr struct {
-	Operand Expr // CASE operand WHEN... (optional)
-	Whens   []WhenClause
-	Else    Expr
-}
-
-func (*CaseExpr) exprNode() {}
-
-// WhenClause represents a WHEN clause in CASE expression.
-type WhenClause struct {
-	Condition Expr
-	Result    Expr
-}
-
-// CastExpr represents a CAST expression.
-type CastExpr struct {
-	Expr     Expr
-	TypeName string
-}
-
-func (*CastExpr) exprNode() {}
-
-// InExpr represents an IN expression.
-type InExpr struct {
-	Expr   Expr
-	Not    bool
-	Values []Expr      // IN (1, 2, 3)
-	Query  *SelectStmt // IN (SELECT ...)
-}
-
-func (*InExpr) exprNode() {}
-
-// BetweenExpr represents a BETWEEN expression.
-type BetweenExpr struct {
-	Expr Expr
-	Not  bool
-	Low  Expr
-	High Expr
-}
-
-func (*BetweenExpr) exprNode() {}
-
-// IsNullExpr represents an IS NULL expression.
-type IsNullExpr struct {
-	Expr Expr
-	Not  bool
-}
-
-func (*IsNullExpr) exprNode() {}
-
-// IsBoolExpr represents an IS [NOT] TRUE/FALSE expression.
-type IsBoolExpr struct {
-	Expr  Expr
-	Not   bool
-	Value bool // true for IS TRUE, false for IS FALSE
-}
-
-func (*IsBoolExpr) exprNode() {}
-
-// LikeExpr represents a LIKE expression.
-type LikeExpr struct {
-	Expr    Expr
-	Not     bool
-	Pattern Expr
-	Op      token.TokenType // token.LIKE or dialect-registered ILIKE
-}
-
-func (*LikeExpr) exprNode() {}
-
-// ParenExpr represents a parenthesized expression.
-type ParenExpr struct {
-	Expr Expr
-}
-
-func (*ParenExpr) exprNode() {}
-
-// StarExpr represents a * expression (for SELECT *).
-type StarExpr struct {
-	Table string // optional table qualifier for t.*
-}
-
-func (*StarExpr) exprNode() {}
-
-// SubqueryExpr represents a subquery used as an expression (e.g., in EXISTS).
-type SubqueryExpr struct {
-	Select *SelectStmt
-}
-
-func (*SubqueryExpr) exprNode() {}
-
-// ExistsExpr represents an EXISTS expression.
-type ExistsExpr struct {
-	Not    bool
-	Select *SelectStmt
-}
-
-func (*ExistsExpr) exprNode() {}
-
-// MacroExpr represents a template macro expression (e.g., {{ ref('table') }}).
-type MacroExpr struct {
-	NodeInfo
-	Content string // raw {{ ... }} content including delimiters
-}
-
-func (*MacroExpr) exprNode() {}
-
-// ---------- DuckDB Expression Extensions ----------
-
-// LambdaExpr represents a lambda expression: x -> expr or (x, y) -> expr.
-// Used with list functions like list_transform, list_filter, list_reduce.
-type LambdaExpr struct {
-	Params []string // Parameter names
-	Body   Expr     // Lambda body expression
-}
-
-func (*LambdaExpr) exprNode() {}
-
-// StructLiteral represents a struct literal: {'key': value, ...}.
-// DuckDB syntax for creating anonymous structs/records.
-type StructLiteral struct {
-	Fields []StructField
-}
-
-func (*StructLiteral) exprNode() {}
-
-// StructField represents a field in a struct literal.
-type StructField struct {
-	Key   string // Field name (can be identifier or string)
-	Value Expr   // Field value
-}
-
-// ListLiteral represents a list/array literal: [expr, expr, ...].
-// DuckDB syntax for creating array values.
-type ListLiteral struct {
-	Elements []Expr
-}
-
-func (*ListLiteral) exprNode() {}
-
-// IndexExpr represents array indexing or slicing: arr[i] or arr[start:end].
-// Supports DuckDB array subscript and slice syntax.
-type IndexExpr struct {
-	Expr  Expr // The expression being indexed
-	Index Expr // Simple index (non-nil if not a slice)
-	// For slicing (arr[start:end])
-	IsSlice bool
-	Start   Expr // nil means from beginning
-	End     Expr // nil means to end
-}
-
-func (*IndexExpr) exprNode() {}
-
-// ---------- DuckDB PIVOT/UNPIVOT Table References ----------
-
-// PivotTable represents a PIVOT operation in FROM clause.
-// SELECT * FROM table PIVOT (agg FOR col IN (values))
-type PivotTable struct {
-	NodeInfo
-	Source     TableRef         // The source table/subquery
-	Aggregates []PivotAggregate // Aggregate functions to compute
-	ForColumn  string           // Column to pivot on
-	InValues   []PivotInValue   // Values to pivot (or InStar=true for *)
-	InStar     bool             // true if IN *
-	Alias      string           // Optional alias
-}
-
-func (*PivotTable) tableRefNode() {}
-
-// PivotAggregate represents an aggregate in PIVOT.
-type PivotAggregate struct {
-	Func  *FuncCall // The aggregate function
-	Alias string    // Optional alias for the result columns
-}
-
-// PivotInValue represents a value in PIVOT ... IN (...).
-type PivotInValue struct {
-	Value Expr   // The value (literal, identifier, or expression)
-	Alias string // Optional column name alias
-}
-
-// UnpivotTable represents an UNPIVOT operation in FROM clause.
-// SELECT * FROM table UNPIVOT (value FOR name IN (columns))
-type UnpivotTable struct {
-	NodeInfo
-	Source       TableRef         // The source table/subquery
-	ValueColumns []string         // Output column(s) for values
-	NameColumn   string           // Output column for names
-	InColumns    []UnpivotInGroup // Source columns to unpivot
-	Alias        string           // Optional alias
-}
-
-func (*UnpivotTable) tableRefNode() {}
-
-// UnpivotInGroup represents a group of columns in UNPIVOT ... IN (...).
-// For simple UNPIVOT: single column per group.
-// For multi-column UNPIVOT: multiple columns per group.
-type UnpivotInGroup struct {
-	Columns []string // Column name(s) in this group
-	Alias   string   // Optional row value alias
+// Note: This is now a method on NodeInfo in core, but kept for compatibility.
+func AddTrailingComment(n *NodeInfo, c *token.Comment) {
+	n.AddTrailingComment(c)
 }
