@@ -21,6 +21,20 @@ var SelfAlias = sql.RuleDef{
 	Description: "Table aliased to its own name is redundant.",
 	Severity:    lint.SeverityHint,
 	Check:       checkSelfAlias,
+
+	Rationale: `Aliasing a table to its own name (e.g., customers AS customers) adds 
+verbosity without any benefit. It may indicate copy-paste errors or incomplete 
+refactoring. Either use a shorter alias or remove the redundant alias entirely.`,
+
+	BadExample: `SELECT customers.id, customers.name
+FROM customers AS customers
+WHERE customers.status = 'active'`,
+
+	GoodExample: `SELECT customers.id, customers.name
+FROM customers
+WHERE customers.status = 'active'`,
+
+	Fix: "Remove the redundant alias, or use a shorter meaningful alias if abbreviation is desired.",
 }
 
 func checkSelfAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

@@ -19,6 +19,20 @@ var AmbiguousColumnRef = sql.RuleDef{
 	Description: "Unqualified column reference may be ambiguous with multiple tables.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkAmbiguousColumnRef,
+
+	Rationale: `When multiple tables are joined, unqualified column names may exist in 
+more than one table. The database may pick an unexpected source, or error out. 
+Qualifying columns prevents ambiguity and makes the query self-documenting.`,
+
+	BadExample: `SELECT name, email, created_at
+FROM customers c
+JOIN orders o ON o.customer_id = c.id`,
+
+	GoodExample: `SELECT c.name, c.email, o.created_at
+FROM customers c
+JOIN orders o ON o.customer_id = c.id`,
+
+	Fix: "Prefix column references with the table alias (e.g., c.name instead of name).",
 }
 
 func checkAmbiguousColumnRef(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

@@ -18,6 +18,25 @@ func init() {
 		Description: "JOINs with no visible join keys in column lineage",
 		Severity:    lint.SeverityWarning,
 		Check:       checkImplicitCrossJoin,
+
+		Rationale: `When a model references multiple tables but no column expression bridges them, it may indicate 
+a missing JOIN condition (Cartesian product). Cross joins are rarely intentional and can cause 
+massive data explosion. This rule uses column lineage to detect potential cross-join scenarios.`,
+
+		BadExample: `SELECT 
+  o.id,
+  o.amount,
+  c.name  -- No column references both 'o' and 'c' tables
+FROM orders o, customers c  -- Implicit cross join`,
+
+		GoodExample: `SELECT 
+  o.id,
+  o.amount,
+  c.name
+FROM orders o
+JOIN customers c ON o.customer_id = c.id  -- Explicit join condition`,
+
+		Fix: "Add explicit JOIN conditions between all referenced tables, or confirm that a cross join is intentional.",
 	})
 }
 

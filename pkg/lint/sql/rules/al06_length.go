@@ -22,6 +22,20 @@ var AliasLength = sql.RuleDef{
 	Severity:    lint.SeverityInfo,
 	ConfigKeys:  []string{"min_length", "max_length"},
 	Check:       checkAliasLength,
+
+	Rationale: `Overly short aliases (single letters) lack meaning and make queries 
+harder to understand. Overly long aliases add verbosity without improving clarity 
+and may exceed database identifier limits. Balance brevity with descriptiveness.`,
+
+	BadExample: `SELECT a.customer_name, b.order_total
+FROM customers_with_active_subscriptions_table a
+JOIN order_history_last_30_days b ON b.customer_id = a.id`,
+
+	GoodExample: `SELECT cust.customer_name, orders.order_total
+FROM customers_with_active_subscriptions_table cust
+JOIN order_history_last_30_days orders ON orders.customer_id = cust.id`,
+
+	Fix: "Choose aliases that are descriptive but concise, typically 2-10 characters. Use meaningful abbreviations.",
 }
 
 const (

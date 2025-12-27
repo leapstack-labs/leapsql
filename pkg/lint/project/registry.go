@@ -26,6 +26,12 @@ type RuleDef struct {
 	Severity    lint.Severity // Default severity (uses unified lint.Severity)
 	Check       Check         // The check function
 	ConfigKeys  []string      // Configuration keys this rule accepts
+
+	// Documentation fields for richer rule documentation
+	Rationale   string // Why this rule exists, what problems it prevents
+	BadExample  string // Code showing the anti-pattern
+	GoodExample string // Code showing the correct pattern
+	Fix         string // How to fix violations (when not obvious)
 }
 
 // Check is the function signature for project-level rule checks.
@@ -120,6 +126,12 @@ func (w *wrappedProjectRule) Group() string                  { return w.def.Grou
 func (w *wrappedProjectRule) Description() string            { return w.def.Description }
 func (w *wrappedProjectRule) DefaultSeverity() lint.Severity { return w.def.Severity }
 func (w *wrappedProjectRule) ConfigKeys() []string           { return w.def.ConfigKeys }
+
+// Documentation methods
+func (w *wrappedProjectRule) Rationale() string   { return w.def.Rationale }
+func (w *wrappedProjectRule) BadExample() string  { return w.def.BadExample }
+func (w *wrappedProjectRule) GoodExample() string { return w.def.GoodExample }
+func (w *wrappedProjectRule) Fix() string         { return w.def.Fix }
 
 func (w *wrappedProjectRule) CheckProject(ctx lint.ProjectContext) []lint.Diagnostic {
 	// Convert lint.ProjectContext to our internal Context

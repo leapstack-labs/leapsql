@@ -19,6 +19,20 @@ var JoinConditionTables = sql.RuleDef{
 	Description: "Join condition should reference both tables being joined.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkJoinConditionTables,
+
+	Rationale: `A JOIN condition that doesn't reference the joined table is likely a bug. 
+It effectively creates a cross join filtered by the condition, which is rarely intended. 
+Each JOIN's ON clause should reference both the preceding and joining tables.`,
+
+	BadExample: `SELECT c.name, o.total
+FROM customers c
+JOIN orders o ON c.status = 'active'`,
+
+	GoodExample: `SELECT c.name, o.total
+FROM customers c
+JOIN orders o ON o.customer_id = c.id`,
+
+	Fix: "Ensure the JOIN condition references columns from both the left and right tables.",
 }
 
 func checkJoinConditionTables(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

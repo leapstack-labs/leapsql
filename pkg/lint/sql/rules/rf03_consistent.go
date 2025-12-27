@@ -19,6 +19,20 @@ var ConsistentQualification = sql.RuleDef{
 	Description: "Column qualification style should be consistent.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkConsistentQualification,
+
+	Rationale: `Mixing qualified and unqualified column references in the same query reduces readability. 
+A consistent style makes it easier to understand which table each column comes from and helps 
+reviewers quickly verify query correctness.`,
+
+	BadExample: `SELECT customers.name, amount, customers.email
+FROM customers
+JOIN orders ON customers.id = orders.customer_id`,
+
+	GoodExample: `SELECT customers.name, orders.amount, customers.email
+FROM customers
+JOIN orders ON customers.id = orders.customer_id`,
+
+	Fix: "Use the same qualification style (qualified or unqualified) for all column references.",
 }
 
 func checkConsistentQualification(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

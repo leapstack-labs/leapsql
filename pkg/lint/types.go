@@ -70,6 +70,12 @@ type RuleDef struct {
 	Check       CheckFunc // The check function
 	ConfigKeys  []string  // Configuration keys this rule accepts (for rule-specific options)
 	Dialects    []string  // Restrict to specific dialects; nil/empty means all dialects
+
+	// Documentation fields for richer rule documentation
+	Rationale   string // Why this rule exists, what problems it prevents
+	BadExample  string // Code showing the anti-pattern
+	GoodExample string // Code showing the correct pattern
+	Fix         string // How to fix violations (when not obvious)
 }
 
 // CheckFunc analyzes a statement and returns diagnostics.
@@ -141,6 +147,12 @@ type Rule interface {
 
 	// ConfigKeys returns configuration keys this rule accepts
 	ConfigKeys() []string
+
+	// Documentation methods for richer rule documentation
+	Rationale() string   // Why this rule exists, what problems it prevents
+	BadExample() string  // Code showing the anti-pattern
+	GoodExample() string // Code showing the correct pattern
+	Fix() string         // How to fix violations (when not obvious)
 }
 
 // SQLRule analyzes individual SQL statements.
@@ -176,6 +188,12 @@ type RuleInfo struct {
 	ConfigKeys      []string `json:"config_keys,omitempty"`
 	Dialects        []string `json:"dialects,omitempty"` // Only for SQL rules
 	Type            string   `json:"type"`               // "sql" or "project"
+
+	// Documentation fields
+	Rationale   string `json:"rationale,omitempty"`
+	BadExample  string `json:"bad_example,omitempty"`
+	GoodExample string `json:"good_example,omitempty"`
+	Fix         string `json:"fix,omitempty"`
 }
 
 // GetRuleInfo extracts metadata from a Rule for documentation/tooling.
@@ -187,6 +205,10 @@ func GetRuleInfo(r Rule) RuleInfo {
 		Description:     r.Description(),
 		DefaultSeverity: r.DefaultSeverity(),
 		ConfigKeys:      r.ConfigKeys(),
+		Rationale:       r.Rationale(),
+		BadExample:      r.BadExample(),
+		GoodExample:     r.GoodExample(),
+		Fix:             r.Fix(),
 	}
 
 	// Check if it's an SQL rule with dialect restrictions
@@ -221,6 +243,12 @@ func (w *wrappedRuleDef) Description() string       { return w.def.Description }
 func (w *wrappedRuleDef) DefaultSeverity() Severity { return w.def.Severity }
 func (w *wrappedRuleDef) ConfigKeys() []string      { return w.def.ConfigKeys }
 func (w *wrappedRuleDef) Dialects() []string        { return w.def.Dialects }
+
+// Documentation methods
+func (w *wrappedRuleDef) Rationale() string   { return w.def.Rationale }
+func (w *wrappedRuleDef) BadExample() string  { return w.def.BadExample }
+func (w *wrappedRuleDef) GoodExample() string { return w.def.GoodExample }
+func (w *wrappedRuleDef) Fix() string         { return w.def.Fix }
 
 func (w *wrappedRuleDef) CheckSQL(stmt any, dialect DialectInfo, opts map[string]any) []Diagnostic {
 	return w.def.Check(stmt, dialect, opts)

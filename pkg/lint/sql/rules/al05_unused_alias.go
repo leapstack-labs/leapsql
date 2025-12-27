@@ -21,6 +21,20 @@ var UnusedTableAlias = sql.RuleDef{
 	Description: "Table alias is defined but not referenced.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkUnusedTableAlias,
+
+	Rationale: `Unused table aliases add noise without providing clarity. They may indicate 
+incomplete refactoring or copy-paste errors. If you alias a table, use that alias 
+consistently to improve query readability.`,
+
+	BadExample: `SELECT id, name, email
+FROM customers c
+WHERE status = 'active'`,
+
+	GoodExample: `SELECT c.id, c.name, c.email
+FROM customers c
+WHERE c.status = 'active'`,
+
+	Fix: "Either use the alias when referencing columns from this table, or remove the alias if it's not needed.",
 }
 
 func checkUnusedTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

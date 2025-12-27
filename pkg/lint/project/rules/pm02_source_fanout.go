@@ -18,6 +18,24 @@ func init() {
 		Description: "Source referenced by multiple non-staging models",
 		Severity:    lint.SeverityWarning,
 		Check:       checkSourceFanout,
+
+		Rationale: `Each raw source should be referenced by exactly one staging model, which then provides a clean 
+interface for downstream models. When multiple non-staging models reference the same source directly, 
+transformation logic gets duplicated and changes to the source require updates in multiple places.`,
+
+		BadExample: `-- models/marts/fct_orders.sql
+SELECT * FROM raw_orders  -- Direct source reference
+
+-- models/marts/fct_revenue.sql  
+SELECT * FROM raw_orders  -- Same source, duplicated reference`,
+
+		GoodExample: `-- models/staging/stg_orders.sql
+SELECT * FROM raw_orders  -- Single staging model for source
+
+-- models/marts/fct_orders.sql
+SELECT * FROM {{ ref('stg_orders') }}  -- Reference staging model`,
+
+		Fix: "Create a staging model for the source and have all downstream models reference the staging model instead.",
 	})
 }
 

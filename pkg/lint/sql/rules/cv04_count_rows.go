@@ -21,6 +21,24 @@ var CountStyle = sql.RuleDef{
 	Description: "Prefer COUNT(*) over COUNT(1) for counting rows.",
 	Severity:    lint.SeverityHint,
 	Check:       checkCountStyle,
+
+	Rationale: `COUNT(*) is the standard and most readable way to count rows. COUNT(1) 
+achieves the same result but is less intuitive. Modern query optimizers treat them 
+identically, so there's no performance benefit to COUNT(1). Use COUNT(*) for clarity.`,
+
+	BadExample: `SELECT
+    department,
+    COUNT(1) AS employee_count
+FROM employees
+GROUP BY department`,
+
+	GoodExample: `SELECT
+    department,
+    COUNT(*) AS employee_count
+FROM employees
+GROUP BY department`,
+
+	Fix: "Replace COUNT(1) with COUNT(*) for counting rows.",
 }
 
 func checkCountStyle(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

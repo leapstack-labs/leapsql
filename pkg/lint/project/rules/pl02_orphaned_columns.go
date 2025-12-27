@@ -17,6 +17,20 @@ func init() {
 		Description: "Columns not used by any downstream model",
 		Severity:    lint.SeverityInfo,
 		Check:       checkOrphanedColumns,
+
+		Rationale: `Columns that are computed but never used by downstream models represent wasted compute and storage. 
+These "orphan" columns often accumulate over time as requirements change but models aren't cleaned up. 
+Removing them reduces costs and simplifies the data model.`,
+
+		BadExample: `-- int_orders.sql outputs: id, amount, tax, discount, shipping, notes
+-- fct_revenue.sql only uses: id, amount, tax
+-- 'discount', 'shipping', 'notes' are orphaned`,
+
+		GoodExample: `-- int_orders.sql outputs: id, amount, tax
+-- fct_revenue.sql uses: id, amount, tax
+-- All columns are consumed downstream`,
+
+		Fix: "Remove columns that are not consumed by any downstream model, or document why they should be retained.",
 	})
 }
 

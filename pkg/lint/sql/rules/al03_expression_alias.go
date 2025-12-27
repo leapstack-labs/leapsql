@@ -19,6 +19,26 @@ var ExpressionAlias = sql.RuleDef{
 	Description: "Expression columns should have explicit aliases.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkExpressionAlias,
+
+	Rationale: `Expressions without aliases produce auto-generated column names that vary 
+by database (e.g., "?column?", "expr0", "count(*)"). Explicit aliases make query results 
+predictable and self-documenting, improving usability for downstream consumers.`,
+
+	BadExample: `SELECT
+    first_name || ' ' || last_name,
+    UPPER(email),
+    COUNT(*)
+FROM users
+GROUP BY 1, 2`,
+
+	GoodExample: `SELECT
+    first_name || ' ' || last_name AS full_name,
+    UPPER(email) AS email_upper,
+    COUNT(*) AS user_count
+FROM users
+GROUP BY 1, 2`,
+
+	Fix: "Add an explicit alias using AS to give the expression a meaningful name.",
 }
 
 func checkExpressionAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

@@ -16,6 +16,21 @@ func init() {
 		Description: "Marts or intermediate model depends directly on source (not staging)",
 		Severity:    lint.SeverityWarning,
 		Check:       checkDownstreamOnSource,
+
+		Rationale: `The recommended transformation pattern is Sources → Staging → Intermediate → Marts. When marts 
+or intermediate models reference sources directly, they bypass data cleaning in staging, leading to 
+duplicated transformation logic and making lineage harder to understand.`,
+
+		BadExample: `-- models/marts/fct_orders.sql
+SELECT * FROM raw.orders  -- Direct source reference in marts`,
+
+		GoodExample: `-- models/staging/stg_orders.sql
+SELECT * FROM raw.orders
+
+-- models/marts/fct_orders.sql  
+SELECT * FROM {{ ref('stg_orders') }}  -- Reference staging`,
+
+		Fix: "Create a staging model for the source and reference it instead of the raw source.",
 	})
 }
 

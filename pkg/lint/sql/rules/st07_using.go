@@ -20,6 +20,20 @@ var PreferUsing = sql.RuleDef{
 	Description: "Prefer USING clause for simple equality joins on same-named columns.",
 	Severity:    lint.SeverityHint,
 	Check:       checkPreferUsing,
+
+	Rationale: `The USING clause is more concise than ON when joining tables on columns with identical names. 
+It clearly communicates that the join is on matching column names and automatically deduplicates the join 
+column in the result set.`,
+
+	BadExample: `SELECT *
+FROM orders o
+JOIN customers c ON o.customer_id = c.customer_id`,
+
+	GoodExample: `SELECT *
+FROM orders o
+JOIN customers c USING (customer_id)`,
+
+	Fix: "Replace ON with USING when joining on columns that have the same name in both tables.",
 }
 
 func checkPreferUsing(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

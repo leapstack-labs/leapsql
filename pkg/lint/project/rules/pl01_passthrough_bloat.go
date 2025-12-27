@@ -17,6 +17,26 @@ func init() {
 		Severity:    lint.SeverityWarning,
 		Check:       checkPassthroughBloat,
 		ConfigKeys:  []string{"threshold"},
+
+		Rationale: `Models with many passthrough columns (direct copies without transformation) indicate a "SELECT *" 
+style that doesn't add value and increases data movement. Explicit column selection ensures only 
+necessary data is processed and makes dependencies clear.`,
+
+		BadExample: `SELECT
+  id, name, email, phone, address,  -- All passthrough
+  created_at, updated_at, deleted_at,
+  field1, field2, field3, field4, field5  -- 20+ columns just copied
+FROM {{ ref('stg_customers') }}`,
+
+		GoodExample: `SELECT
+  id,
+  name,
+  email,
+  COALESCE(phone, 'N/A') AS phone,  -- Actual transformation
+  created_at
+FROM {{ ref('stg_customers') }}`,
+
+		Fix: "Remove unnecessary passthrough columns and only select the columns that are actually needed or transformed.",
 	})
 }
 

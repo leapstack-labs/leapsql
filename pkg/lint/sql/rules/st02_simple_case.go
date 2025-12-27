@@ -19,6 +19,28 @@ var SimpleCaseConversion = sql.RuleDef{
 	Description: "Searched CASE can be simplified to simple CASE expression.",
 	Severity:    lint.SeverityHint,
 	Check:       checkSimpleCaseConversion,
+
+	Rationale: `When all WHEN conditions compare the same column to different literal values using equality, 
+a searched CASE can be rewritten as a simple CASE. Simple CASE expressions are more concise and clearly 
+communicate the intent of mapping values from a single column.`,
+
+	BadExample: `SELECT
+  CASE
+    WHEN status = 'A' THEN 'Active'
+    WHEN status = 'I' THEN 'Inactive'
+    WHEN status = 'P' THEN 'Pending'
+  END AS status_label
+FROM orders`,
+
+	GoodExample: `SELECT
+  CASE status
+    WHEN 'A' THEN 'Active'
+    WHEN 'I' THEN 'Inactive'
+    WHEN 'P' THEN 'Pending'
+  END AS status_label
+FROM orders`,
+
+	Fix: "Convert to simple CASE by moving the common column after CASE and removing it from WHEN clauses.",
 }
 
 func checkSimpleCaseConversion(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

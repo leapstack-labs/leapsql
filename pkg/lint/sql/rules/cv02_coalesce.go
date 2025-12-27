@@ -21,6 +21,22 @@ var PreferCoalesce = sql.RuleDef{
 	Description: "Prefer COALESCE over IFNULL/NVL for better portability.",
 	Severity:    lint.SeverityHint,
 	Check:       checkPreferCoalesce,
+
+	Rationale: `COALESCE is ANSI SQL standard and works across all major databases. IFNULL 
+(MySQL) and NVL (Oracle) are database-specific. Using COALESCE improves query 
+portability and is more flexible as it can handle multiple arguments.`,
+
+	BadExample: `SELECT
+    IFNULL(phone, 'N/A') AS phone,
+    NVL(email, 'unknown') AS email
+FROM contacts`,
+
+	GoodExample: `SELECT
+    COALESCE(phone, 'N/A') AS phone,
+    COALESCE(email, 'unknown') AS email
+FROM contacts`,
+
+	Fix: "Replace IFNULL or NVL with COALESCE for better SQL portability.",
 }
 
 func checkPreferCoalesce(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

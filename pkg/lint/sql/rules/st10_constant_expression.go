@@ -20,6 +20,21 @@ var ConstantExpression = sql.RuleDef{
 	Description: "Unnecessary constant expressions like WHERE 1=1 or WHERE true.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkConstantExpression,
+
+	Rationale: `Constant expressions like WHERE 1=1 or WHERE true are often artifacts of dynamic SQL 
+generation. In static SQL models, they add noise without affecting results. Removing them makes the 
+query cleaner and easier to understand.`,
+
+	BadExample: `SELECT *
+FROM orders
+WHERE 1=1
+  AND status = 'active'`,
+
+	GoodExample: `SELECT *
+FROM orders
+WHERE status = 'active'`,
+
+	Fix: "Remove constant expressions from WHERE clauses.",
 }
 
 func checkConstantExpression(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

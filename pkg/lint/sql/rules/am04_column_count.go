@@ -21,6 +21,20 @@ var ColumnCountMismatch = sql.RuleDef{
 	Description: "Mismatched column counts in set operation.",
 	Severity:    lint.SeverityError,
 	Check:       checkColumnCountMismatch,
+
+	Rationale: `Set operations (UNION, INTERSECT, EXCEPT) require all queries to have the 
+same number of columns. A mismatch will cause a runtime error. This rule catches 
+the issue at development time.`,
+
+	BadExample: `SELECT id, name, email FROM customers
+UNION ALL
+SELECT id, name FROM suppliers`,
+
+	GoodExample: `SELECT id, name, email FROM customers
+UNION ALL
+SELECT id, name, contact_email FROM suppliers`,
+
+	Fix: "Ensure all queries in the set operation have the same number of columns.",
 }
 
 func checkColumnCountMismatch(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

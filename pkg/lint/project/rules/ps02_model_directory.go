@@ -16,6 +16,18 @@ func init() {
 		Description: "Model directory mismatch",
 		Severity:    lint.SeverityWarning,
 		Check:       checkModelDirectory,
+
+		Rationale: `A model's name prefix should match its directory location. When a model is named 'stg_orders' but 
+placed in 'marts/', it creates confusion about the model's purpose and breaks organizational 
+conventions that teams rely on for navigation.`,
+
+		BadExample: `-- models/marts/stg_orders.sql (stg_ model in marts directory)
+-- models/staging/fct_revenue.sql (fct_ model in staging directory)`,
+
+		GoodExample: `-- models/staging/stg_orders.sql
+-- models/marts/fct_revenue.sql`,
+
+		Fix: "Move the model to the directory that matches its name prefix, or rename it to match its current location.",
 	})
 }
 

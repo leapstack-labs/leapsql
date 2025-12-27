@@ -19,6 +19,22 @@ var OrderByAmbiguous = sql.RuleDef{
 	Description: "ORDER BY column may be ambiguous in set operation.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkOrderByAmbiguous,
+
+	Rationale: `In set operations (UNION, INTERSECT, EXCEPT), column names from different 
+queries may differ. Using column names in ORDER BY can be ambiguous and may behave 
+differently across databases. Column positions (1, 2, 3) are unambiguous.`,
+
+	BadExample: `SELECT name, email FROM customers
+UNION ALL
+SELECT company_name, contact_email FROM suppliers
+ORDER BY name`,
+
+	GoodExample: `SELECT name, email FROM customers
+UNION ALL
+SELECT company_name, contact_email FROM suppliers
+ORDER BY 1`,
+
+	Fix: "Use column positions (1, 2, etc.) instead of column names in ORDER BY for set operations.",
 }
 
 func checkOrderByAmbiguous(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

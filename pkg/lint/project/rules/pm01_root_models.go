@@ -16,6 +16,19 @@ func init() {
 		Description: "Models with no sources (broken DAG lineage)",
 		Severity:    lint.SeverityWarning,
 		Check:       checkRootModels,
+
+		Rationale: `Non-staging models without upstream dependencies indicate broken lineage. These "root" models 
+don't reference any tables, suggesting either a configuration error, a model that should be a seed, 
+or missing FROM/JOIN clauses. Proper DAG lineage is essential for understanding data flow.`,
+
+		BadExample: `-- models/marts/fct_orders.sql
+SELECT 1 AS id, 'test' AS name  -- No FROM clause, no sources`,
+
+		GoodExample: `-- models/marts/fct_orders.sql
+SELECT id, name
+FROM {{ ref('stg_orders') }}`,
+
+		Fix: "Add appropriate FROM/JOIN clauses to reference upstream models or sources, or convert to a seed if this is static data.",
 	})
 }
 

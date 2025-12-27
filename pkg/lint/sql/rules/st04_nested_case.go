@@ -19,6 +19,31 @@ var NestedCase = sql.RuleDef{
 	Description: "Nested CASE expressions reduce readability.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkNestedCase,
+
+	Rationale: `Nested CASE expressions are difficult to read and understand. They often indicate complex 
+business logic that could be simplified by restructuring the query, using CTEs, or extracting the logic 
+into a separate model or view.`,
+
+	BadExample: `SELECT
+  CASE
+    WHEN status = 'A' THEN
+      CASE
+        WHEN priority = 1 THEN 'High Active'
+        ELSE 'Low Active'
+      END
+    ELSE 'Inactive'
+  END AS label
+FROM tasks`,
+
+	GoodExample: `SELECT
+  CASE
+    WHEN status = 'A' AND priority = 1 THEN 'High Active'
+    WHEN status = 'A' THEN 'Low Active'
+    ELSE 'Inactive'
+  END AS label
+FROM tasks`,
+
+	Fix: "Flatten nested CASE expressions by combining conditions, or extract complex logic into a CTE or separate model.",
 }
 
 func checkNestedCase(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

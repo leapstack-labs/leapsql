@@ -19,6 +19,20 @@ var DistinctWithGroupBy = sql.RuleDef{
 	Description: "Using DISTINCT with GROUP BY is redundant.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkDistinctWithGroupBy,
+
+	Rationale: `GROUP BY already guarantees unique rows for the grouped columns. 
+Adding DISTINCT is redundant and may confuse readers about the query's intent. 
+It can also mislead developers into thinking DISTINCT is needed for correctness.`,
+
+	BadExample: `SELECT DISTINCT department, COUNT(*)
+FROM employees
+GROUP BY department`,
+
+	GoodExample: `SELECT department, COUNT(*)
+FROM employees
+GROUP BY department`,
+
+	Fix: "Remove the DISTINCT keyword when using GROUP BY.",
 }
 
 func checkDistinctWithGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

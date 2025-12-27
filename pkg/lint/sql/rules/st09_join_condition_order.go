@@ -20,6 +20,20 @@ var JoinConditionOrder = sql.RuleDef{
 	Description: "Join condition should reference left table first (e.g., a.id = b.id, not b.id = a.id).",
 	Severity:    lint.SeverityHint,
 	Check:       checkJoinConditionOrder,
+
+	Rationale: `Consistently ordering join conditions with the left (existing) table first improves readability. 
+It follows the natural reading order of the query: FROM table_a JOIN table_b ON table_a.col = table_b.col. 
+This convention makes it easier to trace relationships through the query.`,
+
+	BadExample: `SELECT *
+FROM orders o
+JOIN customers c ON c.id = o.customer_id`,
+
+	GoodExample: `SELECT *
+FROM orders o
+JOIN customers c ON o.customer_id = c.id`,
+
+	Fix: "Reorder the join condition to reference the left table first.",
 }
 
 func checkJoinConditionOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

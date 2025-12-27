@@ -19,6 +19,27 @@ var ElseNull = sql.RuleDef{
 	Description: "ELSE NULL is redundant in CASE expressions.",
 	Severity:    lint.SeverityHint,
 	Check:       checkElseNull,
+
+	Rationale: `CASE expressions implicitly return NULL when no WHEN clause matches and no ELSE is specified. 
+Writing ELSE NULL explicitly adds verbosity without changing behavior. Removing it keeps the query concise 
+while maintaining the same semantics.`,
+
+	BadExample: `SELECT
+  CASE status
+    WHEN 'active' THEN 1
+    WHEN 'inactive' THEN 0
+    ELSE NULL
+  END AS status_code
+FROM users`,
+
+	GoodExample: `SELECT
+  CASE status
+    WHEN 'active' THEN 1
+    WHEN 'inactive' THEN 0
+  END AS status_code
+FROM users`,
+
+	Fix: "Remove the ELSE NULL clause from the CASE expression.",
 }
 
 func checkElseNull(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

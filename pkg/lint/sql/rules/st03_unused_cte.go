@@ -21,6 +21,25 @@ var UnusedCTE = sql.RuleDef{
 	Description: "CTE is defined but never referenced.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkUnusedCTE,
+
+	Rationale: `Unused CTEs add complexity without benefit. They consume mental overhead 
+for readers trying to understand the query, and may indicate incomplete refactoring 
+or copy-paste errors. Removing them improves query clarity.`,
+
+	BadExample: `WITH unused_cte AS (
+    SELECT * FROM orders
+),
+active_customers AS (
+    SELECT * FROM customers WHERE active = true
+)
+SELECT * FROM active_customers`,
+
+	GoodExample: `WITH active_customers AS (
+    SELECT * FROM customers WHERE active = true
+)
+SELECT * FROM active_customers`,
+
+	Fix: "Remove the unused CTE definition, or reference it in your query if it was intended to be used.",
 }
 
 func checkUnusedCTE(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

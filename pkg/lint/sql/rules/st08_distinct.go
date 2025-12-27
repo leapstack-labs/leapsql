@@ -19,6 +19,19 @@ var DistinctVsGroupBy = sql.RuleDef{
 	Description: "Consider GROUP BY instead of DISTINCT when selecting columns for aggregation.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkDistinctVsGroupBy,
+
+	Rationale: `Using GROUP BY instead of DISTINCT on simple column selections makes the query's intent 
+clearer and positions the code better for future aggregation needs. GROUP BY explicitly shows which 
+columns define the unique rows, while DISTINCT can be ambiguous in complex queries.`,
+
+	BadExample: `SELECT DISTINCT department, location
+FROM employees`,
+
+	GoodExample: `SELECT department, location
+FROM employees
+GROUP BY department, location`,
+
+	Fix: "Replace SELECT DISTINCT with GROUP BY on the same columns.",
 }
 
 func checkDistinctVsGroupBy(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

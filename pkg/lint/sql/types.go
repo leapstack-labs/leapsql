@@ -17,6 +17,12 @@ type RuleDef struct {
 	Check       CheckFunc     // The check function
 	ConfigKeys  []string      // Configuration keys this rule accepts (for rule-specific options)
 	Dialects    []string      // Restrict to specific dialects; nil/empty means all dialects
+
+	// Documentation fields for richer rule documentation
+	Rationale   string // Why this rule exists, what problems it prevents
+	BadExample  string // Code showing the anti-pattern
+	GoodExample string // Code showing the correct pattern
+	Fix         string // How to fix violations (when not obvious)
 }
 
 // CheckFunc analyzes a statement and returns diagnostics.
@@ -42,6 +48,12 @@ func (w *wrappedRuleDef) Description() string            { return w.def.Descript
 func (w *wrappedRuleDef) DefaultSeverity() lint.Severity { return w.def.Severity }
 func (w *wrappedRuleDef) ConfigKeys() []string           { return w.def.ConfigKeys }
 func (w *wrappedRuleDef) Dialects() []string             { return w.def.Dialects }
+
+// Documentation methods
+func (w *wrappedRuleDef) Rationale() string   { return w.def.Rationale }
+func (w *wrappedRuleDef) BadExample() string  { return w.def.BadExample }
+func (w *wrappedRuleDef) GoodExample() string { return w.def.GoodExample }
+func (w *wrappedRuleDef) Fix() string         { return w.def.Fix }
 
 func (w *wrappedRuleDef) CheckSQL(stmt any, dialect lint.DialectInfo, opts map[string]any) []lint.Diagnostic {
 	return w.def.Check(stmt, dialect, opts)

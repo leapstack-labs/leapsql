@@ -21,6 +21,20 @@ var UniqueTableAlias = sql.RuleDef{
 	Description: "Table aliases should be unique within a query.",
 	Severity:    lint.SeverityError,
 	Check:       checkUniqueTableAlias,
+
+	Rationale: `Duplicate table aliases cause ambiguity when referencing columns. Most 
+databases will reject queries with duplicate aliases. Even if accepted, it makes the 
+query confusing and error-prone. Each table reference should have a unique alias.`,
+
+	BadExample: `SELECT a.id, a.name
+FROM customers a
+JOIN orders a ON a.customer_id = a.id`,
+
+	GoodExample: `SELECT c.id, c.name
+FROM customers c
+JOIN orders o ON o.customer_id = c.id`,
+
+	Fix: "Rename one of the duplicate aliases to be unique within the query.",
 }
 
 func checkUniqueTableAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

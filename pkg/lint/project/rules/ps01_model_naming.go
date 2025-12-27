@@ -17,6 +17,19 @@ func init() {
 		Description: "Model naming convention mismatch",
 		Severity:    lint.SeverityWarning,
 		Check:       checkModelNaming,
+
+		Rationale: `Consistent naming conventions make it easy to identify model types at a glance. Models in specific 
+directories should follow the expected prefix convention: staging models use 'stg_', intermediate 
+models use 'int_', and marts models use 'fct_' or 'dim_'.`,
+
+		BadExample: `-- models/staging/orders.sql (missing stg_ prefix)
+-- models/marts/order_metrics.sql (missing fct_ or dim_ prefix)`,
+
+		GoodExample: `-- models/staging/stg_orders.sql
+-- models/marts/fct_order_metrics.sql
+-- models/marts/dim_customers.sql`,
+
+		Fix: "Rename the model to include the appropriate prefix for its directory location.",
 	})
 }
 

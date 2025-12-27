@@ -16,6 +16,25 @@ func init() {
 		Description: "SELECT * from source with changed schema since last run",
 		Severity:    lint.SeverityWarning,
 		Check:       checkSchemaDrift,
+
+		Rationale: `When using SELECT *, upstream schema changes silently propagate to your model. Added columns 
+may break downstream processes, while removed columns cause runtime errors. This rule compares 
+current source schemas against snapshots from the last run to catch breaking changes early.`,
+
+		BadExample: `-- Model uses SELECT * and upstream added a breaking column
+SELECT *
+FROM {{ source('raw', 'orders') }}
+-- raw.orders added 'internal_notes' column that shouldn't be exposed`,
+
+		GoodExample: `-- Explicit column selection protects against schema drift
+SELECT
+  id,
+  customer_id,
+  amount,
+  created_at
+FROM {{ source('raw', 'orders') }}`,
+
+		Fix: "Replace SELECT * with explicit column selection, or review and accept the schema changes if they are expected.",
 	})
 }
 

@@ -19,6 +19,20 @@ var QualifyColumns = sql.RuleDef{
 	Description: "Qualify column references in queries with multiple tables.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkQualifyColumns,
+
+	Rationale: `In queries involving multiple tables, unqualified column names can be ambiguous. 
+If two tables have a column with the same name, the query may fail or return unexpected results. 
+Qualifying columns with table names or aliases makes the query explicit and prevents errors when schemas change.`,
+
+	BadExample: `SELECT name, amount
+FROM customers
+JOIN orders ON customers.id = orders.customer_id`,
+
+	GoodExample: `SELECT customers.name, orders.amount
+FROM customers
+JOIN orders ON customers.id = orders.customer_id`,
+
+	Fix: "Prefix each column reference with its table name or alias.",
 }
 
 func checkQualifyColumns(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

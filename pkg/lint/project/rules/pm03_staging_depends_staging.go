@@ -16,6 +16,22 @@ func init() {
 		Description: "Staging model references another staging model",
 		Severity:    lint.SeverityWarning,
 		Check:       checkStagingDependsStaging,
+
+		Rationale: `Staging models should only reference raw sources, not other staging models. When staging models 
+depend on each other, it blurs the boundary between data cleaning (staging) and data transformation 
+(intermediate/marts). If you need to combine staging models, create an intermediate model instead.`,
+
+		BadExample: `-- models/staging/stg_orders_enhanced.sql
+SELECT o.*, c.name
+FROM {{ ref('stg_orders') }} o  -- Staging depending on staging
+JOIN {{ ref('stg_customers') }} c ON o.customer_id = c.id`,
+
+		GoodExample: `-- models/intermediate/int_orders_with_customers.sql
+SELECT o.*, c.name
+FROM {{ ref('stg_orders') }} o
+JOIN {{ ref('stg_customers') }} c ON o.customer_id = c.id`,
+
+		Fix: "Move the model to the intermediate layer if it combines staging models, or reference raw sources directly if it's truly staging.",
 	})
 }
 

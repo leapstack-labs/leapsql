@@ -19,6 +19,26 @@ var UnionDistinct = sql.RuleDef{
 	Description: "UNION without ALL performs implicit DISTINCT which may be unintended.",
 	Severity:    lint.SeverityInfo,
 	Check:       checkUnionDistinct,
+
+	Rationale: `UNION (without ALL) automatically removes duplicate rows, which has 
+performance implications and may not be the intended behavior. Explicitly using 
+UNION ALL or UNION DISTINCT makes the intent clear and avoids accidental deduplication.`,
+
+	BadExample: `SELECT name FROM customers
+UNION
+SELECT name FROM suppliers`,
+
+	GoodExample: `-- If duplicates should be removed:
+SELECT name FROM customers
+UNION DISTINCT
+SELECT name FROM suppliers
+
+-- If duplicates should be kept:
+SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers`,
+
+	Fix: "Use UNION ALL if duplicates are acceptable, or UNION DISTINCT to make deduplication explicit.",
 }
 
 func checkUnionDistinct(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

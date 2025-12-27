@@ -24,6 +24,22 @@ var ForbidAlias = sql.RuleDef{
 	Severity:    lint.SeverityWarning,
 	ConfigKeys:  []string{"forbidden_patterns", "forbidden_names"},
 	Check:       checkForbidAlias,
+
+	Rationale: `Generic aliases like single letters (a, b, c) or numbered tables (t1, t2) 
+provide no semantic meaning. They make queries harder to understand and maintain, 
+especially in complex queries with multiple joins. Use descriptive aliases instead.`,
+
+	BadExample: `SELECT a.name, b.total, c.date
+FROM customers a
+JOIN orders b ON b.customer_id = a.id
+JOIN shipments c ON c.order_id = b.id`,
+
+	GoodExample: `SELECT cust.name, ord.total, ship.date
+FROM customers cust
+JOIN orders ord ON ord.customer_id = cust.id
+JOIN shipments ship ON ship.order_id = ord.id`,
+
+	Fix: "Replace forbidden aliases with meaningful names that describe what the table represents in this query context.",
 }
 
 // Default forbidden patterns:

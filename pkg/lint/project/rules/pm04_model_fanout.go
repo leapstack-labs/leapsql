@@ -18,6 +18,19 @@ func init() {
 		Severity:    lint.SeverityWarning,
 		Check:       checkModelFanout,
 		ConfigKeys:  []string{"threshold"},
+
+		Rationale: `Models with many downstream consumers become bottlenecks for changes. A "God Model" that many 
+models depend on makes refactoring risky since changes affect many downstream models. Consider whether 
+the model should be split into focused models or if an abstraction layer is needed.`,
+
+		BadExample: `-- stg_orders is consumed by 10+ models directly
+-- Any change to stg_orders requires checking all consumers`,
+
+		GoodExample: `-- Create focused intermediate models
+-- int_order_metrics, int_order_dates, int_order_status
+-- Each downstream model references only what it needs`,
+
+		Fix: "Split the model into smaller, focused models, or create intermediate abstraction layers to reduce direct dependencies.",
 	})
 }
 

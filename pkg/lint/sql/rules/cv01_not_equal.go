@@ -27,6 +27,20 @@ var NotEqualOperator = sql.RuleDef{
 	Description: "Prefer != over <> for not equal operator (NOT IMPLEMENTED: AST normalizes both operators).",
 	Severity:    lint.SeverityHint,
 	Check:       checkNotEqualOperator,
+
+	Rationale: `Using a consistent not-equal operator (either != or <>) throughout a 
+codebase improves readability. The != operator is more common in modern programming 
+languages, while <> is standard SQL. Pick one and use it consistently.`,
+
+	BadExample: `SELECT * FROM orders
+WHERE status <> 'cancelled'
+  AND type != 'test'`,
+
+	GoodExample: `SELECT * FROM orders
+WHERE status != 'cancelled'
+  AND type != 'test'`,
+
+	Fix: "Use a consistent not-equal operator throughout your queries. This rule is not currently enforced due to AST limitations.",
 }
 
 // checkNotEqualOperator is a stub that returns no diagnostics.

@@ -156,26 +156,10 @@ func generateSQLRulesPage(outDir string, rules []lint.SQLRule) error {
 			w.Paragraph(desc)
 		}
 
-		// Build table rows
-		headers := []string{"ID", "Name", "Description", "Severity", "Dialects"}
-		var rows [][]string
+		// Write each rule with full documentation
 		for _, rule := range groupRules {
-			dialects := rule.Dialects()
-			dialectStr := "all"
-			if len(dialects) > 0 {
-				dialectStr = strings.Join(dialects, ", ")
-			}
-
-			rows = append(rows, []string{
-				InlineCode(rule.ID()),
-				rule.Name(),
-				cleanDescription(rule.Description()),
-				InlineCode(rule.DefaultSeverity().String()),
-				dialectStr,
-			})
+			writeRuleDoc(w, rule)
 		}
-
-		w.Table(headers, rows)
 	}
 
 	return os.WriteFile(filepath.Join(outDir, "sql-rules.md"), w.Bytes(), 0600)
@@ -212,26 +196,10 @@ func generateProjectRulesPage(outDir string, rules []lint.ProjectRule) error {
 			w.Paragraph(desc)
 		}
 
-		// Build table rows
-		headers := []string{"ID", "Name", "Description", "Severity", "Config"}
-		var rows [][]string
+		// Write each rule with full documentation
 		for _, rule := range groupRules {
-			configKeys := rule.ConfigKeys()
-			configStr := ""
-			if len(configKeys) > 0 {
-				configStr = InlineCode(strings.Join(configKeys, ", "))
-			}
-
-			rows = append(rows, []string{
-				InlineCode(rule.ID()),
-				rule.Name(),
-				cleanDescription(rule.Description()),
-				InlineCode(rule.DefaultSeverity().String()),
-				configStr,
-			})
+			writeRuleDoc(w, rule)
 		}
-
-		w.Table(headers, rows)
 	}
 
 	return os.WriteFile(filepath.Join(outDir, "project-rules.md"), w.Bytes(), 0600)
@@ -273,4 +241,60 @@ func capitalizeFirst(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// writeRuleDoc writes detailed documentation for a single rule.
+func writeRuleDoc(w *MarkdownWriter, rule lint.Rule) {
+	// Rule header with anchor: ### AM01 - ambiguous.distinct {#AM01}
+	w.Line(fmt.Sprintf("### %s - %s {#%s}", rule.ID(), rule.Name(), rule.ID()))
+	w.Newline()
+
+	// Severity badge and description
+	w.Line(fmt.Sprintf("**Severity:** %s", InlineCode(rule.DefaultSeverity().String())))
+	w.Newline()
+
+	w.Paragraph(cleanDescription(rule.Description()))
+
+	// Rationale (if available)
+	if rationale := rule.Rationale(); rationale != "" {
+		w.Header(4, "Why This Matters")
+		w.Paragraph(strings.TrimSpace(rationale))
+	}
+
+	// Bad example (if available)
+	if badExample := rule.BadExample(); badExample != "" {
+		w.Header(4, "Bad")
+		w.CodeBlock("sql", badExample)
+	}
+
+	// Good example (if available)
+	if goodExample := rule.GoodExample(); goodExample != "" {
+		w.Header(4, "Good")
+		w.CodeBlock("sql", goodExample)
+	}
+
+	// Fix (if available)
+	if fix := rule.Fix(); fix != "" {
+		w.Header(4, "How to Fix")
+		w.Paragraph(strings.TrimSpace(fix))
+	}
+
+	// Config keys (if available)
+	if configKeys := rule.ConfigKeys(); len(configKeys) > 0 {
+		w.Header(4, "Configuration")
+		w.Paragraph(fmt.Sprintf("This rule accepts the following configuration options: %s",
+			InlineCode(strings.Join(configKeys, ", "))))
+	}
+
+	// Dialect restrictions for SQL rules
+	if sqlRule, ok := rule.(lint.SQLRule); ok {
+		if dialects := sqlRule.Dialects(); len(dialects) > 0 {
+			w.Line(fmt.Sprintf("**Dialects:** %s", strings.Join(dialects, ", ")))
+			w.Newline()
+		}
+	}
+
+	// Horizontal rule between rules for readability
+	w.Line("---")
+	w.Newline()
 }

@@ -15,6 +15,23 @@ func init() {
 		Description: "Unnecessary intermediate model in a fan-in pattern (A→B, A→C, B→C where B has no other consumers)",
 		Severity:    lint.SeverityWarning,
 		Check:       checkRejoiningUpstream,
+
+		Rationale: `When model B has exactly one consumer (C), and B's upstream (A) is also a direct upstream of C, 
+model B serves no purpose as a reusable abstraction. The pattern A→B→C with A→C means B's logic could 
+be inlined into C, eliminating an unnecessary model and simplifying the DAG.`,
+
+		BadExample: `-- stg_orders (A) → int_order_totals (B) → fct_report (C)
+-- stg_orders (A) → fct_report (C)
+-- int_order_totals only has one consumer and doesn't add reusable value`,
+
+		GoodExample: `-- Either inline B into C:
+-- stg_orders → fct_report (with B's logic inlined)
+
+-- Or give B more consumers to justify its existence:
+-- stg_orders → int_order_totals → fct_report
+-- stg_orders → int_order_totals → fct_dashboard`,
+
+		Fix: "Either inline the intermediate model's logic into its single consumer, or add more consumers to justify it as a reusable abstraction.",
 	})
 }
 

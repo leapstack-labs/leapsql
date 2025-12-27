@@ -26,6 +26,12 @@ func (m *mockSQLRule) DefaultSeverity() Severity { return m.severity }
 func (m *mockSQLRule) ConfigKeys() []string      { return m.configKeys }
 func (m *mockSQLRule) Dialects() []string        { return m.dialects }
 
+// Documentation methods (return empty for mocks)
+func (m *mockSQLRule) Rationale() string   { return "" }
+func (m *mockSQLRule) BadExample() string  { return "" }
+func (m *mockSQLRule) GoodExample() string { return "" }
+func (m *mockSQLRule) Fix() string         { return "" }
+
 func (m *mockSQLRule) CheckSQL(_ any, _ DialectInfo, _ map[string]any) []Diagnostic {
 	return nil
 }
@@ -46,6 +52,12 @@ func (m *mockProjectRule) Group() string             { return m.group }
 func (m *mockProjectRule) Description() string       { return m.description }
 func (m *mockProjectRule) DefaultSeverity() Severity { return m.severity }
 func (m *mockProjectRule) ConfigKeys() []string      { return m.configKeys }
+
+// Documentation methods (return empty for mocks)
+func (m *mockProjectRule) Rationale() string   { return "" }
+func (m *mockProjectRule) BadExample() string  { return "" }
+func (m *mockProjectRule) GoodExample() string { return "" }
+func (m *mockProjectRule) Fix() string         { return "" }
 
 func (m *mockProjectRule) CheckProject(_ ProjectContext) []Diagnostic {
 	return nil

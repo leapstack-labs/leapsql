@@ -22,6 +22,19 @@ var BlockedWords = sql.RuleDef{
 	Severity:    lint.SeverityWarning,
 	ConfigKeys:  []string{"blocked_words"},
 	Check:       checkBlockedWords,
+
+	Rationale: `In data transformation pipelines (dbt, LeapSQL), destructive operations 
+like DELETE, DROP, and TRUNCATE are usually mistakes. Models should be declarative 
+transformations, not imperative modifications. Block these keywords to prevent accidents.`,
+
+	BadExample: `-- This could accidentally delete production data
+DELETE FROM customers WHERE status = 'inactive'`,
+
+	GoodExample: `-- Use a filter in your SELECT instead
+SELECT * FROM customers
+WHERE status != 'inactive'`,
+
+	Fix: "Remove or refactor destructive SQL statements. For data pipelines, use incremental logic or WHERE filters instead of DELETE/TRUNCATE.",
 }
 
 // Default blocked words

@@ -21,6 +21,24 @@ var UniqueColumnAlias = sql.RuleDef{
 	Description: "Column aliases should be unique within SELECT clause.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkUniqueColumnAlias,
+
+	Rationale: `Duplicate column aliases create ambiguity in the result set. Downstream 
+consumers (reports, APIs, other queries) may not be able to reliably reference the 
+correct column. Some databases will error, others will silently pick one column.`,
+
+	BadExample: `SELECT
+    first_name AS name,
+    last_name AS name,
+    company_name AS name
+FROM contacts`,
+
+	GoodExample: `SELECT
+    first_name AS first_name,
+    last_name AS last_name,
+    company_name AS company_name
+FROM contacts`,
+
+	Fix: "Rename column aliases to be unique within the SELECT clause.",
 }
 
 func checkUniqueColumnAlias(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

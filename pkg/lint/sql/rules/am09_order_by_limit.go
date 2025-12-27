@@ -19,6 +19,30 @@ var OrderByLimitWithUnion = sql.RuleDef{
 	Description: "ORDER BY/LIMIT with set operation may have unexpected scope.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkOrderByLimitWithUnion,
+
+	Rationale: `In set operations, ORDER BY and LIMIT without parentheses apply to the 
+entire combined result, not individual queries. This behavior may be surprising. 
+Use parentheses to make the intended scope explicit.`,
+
+	BadExample: `SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers
+ORDER BY name
+LIMIT 10`,
+
+	GoodExample: `-- To order/limit the final result:
+(SELECT name FROM customers
+UNION ALL
+SELECT name FROM suppliers)
+ORDER BY name
+LIMIT 10
+
+-- To order/limit individual queries:
+(SELECT name FROM customers ORDER BY name LIMIT 10)
+UNION ALL
+(SELECT name FROM suppliers ORDER BY name LIMIT 10)`,
+
+	Fix: "Use parentheses to clarify whether ORDER BY/LIMIT applies to individual queries or the combined result.",
 }
 
 func checkOrderByLimitWithUnion(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

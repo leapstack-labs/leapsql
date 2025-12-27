@@ -18,6 +18,25 @@ func init() {
 		Severity:    lint.SeverityWarning,
 		Check:       checkTooManyJoins,
 		ConfigKeys:  []string{"threshold"},
+
+		Rationale: `High join counts often indicate a "God Model" that tries to do too much in a single query. 
+These models are hard to understand, slow to execute, and difficult to maintain. Breaking complex 
+queries into smaller intermediate models improves readability and allows for incremental processing.`,
+
+		BadExample: `-- fct_comprehensive_report.sql with 8+ JOINs
+SELECT * FROM stg_orders
+JOIN stg_customers ON ...
+JOIN stg_products ON ...
+JOIN stg_payments ON ...
+JOIN stg_shipments ON ...
+-- ... more joins`,
+
+		GoodExample: `-- Break into focused intermediate models
+-- int_order_details.sql (orders + customers + products)
+-- int_order_fulfillment.sql (orders + shipments + payments)
+-- fct_report.sql (join intermediates)`,
+
+		Fix: "Create intermediate models that pre-join related tables, then compose them in the final model.",
 	})
 }
 

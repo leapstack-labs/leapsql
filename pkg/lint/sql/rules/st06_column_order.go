@@ -19,6 +19,18 @@ var SelectColumnOrder = sql.RuleDef{
 	Description: "Wildcards should appear last in SELECT clause.",
 	Severity:    lint.SeverityHint,
 	Check:       checkSelectColumnOrder,
+
+	Rationale: `Placing explicit columns before wildcards improves readability and makes the query's output 
+structure clearer. The explicitly named columns are typically the most important ones, so listing them 
+first highlights their significance.`,
+
+	BadExample: `SELECT *, created_at, updated_at
+FROM orders`,
+
+	GoodExample: `SELECT created_at, updated_at, *
+FROM orders`,
+
+	Fix: "Move wildcard expressions (* or table.*) to the end of the SELECT clause.",
 }
 
 func checkSelectColumnOrder(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

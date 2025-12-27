@@ -21,6 +21,20 @@ var PreferLeftJoin = sql.RuleDef{
 	Description: "Prefer LEFT JOIN over RIGHT JOIN for consistency.",
 	Severity:    lint.SeverityHint,
 	Check:       checkPreferLeftJoin,
+
+	Rationale: `LEFT JOIN is more intuitive because it preserves all rows from the table 
+you naturally read first (left to right). RIGHT JOIN can always be rewritten as 
+LEFT JOIN by swapping table order. Consistently using LEFT JOIN improves readability.`,
+
+	BadExample: `SELECT o.id, c.name
+FROM orders o
+RIGHT JOIN customers c ON c.id = o.customer_id`,
+
+	GoodExample: `SELECT o.id, c.name
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id`,
+
+	Fix: "Swap the table order and use LEFT JOIN instead of RIGHT JOIN.",
 }
 
 func checkPreferLeftJoin(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {

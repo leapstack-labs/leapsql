@@ -20,6 +20,18 @@ var IsNullComparison = sql.RuleDef{
 	Description: "Use IS NULL instead of = NULL for NULL comparisons.",
 	Severity:    lint.SeverityWarning,
 	Check:       checkIsNullComparison,
+
+	Rationale: `In SQL, NULL represents unknown, and comparing anything to NULL with = 
+or != always yields NULL (unknown), not true or false. This is a common source of 
+bugs. Use IS NULL or IS NOT NULL for correct NULL handling.`,
+
+	BadExample: `SELECT * FROM orders
+WHERE shipped_date = NULL`,
+
+	GoodExample: `SELECT * FROM orders
+WHERE shipped_date IS NULL`,
+
+	Fix: "Replace = NULL with IS NULL, and != NULL with IS NOT NULL.",
 }
 
 func checkIsNullComparison(stmt any, _ lint.DialectInfo, _ map[string]any) []lint.Diagnostic {
