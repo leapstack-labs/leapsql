@@ -26,6 +26,7 @@ type LintOptions struct {
 	Severity    string   // Minimum severity: error, warning, info, hint
 	Rules       []string // Run only specific rules
 	SkipProject bool     // Skip project health linting
+	Verbose     bool     // Show rule documentation with violations
 }
 
 // NewLintCommand creates the lint command.
@@ -56,7 +57,10 @@ Output adapts to environment:
   leapsql lint --disable AM01,ST01
 
   # Only report errors (ignore warnings/hints)
-  leapsql lint --severity error`,
+  leapsql lint --severity error
+
+  # Show rule documentation with violations
+  leapsql lint --verbose`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Path = args[0]
@@ -70,6 +74,7 @@ Output adapts to environment:
 	cmd.Flags().StringVar(&opts.Severity, "severity", "warning", "Minimum severity: error, warning, info, hint")
 	cmd.Flags().StringSliceVar(&opts.Rules, "rule", nil, "Run only specific rules")
 	cmd.Flags().BoolVar(&opts.SkipProject, "skip-project", false, "Skip project health linting")
+	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "Show rule documentation with violations")
 
 	return cmd
 }
@@ -124,8 +129,8 @@ func runLint(cmd *cobra.Command, opts *LintOptions) error {
 	projectResults = filterProjectBySeverity(projectResults, opts.Severity)
 
 	// Render output
-	hasIssues := renderLintResults(r, results)
-	hasProjectIssues := renderProjectHealthResults(r, projectResults)
+	hasIssues := renderLintResults(r, results, opts.Verbose)
+	hasProjectIssues := renderProjectHealthResults(r, projectResults, opts.Verbose)
 
 	// Exit with code 1 if issues found
 	if hasIssues || hasProjectIssues {
@@ -269,7 +274,7 @@ func filterBySeverity(results []lintFileResult, severityThreshold string) []lint
 	return filtered
 }
 
-func renderLintResults(r *output.Renderer, results []lintFileResult) bool {
+func renderLintResults(r *output.Renderer, results []lintFileResult, verbose bool) bool {
 	if len(results) == 0 {
 		r.Success("No lint issues found")
 		return false
@@ -336,8 +341,23 @@ func renderLintResults(r *output.Renderer, results []lintFileResult) bool {
 				r.Styles().Bold.Render(d.RuleID),
 				d.Message,
 			)
+
+			// Verbose mode: show rule documentation
+			if verbose {
+				if info, ok := getRuleInfo(d.RuleID); ok {
+					if info.Rationale != "" {
+						r.Println(r.Styles().Muted.Render("       Why: " + truncateOneLineVerbose(info.Rationale, 70)))
+					}
+					if info.Fix != "" {
+						r.Println(r.Styles().Muted.Render("       Fix: " + truncateOneLineVerbose(info.Fix, 70)))
+					}
+				}
+				r.Println("")
+			}
 		}
-		r.Println("")
+		if !verbose {
+			r.Println("")
+		}
 	}
 
 	// Print summary
@@ -530,7 +550,7 @@ func parseSeverityThreshold(s string) core.Severity {
 }
 
 // renderProjectHealthResults renders project health diagnostics.
-func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic) bool {
+func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic, verbose bool) bool {
 	if len(diags) == 0 {
 		return false
 	}
@@ -545,9 +565,24 @@ func renderProjectHealthResults(r *output.Renderer, diags []project.Diagnostic) 
 			r.Styles().Bold.Render(d.RuleID),
 			d.Message,
 		)
+
+		// Verbose mode: show rule documentation
+		if verbose {
+			if info, ok := getRuleInfo(d.RuleID); ok {
+				if info.Rationale != "" {
+					r.Println(r.Styles().Muted.Render("       Why: " + truncateOneLineVerbose(info.Rationale, 70)))
+				}
+				if info.Fix != "" {
+					r.Println(r.Styles().Muted.Render("       Fix: " + truncateOneLineVerbose(info.Fix, 70)))
+				}
+			}
+			r.Println("")
+		}
 	}
 
-	r.Println("")
+	if !verbose {
+		r.Println("")
+	}
 	return true
 }
 
@@ -565,4 +600,23 @@ func projectSeverityStyle(r *output.Renderer, sev core.Severity) string {
 	default:
 		return r.Styles().Muted.Render("unknown")
 	}
+}
+
+// getRuleInfo fetches rule metadata by ID for verbose output.
+func getRuleInfo(ruleID string) (core.RuleInfo, bool) {
+	for _, r := range lint.AllRules() {
+		if r.ID == ruleID {
+			return r, true
+		}
+	}
+	return core.RuleInfo{}, false
+}
+
+// truncateOneLineVerbose truncates a string to a single line with max length.
+func truncateOneLineVerbose(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
