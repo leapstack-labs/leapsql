@@ -1,5 +1,41 @@
 // TypeScript interfaces matching Go structs from docs.go
 
+// Manifest types for instant shell render (from manifest.go)
+export interface Manifest {
+  project_name: string;
+  generated_at: string;
+  nav_tree: NavGroup[];
+  stats: ManifestStats;
+}
+
+export interface NavGroup {
+  folder: string;
+  models: NavItem[];
+}
+
+export interface NavItem {
+  name: string;
+  path: string;
+  materialized?: string;
+}
+
+export interface ManifestStats {
+  model_count: number;
+  source_count: number;
+  column_count: number;
+  folder_count: number;
+  table_count: number;
+  view_count: number;
+}
+
+// Global window types for embedded data
+declare global {
+  interface Window {
+    __MANIFEST__?: Manifest;
+    __DEV_MODE__?: boolean;
+  }
+}
+
 export interface SourceRef {
   table: string;
   column: string;

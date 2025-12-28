@@ -1,21 +1,26 @@
 // Sidebar component with navigation and search
 import type { FunctionComponent } from 'preact';
-import { useCatalog, useModelsByFolder } from '../../lib/context';
+import { useManifest, useNavTree, useSources } from '../../lib/context';
 import { SearchBox } from './SearchBox';
 import { NavGroup } from './NavGroup';
 
-export const Sidebar: FunctionComponent = () => {
-  const { catalog } = useCatalog();
-  const modelsByFolder = useModelsByFolder();
+interface SidebarProps {
+  dbReady: boolean;
+}
+
+export const Sidebar: FunctionComponent<SidebarProps> = ({ dbReady }) => {
+  const manifest = useManifest();
+  const navTree = useNavTree();
+  const sources = useSources();
 
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>{catalog.project_name || 'LeapSQL'}</h1>
+        <h1>{manifest.project_name || 'LeapSQL'}</h1>
         <div class="subtitle">Documentation</div>
       </div>
 
-      <SearchBox />
+      <SearchBox dbReady={dbReady} />
 
       <nav class="sidebar-nav">
         <div class="nav-section">
@@ -31,12 +36,12 @@ export const Sidebar: FunctionComponent = () => {
 
         <div class="nav-section" id="models-nav">
           <div class="nav-group-list">
-            {/* Sources group */}
-            {catalog.sources && catalog.sources.length > 0 && (
+            {/* Sources group - loads from database when ready */}
+            {sources.data && sources.data.length > 0 && (
               <NavGroup
                 title="Sources"
                 groupId="sources"
-                items={catalog.sources.map(src => ({
+                items={sources.data.map(src => ({
                   id: src.name,
                   name: src.name,
                   type: 'source' as const,
@@ -44,15 +49,15 @@ export const Sidebar: FunctionComponent = () => {
               />
             )}
 
-            {/* Model groups by folder */}
-            {Object.entries(modelsByFolder)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([folder, models]) => (
+            {/* Model groups by folder - instant from manifest */}
+            {navTree
+              .sort((a, b) => a.folder.localeCompare(b.folder))
+              .map((group) => (
                 <NavGroup
-                  key={folder}
-                  title={folder}
-                  groupId={folder}
-                  items={models.map(m => ({
+                  key={group.folder}
+                  title={group.folder}
+                  groupId={group.folder}
+                  items={group.models.map(m => ({
                     id: m.path,
                     name: m.name,
                     type: 'model' as const,

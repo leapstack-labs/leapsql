@@ -10,7 +10,7 @@
     "@xyflow/react": "^12.10.0",
     "dagre": "^0.8.5",
     "highlight.js": "^11.9.0",
-    "minisearch": "^7.2.0",
-    "preact": "^10.24.0"
+    "preact": "^10.24.0",
+    "sql.js-httpvfs": "^0.8.12"
   }
 }

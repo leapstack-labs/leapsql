@@ -12,8 +12,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react';
-import { useCatalog } from '../../lib/context';
-import { columnLineageToFlow } from '../../lib/layout';
+import { useColumnLineage } from '../../lib/context';
 import type { ColumnNodeData } from '../../lib/types';
 import '@xyflow/react/dist/style.css';
 
@@ -89,31 +88,109 @@ const nodeTypes = {
 
 interface ColumnLineageGraphProps {
   modelPath: string;
+  dbReady: boolean;
 }
 
 export const ColumnLineageGraph: FunctionComponent<ColumnLineageGraphProps> = ({
   modelPath,
+  dbReady,
 }) => {
-  const { getModel, modelsByPath } = useCatalog();
-  const model = getModel(modelPath);
+  const { data: lineage, loading, error } = useColumnLineage(modelPath);
 
   // Convert column lineage data to React Flow format
   const { initialNodes, initialEdges } = useMemo(() => {
-    if (!model || !model.columns || model.columns.length === 0) {
+    if (!lineage || lineage.nodes.length === 0) {
       return { initialNodes: [], initialEdges: [] };
     }
 
-    const { nodes, edges } = columnLineageToFlow(
-      modelPath,
-      model.columns,
-      modelsByPath
-    );
+    // Build a set of model paths that are sources (appear in edges as sources)
+    const sourceModels = new Set<string>();
+    lineage.edges.forEach(edge => {
+      const sourceNode = lineage.nodes.find(n => n.id === edge.source);
+      if (sourceNode && sourceNode.model !== modelPath) {
+        sourceModels.add(sourceNode.model);
+      }
+    });
+
+    // Layout nodes in columns by model
+    const nodesByModel = new Map<string, typeof lineage.nodes>();
+    lineage.nodes.forEach(node => {
+      if (!nodesByModel.has(node.model)) {
+        nodesByModel.set(node.model, []);
+      }
+      nodesByModel.get(node.model)!.push(node);
+    });
+
+    // Assign x positions: current model on right, sources on left
+    const modelOrder = Array.from(nodesByModel.keys()).sort((a, b) => {
+      if (a === modelPath) return 1;
+      if (b === modelPath) return -1;
+      return a.localeCompare(b);
+    });
+
+    const columnSpacing = 200;
+    const rowSpacing = 50;
+
+    const nodes: Node[] = [];
+    modelOrder.forEach((model, modelIdx) => {
+      const modelNodes = nodesByModel.get(model)!;
+      modelNodes.forEach((node, idx) => {
+        const isCurrentModel = model === modelPath;
+        const isModelSource = sourceModels.has(model);
+
+        nodes.push({
+          id: node.id,
+          type: 'column',
+          position: {
+            x: modelIdx * columnSpacing,
+            y: idx * rowSpacing,
+          },
+          data: {
+            column: node.column,
+            model: node.model,
+            isCurrentModel,
+            isModelSource,
+          } as ColumnNodeData,
+        });
+      });
+    });
+
+    // Create edges
+    const edges = lineage.edges.map((edge, idx) => ({
+      id: `e-${idx}`,
+      source: edge.source,
+      target: edge.target,
+      animated: false,
+      style: { stroke: '#8b949e', strokeWidth: 1 },
+    }));
 
     return { initialNodes: nodes, initialEdges: edges };
-  }, [model, modelPath, modelsByPath]);
+  }, [lineage, modelPath]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Loading state
+  if (!dbReady || loading) {
+    return (
+      <div class="column-lineage-container">
+        <div class="empty-state">
+          <p>Loading column lineage...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div class="column-lineage-container">
+        <div class="empty-state">
+          <p>Error loading column lineage: {error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (initialNodes.length === 0) {
     return (

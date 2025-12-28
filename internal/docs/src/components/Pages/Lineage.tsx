@@ -2,7 +2,11 @@
 import type { FunctionComponent } from 'preact';
 import { LineageFlow } from '../Graph/LineageFlow';
 
-export const Lineage: FunctionComponent = () => {
+interface LineageProps {
+  dbReady: boolean;
+}
+
+export const Lineage: FunctionComponent<LineageProps> = ({ dbReady }) => {
   return (
     <>
       <div class="page-header">
@@ -11,7 +15,7 @@ export const Lineage: FunctionComponent = () => {
       </div>
 
       <div class="section">
-        <LineageFlow />
+        <LineageFlow dbReady={dbReady} />
       </div>
 
       <div class="section">

@@ -11,7 +11,7 @@ import {
   type Node,
   type Edge,
 } from '@xyflow/react';
-import { useCatalog } from '../../lib/context';
+import { useLineage } from '../../lib/context';
 import { lineageToFlow } from '../../lib/layout';
 import { navigateToModel, navigateToSource } from '../../lib/router';
 import { ModelNode } from './ModelNode';
@@ -24,23 +24,38 @@ const nodeTypes = {
   source: SourceNode,
 };
 
-export const LineageFlow: FunctionComponent = () => {
-  const { catalog, modelsByPath } = useCatalog();
+interface LineageFlowProps {
+  dbReady: boolean;
+}
+
+export const LineageFlow: FunctionComponent<LineageFlowProps> = ({ dbReady }) => {
+  const { data: lineage, loading, error } = useLineage();
 
   // Convert lineage data to React Flow format
   const { initialNodes, initialEdges } = useMemo(() => {
-    if (!catalog.lineage) {
+    if (!lineage || lineage.nodes.length === 0) {
       return { initialNodes: [], initialEdges: [] };
     }
 
+    // Create a simple modelsByPath map for layout
+    // In the new architecture, we pass minimal data since layout only needs node IDs
+    const modelsByPath = new Map<string, { name: string; path: string; materialized?: string }>();
+    lineage.nodes.forEach(node => {
+      if (!node.startsWith('source:')) {
+        const parts = node.split('.');
+        const name = parts[parts.length - 1];
+        modelsByPath.set(node, { name, path: node });
+      }
+    });
+
     const { nodes, edges } = lineageToFlow(
-      catalog.lineage.nodes,
-      catalog.lineage.edges,
+      lineage.nodes,
+      lineage.edges,
       modelsByPath
     );
 
     return { initialNodes: nodes, initialEdges: edges };
-  }, [catalog.lineage, modelsByPath]);
+  }, [lineage]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -54,6 +69,28 @@ export const LineageFlow: FunctionComponent = () => {
       navigateToModel(data.path);
     }
   }, []);
+
+  // Loading state
+  if (!dbReady || loading) {
+    return (
+      <div class="dag-container">
+        <div class="empty-state">
+          <p>Loading lineage data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div class="dag-container">
+        <div class="empty-state">
+          <p>Error loading lineage: {error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (initialNodes.length === 0) {
     return (

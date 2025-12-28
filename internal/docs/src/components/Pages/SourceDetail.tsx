@@ -1,17 +1,65 @@
 // Source detail page component
 import type { FunctionComponent } from 'preact';
-import { useCatalog } from '../../lib/context';
+import { useSource } from '../../lib/context';
 import { navigateToModel } from '../../lib/router';
 import { NotFound } from './NotFound';
 
 interface SourceDetailProps {
   name: string;
+  dbReady: boolean;
 }
 
-export const SourceDetail: FunctionComponent<SourceDetailProps> = ({ name }) => {
-  const { getSource } = useCatalog();
-  const source = getSource(name);
+// Skeleton component
+const Skeleton: FunctionComponent<{ width?: string; height?: string }> = ({
+  width = '100%',
+  height = '1em'
+}) => (
+  <div
+    class="skeleton"
+    style={{
+      width,
+      height,
+      backgroundColor: 'var(--bg-tertiary)',
+      borderRadius: '4px',
+      animation: 'pulse 1.5s ease-in-out infinite'
+    }}
+  />
+);
 
+export const SourceDetail: FunctionComponent<SourceDetailProps> = ({ name, dbReady }) => {
+  const { data: source, loading, error } = useSource(name);
+
+  // Loading state
+  if (!dbReady || loading) {
+    return (
+      <>
+        <div class="model-header">
+          <div>
+            <div class="source-badge-header">SOURCE</div>
+            <Skeleton width="200px" height="2rem" />
+            <p style={{ marginTop: '1rem' }}>
+              <Skeleton width="300px" />
+            </p>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Referenced By</h2>
+          <div class="dep-list">
+            <Skeleton width="120px" height="1.5rem" />
+            <Skeleton width="140px" height="1.5rem" />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return <NotFound message={`Error loading source: ${error.message}`} />;
+  }
+
+  // Not found
   if (!source) {
     return <NotFound message={`Source "${name}" not found`} />;
   }

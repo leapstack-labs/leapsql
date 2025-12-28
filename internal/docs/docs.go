@@ -427,17 +427,13 @@ func isEmptyOrWhitespace(s string) bool {
 	return true
 }
 
-// templateData holds data for the HTML template
-type templateData struct {
-	ProjectName string
-	CSS         template.CSS
-	JS          template.JS
-	CatalogJSON template.JS
-}
-
-// Build generates a single-file HTML documentation site.
+// Build generates documentation site with SQLite database.
+// Output structure:
+//   - index.html (shell + manifest + JS/CSS)
+//   - metadata.db (SQLite database)
 func (g *Generator) Build(outputDir string) error {
 	catalog := g.GenerateCatalog()
+	manifest := GenerateManifest(catalog)
 
 	// Create output directory
 	if err := os.MkdirAll(outputDir, 0750); err != nil {
@@ -450,33 +446,40 @@ func (g *Generator) Build(outputDir string) error {
 		return fmt.Errorf("failed to get docs directory: %w", err)
 	}
 
-	// Build frontend (TypeScript -> JS, CSS bundled)
+	// 1. Generate metadata.db
+	dbPath := filepath.Join(outputDir, "metadata.db")
+	if err := GenerateMetadataDB(catalog, dbPath); err != nil {
+		return fmt.Errorf("failed to generate database: %w", err)
+	}
+
+	// 2. Build frontend (TypeScript -> JS, CSS bundled)
 	buildResult, err := BuildFrontend(docsDir, true)
 	if err != nil {
 		return fmt.Errorf("failed to build frontend: %w", err)
 	}
 
-	// Marshal catalog to JSON
-	catalogJSON, err := json.Marshal(catalog)
+	// 3. Marshal manifest to JSON for embedding
+	manifestJSON, err := json.Marshal(manifest)
 	if err != nil {
-		return fmt.Errorf("failed to marshal catalog: %w", err)
+		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
-	// Parse and execute HTML template
+	// 4. Parse and execute HTML template
 	tmpl, err := template.New("docs").Parse(htmlTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	// G203: CSS/JS are from our own build output, not user input
-	data := templateData{
-		ProjectName: g.projectName,
-		CSS:         template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
-		JS:          template.JS(buildResult.JS),   //nolint:gosec // G203: trusted build output
-		CatalogJSON: template.JS(catalogJSON),      //nolint:gosec // G203: trusted build output
+	data := templateDataV2{
+		ProjectName:  g.projectName,
+		CSS:          template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
+		JS:           template.JS(buildResult.JS),   //nolint:gosec // G203: trusted build output
+		ManifestJSON: template.JS(manifestJSON),     //nolint:gosec // G203: trusted build output
+		DevMode:      false,
 	}
 
-	// Write single HTML file
+	// Write index.html
 	outputPath := filepath.Join(outputDir, "index.html")
 	f, err := os.Create(outputPath) //nolint:gosec // G304: path is from trusted source
 	if err != nil {
@@ -488,7 +491,27 @@ func (g *Generator) Build(outputDir string) error {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
+	// 5. Copy sql.js WASM assets (for production mode)
+	if err := copyWasmAssets(docsDir, outputDir); err != nil {
+		return fmt.Errorf("failed to copy WASM assets: %w", err)
+	}
+
 	return nil
+}
+
+// copyWasmAssets copies sql.js-httpvfs WASM files to the output directory.
+func copyWasmAssets(docsDir, outputDir string) error {
+	// Look for WASM files in node_modules
+	wasmSrc := filepath.Join(docsDir, "node_modules", "sql.js-httpvfs", "dist", "sql-wasm.wasm")
+	wasmDst := filepath.Join(outputDir, "sql-wasm.wasm")
+
+	// Check if the source exists
+	if _, err := os.Stat(wasmSrc); os.IsNotExist(err) {
+		// sql.js-httpvfs not installed yet - this is okay for dev, warn for prod
+		return nil
+	}
+
+	return CopyFile(wasmSrc, wasmDst)
 }
 
 // Serve starts a local HTTP server for the documentation site.

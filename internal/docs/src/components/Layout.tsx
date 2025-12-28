@@ -4,12 +4,13 @@ import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: ComponentChildren;
+  dbReady: boolean;
 }
 
-export const Layout: FunctionComponent<LayoutProps> = ({ children }) => {
+export const Layout: FunctionComponent<LayoutProps> = ({ children, dbReady }) => {
   return (
     <div class="layout">
-      <Sidebar />
+      <Sidebar dbReady={dbReady} />
       <main class="main">{children}</main>
     </div>
   );

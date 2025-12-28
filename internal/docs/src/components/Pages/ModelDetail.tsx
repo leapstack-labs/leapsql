@@ -1,7 +1,7 @@
 // Model detail page component
 import type { FunctionComponent } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
-import { useCatalog } from '../../lib/context';
+import { useModel } from '../../lib/context';
 import { navigateToModel, navigateToSource } from '../../lib/router';
 import { NotFound } from './NotFound';
 import { ColumnLineageGraph } from '../Graph/ColumnLineage';
@@ -13,7 +13,33 @@ hljs.registerLanguage('sql', sql);
 
 interface ModelDetailProps {
   path: string;
+  dbReady: boolean;
 }
+
+// Skeleton components
+const Skeleton: FunctionComponent<{ width?: string; height?: string }> = ({
+  width = '100%',
+  height = '1em'
+}) => (
+  <div
+    class="skeleton"
+    style={{
+      width,
+      height,
+      backgroundColor: 'var(--bg-tertiary)',
+      borderRadius: '4px',
+      animation: 'pulse 1.5s ease-in-out infinite'
+    }}
+  />
+);
+
+const SkeletonText: FunctionComponent<{ lines?: number }> = ({ lines = 3 }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    {[...Array(lines)].map((_, i) => (
+      <Skeleton key={i} width={`${80 - i * 10}%`} />
+    ))}
+  </div>
+);
 
 // Escape HTML special characters
 function escapeHtml(text: string): string {
@@ -22,25 +48,80 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-export const ModelDetail: FunctionComponent<ModelDetailProps> = ({ path }) => {
-  const { getModel, modelsByPath, catalog } = useCatalog();
-  const model = getModel(path);
+export const ModelDetail: FunctionComponent<ModelDetailProps> = ({ path, dbReady }) => {
+  const { data: model, loading, error } = useModel(path);
   const codeRef = useRef<HTMLElement>(null);
 
-  // Highlight code on mount
+  // Highlight code when model loads
   useEffect(() => {
     if (codeRef.current && model) {
+      codeRef.current.removeAttribute('data-highlighted');
       hljs.highlightElement(codeRef.current);
     }
   }, [model, path]);
 
+  // Loading state
+  if (!dbReady || loading) {
+    return (
+      <>
+        <div class="model-header">
+          <div>
+            <Skeleton width="200px" height="2rem" />
+            <div style={{ marginTop: '0.5rem' }}>
+              <Skeleton width="300px" />
+            </div>
+            <div class="model-meta" style={{ marginTop: '1rem' }}>
+              <Skeleton width="100px" height="1.5rem" />
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Dependencies</h2>
+          <div class="dep-list">
+            <Skeleton width="80px" height="1.5rem" />
+            <Skeleton width="100px" height="1.5rem" />
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Columns</h2>
+          <table class="data-table columns-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Transform</th>
+                <th>Sources</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(5)].map((_, i) => (
+                <tr key={i}>
+                  <td><Skeleton width="120px" /></td>
+                  <td><Skeleton width="60px" /></td>
+                  <td><Skeleton width="150px" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return <NotFound message={`Error loading model: ${error.message}`} />;
+  }
+
+  // Not found
   if (!model) {
     return <NotFound message={`Model "${path}" not found`} />;
   }
 
-  // Find external sources (sources that aren't models)
+  // Find external sources (sources that aren't models in dependencies)
   const externalSources = model.sources.filter(
-    (src) => !modelsByPath.has(src) && !catalog.models.some((m) => m.name === src)
+    (src) => !model.dependencies.includes(src)
   );
 
   return (
@@ -181,7 +262,7 @@ export const ModelDetail: FunctionComponent<ModelDetailProps> = ({ path }) => {
 
       <div class="section">
         <h2 class="section-title">Column Lineage</h2>
-        <ColumnLineageGraph modelPath={path} />
+        <ColumnLineageGraph modelPath={path} dbReady={dbReady} />
         <div class="column-lineage-legend">
           <div class="legend-item">
             <div

@@ -1,8 +1,5 @@
 // Root application component
 import type { FunctionComponent } from 'preact';
-import { useMemo } from 'preact/hooks';
-import type { Catalog } from '../lib/types';
-import { CatalogContext, createCatalogContext } from '../lib/context';
 import { useRoute } from '../lib/router';
 import { Layout } from './Layout';
 import { Overview } from './Pages/Overview';
@@ -12,23 +9,22 @@ import { Lineage } from './Pages/Lineage';
 import { NotFound } from './Pages/NotFound';
 
 interface AppProps {
-  catalog: Catalog;
+  dbReady: boolean;
 }
 
-export const App: FunctionComponent<AppProps> = ({ catalog }) => {
-  const catalogContext = useMemo(() => createCatalogContext(catalog), [catalog]);
+export const App: FunctionComponent<AppProps> = ({ dbReady }) => {
   const route = useRoute();
 
   const renderPage = () => {
     switch (route.type) {
       case 'overview':
-        return <Overview />;
+        return <Overview dbReady={dbReady} />;
       case 'lineage':
-        return <Lineage />;
+        return <Lineage dbReady={dbReady} />;
       case 'model':
-        return <ModelDetail path={route.path} />;
+        return <ModelDetail path={route.path} dbReady={dbReady} />;
       case 'source':
-        return <SourceDetail name={route.name} />;
+        return <SourceDetail name={route.name} dbReady={dbReady} />;
       case 'not-found':
       default:
         return <NotFound />;
@@ -36,8 +32,6 @@ export const App: FunctionComponent<AppProps> = ({ catalog }) => {
   };
 
   return (
-    <CatalogContext.Provider value={catalogContext}>
-      <Layout>{renderPage()}</Layout>
-    </CatalogContext.Provider>
+    <Layout dbReady={dbReady}>{renderPage()}</Layout>
   );
 };

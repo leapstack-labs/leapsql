@@ -4,6 +4,7 @@ package docs
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -19,6 +20,18 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// QueryRequest represents a SQL query request from the frontend.
+type QueryRequest struct {
+	SQL    string        `json:"sql"`
+	Params []interface{} `json:"params"`
+}
+
+// QueryResponse represents the response format matching sql.js.
+type QueryResponse struct {
+	Columns []string        `json:"columns"`
+	Values  [][]interface{} `json:"values"`
+}
+
 // DevServer provides a development server with watch mode and live reload.
 type DevServer struct {
 	generator   *Generator
@@ -27,6 +40,8 @@ type DevServer struct {
 	docsDir     string
 	mu          sync.RWMutex
 	currentHTML []byte
+	manifest    *Manifest
+	metaDB      *MetadataDB
 	clients     map[chan struct{}]struct{}
 	clientsMu   sync.Mutex
 }
@@ -84,6 +99,8 @@ func (s *DevServer) Serve(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/__reload", s.handleSSE)
+	mux.HandleFunc("/query", s.handleQuery)
+	mux.HandleFunc("/manifest", s.handleManifest)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.port),
@@ -97,6 +114,12 @@ func (s *DevServer) Serve(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
+		// Clean up database
+		s.mu.Lock()
+		if s.metaDB != nil {
+			_ = s.metaDB.Close()
+		}
+		s.mu.Unlock()
 	}()
 
 	log.Printf("Dev server running at http://localhost:%d", s.port)
@@ -185,7 +208,7 @@ func (s *DevServer) watchLoop(ctx context.Context, watcher *fsnotify.Watcher) {
 	}
 }
 
-// rebuild regenerates the HTML output.
+// rebuild regenerates the HTML output and database.
 func (s *DevServer) rebuild(reloadModels bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -206,13 +229,33 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 
 	// Generate catalog
 	catalog := s.generator.GenerateCatalog()
-	catalogJSON, err := json.Marshal(catalog)
+
+	// Generate manifest
+	s.manifest = GenerateManifest(catalog)
+
+	// Rebuild in-memory database
+	if s.metaDB != nil {
+		_ = s.metaDB.Close()
+	}
+	s.metaDB, err = OpenMemoryDB()
 	if err != nil {
-		return fmt.Errorf("failed to marshal catalog: %w", err)
+		return fmt.Errorf("failed to open memory database: %w", err)
+	}
+	if err := s.metaDB.InitSchema(); err != nil {
+		return fmt.Errorf("failed to init schema: %w", err)
+	}
+	if err := s.metaDB.PopulateFromCatalog(catalog); err != nil {
+		return fmt.Errorf("failed to populate database: %w", err)
+	}
+
+	// Marshal manifest to JSON for embedding
+	manifestJSON, err := json.Marshal(s.manifest)
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
 	// Parse template
-	tmpl, err := template.New("docs").Parse(htmlTemplate)
+	tmpl, err := template.New("docs").Parse(htmlTemplateV2)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -220,11 +263,12 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 	// Inject live reload script
 	jsWithReload := buildResult.JS + liveReloadScript
 
-	data := templateData{
-		ProjectName: s.generator.projectName,
-		CSS:         template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
-		JS:          template.JS(jsWithReload),     //nolint:gosec // G203: trusted build output
-		CatalogJSON: template.JS(catalogJSON),      //nolint:gosec // G203: trusted build output
+	data := templateDataV2{
+		ProjectName:  s.generator.projectName,
+		CSS:          template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
+		JS:           template.JS(jsWithReload),     //nolint:gosec // G203: trusted build output
+		ManifestJSON: template.JS(manifestJSON),     //nolint:gosec // G203: trusted build output
+		DevMode:      true,
 	}
 
 	var buf bytes.Buffer
@@ -251,6 +295,112 @@ func (s *DevServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	_, _ = w.Write(html)
+}
+
+// handleQuery executes SQL queries against the in-memory database.
+func (s *DevServer) handleQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req QueryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	s.mu.RLock()
+	db := s.metaDB
+	s.mu.RUnlock()
+
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Execute query with parameter binding (safe from injection)
+	rows, err := db.DB().QueryContext(r.Context(), req.SQL, req.Params...)
+	if err != nil {
+		http.Error(w, "Query error: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Convert to {columns, values} format matching sql.js
+	resp, err := rowsToQueryResponse(rows)
+	if err != nil {
+		http.Error(w, "Failed to process results: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// handleManifest returns the manifest JSON.
+func (s *DevServer) handleManifest(w http.ResponseWriter, _ *http.Request) {
+	s.mu.RLock()
+	manifest := s.manifest
+	s.mu.RUnlock()
+
+	if manifest == nil {
+		http.Error(w, "Manifest not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	_ = json.NewEncoder(w).Encode(manifest)
+}
+
+// rowsToQueryResponse converts sql.Rows to QueryResponse format.
+func rowsToQueryResponse(rows *sql.Rows) (*QueryResponse, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	var values [][]interface{}
+
+	// Create a slice of interface{}'s to represent each column,
+	// and a second slice to contain pointers to each item in the columns slice.
+	columnPtrs := make([]interface{}, len(columns))
+	columnValues := make([]interface{}, len(columns))
+	for i := range columnValues {
+		columnPtrs[i] = &columnValues[i]
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(columnPtrs...); err != nil {
+			return nil, err
+		}
+
+		// Copy values to a new slice
+		row := make([]interface{}, len(columns))
+		for i, val := range columnValues {
+			// Handle SQL null values
+			switch v := val.(type) {
+			case nil:
+				row[i] = nil
+			case []byte:
+				row[i] = string(v)
+			default:
+				row[i] = v
+			}
+		}
+		values = append(values, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &QueryResponse{
+		Columns: columns,
+		Values:  values,
+	}, nil
 }
 
 // handleSSE handles Server-Sent Events for live reload.
@@ -323,6 +473,38 @@ const liveReloadScript = `
     setTimeout(function() { window.location.reload(); }, 1000);
   };
 })();
+`
+
+// templateDataV2 holds data for the new HTML template with manifest.
+type templateDataV2 struct {
+	ProjectName  string
+	CSS          template.CSS
+	JS           template.JS
+	ManifestJSON template.JS
+	DevMode      bool
+}
+
+// htmlTemplateV2 is the new template that uses manifest instead of full catalog.
+const htmlTemplateV2 = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.ProjectName}} - Documentation</title>
+  <style>{{.CSS}}</style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading">Loading...</div>
+  </div>
+  <!-- Manifest for instant shell render -->
+  <script>
+    window.__MANIFEST__ = {{.ManifestJSON}};
+    window.__DEV_MODE__ = {{.DevMode}};
+  </script>
+  <script>{{.JS}}</script>
+</body>
+</html>
 `
 
 // ServeDev is a convenience function to start the dev server.

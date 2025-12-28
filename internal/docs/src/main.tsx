@@ -1,20 +1,62 @@
-// Main entry point for the documentation site
+// Main entry point for the documentation site with SQLite-over-HTTP
 import { render } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
 import { App } from './components/App';
+import { ManifestContext, DatabaseContext } from './lib/context';
+import { HttpAdapter } from './lib/db/http-adapter';
+import { WasmAdapter } from './lib/db/wasm-adapter';
+import type { DatabaseAdapter } from './lib/db/types';
+import type { Manifest } from './lib/types';
 import './css/main.css';
 
-// Load catalog data from embedded JSON
-function loadCatalog() {
-  const dataElement = document.getElementById('catalog-data');
-  if (!dataElement) {
-    throw new Error('Catalog data not found');
+// Get manifest from embedded data (instant load)
+function getManifest(): Manifest {
+  if (window.__MANIFEST__) {
+    return window.__MANIFEST__;
   }
-  
-  try {
-    return JSON.parse(dataElement.textContent || '{}');
-  } catch (e) {
-    throw new Error('Failed to parse catalog data');
+  throw new Error('Manifest not found - please ensure __MANIFEST__ is embedded in the page');
+}
+
+// Check if running in dev mode
+function isDevMode(): boolean {
+  return window.__DEV_MODE__ === true || window.location.hostname === 'localhost';
+}
+
+// Root component with hybrid boot
+function Root() {
+  const [manifest] = useState<Manifest>(() => getManifest());
+  const [db, setDb] = useState<DatabaseAdapter | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    // Initialize the appropriate database adapter
+    const adapter = isDevMode() ? new HttpAdapter() : new WasmAdapter();
+
+    adapter.init()
+      .then(() => setDb(adapter))
+      .catch(setError);
+  }, []);
+
+  if (error) {
+    return (
+      <div class="loading">
+        <div>
+          <h3>Failed to load database</h3>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            {error.message}
+          </p>
+        </div>
+      </div>
+    );
   }
+
+  return (
+    <ManifestContext.Provider value={manifest}>
+      <DatabaseContext.Provider value={db}>
+        <App dbReady={db !== null} />
+      </DatabaseContext.Provider>
+    </ManifestContext.Provider>
+  );
 }
 
 // Initialize the app
@@ -26,8 +68,7 @@ function init() {
   }
 
   try {
-    const catalog = loadCatalog();
-    render(<App catalog={catalog} />, appRoot);
+    render(<Root />, appRoot);
   } catch (error) {
     appRoot.innerHTML = `
       <div class="loading">
