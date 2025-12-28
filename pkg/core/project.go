@@ -7,6 +7,12 @@ type ProjectConfig struct {
 	MacrosDir string        `koanf:"macros_dir"`
 	Target    *TargetConfig `koanf:"target"`
 	Lint      *LintConfig   `koanf:"lint"`
+	Docs      *DocsConfig   `koanf:"docs"`
+}
+
+// DocsConfig holds documentation generation configuration.
+type DocsConfig struct {
+	Theme string `koanf:"theme"` // vercel, claude, corporate, etc.
 }
 
 // TargetConfig holds database target configuration.

@@ -107,6 +107,7 @@ type Generator struct {
 	registry    *registry.ModelRegistry
 	models      []*core.Model
 	projectName string
+	theme       string
 }
 
 // NewGenerator creates a new documentation generator.
@@ -114,6 +115,14 @@ func NewGenerator(projectName string) *Generator {
 	return &Generator{
 		registry:    registry.NewModelRegistry(),
 		projectName: projectName,
+		theme:       "vercel", // Default theme
+	}
+}
+
+// SetTheme sets the theme for documentation generation.
+func (g *Generator) SetTheme(theme string) {
+	if theme != "" {
+		g.theme = theme
 	}
 }
 
@@ -453,7 +462,7 @@ func (g *Generator) Build(outputDir string) error {
 	}
 
 	// 2. Build frontend (TypeScript -> JS, CSS bundled)
-	buildResult, err := BuildFrontend(docsDir, true)
+	buildResult, err := BuildFrontend(docsDir, true, g.theme)
 	if err != nil {
 		return fmt.Errorf("failed to build frontend: %w", err)
 	}

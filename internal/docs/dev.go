@@ -38,6 +38,7 @@ type DevServer struct {
 	modelsDir   string
 	port        int
 	docsDir     string
+	theme       string
 	mu          sync.RWMutex
 	currentHTML []byte
 	manifest    *Manifest
@@ -47,13 +48,16 @@ type DevServer struct {
 }
 
 // NewDevServer creates a new development server.
-func NewDevServer(projectName, modelsDir string, port int) (*DevServer, error) {
+func NewDevServer(projectName, modelsDir string, port int, theme string) (*DevServer, error) {
 	docsDir, err := GetDocsDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docs directory: %w", err)
 	}
 
 	gen := NewGenerator(projectName)
+	if theme != "" {
+		gen.SetTheme(theme)
+	}
 	if err := gen.LoadModels(modelsDir); err != nil {
 		return nil, fmt.Errorf("failed to load models: %w", err)
 	}
@@ -63,6 +67,7 @@ func NewDevServer(projectName, modelsDir string, port int) (*DevServer, error) {
 		modelsDir: modelsDir,
 		port:      port,
 		docsDir:   docsDir,
+		theme:     theme,
 		clients:   make(map[chan struct{}]struct{}),
 	}, nil
 }
@@ -230,7 +235,7 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 	}
 
 	// Build frontend (non-minified for dev) - slow operation
-	buildResult, err := BuildFrontend(s.docsDir, false)
+	buildResult, err := BuildFrontend(s.docsDir, false, s.theme)
 	if err != nil {
 		return fmt.Errorf("failed to build frontend: %w", err)
 	}
@@ -528,6 +533,16 @@ const htmlTemplateV2 = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{.ProjectName}} - Documentation</title>
   <style>{{.CSS}}</style>
+  <!-- Theme initialization - must run before body renders to prevent flash -->
+  <script>
+    (function() {
+      var stored = localStorage.getItem('color-mode');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'dark' || (!stored && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="app">
@@ -544,8 +559,8 @@ const htmlTemplateV2 = `<!DOCTYPE html>
 `
 
 // ServeDev is a convenience function to start the dev server.
-func ServeDev(projectName, modelsDir string, port int) error {
-	server, err := NewDevServer(projectName, modelsDir, port)
+func ServeDev(projectName, modelsDir string, port int, theme string) error {
+	server, err := NewDevServer(projectName, modelsDir, port, theme)
 	if err != nil {
 		return err
 	}

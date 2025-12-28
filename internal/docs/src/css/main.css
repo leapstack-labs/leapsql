@@ -1,4 +1,5 @@
 /* Main CSS aggregator - imports all styles */
+/* Theme CSS is injected at build time by loadThemeCSS() in build.go */
 @import './variables.css';
 @import './base.css';
 @import './sidebar.css';

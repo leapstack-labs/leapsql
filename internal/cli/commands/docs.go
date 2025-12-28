@@ -15,6 +15,7 @@ type DocsOptions struct {
 	OutputPath  string
 	ProjectName string
 	Port        int
+	Theme       string
 }
 
 // NewDocsCommand creates the docs command with subcommands.
@@ -50,12 +51,19 @@ func newDocsBuildCommand() *cobra.Command {
   leapsql docs build --output ./public
 
   # Build with custom project name
-  leapsql docs build --project "My Data Platform"`,
+  leapsql docs build --project "My Data Platform"
+
+  # Build with a specific theme
+  leapsql docs build --theme claude`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Get config inside RunE, not at command definition time
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
 				opts.ModelsPath = cfg.ModelsDir
+			}
+			// Get theme from config if not specified via flag
+			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
+				opts.Theme = cfg.Docs.Theme
 			}
 			return runDocsBuild(opts)
 		},
@@ -64,6 +72,7 @@ func newDocsBuildCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.ModelsPath, "models", "", "Path to models directory (default: from config)")
 	cmd.Flags().StringVar(&opts.OutputPath, "output", "./docs-site", "Output directory for generated site")
 	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
+	cmd.Flags().StringVar(&opts.Theme, "theme", "", "Theme name: vercel, claude, corporate (default: from config or 'vercel')")
 
 	return cmd
 }
@@ -79,12 +88,19 @@ func newDocsServeCommand() *cobra.Command {
   leapsql docs serve
 
   # Serve on custom port
-  leapsql docs serve --port 3000`,
+  leapsql docs serve --port 3000
+
+  # Serve with a specific theme
+  leapsql docs serve --theme corporate`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Get config inside RunE, not at command definition time
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
 				opts.ModelsPath = cfg.ModelsDir
+			}
+			// Get theme from config if not specified via flag
+			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
+				opts.Theme = cfg.Docs.Theme
 			}
 			return runDocsServe(opts)
 		},
@@ -94,6 +110,7 @@ func newDocsServeCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.OutputPath, "output", "./.leapsql-docs", "Output directory for generated site")
 	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
 	cmd.Flags().IntVar(&opts.Port, "port", 8080, "Port to serve on")
+	cmd.Flags().StringVar(&opts.Theme, "theme", "", "Theme name: vercel, claude, corporate (default: from config or 'vercel')")
 
 	return cmd
 }
@@ -104,13 +121,20 @@ func runDocsBuild(opts *DocsOptions) error {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
+	theme := opts.Theme
+	if theme == "" {
+		theme = "vercel"
+	}
+
 	fmt.Printf("Building documentation...\n")
 	fmt.Printf("  Models:  %s\n", opts.ModelsPath)
 	fmt.Printf("  Output:  %s\n", opts.OutputPath)
 	fmt.Printf("  Project: %s\n", opts.ProjectName)
+	fmt.Printf("  Theme:   %s\n", theme)
 	fmt.Println()
 
 	gen := docs.NewGenerator(opts.ProjectName)
+	gen.SetTheme(opts.Theme)
 
 	if err := gen.LoadModels(opts.ModelsPath); err != nil {
 		return fmt.Errorf("failed to load models: %w", err)
@@ -132,12 +156,19 @@ func runDocsServe(opts *DocsOptions) error {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
+	theme := opts.Theme
+	if theme == "" {
+		theme = "vercel"
+	}
+
 	fmt.Printf("Building documentation...\n")
 	fmt.Printf("  Models:  %s\n", opts.ModelsPath)
 	fmt.Printf("  Project: %s\n", opts.ProjectName)
+	fmt.Printf("  Theme:   %s\n", theme)
 	fmt.Println()
 
 	gen := docs.NewGenerator(opts.ProjectName)
+	gen.SetTheme(opts.Theme)
 
 	if err := gen.LoadModels(opts.ModelsPath); err != nil {
 		return fmt.Errorf("failed to load models: %w", err)
@@ -164,11 +195,18 @@ will trigger a rebuild, and connected browsers will automatically reload.`,
   leapsql docs dev
 
   # Start on custom port
-  leapsql docs dev --port 3000`,
+  leapsql docs dev --port 3000
+
+  # Start with a specific theme
+  leapsql docs dev --theme claude`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
 				opts.ModelsPath = cfg.ModelsDir
+			}
+			// Get theme from config if not specified via flag
+			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
+				opts.Theme = cfg.Docs.Theme
 			}
 			return runDocsDev(opts)
 		},
@@ -177,6 +215,7 @@ will trigger a rebuild, and connected browsers will automatically reload.`,
 	cmd.Flags().StringVar(&opts.ModelsPath, "models", "", "Path to models directory (default: from config)")
 	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
 	cmd.Flags().IntVar(&opts.Port, "port", 8080, "Port to serve on")
+	cmd.Flags().StringVar(&opts.Theme, "theme", "", "Theme name: vercel, claude, corporate (default: from config or 'vercel')")
 
 	return cmd
 }
@@ -187,7 +226,7 @@ func runDocsDev(opts *DocsOptions) error {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
-	return docs.ServeDev(opts.ProjectName, opts.ModelsPath, opts.Port)
+	return docs.ServeDev(opts.ProjectName, opts.ModelsPath, opts.Port, opts.Theme)
 }
 
 // Ensure config package is imported for getConfig usage

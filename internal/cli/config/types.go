@@ -23,6 +23,10 @@ type LintConfig = core.LintConfig
 // This allows CLI code to use config.RuleOptions without importing pkg/core.
 type RuleOptions = core.RuleOptions
 
+// DocsConfig is an alias for the shared docs configuration.
+// This allows CLI code to use config.DocsConfig without importing pkg/core.
+type DocsConfig = core.DocsConfig
+
 // Config holds all CLI configuration options.
 type Config struct {
 	ModelsDir    string               `koanf:"models_dir"`
@@ -35,6 +39,7 @@ type Config struct {
 	OutputFormat string               `koanf:"output"`
 	Target       *TargetConfig        `koanf:"target"`
 	Lint         *LintConfig          `koanf:"lint"`
+	Docs         *DocsConfig          `koanf:"docs"`
 	Environments map[string]EnvConfig `koanf:"environments"`
 }
 

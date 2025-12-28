@@ -1,0 +1,7 @@
+/* Graph node colors derived from theme variables */
+:root {
+  --node-source: var(--chart-1);
+  --node-staging: var(--chart-2);
+  --node-marts: var(--primary);
+  --node-default: var(--muted-foreground);
+}

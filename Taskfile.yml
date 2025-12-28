@@ -167,22 +167,22 @@ tasks:
 
   # Model Catalog (leapsql docs command - generates HTML from SQL models)
   catalog:build:
-    desc: Generate static model catalog site
+    desc: Generate static model catalog site (use THEME=vercel|claude|corporate)
     deps: [build]
     cmds:
-      - ./leapsql docs build --models {{.MODELS_DIR}} --output catalog-site --project "LeapSQL Project"
+      - ./leapsql docs build --models {{.MODELS_DIR}} --output catalog-site --project "LeapSQL Project" {{if .THEME}}--theme {{.THEME}}{{end}}
 
   catalog:serve:
-    desc: Build and serve model catalog locally
+    desc: Build and serve model catalog locally (use THEME=vercel|claude|corporate)
     deps: [build]
     cmds:
-      - ./leapsql docs serve --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project"
+      - ./leapsql docs serve --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project" {{if .THEME}}--theme {{.THEME}}{{end}}
 
   catalog:dev:
-    desc: Start model catalog dev server with live reload
+    desc: Start model catalog dev server with live reload (use THEME=vercel|claude|corporate)
     deps: [build]
     cmds:
-      - ./leapsql docs dev --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project"
+      - ./leapsql docs dev --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project" {{if .THEME}}--theme {{.THEME}}{{end}}
 
   # Project Documentation (VitePress in /docs folder)
   docs:dev:

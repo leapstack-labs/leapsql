@@ -2,27 +2,27 @@
 
 /* DAG Container */
 .dag-container {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
   overflow: hidden;
   height: 500px;
 }
 
 .dag-container .react-flow {
-  background-color: var(--bg-secondary);
+  background-color: var(--card);
 }
 
 /* DAG Node */
 .dag-node {
   cursor: pointer;
   padding: 4px 8px;
-  background-color: var(--bg-secondary);
-  border-radius: 4px;
+  background-color: var(--card);
+  border-radius: var(--radius, 4px);
 }
 
 .dag-node:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--accent);
 }
 
 .dag-node-source {
@@ -31,16 +31,16 @@
 
 /* Column Lineage Container */
 .column-lineage-container {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
   overflow: hidden;
   height: 400px;
   margin-bottom: 1rem;
 }
 
 .column-lineage-container .react-flow {
-  background-color: var(--bg-secondary);
+  background-color: var(--card);
 }
 
 .column-lineage-container .empty-state {
@@ -64,30 +64,30 @@
 }
 
 .react-flow__edge-path {
-  stroke: var(--border-color);
+  stroke: var(--border);
   stroke-width: 1.5;
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
-  stroke: var(--accent-orange);
+  stroke: var(--chart-1);
   stroke-dasharray: 4 2;
 }
 
 .react-flow__controls {
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
   box-shadow: none;
 }
 
 .react-flow__controls-button {
-  background-color: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background-color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
 }
 
 .react-flow__controls-button:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--accent);
 }
 
 .react-flow__controls-button svg {
@@ -95,9 +95,9 @@
 }
 
 .react-flow__minimap {
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
 }
 
 .react-flow__attribution {
@@ -107,9 +107,9 @@
 .react-flow__handle {
   width: 8px;
   height: 8px;
-  border: 2px solid var(--bg-secondary);
+  border: 2px solid var(--card);
 }
 
 .react-flow__background pattern line {
-  stroke: var(--border-color);
+  stroke: var(--border);
 }
