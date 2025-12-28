@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Build artifacts (generated at runtime)
+/static/*.js
+/static/*.css
+
+# Package manager locks (use package.json for versions)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

@@ -1,0 +1,16 @@
+{
+  "name": "leapsql-docs-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Build is handled by Go'"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.10.0",
+    "dagre": "^0.8.5",
+    "highlight.js": "^11.9.0",
+    "minisearch": "^7.2.0",
+    "preact": "^10.24.0"
+  }
+}

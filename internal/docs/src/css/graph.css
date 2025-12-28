@@ -1,0 +1,115 @@
+/* Graph and React Flow styles */
+
+/* DAG Container */
+.dag-container {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 500px;
+}
+
+.dag-container .react-flow {
+  background-color: var(--bg-secondary);
+}
+
+/* DAG Node */
+.dag-node {
+  cursor: pointer;
+  padding: 4px 8px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.dag-node:hover {
+  background-color: var(--hover-bg);
+}
+
+.dag-node-source {
+  cursor: pointer;
+}
+
+/* Column Lineage Container */
+.column-lineage-container {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 400px;
+  margin-bottom: 1rem;
+}
+
+.column-lineage-container .react-flow {
+  background-color: var(--bg-secondary);
+}
+
+.column-lineage-container .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.column-lineage-node {
+  cursor: grab;
+}
+
+.column-lineage-node:active {
+  cursor: grabbing;
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  font-size: 11px;
+}
+
+.react-flow__edge-path {
+  stroke: var(--border-color);
+  stroke-width: 1.5;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--accent-orange);
+  stroke-dasharray: 4 2;
+}
+
+.react-flow__controls {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--hover-bg);
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.react-flow__minimap {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-secondary);
+}
+
+.react-flow__background pattern line {
+  stroke: var(--border-color);
+}

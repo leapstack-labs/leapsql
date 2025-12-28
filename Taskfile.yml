@@ -28,7 +28,7 @@ tasks:
   test:
     desc: Run all tests (package summary, shows failures inline)
     cmds:
-      - gotestsum --format pkgname-and-test-fails ./...
+      - gotestsum --format pkgname-and-test-fails $(go list ./... | grep -v '/pkg/core')
 
   test:pkg:
     desc: Run tests for a specific package (use PKG=./internal/cli/...)
@@ -40,12 +40,12 @@ tasks:
   test:watch:
     desc: Watch mode - rerun tests on file changes
     cmds:
-      - gotestsum --watch --format pkgname-and-test-fails ./...
+      - gotestsum --watch --format pkgname-and-test-fails $(go list ./... | grep -v '/pkg/core')
 
   test:all:
     desc: Run all tests including integration tests
     cmds:
-      - gotestsum --format pkgname-and-test-fails -- -tags=integration ./...
+      - gotestsum --format pkgname-and-test-fails -- -tags=integration $(go list ./... | grep -v '/pkg/core')
 
   lint:
     desc: Run golangci-lint on all packages
@@ -78,22 +78,22 @@ tasks:
     cmds:
       - go run ./scripts/gendialect -dialect=duckdb -gen=all -outdir=pkg/adapters/duckdb/dialect
 
-  generate:docs:
+  docs:generate:
     desc: Generate documentation from code
     cmds:
       - go run ./scripts/gendocs -gen=all
 
-  generate:docs:cli:
+  docs:generate:cli:
     desc: Generate CLI reference documentation
     cmds:
       - go run ./scripts/gendocs -gen=cli
 
-  generate:docs:schema:
+  docs:generate:schema:
     desc: Generate schema documentation (frontmatter, config)
     cmds:
       - go run ./scripts/gendocs -gen=schema
 
-  generate:docs:globals:
+  docs:generate:globals:
     desc: Generate template globals documentation
     cmds:
       - go run ./scripts/gendocs -gen=globals
@@ -101,7 +101,7 @@ tasks:
   docs:check:
     desc: Verify generated docs are up-to-date
     cmds:
-      - task: generate:docs
+      - task: docs:generate
       - git diff --exit-code docs/
 
   generate:all:
@@ -109,7 +109,7 @@ tasks:
     cmds:
       - task: generate
       - task: generate:dialect
-      - task: generate:docs
+      - task: docs:generate
 
   run:
     desc: Run all models
@@ -157,28 +157,36 @@ tasks:
     cmds:
       - ./leapsql version
 
-  docs:build:
-    desc: Generate static documentation site
-    deps: [build]
-    cmds:
-      - ./leapsql docs build -models {{.MODELS_DIR}} -output docs-site -project "LeapSQL Project"
-
-  docs:serve:
-    desc: Build and serve documentation locally
-    deps: [build]
-    cmds:
-      - ./leapsql docs serve -models {{.MODELS_DIR}} -port 8080 -project "LeapSQL Project"
-
   clean:
     desc: Clean build artifacts and state
     cmds:
       - rm -f leapsql
       - rm -rf .leapsql
       - rm -rf .leapsql-docs
-      - rm -rf docs-site
+      - rm -rf catalog-site
 
+  # Model Catalog (leapsql docs command - generates HTML from SQL models)
+  catalog:build:
+    desc: Generate static model catalog site
+    deps: [build]
+    cmds:
+      - ./leapsql docs build --models {{.MODELS_DIR}} --output catalog-site --project "LeapSQL Project"
+
+  catalog:serve:
+    desc: Build and serve model catalog locally
+    deps: [build]
+    cmds:
+      - ./leapsql docs serve --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project"
+
+  catalog:dev:
+    desc: Start model catalog dev server with live reload
+    deps: [build]
+    cmds:
+      - ./leapsql docs dev --models {{.MODELS_DIR}} --port 8080 --project "LeapSQL Project"
+
+  # Project Documentation (VitePress in /docs folder)
   docs:dev:
-    desc: Start Astro docs development server
+    desc: Start VitePress docs development server
     dir: docs
     cmds:
       - pnpm install

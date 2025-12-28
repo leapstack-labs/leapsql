@@ -1,0 +1,6 @@
+/* Main CSS aggregator - imports all styles */
+@import './variables.css';
+@import './base.css';
+@import './sidebar.css';
+@import './components.css';
+@import './graph.css';

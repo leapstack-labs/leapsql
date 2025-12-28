@@ -1,5 +1,6 @@
 plans/*
 docs-site/
+catalog-site/
 .leapsql-docs/
 session-ses*.md
 
@@ -35,6 +36,9 @@ Thumbs.db
 .leapsql/
 *.duckdb
 *.duckdb.wal
+
+# Node.js (for docs frontend build)
+node_modules/
 
 # External materialization outputs
 output/

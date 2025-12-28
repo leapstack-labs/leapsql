@@ -4,14 +4,15 @@
 package docs
 
 import (
-	"embed"
+	_ "embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/loader"
@@ -19,8 +20,8 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
-//go:embed static/*
-var staticFiles embed.FS
+//go:embed template.html
+var htmlTemplate string
 
 // SourceRef represents a source column reference in lineage.
 type SourceRef struct {
@@ -426,7 +427,15 @@ func isEmptyOrWhitespace(s string) bool {
 	return true
 }
 
-// Build generates the static site to the output directory.
+// templateData holds data for the HTML template
+type templateData struct {
+	ProjectName string
+	CSS         template.CSS
+	JS          template.JS
+	CatalogJSON template.JS
+}
+
+// Build generates a single-file HTML documentation site.
 func (g *Generator) Build(outputDir string) error {
 	catalog := g.GenerateCatalog()
 
@@ -435,57 +444,51 @@ func (g *Generator) Build(outputDir string) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	// Create data directory
-	dataDir := filepath.Join(outputDir, "data")
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	// Get the docs package directory for building frontend
+	docsDir, err := GetDocsDir()
+	if err != nil {
+		return fmt.Errorf("failed to get docs directory: %w", err)
 	}
 
-	// Write catalog.json
-	catalogJSON, err := json.MarshalIndent(catalog, "", "  ")
+	// Build frontend (TypeScript -> JS, CSS bundled)
+	buildResult, err := BuildFrontend(docsDir, true)
+	if err != nil {
+		return fmt.Errorf("failed to build frontend: %w", err)
+	}
+
+	// Marshal catalog to JSON
+	catalogJSON, err := json.Marshal(catalog)
 	if err != nil {
 		return fmt.Errorf("failed to marshal catalog: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, "catalog.json"), catalogJSON, 0600); err != nil {
-		return fmt.Errorf("failed to write catalog.json: %w", err)
+
+	// Parse and execute HTML template
+	tmpl, err := template.New("docs").Parse(htmlTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	// Copy static files
-	if err := g.copyStaticFiles(outputDir); err != nil {
-		return fmt.Errorf("failed to copy static files: %w", err)
+	// G203: CSS/JS are from our own build output, not user input
+	data := templateData{
+		ProjectName: g.projectName,
+		CSS:         template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
+		JS:          template.JS(buildResult.JS),   //nolint:gosec // G203: trusted build output
+		CatalogJSON: template.JS(catalogJSON),      //nolint:gosec // G203: trusted build output
+	}
+
+	// Write single HTML file
+	outputPath := filepath.Join(outputDir, "index.html")
+	f, err := os.Create(outputPath) //nolint:gosec // G304: path is from trusted source
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := tmpl.Execute(f, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return nil
-}
-
-// copyStaticFiles copies embedded static files to the output directory.
-func (g *Generator) copyStaticFiles(outputDir string) error {
-	return fs.WalkDir(staticFiles, "static", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip the root "static" directory
-		if path == "static" {
-			return nil
-		}
-
-		// Get relative path from "static/"
-		relPath := path[len("static/"):]
-		outPath := filepath.Join(outputDir, relPath)
-
-		if d.IsDir() {
-			return os.MkdirAll(outPath, 0750)
-		}
-
-		// Copy file
-		content, err := staticFiles.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", path, err)
-		}
-
-		return os.WriteFile(outPath, content, 0600)
-	})
 }
 
 // Serve starts a local HTTP server for the documentation site.
@@ -520,7 +523,7 @@ func ServeFromFS(outputDir string, port int) error {
 }
 
 // WriteJSON writes any data structure to a JSON file.
-func WriteJSON(path string, data interface{}) error {
+func WriteJSON(path string, data any) error {
 	f, err := os.Create(path) //nolint:gosec // G304: path is from trusted source
 	if err != nil {
 		return err
@@ -549,3 +552,6 @@ func CopyFile(src, dst string) error {
 	_, err = io.Copy(dstFile, srcFile)
 	return err
 }
+
+// Ensure the unused import for strings is used
+var _ = strings.Contains

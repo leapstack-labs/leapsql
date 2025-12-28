@@ -31,6 +31,7 @@ and execution history.`,
 	// Add subcommands
 	cmd.AddCommand(newDocsBuildCommand())
 	cmd.AddCommand(newDocsServeCommand())
+	cmd.AddCommand(newDocsDevCommand())
 
 	return cmd
 }
@@ -147,6 +148,46 @@ func runDocsServe(opts *DocsOptions) error {
 	}
 
 	return nil
+}
+
+func newDocsDevCommand() *cobra.Command {
+	opts := &DocsOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "dev",
+		Short: "Start development server with live reload",
+		Long: `Start a development server that watches for changes and automatically rebuilds.
+
+Changes to model files (.sql) and frontend source files (.tsx, .ts, .css) 
+will trigger a rebuild, and connected browsers will automatically reload.`,
+		Example: `  # Start dev server on default port
+  leapsql docs dev
+
+  # Start on custom port
+  leapsql docs dev --port 3000`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			cfg := getConfig()
+			if opts.ModelsPath == "" {
+				opts.ModelsPath = cfg.ModelsDir
+			}
+			return runDocsDev(opts)
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.ModelsPath, "models", "", "Path to models directory (default: from config)")
+	cmd.Flags().StringVar(&opts.ProjectName, "project", "LeapSQL Project", "Project name for documentation")
+	cmd.Flags().IntVar(&opts.Port, "port", 8080, "Port to serve on")
+
+	return cmd
+}
+
+func runDocsDev(opts *DocsOptions) error {
+	// Validate models directory exists
+	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
+		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
+	}
+
+	return docs.ServeDev(opts.ProjectName, opts.ModelsPath, opts.Port)
 }
 
 // Ensure config package is imported for getConfig usage
