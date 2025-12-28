@@ -88,10 +88,6 @@ func TestInitSchema(t *testing.T) {
 func TestInitSchema_FTS5Created(t *testing.T) {
 	db := setupTestDB(t)
 
-	if !db.FTS5Available() {
-		t.Skip("FTS5 not available in this environment")
-	}
-
 	ctx := context.Background()
 	// Check for FTS5 virtual table
 	var count int
@@ -430,9 +426,6 @@ func TestDatabaseRoundTrip_Lineage(t *testing.T) {
 
 func TestFTS5Search_ByName(t *testing.T) {
 	db := setupTestDB(t)
-	if !db.FTS5Available() {
-		t.Skip("FTS5 not available in this environment")
-	}
 
 	catalog := newTestCatalogWithModels(
 		newTestModel("staging.customers", "customers", "view"),
@@ -470,9 +463,6 @@ func TestFTS5Search_ByName(t *testing.T) {
 
 func TestFTS5Search_BySQL(t *testing.T) {
 	db := setupTestDB(t)
-	if !db.FTS5Available() {
-		t.Skip("FTS5 not available in this environment")
-	}
 
 	model := newTestModel("staging.orders", "orders", "view")
 	model.SQL = "SELECT * FROM raw_orders WHERE amount > 100"
@@ -506,9 +496,6 @@ func TestFTS5Search_BySQL(t *testing.T) {
 
 func TestFTS5Search_NoResults(t *testing.T) {
 	db := setupTestDB(t)
-	if !db.FTS5Available() {
-		t.Skip("FTS5 not available in this environment")
-	}
 
 	catalog := newTestCatalogWithModels(
 		newTestModel("staging.customers", "customers", "view"),
@@ -649,9 +636,6 @@ func TestPopulateFromCatalog_EmptySources(t *testing.T) {
 
 func TestFTS5Search_SpecialCharacters(t *testing.T) {
 	db := setupTestDB(t)
-	if !db.FTS5Available() {
-		t.Skip("FTS5 not available in this environment")
-	}
 
 	model := newTestModel("staging.special_chars", "special_chars", "view")
 	model.Description = "Test with 'quotes' and \"double quotes\""

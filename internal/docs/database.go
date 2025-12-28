@@ -5,23 +5,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync/atomic"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
+// memoryDBCounter is used to generate unique names for in-memory databases.
+var memoryDBCounter atomic.Uint64
+
 // MetadataDB handles SQLite database generation for docs.
 type MetadataDB struct {
-	db            *sql.DB
-	fts5Available bool
-}
-
-// FTS5Available returns true if FTS5 is available in this database.
-func (m *MetadataDB) FTS5Available() bool {
-	return m.fts5Available
+	db *sql.DB
 }
 
 // Schema optimized for UI consumption with FTS5 for search.
-const metadataCoreSchema = `
+// FTS5 is a hard requirement - if not available, the build will fail.
+// For mattn/go-sqlite3, ensure you build with: -tags sqlite_fts5
+const metadataSchema = `
 -- Core tables
 CREATE TABLE models (
     rowid INTEGER PRIMARY KEY,
@@ -116,11 +116,8 @@ CREATE TABLE catalog_meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
-`
 
-// FTS5 schema (optional - may not be available in all environments)
-const metadataFTS5Schema = `
--- Full-text search
+-- Full-text search (FTS5 is required)
 CREATE VIRTUAL TABLE models_fts USING fts5(
     name, path, description, sql_content,
     content='models',
@@ -173,8 +170,16 @@ func OpenMetadataDB(path string) (*MetadataDB, error) {
 }
 
 // OpenMemoryDB opens an in-memory SQLite database (for dev server).
+// Each call creates a new isolated database with shared cache enabled
+// to allow concurrent access from multiple goroutines within that database.
 func OpenMemoryDB() (*MetadataDB, error) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	// Use a unique name for each in-memory database so they're isolated.
+	// Shared cache mode allows concurrent access from multiple connections
+	// within the same named database.
+	// See: https://www.sqlite.org/inmemorydb.html
+	id := memoryDBCounter.Add(1)
+	dsn := fmt.Sprintf("file:memdb%d?mode=memory&cache=shared", id)
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open in-memory database: %w", err)
 	}
@@ -192,25 +197,14 @@ func (m *MetadataDB) DB() *sql.DB {
 	return m.db
 }
 
-// InitSchema creates the database schema.
+// InitSchema creates the database schema including FTS5.
+// FTS5 is a hard requirement. If not available, this will return an error.
+// For mattn/go-sqlite3, build with: -tags sqlite_fts5
 func (m *MetadataDB) InitSchema() error {
 	ctx := context.Background()
-
-	// Create core schema (required)
-	if _, err := m.db.ExecContext(ctx, metadataCoreSchema); err != nil {
-		return fmt.Errorf("failed to create core schema: %w", err)
+	if _, err := m.db.ExecContext(ctx, metadataSchema); err != nil {
+		return fmt.Errorf("failed to create schema (ensure FTS5 is enabled): %w", err)
 	}
-
-	// Try to create FTS5 schema (optional - may not be available)
-	// FTS5 requires SQLite to be compiled with FTS5 support
-	if _, err := m.db.ExecContext(ctx, metadataFTS5Schema); err != nil {
-		// Log or ignore - FTS5 is optional for testing
-		// In production, FTS5 should be available
-		m.fts5Available = false
-	} else {
-		m.fts5Available = true
-	}
-
 	return nil
 }
 

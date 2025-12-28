@@ -209,54 +209,65 @@ func (s *DevServer) watchLoop(ctx context.Context, watcher *fsnotify.Watcher) {
 }
 
 // rebuild regenerates the HTML output and database.
+// Uses atomic swap pattern: all expensive work happens outside the lock,
+// then we atomically swap pointers to avoid race conditions.
 func (s *DevServer) rebuild(reloadModels bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// =========================================================================
+	// Phase 1: Build all new state OUTSIDE the lock (can take 500ms+)
+	// =========================================================================
 
-	// Reload models if they changed
+	// Get current generator (need lock for read)
+	s.mu.RLock()
+	gen := s.generator
+	s.mu.RUnlock()
+
+	// Reload models if they changed (creates new generator)
 	if reloadModels {
-		s.generator = NewGenerator(s.generator.projectName)
-		if err := s.generator.LoadModels(s.modelsDir); err != nil {
+		gen = NewGenerator(gen.projectName)
+		if err := gen.LoadModels(s.modelsDir); err != nil {
 			return fmt.Errorf("failed to reload models: %w", err)
 		}
 	}
 
-	// Build frontend (non-minified for dev)
+	// Build frontend (non-minified for dev) - slow operation
 	buildResult, err := BuildFrontend(s.docsDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to build frontend: %w", err)
 	}
 
 	// Generate catalog
-	catalog := s.generator.GenerateCatalog()
+	catalog := gen.GenerateCatalog()
 
-	// Generate manifest
-	s.manifest = GenerateManifest(catalog)
+	// Generate new manifest
+	newManifest := GenerateManifest(catalog)
 
-	// Rebuild in-memory database
-	if s.metaDB != nil {
-		_ = s.metaDB.Close()
-	}
-	s.metaDB, err = OpenMemoryDB()
+	// Build new in-memory database
+	newDB, err := OpenMemoryDB()
 	if err != nil {
 		return fmt.Errorf("failed to open memory database: %w", err)
 	}
-	if err := s.metaDB.InitSchema(); err != nil {
+
+	// Initialize schema and populate (if this fails, clean up newDB)
+	if err := newDB.InitSchema(); err != nil {
+		_ = newDB.Close()
 		return fmt.Errorf("failed to init schema: %w", err)
 	}
-	if err := s.metaDB.PopulateFromCatalog(catalog); err != nil {
+	if err := newDB.PopulateFromCatalog(catalog); err != nil {
+		_ = newDB.Close()
 		return fmt.Errorf("failed to populate database: %w", err)
 	}
 
 	// Marshal manifest to JSON for embedding
-	manifestJSON, err := json.Marshal(s.manifest)
+	manifestJSON, err := json.Marshal(newManifest)
 	if err != nil {
+		_ = newDB.Close()
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
 	// Parse template
 	tmpl, err := template.New("docs").Parse(htmlTemplateV2)
 	if err != nil {
+		_ = newDB.Close()
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
@@ -264,7 +275,7 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 	jsWithReload := buildResult.JS + liveReloadScript
 
 	data := templateDataV2{
-		ProjectName:  s.generator.projectName,
+		ProjectName:  gen.projectName,
 		CSS:          template.CSS(buildResult.CSS), //nolint:gosec // G203: trusted build output
 		JS:           template.JS(jsWithReload),     //nolint:gosec // G203: trusted build output
 		ManifestJSON: template.JS(manifestJSON),     //nolint:gosec // G203: trusted build output
@@ -273,10 +284,32 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
+		_ = newDB.Close()
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
+	newHTML := buf.Bytes()
 
-	s.currentHTML = buf.Bytes()
+	// =========================================================================
+	// Phase 2: Atomic swap (nanoseconds under lock)
+	// =========================================================================
+	s.mu.Lock()
+	oldDB := s.metaDB
+	s.metaDB = newDB
+	s.manifest = newManifest
+	s.currentHTML = newHTML
+	s.generator = gen
+	s.mu.Unlock()
+
+	// =========================================================================
+	// Phase 3: Cleanup old state OUTSIDE the lock
+	// =========================================================================
+	if oldDB != nil {
+		if err := oldDB.Close(); err != nil {
+			// Log but don't fail - new state is already live and working
+			log.Printf("Warning: failed to close old database: %v", err)
+		}
+	}
+
 	log.Println("Rebuild complete")
 	return nil
 }
@@ -310,10 +343,13 @@ func (s *DevServer) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hold read lock for entire query operation to prevent DB from being
+	// closed mid-query during a rebuild. This is safe for a dev server with
+	// low query concurrency - rebuilds will just wait briefly for queries.
 	s.mu.RLock()
-	db := s.metaDB
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
 
+	db := s.metaDB
 	if db == nil {
 		http.Error(w, "Database not initialized", http.StatusServiceUnavailable)
 		return

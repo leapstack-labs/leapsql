@@ -18,34 +18,34 @@ tasks:
   build:
     desc: Build the leapsql CLI
     cmds:
-      - go build -o leapsql ./cmd/leapsql
+      - go build -tags=sqlite_fts5 -o leapsql ./cmd/leapsql
 
   install:
     desc: Install leapsql CLI to $GOPATH/bin
     cmds:
-      - go install ./cmd/leapsql
+      - go install -tags=sqlite_fts5 ./cmd/leapsql
 
   test:
     desc: Run all tests (package summary, shows failures inline)
     cmds:
-      - gotestsum --format pkgname-and-test-fails $(go list ./... | grep -v '/pkg/core')
+      - gotestsum --format pkgname-and-test-fails -- -tags=sqlite_fts5 $(go list ./... | grep -v '/pkg/core')
 
   test:pkg:
     desc: Run tests for a specific package (use PKG=./internal/cli/...)
     cmds:
-      - gotestsum --format testname {{.PKG}}
+      - gotestsum --format testname -- -tags=sqlite_fts5 {{.PKG}}
     requires:
       vars: [PKG]
 
   test:watch:
     desc: Watch mode - rerun tests on file changes
     cmds:
-      - gotestsum --watch --format pkgname-and-test-fails $(go list ./... | grep -v '/pkg/core')
+      - gotestsum --watch --format pkgname-and-test-fails -- -tags=sqlite_fts5 $(go list ./... | grep -v '/pkg/core')
 
   test:all:
     desc: Run all tests including integration tests
     cmds:
-      - gotestsum --format pkgname-and-test-fails -- -tags=integration $(go list ./... | grep -v '/pkg/core')
+      - gotestsum --format pkgname-and-test-fails -- -tags=integration,sqlite_fts5 $(go list ./... | grep -v '/pkg/core')
 
   lint:
     desc: Run golangci-lint on all packages
