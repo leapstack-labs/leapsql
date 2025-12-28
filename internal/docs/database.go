@@ -11,11 +11,17 @@ import (
 
 // MetadataDB handles SQLite database generation for docs.
 type MetadataDB struct {
-	db *sql.DB
+	db            *sql.DB
+	fts5Available bool
+}
+
+// FTS5Available returns true if FTS5 is available in this database.
+func (m *MetadataDB) FTS5Available() bool {
+	return m.fts5Available
 }
 
 // Schema optimized for UI consumption with FTS5 for search.
-const metadataSchema = `
+const metadataCoreSchema = `
 -- Core tables
 CREATE TABLE models (
     rowid INTEGER PRIMARY KEY,
@@ -110,7 +116,10 @@ CREATE TABLE catalog_meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+`
 
+// FTS5 schema (optional - may not be available in all environments)
+const metadataFTS5Schema = `
 -- Full-text search
 CREATE VIRTUAL TABLE models_fts USING fts5(
     name, path, description, sql_content,
@@ -186,10 +195,22 @@ func (m *MetadataDB) DB() *sql.DB {
 // InitSchema creates the database schema.
 func (m *MetadataDB) InitSchema() error {
 	ctx := context.Background()
-	_, err := m.db.ExecContext(ctx, metadataSchema)
-	if err != nil {
-		return fmt.Errorf("failed to create schema: %w", err)
+
+	// Create core schema (required)
+	if _, err := m.db.ExecContext(ctx, metadataCoreSchema); err != nil {
+		return fmt.Errorf("failed to create core schema: %w", err)
 	}
+
+	// Try to create FTS5 schema (optional - may not be available)
+	// FTS5 requires SQLite to be compiled with FTS5 support
+	if _, err := m.db.ExecContext(ctx, metadataFTS5Schema); err != nil {
+		// Log or ignore - FTS5 is optional for testing
+		// In production, FTS5 should be available
+		m.fts5Available = false
+	} else {
+		m.fts5Available = true
+	}
+
 	return nil
 }
 

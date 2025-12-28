@@ -42,6 +42,10 @@ func BuildFrontend(docsDir string, minify bool) (*BuildResult, error) {
 			"react/jsx-runtime": "preact/jsx-runtime",
 		},
 
+		// External packages (not bundled, resolved at runtime)
+		// sql.js-httpvfs is only used in production WASM mode, not dev mode
+		External: []string{"sql.js-httpvfs"},
+
 		// Resolve from node_modules
 		NodePaths: []string{nodeModules},
 
