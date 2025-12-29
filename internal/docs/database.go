@@ -5,8 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io"
-	"os"
 
 	_ "modernc.org/sqlite" // SQLite driver (pure Go)
 )
@@ -16,7 +14,7 @@ import (
 // so we just copy it and optimize for HTTP range requests.
 func CopyFromState(statePath, outputPath string) error {
 	// Copy the file
-	if err := copyFile(statePath, outputPath); err != nil {
+	if err := CopyFile(statePath, outputPath); err != nil {
 		return fmt.Errorf("failed to copy state database: %w", err)
 	}
 
@@ -33,24 +31,6 @@ func CopyFromState(statePath, outputPath string) error {
 	}
 
 	return nil
-}
-
-// copyFile copies a file from src to dst.
-func copyFile(src, dst string) error {
-	srcFile, err := os.Open(src) //nolint:gosec // G304: src is from trusted source
-	if err != nil {
-		return err
-	}
-	defer func() { _ = srcFile.Close() }()
-
-	dstFile, err := os.Create(dst) //nolint:gosec // G304: dst is from trusted source
-	if err != nil {
-		return err
-	}
-	defer func() { _ = dstFile.Close() }()
-
-	_, err = io.Copy(dstFile, srcFile)
-	return err
 }
 
 // extractFolder extracts the folder from a model path (e.g., "staging.customers" -> "staging").

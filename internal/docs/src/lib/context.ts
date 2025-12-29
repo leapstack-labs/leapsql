@@ -353,66 +353,6 @@ export function useRecentModels(limit: number = 10): AsyncState<ModelRow[]> {
   }, [db, limit]);
 }
 
-// ============================================
-// Legacy compatibility (for gradual migration)
-// ============================================
-
-// This provides the old CatalogContext interface for components
-// that haven't been migrated yet
-export interface CatalogContextValue {
-  catalog: {
-    project_name: string;
-    generated_at: string;
-    models: ModelDoc[];
-    sources: SourceDoc[];
-  };
-  modelsByPath: Map<string, ModelDoc>;
-  sourcesByName: Map<string, SourceDoc>;
-  getModel: (path: string) => ModelDoc | undefined;
-  getSource: (name: string) => SourceDoc | undefined;
-}
-
-export const CatalogContext = createContext<CatalogContextValue | null>(null);
-
-export function useCatalog(): CatalogContextValue {
-  const ctx = useContext(CatalogContext);
-  if (!ctx) {
-    throw new Error('useCatalog must be used within a CatalogProvider');
-  }
-  return ctx;
-}
-
-// Helper to create CatalogContextValue from loaded data
-export function createCatalogContext(
-  projectName: string,
-  generatedAt: string,
-  models: ModelDoc[],
-  sources: SourceDoc[]
-): CatalogContextValue {
-  const modelsByPath = new Map<string, ModelDoc>();
-  models.forEach(model => {
-    modelsByPath.set(model.path, model);
-  });
-
-  const sourcesByName = new Map<string, SourceDoc>();
-  sources.forEach(source => {
-    sourcesByName.set(source.name, source);
-  });
-
-  return {
-    catalog: {
-      project_name: projectName,
-      generated_at: generatedAt,
-      models,
-      sources,
-    },
-    modelsByPath,
-    sourcesByName,
-    getModel: (path: string) => modelsByPath.get(path),
-    getSource: (name: string) => sourcesByName.get(name),
-  };
-}
-
 // Hook to group models by folder (uses manifest for instant render)
 export function useModelsByFolder(): Record<string, NavGroup['models']> {
   const navTree = useNavTree();

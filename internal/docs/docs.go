@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/leapstack-labs/leapsql/internal/loader"
@@ -647,6 +646,3 @@ func CopyFile(src, dst string) error {
 	_, err = io.Copy(dstFile, srcFile)
 	return err
 }
-
-// Ensure the unused import for strings is used
-var _ = strings.Contains
