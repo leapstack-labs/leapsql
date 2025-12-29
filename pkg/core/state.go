@@ -1,6 +1,9 @@
 package core
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 // Store defines the interface for state management operations.
 type Store interface {
@@ -76,6 +79,14 @@ type Store interface {
 	BatchGetAllColumns() (map[string][]ColumnInfo, error)
 	BatchGetAllDependencies() (map[string][]string, error)
 	BatchGetAllDependents() (map[string][]string, error)
+}
+
+// QueryableStore is an optional interface that stores can implement
+// to allow direct database queries (used by dev server for efficiency).
+type QueryableStore interface {
+	Store
+	// DB returns the underlying database connection for direct queries.
+	DB() *sql.DB
 }
 
 // RunStatus represents the status of a pipeline run.

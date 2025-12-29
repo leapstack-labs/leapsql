@@ -108,6 +108,7 @@ type Generator struct {
 	models      []*core.Model
 	projectName string
 	theme       string
+	statePath   string // Path to state.db (set when loading from state)
 }
 
 // NewGenerator creates a new documentation generator.
@@ -148,6 +149,14 @@ func (g *Generator) LoadModels(modelsDir string) error {
 // LoadFromState loads models and lineage from the state database.
 // This is the preferred method as it includes column lineage extracted during discover.
 func (g *Generator) LoadFromState(store core.Store) error {
+	return g.LoadFromStateWithPath(store, "")
+}
+
+// LoadFromStateWithPath loads models and stores the state DB path for later use.
+// The statePath is used by Build() to copy state.db to metadata.db.
+func (g *Generator) LoadFromStateWithPath(store core.Store, statePath string) error {
+	g.statePath = statePath
+
 	// 1. Get all persisted models
 	persistedModels, err := store.ListModels()
 	if err != nil {
@@ -487,7 +496,7 @@ func isEmptyOrWhitespace(s string) bool {
 // Build generates documentation site with SQLite database.
 // Output structure:
 //   - index.html (shell + manifest + JS/CSS)
-//   - metadata.db (SQLite database)
+//   - metadata.db (SQLite database - copied from state.db)
 func (g *Generator) Build(outputDir string) error {
 	catalog := g.GenerateCatalog()
 	manifest := GenerateManifest(catalog)
@@ -503,10 +512,16 @@ func (g *Generator) Build(outputDir string) error {
 		return fmt.Errorf("failed to get docs directory: %w", err)
 	}
 
-	// 1. Generate metadata.db
+	// 1. Copy state.db to metadata.db (state.db has all views and data)
 	dbPath := filepath.Join(outputDir, "metadata.db")
-	if err := GenerateMetadataDB(catalog, dbPath); err != nil {
-		return fmt.Errorf("failed to generate database: %w", err)
+	if g.statePath != "" {
+		if err := CopyFromState(g.statePath, dbPath); err != nil {
+			return fmt.Errorf("failed to copy state database: %w", err)
+		}
+	} else {
+		// Fallback: if no state path, create empty database
+		// This shouldn't happen in normal usage but provides safety
+		return fmt.Errorf("state database path not set - call LoadFromStateWithPath first")
 	}
 
 	// 2. Build frontend (TypeScript -> JS, CSS bundled)

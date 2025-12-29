@@ -1,5 +1,6 @@
 // Safe SQL queries with parameter binding
 // All queries use ? placeholders for safe parameter substitution
+// Uses v_* views from state.db for data that needs joins/computations
 
 export interface QueryDef {
   sql: string;
@@ -8,49 +9,49 @@ export interface QueryDef {
 
 // Model queries
 export const queries = {
-  // Get all models for listing
+  // Get all models for listing (uses v_models view for computed folder)
   getModels: (): QueryDef => ({
     sql: `SELECT path, name, folder, materialized, unique_key, description, file_path, updated_at 
-          FROM models ORDER BY folder, name`,
+          FROM v_models ORDER BY folder, name`,
     params: []
   }),
 
   // Get a single model by path
   getModel: (path: string): QueryDef => ({
     sql: `SELECT path, name, folder, materialized, unique_key, sql_content, description, file_path, updated_at 
-          FROM models WHERE path = ?`,
+          FROM v_models WHERE path = ?`,
     params: [path]
   }),
 
   // Get model dependencies (what this model depends on)
   getModelDependencies: (path: string): QueryDef => ({
-    sql: `SELECT parent_path FROM dependencies WHERE model_path = ?`,
+    sql: `SELECT parent_path FROM v_dependencies WHERE model_path = ?`,
     params: [path]
   }),
 
   // Get model dependents (what depends on this model)
   getModelDependents: (path: string): QueryDef => ({
-    sql: `SELECT dependent_path FROM dependents WHERE model_path = ?`,
+    sql: `SELECT dependent_path FROM v_dependents WHERE model_path = ?`,
     params: [path]
   }),
 
   // Get model sources (external tables referenced)
   getModelSources: (path: string): QueryDef => ({
-    sql: `SELECT source_name FROM model_sources WHERE model_path = ?`,
+    sql: `SELECT source_name FROM v_source_refs WHERE model_path = ?`,
     params: [path]
   }),
 
   // Get columns for a model
   getModelColumns: (path: string): QueryDef => ({
     sql: `SELECT name, idx, transform_type, function_name 
-          FROM columns WHERE model_path = ? ORDER BY idx`,
+          FROM v_columns WHERE model_path = ? ORDER BY idx`,
     params: [path]
   }),
 
   // Get column sources for a specific column
   getColumnSources: (modelPath: string, columnName: string): QueryDef => ({
     sql: `SELECT source_table, source_column 
-          FROM column_sources 
+          FROM v_column_sources 
           WHERE model_path = ? AND column_name = ?`,
     params: [modelPath, columnName]
   }),
@@ -58,69 +59,69 @@ export const queries = {
   // Get all column sources for a model
   getAllColumnSources: (modelPath: string): QueryDef => ({
     sql: `SELECT column_name, source_table, source_column 
-          FROM column_sources 
+          FROM v_column_sources 
           WHERE model_path = ?`,
     params: [modelPath]
   }),
 
   // Source queries
   getSources: (): QueryDef => ({
-    sql: `SELECT name FROM sources ORDER BY name`,
+    sql: `SELECT name FROM v_sources ORDER BY name`,
     params: []
   }),
 
   getSource: (name: string): QueryDef => ({
-    sql: `SELECT name FROM sources WHERE name = ?`,
+    sql: `SELECT name FROM v_sources WHERE name = ?`,
     params: [name]
   }),
 
   getSourceReferencedBy: (name: string): QueryDef => ({
-    sql: `SELECT model_path FROM source_refs WHERE source_name = ?`,
+    sql: `SELECT model_path FROM v_source_refs WHERE source_name = ?`,
     params: [name]
   }),
 
   // Lineage queries
   getLineageEdges: (): QueryDef => ({
-    sql: `SELECT source_node, target_node FROM lineage_edges`,
+    sql: `SELECT source_node, target_node FROM v_lineage_edges`,
     params: []
   }),
 
   getLineageNodes: (): QueryDef => ({
-    sql: `SELECT path, name, folder, materialized FROM models
+    sql: `SELECT path, name, folder, materialized FROM v_models
           UNION ALL
-          SELECT 'source:' || name, name, 'sources', 'source' FROM sources`,
+          SELECT 'source:' || name, name, 'sources', 'source' FROM v_sources`,
     params: []
   }),
 
   // Column lineage queries
   getColumnLineageNodes: (): QueryDef => ({
-    sql: `SELECT id, model, column_name FROM column_lineage_nodes`,
+    sql: `SELECT id, model, column_name FROM v_column_lineage_nodes`,
     params: []
   }),
 
   getColumnLineageEdges: (): QueryDef => ({
-    sql: `SELECT source_id, target_id FROM column_lineage_edges`,
+    sql: `SELECT source_id, target_id FROM v_column_lineage_edges`,
     params: []
   }),
 
   // Get column lineage for a specific model
   getColumnLineageForModel: (modelPath: string): QueryDef => ({
     sql: `SELECT DISTINCT cln.id, cln.model, cln.column_name
-          FROM column_lineage_nodes cln
+          FROM v_column_lineage_nodes cln
           WHERE cln.model = ?
           UNION
           SELECT DISTINCT cln2.id, cln2.model, cln2.column_name
-          FROM column_lineage_nodes cln
-          JOIN column_lineage_edges cle ON cln.id = cle.target_id
-          JOIN column_lineage_nodes cln2 ON cle.source_id = cln2.id
+          FROM v_column_lineage_nodes cln
+          JOIN v_column_lineage_edges cle ON cln.id = cle.target_id
+          JOIN v_column_lineage_nodes cln2 ON cle.source_id = cln2.id
           WHERE cln.model = ?`,
     params: [modelPath, modelPath]
   }),
 
   getColumnLineageEdgesForModel: (modelPath: string): QueryDef => ({
     sql: `SELECT cle.source_id, cle.target_id
-          FROM column_lineage_edges cle
-          JOIN column_lineage_nodes cln ON cle.target_id = cln.id
+          FROM v_column_lineage_edges cle
+          JOIN v_column_lineage_nodes cln ON cle.target_id = cln.id
           WHERE cln.model = ?`,
     params: [modelPath]
   }),
@@ -130,13 +131,13 @@ export const queries = {
     sql: `
       WITH RECURSIVE lineage AS (
         SELECT source_table, source_column, 1 as depth
-        FROM column_sources
+        FROM v_column_sources
         WHERE model_path = ? AND column_name = ?
         
         UNION ALL
         
         SELECT cs.source_table, cs.source_column, l.depth + 1
-        FROM column_sources cs
+        FROM v_column_sources cs
         JOIN lineage l ON cs.model_path = l.source_table 
                       AND cs.column_name = l.source_column
         WHERE l.depth < 10
@@ -149,12 +150,13 @@ export const queries = {
     params: [modelPath, columnName]
   }),
 
-  // Full-text search
+  // Full-text search (join through models table for rowid)
   searchModels: (term: string): QueryDef => ({
     sql: `
-      SELECT m.path, m.name, m.folder, m.materialized, m.description
+      SELECT v.path, v.name, v.folder, v.materialized, v.description
       FROM models m
       JOIN models_fts fts ON m.rowid = fts.rowid
+      JOIN v_models v ON m.path = v.path
       WHERE models_fts MATCH ?
       ORDER BY rank
       LIMIT 20
@@ -162,14 +164,14 @@ export const queries = {
     params: [term + '*']  // Prefix search
   }),
 
-  // Catalog metadata
+  // Project metadata (uses project_meta table in state.db)
   getProjectName: (): QueryDef => ({
-    sql: `SELECT value FROM catalog_meta WHERE key = 'project_name'`,
+    sql: `SELECT value FROM project_meta WHERE key = 'project_name'`,
     params: []
   }),
 
   getGeneratedAt: (): QueryDef => ({
-    sql: `SELECT value FROM catalog_meta WHERE key = 'generated_at'`,
+    sql: `SELECT value FROM project_meta WHERE key = 'generated_at'`,
     params: []
   }),
 
@@ -180,12 +182,12 @@ export const queries = {
   }),
 
   getSourceCount: (): QueryDef => ({
-    sql: `SELECT COUNT(*) as count FROM sources`,
+    sql: `SELECT COUNT(*) as count FROM v_sources`,
     params: []
   }),
 
   getColumnCount: (): QueryDef => ({
-    sql: `SELECT COUNT(*) as count FROM columns`,
+    sql: `SELECT COUNT(*) as count FROM model_columns`,
     params: []
   }),
 
@@ -195,7 +197,7 @@ export const queries = {
   }),
 
   getFolderCount: (): QueryDef => ({
-    sql: `SELECT COUNT(DISTINCT folder) as count FROM models`,
+    sql: `SELECT COUNT(DISTINCT folder) as count FROM v_models`,
     params: []
   }),
 };

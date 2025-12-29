@@ -150,12 +150,13 @@ func runDocsBuild(cmd *cobra.Command, opts *DocsOptions) error {
 
 	// Get store from engine
 	store := eng.GetStateStore()
+	statePath := eng.GetStatePath()
 
 	gen := docs.NewGenerator(opts.ProjectName)
 	gen.SetTheme(opts.Theme)
 
-	// Load from state (includes column lineage)
-	if err := gen.LoadFromState(store); err != nil {
+	// Load from state (includes column lineage) - pass state path for Build()
+	if err := gen.LoadFromStateWithPath(store, statePath); err != nil {
 		return fmt.Errorf("failed to load from state: %w", err)
 	}
 
@@ -201,12 +202,13 @@ func runDocsServe(cmd *cobra.Command, opts *DocsOptions) error {
 
 	// Get store from engine
 	store := eng.GetStateStore()
+	statePath := eng.GetStatePath()
 
 	gen := docs.NewGenerator(opts.ProjectName)
 	gen.SetTheme(opts.Theme)
 
-	// Load from state (includes column lineage)
-	if err := gen.LoadFromState(store); err != nil {
+	// Load from state (includes column lineage) - pass state path for Build()
+	if err := gen.LoadFromStateWithPath(store, statePath); err != nil {
 		return fmt.Errorf("failed to load from state: %w", err)
 	}
 

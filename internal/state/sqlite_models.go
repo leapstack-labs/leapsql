@@ -67,6 +67,9 @@ func (s *SQLiteStore) RegisterModel(model *core.PersistedModel) error {
 			Tests:          testsJSON,
 			Meta:           metaJSON,
 			UsesSelectStar: usesSelectStar,
+			SqlContent:     nullableString(model.SQL),
+			RawContent:     nullableString(model.RawContent),
+			Description:    nullableString(model.Description),
 			UpdatedAt:      model.UpdatedAt,
 			ID:             model.ID,
 		})
@@ -93,6 +96,9 @@ func (s *SQLiteStore) RegisterModel(model *core.PersistedModel) error {
 		Tests:          testsJSON,
 		Meta:           metaJSON,
 		UsesSelectStar: usesSelectStar,
+		SqlContent:     nullableString(model.SQL),
+		RawContent:     nullableString(model.RawContent),
+		Description:    nullableString(model.Description),
 		CreatedAt:      model.CreatedAt,
 		UpdatedAt:      model.UpdatedAt,
 	})
@@ -359,6 +365,15 @@ func convertModel(row sqlcgen.Model) (*core.PersistedModel, error) {
 	}
 	if row.SchemaName != nil {
 		coreModel.Schema = *row.SchemaName
+	}
+	if row.SqlContent != nil {
+		coreModel.SQL = *row.SqlContent
+	}
+	if row.RawContent != nil {
+		coreModel.RawContent = *row.RawContent
+	}
+	if row.Description != nil {
+		coreModel.Description = *row.Description
 	}
 	// Convert int64 to bool for UsesSelectStar
 	if row.UsesSelectStar != nil && *row.UsesSelectStar == 1 {

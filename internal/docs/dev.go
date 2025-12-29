@@ -39,6 +39,7 @@ type QueryResponse struct {
 type DevServer struct {
 	generator   *Generator
 	store       core.Store     // State store for reloading from state database
+	stateDB     *sql.DB        // Direct DB connection for queries (from QueryableStore)
 	engine      *engine.Engine // Engine for re-discover on file change
 	modelsDir   string
 	port        int
@@ -47,7 +48,6 @@ type DevServer struct {
 	mu          sync.RWMutex
 	currentHTML []byte
 	manifest    *Manifest
-	metaDB      *MetadataDB
 	clients     map[chan struct{}]struct{}
 	clientsMu   sync.Mutex
 }
@@ -101,9 +101,16 @@ func NewDevServerWithState(
 		return nil, fmt.Errorf("failed to load from state: %w", err)
 	}
 
+	// Get direct DB connection if store supports it
+	var stateDB *sql.DB
+	if queryable, ok := store.(core.QueryableStore); ok {
+		stateDB = queryable.DB()
+	}
+
 	return &DevServer{
 		generator: gen,
 		store:     store,
+		stateDB:   stateDB,
 		engine:    eng,
 		modelsDir: modelsDir,
 		port:      port,
@@ -162,12 +169,6 @@ func (s *DevServer) Serve(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
-		// Clean up database
-		s.mu.Lock()
-		if s.metaDB != nil {
-			_ = s.metaDB.Close()
-		}
-		s.mu.Unlock()
 	}()
 
 	log.Printf("Dev server running at http://localhost:%d", s.port)
@@ -256,9 +257,8 @@ func (s *DevServer) watchLoop(ctx context.Context, watcher *fsnotify.Watcher) {
 	}
 }
 
-// rebuild regenerates the HTML output and database.
-// Uses atomic swap pattern: all expensive work happens outside the lock,
-// then we atomically swap pointers to avoid race conditions.
+// rebuild regenerates the HTML output and manifest.
+// State database is updated by engine.Discover(), queries hit state.db directly.
 func (s *DevServer) rebuild(reloadModels bool) error {
 	// =========================================================================
 	// Phase 1: Re-discover if models changed and engine is available
@@ -303,39 +303,21 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 		return fmt.Errorf("failed to build frontend: %w", err)
 	}
 
-	// Generate catalog
+	// Generate catalog (for manifest only - queries go directly to state.db)
 	catalog := gen.GenerateCatalog()
 
 	// Generate new manifest
 	newManifest := GenerateManifest(catalog)
 
-	// Build new in-memory database
-	newDB, err := OpenMemoryDB()
-	if err != nil {
-		return fmt.Errorf("failed to open memory database: %w", err)
-	}
-
-	// Initialize schema and populate (if this fails, clean up newDB)
-	if err := newDB.InitSchema(); err != nil {
-		_ = newDB.Close()
-		return fmt.Errorf("failed to init schema: %w", err)
-	}
-	if err := newDB.PopulateFromCatalog(catalog); err != nil {
-		_ = newDB.Close()
-		return fmt.Errorf("failed to populate database: %w", err)
-	}
-
 	// Marshal manifest to JSON for embedding
 	manifestJSON, err := json.Marshal(newManifest)
 	if err != nil {
-		_ = newDB.Close()
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
 	// Parse template
 	tmpl, err := template.New("docs").Parse(htmlTemplateV2)
 	if err != nil {
-		_ = newDB.Close()
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
@@ -352,31 +334,18 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		_ = newDB.Close()
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 	newHTML := buf.Bytes()
 
 	// =========================================================================
-	// Phase 2: Atomic swap (nanoseconds under lock)
+	// Phase 3: Atomic swap (nanoseconds under lock)
 	// =========================================================================
 	s.mu.Lock()
-	oldDB := s.metaDB
-	s.metaDB = newDB
 	s.manifest = newManifest
 	s.currentHTML = newHTML
 	s.generator = gen
 	s.mu.Unlock()
-
-	// =========================================================================
-	// Phase 3: Cleanup old state OUTSIDE the lock
-	// =========================================================================
-	if oldDB != nil {
-		if err := oldDB.Close(); err != nil {
-			// Log but don't fail - new state is already live and working
-			log.Printf("Warning: failed to close old database: %v", err)
-		}
-	}
 
 	log.Println("Rebuild complete")
 	return nil
@@ -398,7 +367,7 @@ func (s *DevServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(html)
 }
 
-// handleQuery executes SQL queries against the in-memory database.
+// handleQuery executes SQL queries against the state database.
 func (s *DevServer) handleQuery(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -411,20 +380,15 @@ func (s *DevServer) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hold read lock for entire query operation to prevent DB from being
-	// closed mid-query during a rebuild. This is safe for a dev server with
-	// low query concurrency - rebuilds will just wait briefly for queries.
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	db := s.metaDB
+	// Get DB connection
+	db := s.stateDB
 	if db == nil {
-		http.Error(w, "Database not initialized", http.StatusServiceUnavailable)
+		http.Error(w, "Database not available (store does not support direct queries)", http.StatusServiceUnavailable)
 		return
 	}
 
 	// Execute query with parameter binding (safe from injection)
-	rows, err := db.DB().QueryContext(r.Context(), req.SQL, req.Params...)
+	rows, err := db.QueryContext(r.Context(), req.SQL, req.Params...)
 	if err != nil {
 		http.Error(w, "Query error: "+err.Error(), http.StatusBadRequest)
 		return

@@ -1,29 +1,30 @@
 -- name: InsertModel :exec
 INSERT INTO models (id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    owner, schema_name, tags, tests, meta, uses_select_star, sql_content, raw_content, description, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateModel :exec
 UPDATE models
 SET name = ?, materialized = ?, unique_key = ?, content_hash = ?, file_path = ?,
-    owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, uses_select_star = ?, updated_at = ?
+    owner = ?, schema_name = ?, tags = ?, tests = ?, meta = ?, uses_select_star = ?, 
+    sql_content = ?, raw_content = ?, description = ?, updated_at = ?
 WHERE id = ?;
 
 -- name: GetModelByID :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, sql_content, raw_content, description, created_at, updated_at
 FROM models
 WHERE id = ?;
 
 -- name: GetModelByPath :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, sql_content, raw_content, description, created_at, updated_at
 FROM models
 WHERE path = ?;
 
 -- name: GetModelByFilePath :one
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, sql_content, raw_content, description, created_at, updated_at
 FROM models
 WHERE file_path = ?;
 
@@ -34,7 +35,7 @@ WHERE id = ?;
 
 -- name: ListModels :many
 SELECT id, path, name, materialized, unique_key, content_hash, file_path,
-    owner, schema_name, tags, tests, meta, uses_select_star, created_at, updated_at
+    owner, schema_name, tags, tests, meta, uses_select_star, sql_content, raw_content, description, created_at, updated_at
 FROM models
 ORDER BY path;
 

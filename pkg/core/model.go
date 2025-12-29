@@ -39,6 +39,8 @@ type Model struct {
 	Owner string
 	// Schema is the database schema for this model
 	Schema string
+	// Description is a human-readable description of the model
+	Description string
 	// Tags are metadata labels for filtering/organizing models
 	Tags []string
 	// Meta contains custom extension fields

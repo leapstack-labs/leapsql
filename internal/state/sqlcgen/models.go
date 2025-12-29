@@ -73,6 +73,9 @@ type Model struct {
 	Tests          *string   `json:"tests"`
 	Meta           *string   `json:"meta"`
 	UsesSelectStar *int64    `json:"uses_select_star"`
+	SqlContent     *string   `json:"sql_content"`
+	RawContent     *string   `json:"raw_content"`
+	Description    *string   `json:"description"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -97,6 +100,18 @@ type ModelRun struct {
 	ExecutionMs  *int64     `json:"execution_ms"`
 }
 
+type ModelsFt struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
+	SqlContent  string `json:"sql_content"`
+}
+
+type ProjectMetum struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Run struct {
 	ID          string     `json:"id"`
 	Environment string     `json:"environment"`
@@ -104,4 +119,85 @@ type Run struct {
 	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at"`
 	Error       *string    `json:"error"`
+}
+
+type VColumn struct {
+	ModelPath     string  `json:"model_path"`
+	Name          string  `json:"name"`
+	Idx           int64   `json:"idx"`
+	TransformType *string `json:"transform_type"`
+	FunctionName  *string `json:"function_name"`
+}
+
+type VColumnLineageEdge struct {
+	SourceID interface{} `json:"source_id"`
+	TargetID interface{} `json:"target_id"`
+}
+
+type VColumnLineageNode struct {
+	ID         interface{} `json:"id"`
+	Model      string      `json:"model"`
+	ColumnName string      `json:"column_name"`
+}
+
+type VColumnSource struct {
+	ModelPath    string `json:"model_path"`
+	ColumnName   string `json:"column_name"`
+	SourceTable  string `json:"source_table"`
+	SourceColumn string `json:"source_column"`
+}
+
+type VDependency struct {
+	ModelPath  string `json:"model_path"`
+	ParentPath string `json:"parent_path"`
+}
+
+type VDependent struct {
+	ModelPath     string `json:"model_path"`
+	DependentPath string `json:"dependent_path"`
+}
+
+type VLineageEdge struct {
+	SourceNode string `json:"source_node"`
+	TargetNode string `json:"target_node"`
+}
+
+type VMacro struct {
+	Namespace    string  `json:"namespace"`
+	FilePath     string  `json:"file_path"`
+	Package      *string `json:"package"`
+	FunctionName *string `json:"function_name"`
+	Args         *string `json:"args"`
+	Docstring    *string `json:"docstring"`
+	Line         *int64  `json:"line"`
+}
+
+type VModel struct {
+	ID             string    `json:"id"`
+	Path           string    `json:"path"`
+	Name           string    `json:"name"`
+	Folder         string    `json:"folder"`
+	Materialized   string    `json:"materialized"`
+	UniqueKey      *string   `json:"unique_key"`
+	SqlContent     *string   `json:"sql_content"`
+	RawContent     *string   `json:"raw_content"`
+	FilePath       *string   `json:"file_path"`
+	Description    *string   `json:"description"`
+	Owner          *string   `json:"owner"`
+	SchemaName     *string   `json:"schema_name"`
+	Tags           *string   `json:"tags"`
+	Tests          *string   `json:"tests"`
+	Meta           *string   `json:"meta"`
+	UsesSelectStar *int64    `json:"uses_select_star"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type VSource struct {
+	Name string `json:"name"`
+}
+
+type VSourceRef struct {
+	SourceName string `json:"source_name"`
+	ModelPath  string `json:"model_path"`
 }

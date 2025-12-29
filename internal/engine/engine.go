@@ -34,6 +34,7 @@ type Engine struct {
 	logger *slog.Logger
 
 	store         core.Store
+	statePath     string // Path to state.db
 	modelsDir     string
 	seedsDir      string
 	macrosDir     string
@@ -160,6 +161,7 @@ func New(cfg Config) (*Engine, error) {
 		dialect:       d,
 		logger:        logger,
 		store:         store,
+		statePath:     cfg.StatePath,
 		modelsDir:     cfg.ModelsDir,
 		seedsDir:      cfg.SeedsDir,
 		macrosDir:     cfg.MacrosDir,
@@ -257,6 +259,11 @@ func (e *Engine) GetModels() map[string]*core.Model {
 // GetStateStore returns the state store.
 func (e *Engine) GetStateStore() core.Store {
 	return e.store
+}
+
+// GetStatePath returns the path to the state database file.
+func (e *Engine) GetStatePath() string {
+	return e.statePath
 }
 
 // GetDialect returns the SQL dialect for the connected adapter.

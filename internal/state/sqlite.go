@@ -5,7 +5,6 @@ package state
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,9 +14,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	_ "modernc.org/sqlite" // sqlite3 driver (pure Go)
 )
-
-//go:embed schema.sql
-var schemaSQL string
 
 // SQLiteStore implements Store using SQLite with sqlc-generated queries.
 type SQLiteStore struct {
@@ -74,19 +70,26 @@ func (s *SQLiteStore) Close() error {
 	return nil
 }
 
-// InitSchema initializes the database schema.
+// InitSchema initializes the database schema using Goose migrations.
 func (s *SQLiteStore) InitSchema() error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
 
-	s.logger.Debug("initializing database schema")
+	s.logger.Debug("initializing database schema via migrations")
 
-	_, err := s.db.ExecContext(context.Background(), schemaSQL)
-	if err != nil {
-		return fmt.Errorf("failed to initialize schema: %w", err)
+	// Use Goose migrations for schema management
+	if err := s.Migrate(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
+
 	return nil
+}
+
+// DB returns the underlying database connection.
+// This is useful for direct queries or testing.
+func (s *SQLiteStore) DB() *sql.DB {
+	return s.db
 }
 
 // Ensure SQLiteStore implements Store interface

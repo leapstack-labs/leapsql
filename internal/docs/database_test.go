@@ -2,6 +2,7 @@ package docs
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,11 +13,11 @@ import (
 )
 
 // =============================================================================
-// Phase 3: Database Lifecycle Tests
+// Test Database Infrastructure Tests
 // =============================================================================
 
-func TestOpenMemoryDB(t *testing.T) {
-	db, err := OpenMemoryDB()
+func TestOpenTestMemoryDB(t *testing.T) {
+	db, err := openTestMemoryDB()
 	require.NoError(t, err)
 	require.NotNil(t, db)
 	defer func() { _ = db.Close() }()
@@ -26,33 +27,12 @@ func TestOpenMemoryDB(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestOpenMetadataDB(t *testing.T) {
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
-
-	db, err := OpenMetadataDB(dbPath)
-	require.NoError(t, err)
-	require.NotNil(t, db)
-	defer func() { _ = db.Close() }()
-
-	// Verify file was created
-	_, err = os.Stat(dbPath)
-	require.NoError(t, err)
-
-	// Verify connection works
-	_, err = db.DB().ExecContext(context.Background(), "SELECT 1")
-	require.NoError(t, err)
-}
-
-func TestMetadataDB_Close(t *testing.T) {
-	db, err := OpenMemoryDB()
+func TestTestMetadataDB_Close(t *testing.T) {
+	db, err := openTestMemoryDB()
 	require.NoError(t, err)
 
 	err = db.Close()
 	assert.NoError(t, err)
-
-	// Second close should also not error (idempotent behavior may vary by driver)
-	// We don't test this as sqlite3 may return an error on double close
 }
 
 func TestInitSchema(t *testing.T) {
@@ -99,7 +79,7 @@ func TestInitSchema_FTS5Created(t *testing.T) {
 }
 
 // =============================================================================
-// Phase 3: Population Tests
+// Population Tests
 // =============================================================================
 
 func TestPopulateFromCatalog_Models(t *testing.T) {
@@ -347,7 +327,7 @@ func TestPopulateFromCatalog_CatalogMeta(t *testing.T) {
 }
 
 // =============================================================================
-// Phase 3: Query Tests (Round-Trip Verification)
+// Round-Trip Verification Tests
 // =============================================================================
 
 func TestDatabaseRoundTrip_Models(t *testing.T) {
@@ -423,6 +403,10 @@ func TestDatabaseRoundTrip_Lineage(t *testing.T) {
 	assert.Equal(t, "b", edges[1].Source)
 	assert.Equal(t, "c", edges[1].Target)
 }
+
+// =============================================================================
+// FTS5 Search Tests
+// =============================================================================
 
 func TestFTS5Search_ByName(t *testing.T) {
 	db := setupTestDB(t)
@@ -523,84 +507,59 @@ func TestFTS5Search_NoResults(t *testing.T) {
 }
 
 // =============================================================================
-// Phase 3: Utility Tests
+// Production Function Tests
 // =============================================================================
 
-func TestVacuum(t *testing.T) {
-	db := setupTestDB(t)
-	catalog := newTestCatalogWithModels(
-		newTestModel("staging.customers", "customers", "view"),
-	)
-
-	err := db.PopulateFromCatalog(catalog)
-	require.NoError(t, err)
-
-	// Vacuum should not error
-	err = db.Vacuum()
-	assert.NoError(t, err)
-}
-
-func TestCopyToPath(t *testing.T) {
-	db := setupTestDB(t)
-	catalog := newTestCatalogWithModels(
-		newTestModel("staging.customers", "customers", "view"),
-	)
-
-	err := db.PopulateFromCatalog(catalog)
-	require.NoError(t, err)
-
-	// Copy to file
-	tmpDir := t.TempDir()
-	destPath := filepath.Join(tmpDir, "copy.db")
-
-	err = db.CopyToPath(destPath)
-	require.NoError(t, err)
-
-	// Verify the copy is readable
-	copyDB, err := OpenMetadataDB(destPath)
-	require.NoError(t, err)
-	defer func() { _ = copyDB.Close() }()
-
-	ctx := context.Background()
-	var count int
-	err = copyDB.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM models").Scan(&count)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-}
-
-func TestGenerateMetadataDB(t *testing.T) {
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "metadata.db")
-
+func TestCopyFromState(t *testing.T) {
+	// Create a source database with test schema and data
+	srcDB := setupTestDB(t)
 	catalog := newTestCatalogWithModels(
 		newTestModel("staging.customers", "customers", "view"),
 		newTestModel("marts.summary", "summary", "table"),
 	)
-	catalog.Sources = []SourceDoc{
-		{Name: "raw_customers", ReferencedBy: []string{"staging.customers"}},
-	}
-
-	err := GenerateMetadataDB(catalog, dbPath)
+	err := srcDB.PopulateFromCatalog(catalog)
 	require.NoError(t, err)
 
-	// Verify the database
-	db, err := OpenMetadataDB(dbPath)
+	// Write it to a temp file (simulating state.db)
+	tmpDir := t.TempDir()
+	srcPath := filepath.Join(tmpDir, "state.db")
+
+	// Use VACUUM INTO to write to file
+	_, err = srcDB.DB().ExecContext(context.Background(), "VACUUM INTO '"+srcPath+"'")
 	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
+
+	// Now test CopyFromState
+	dstPath := filepath.Join(tmpDir, "metadata.db")
+	err = CopyFromState(srcPath, dstPath)
+	require.NoError(t, err)
+
+	// Verify the copy exists and is readable
+	_, err = os.Stat(dstPath)
+	require.NoError(t, err)
+
+	// Open and verify content
+	dstDB, err := openTestDBFromFile(dstPath)
+	require.NoError(t, err)
+	defer func() { _ = dstDB.Close() }()
 
 	ctx := context.Background()
-	var modelCount, sourceCount int
-	err = db.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM models").Scan(&modelCount)
+	var count int
+	err = dstDB.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM models").Scan(&count)
 	require.NoError(t, err)
-	assert.Equal(t, 2, modelCount)
+	assert.Equal(t, 2, count)
+}
 
-	err = db.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM sources").Scan(&sourceCount)
-	require.NoError(t, err)
-	assert.Equal(t, 1, sourceCount)
+// openTestDBFromFile opens a file-based database for testing.
+func openTestDBFromFile(path string) (*TestMetadataDB, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	return &TestMetadataDB{db: db}, nil
 }
 
 // =============================================================================
-// Phase 5: Edge Case Tests
+// Edge Case Tests
 // =============================================================================
 
 func TestPopulateFromCatalog_EmptyColumns(t *testing.T) {

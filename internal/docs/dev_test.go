@@ -142,7 +142,7 @@ func testDevServer(t *testing.T) *DevServer {
 	manifest := GenerateManifest(catalog)
 
 	return &DevServer{
-		metaDB:   db,
+		stateDB:  db.DB(),
 		manifest: manifest,
 	}
 }
@@ -250,7 +250,7 @@ func TestHandleQuery_WithParams(t *testing.T) {
 
 func TestHandleQuery_DBNotReady(t *testing.T) {
 	server := &DevServer{
-		metaDB: nil, // DB not initialized
+		stateDB: nil, // DB not initialized
 	}
 
 	body := QueryRequest{SQL: "SELECT 1"}
@@ -263,7 +263,7 @@ func TestHandleQuery_DBNotReady(t *testing.T) {
 	server.handleQuery(rec, req)
 
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Contains(t, rec.Body.String(), "Database not initialized")
+	assert.Contains(t, rec.Body.String(), "Database not available")
 }
 
 // =============================================================================
@@ -378,7 +378,7 @@ func TestAtomicSwapPreservesConsistency(t *testing.T) {
 	manifest := GenerateManifest(catalog)
 
 	server := &DevServer{
-		metaDB:   db,
+		stateDB:  db.DB(),
 		manifest: manifest,
 	}
 
@@ -431,7 +431,7 @@ func TestAtomicSwapPreservesConsistency(t *testing.T) {
 	// Perform swaps in main goroutine
 	for i := 0; i < 10; i++ {
 		// Create new database (fully initialized before swap)
-		newDB, err := OpenMemoryDB()
+		newDB, err := openTestMemoryDB()
 		require.NoError(t, err)
 		require.NoError(t, newDB.InitSchema())
 
@@ -443,8 +443,8 @@ func TestAtomicSwapPreservesConsistency(t *testing.T) {
 
 		// Atomic swap under write lock
 		server.mu.Lock()
-		oldDB := server.metaDB
-		server.metaDB = newDB
+		oldDB := server.stateDB
+		server.stateDB = newDB.DB()
 		server.manifest = newManifest
 		server.mu.Unlock()
 
@@ -462,8 +462,8 @@ func TestAtomicSwapPreservesConsistency(t *testing.T) {
 
 	// Clean up
 	server.mu.Lock()
-	if server.metaDB != nil {
-		_ = server.metaDB.Close()
+	if server.stateDB != nil {
+		_ = server.stateDB.Close()
 	}
 	server.mu.Unlock()
 
