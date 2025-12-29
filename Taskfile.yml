@@ -17,6 +17,12 @@ tasks:
 
   build:
     desc: Build the leapsql CLI
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - leapsql
     cmds:
       - go build -o leapsql ./cmd/leapsql
 

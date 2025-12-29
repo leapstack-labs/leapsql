@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -106,6 +107,8 @@ func (s *DevServer) Serve(ctx context.Context) error {
 	mux.HandleFunc("/__reload", s.handleSSE)
 	mux.HandleFunc("/query", s.handleQuery)
 	mux.HandleFunc("/manifest", s.handleManifest)
+	mux.HandleFunc("/themes", s.handleThemeList)
+	mux.HandleFunc("/themes/", s.handleThemeCSS)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.port),
@@ -442,6 +445,92 @@ func rowsToQueryResponse(rows *sql.Rows) (*QueryResponse, error) {
 		Columns: columns,
 		Values:  values,
 	}, nil
+}
+
+// handleThemeList returns a JSON array of available theme names.
+func (s *DevServer) handleThemeList(w http.ResponseWriter, _ *http.Request) {
+	themesDir := filepath.Join(s.docsDir, "src", "css", "themes")
+
+	entries, err := os.ReadDir(themesDir)
+	if err != nil {
+		http.Error(w, "Failed to read themes directory", http.StatusInternalServerError)
+		return
+	}
+
+	themes := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Filter out _base.css and non-CSS files
+		if name == "_base.css" || filepath.Ext(name) != ".css" {
+			continue
+		}
+		// Return theme name without .css extension
+		themes = append(themes, name[:len(name)-4])
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	_ = json.NewEncoder(w).Encode(themes)
+}
+
+// handleThemeCSS returns the concatenated theme CSS with _base.css.
+func (s *DevServer) handleThemeCSS(w http.ResponseWriter, r *http.Request) {
+	// Parse theme name from URL path: /themes/{name}.css
+	path := r.URL.Path
+	if !strings.HasPrefix(path, "/themes/") || !strings.HasSuffix(path, ".css") {
+		http.NotFound(w, r)
+		return
+	}
+
+	themeName := path[len("/themes/") : len(path)-4] // Extract name without /themes/ prefix and .css suffix
+	if themeName == "" || themeName == "_base" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Prevent directory traversal by checking for path separators
+	if strings.ContainsAny(themeName, "/\\") {
+		http.NotFound(w, r)
+		return
+	}
+
+	themesDir := filepath.Join(s.docsDir, "src", "css", "themes")
+	themeFile := filepath.Join(themesDir, themeName+".css")
+	baseFile := filepath.Join(themesDir, "_base.css")
+
+	// Verify the resolved path is still within themesDir (defense in depth)
+	if !strings.HasPrefix(themeFile, themesDir) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Read theme CSS
+	themeCSS, err := os.ReadFile(themeFile) //nolint:gosec // G304: path is validated above
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, "Failed to read theme file", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Read base CSS
+	baseCSS, err := os.ReadFile(baseFile) //nolint:gosec // G304: baseFile is a constant path
+	if err != nil {
+		http.Error(w, "Failed to read base CSS", http.StatusInternalServerError)
+		return
+	}
+
+	// Concatenate: theme CSS + newline + base CSS
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(themeCSS)
+	_, _ = w.Write([]byte("\n"))
+	_, _ = w.Write(baseCSS)
 }
 
 // handleSSE handles Server-Sent Events for live reload.

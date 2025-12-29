@@ -3,6 +3,7 @@ docs-site/
 catalog-site/
 .leapsql-docs/
 session-ses*.md
+.task/
 
 # Binaries
 /gendatabricks
