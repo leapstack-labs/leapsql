@@ -145,6 +145,49 @@ func (g *Generator) LoadModels(modelsDir string) error {
 	return nil
 }
 
+// LoadFromState loads models and lineage from the state database.
+// This is the preferred method as it includes column lineage extracted during discover.
+func (g *Generator) LoadFromState(store core.Store) error {
+	// 1. Get all persisted models
+	persistedModels, err := store.ListModels()
+	if err != nil {
+		return fmt.Errorf("list models: %w", err)
+	}
+
+	// 2. Get columns with lineage (BatchGetAllColumns already includes sources)
+	columnsMap, err := store.BatchGetAllColumns()
+	if err != nil {
+		return fmt.Errorf("get columns: %w", err)
+	}
+
+	// 3. Get dependencies for each model
+	depsMap, err := store.BatchGetAllDependencies()
+	if err != nil {
+		return fmt.Errorf("get dependencies: %w", err)
+	}
+
+	// 4. Convert PersistedModel -> core.Model with columns attached
+	g.models = make([]*core.Model, 0, len(persistedModels))
+	for _, pm := range persistedModels {
+		model := pm.Model // embedded core.Model
+		if model == nil {
+			continue
+		}
+		// Attach columns with lineage
+		if cols, ok := columnsMap[model.Path]; ok {
+			model.Columns = cols
+		}
+		// Attach dependencies (Sources field)
+		if deps, ok := depsMap[pm.ID]; ok {
+			model.Sources = deps
+		}
+		g.models = append(g.models, model)
+		g.registry.Register(model)
+	}
+
+	return nil
+}
+
 // GenerateCatalog generates the documentation catalog.
 func (g *Generator) GenerateCatalog() *Catalog {
 	catalog := &Catalog{
@@ -351,9 +394,14 @@ func (g *Generator) buildColumnLineage(models []*core.Model, _ map[string]*Model
 
 				// Add source node if not exists
 				if !nodeSet[sourceNodeID] {
+					// Use resolved model path for known models, raw table name for external sources
+					nodeModel := src.Table
+					if sourceModelPath != "" {
+						nodeModel = sourceModelPath
+					}
 					lineage.Nodes = append(lineage.Nodes, ColumnLineageNode{
 						ID:     sourceNodeID,
-						Model:  src.Table,
+						Model:  nodeModel,
 						Column: src.Column,
 					})
 					nodeSet[sourceNodeID] = true

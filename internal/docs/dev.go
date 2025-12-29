@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // QueryRequest represents a SQL query request from the frontend.
@@ -36,6 +38,8 @@ type QueryResponse struct {
 // DevServer provides a development server with watch mode and live reload.
 type DevServer struct {
 	generator   *Generator
+	store       core.Store     // State store for reloading from state database
+	engine      *engine.Engine // Engine for re-discover on file change
 	modelsDir   string
 	port        int
 	docsDir     string
@@ -65,6 +69,42 @@ func NewDevServer(projectName, modelsDir string, port int, theme string) (*DevSe
 
 	return &DevServer{
 		generator: gen,
+		modelsDir: modelsDir,
+		port:      port,
+		docsDir:   docsDir,
+		theme:     theme,
+		clients:   make(map[chan struct{}]struct{}),
+	}, nil
+}
+
+// NewDevServerWithState creates a dev server that reads from state database.
+func NewDevServerWithState(
+	projectName string,
+	modelsDir string,
+	store core.Store,
+	eng *engine.Engine,
+	port int,
+	theme string,
+) (*DevServer, error) {
+	docsDir, err := GetDocsDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docs directory: %w", err)
+	}
+
+	gen := NewGenerator(projectName)
+	if theme != "" {
+		gen.SetTheme(theme)
+	}
+
+	// Load from state instead of re-parsing SQL
+	if err := gen.LoadFromState(store); err != nil {
+		return nil, fmt.Errorf("failed to load from state: %w", err)
+	}
+
+	return &DevServer{
+		generator: gen,
+		store:     store,
+		engine:    eng,
 		modelsDir: modelsDir,
 		port:      port,
 		docsDir:   docsDir,
@@ -221,7 +261,17 @@ func (s *DevServer) watchLoop(ctx context.Context, watcher *fsnotify.Watcher) {
 // then we atomically swap pointers to avoid race conditions.
 func (s *DevServer) rebuild(reloadModels bool) error {
 	// =========================================================================
-	// Phase 1: Build all new state OUTSIDE the lock (can take 500ms+)
+	// Phase 1: Re-discover if models changed and engine is available
+	// =========================================================================
+	if reloadModels && s.engine != nil {
+		if _, err := s.engine.Discover(engine.DiscoveryOptions{}); err != nil {
+			// Log error but continue with last known state
+			log.Printf("Discover error: %v", err)
+		}
+	}
+
+	// =========================================================================
+	// Phase 2: Build all new state OUTSIDE the lock (can take 500ms+)
 	// =========================================================================
 
 	// Get current generator (need lock for read)
@@ -232,8 +282,18 @@ func (s *DevServer) rebuild(reloadModels bool) error {
 	// Reload models if they changed (creates new generator)
 	if reloadModels {
 		gen = NewGenerator(gen.projectName)
-		if err := gen.LoadModels(s.modelsDir); err != nil {
-			return fmt.Errorf("failed to reload models: %w", err)
+		gen.SetTheme(s.theme)
+
+		if s.store != nil {
+			// Preferred: load from state (includes lineage)
+			if err := gen.LoadFromState(s.store); err != nil {
+				return fmt.Errorf("failed to reload from state: %w", err)
+			}
+		} else {
+			// Fallback: re-parse SQL (no lineage)
+			if err := gen.LoadModels(s.modelsDir); err != nil {
+				return fmt.Errorf("failed to reload models: %w", err)
+			}
 		}
 	}
 
@@ -668,4 +728,35 @@ func ServeDev(projectName, modelsDir string, port int, theme string) error {
 	}()
 
 	return server.Serve(ctx)
+}
+
+// ServeDevWithState starts a dev server that reads from state database.
+func ServeDevWithState(
+	ctx context.Context,
+	projectName string,
+	modelsDir string,
+	store core.Store,
+	eng *engine.Engine,
+	port int,
+	theme string,
+) error {
+	server, err := NewDevServerWithState(projectName, modelsDir, store, eng, port, theme)
+	if err != nil {
+		return err
+	}
+
+	// Handle interrupt signals
+	sigCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Println("\nShutting down...")
+		cancel()
+	}()
+
+	return server.Serve(sigCtx)
 }

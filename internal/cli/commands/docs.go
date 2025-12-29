@@ -1,11 +1,13 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/docs"
+	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +57,7 @@ func newDocsBuildCommand() *cobra.Command {
 
   # Build with a specific theme
   leapsql docs build --theme claude`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get config inside RunE, not at command definition time
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
@@ -65,7 +67,7 @@ func newDocsBuildCommand() *cobra.Command {
 			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
 				opts.Theme = cfg.Docs.Theme
 			}
-			return runDocsBuild(opts)
+			return runDocsBuild(cmd, opts)
 		},
 	}
 
@@ -92,7 +94,7 @@ func newDocsServeCommand() *cobra.Command {
 
   # Serve with a specific theme
   leapsql docs serve --theme corporate`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get config inside RunE, not at command definition time
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
@@ -102,7 +104,7 @@ func newDocsServeCommand() *cobra.Command {
 			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
 				opts.Theme = cfg.Docs.Theme
 			}
-			return runDocsServe(opts)
+			return runDocsServe(cmd, opts)
 		},
 	}
 
@@ -115,7 +117,7 @@ func newDocsServeCommand() *cobra.Command {
 	return cmd
 }
 
-func runDocsBuild(opts *DocsOptions) error {
+func runDocsBuild(cmd *cobra.Command, opts *DocsOptions) error {
 	// Validate models directory exists
 	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
@@ -133,11 +135,28 @@ func runDocsBuild(opts *DocsOptions) error {
 	fmt.Printf("  Theme:   %s\n", theme)
 	fmt.Println()
 
+	// Create engine for state access and discover
+	eng, cleanup, err := createEngineForDocs(cmd, opts.ModelsPath)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	// Auto-run discover
+	fmt.Println("Discovering models...")
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
+		return fmt.Errorf("discover failed: %w", err)
+	}
+
+	// Get store from engine
+	store := eng.GetStateStore()
+
 	gen := docs.NewGenerator(opts.ProjectName)
 	gen.SetTheme(opts.Theme)
 
-	if err := gen.LoadModels(opts.ModelsPath); err != nil {
-		return fmt.Errorf("failed to load models: %w", err)
+	// Load from state (includes column lineage)
+	if err := gen.LoadFromState(store); err != nil {
+		return fmt.Errorf("failed to load from state: %w", err)
 	}
 
 	if err := gen.Build(opts.OutputPath); err != nil {
@@ -150,7 +169,7 @@ func runDocsBuild(opts *DocsOptions) error {
 	return nil
 }
 
-func runDocsServe(opts *DocsOptions) error {
+func runDocsServe(cmd *cobra.Command, opts *DocsOptions) error {
 	// Validate models directory exists
 	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
@@ -167,11 +186,28 @@ func runDocsServe(opts *DocsOptions) error {
 	fmt.Printf("  Theme:   %s\n", theme)
 	fmt.Println()
 
+	// Create engine for state access and discover
+	eng, cleanup, err := createEngineForDocs(cmd, opts.ModelsPath)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	// Auto-run discover
+	fmt.Println("Discovering models...")
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
+		return fmt.Errorf("discover failed: %w", err)
+	}
+
+	// Get store from engine
+	store := eng.GetStateStore()
+
 	gen := docs.NewGenerator(opts.ProjectName)
 	gen.SetTheme(opts.Theme)
 
-	if err := gen.LoadModels(opts.ModelsPath); err != nil {
-		return fmt.Errorf("failed to load models: %w", err)
+	// Load from state (includes column lineage)
+	if err := gen.LoadFromState(store); err != nil {
+		return fmt.Errorf("failed to load from state: %w", err)
 	}
 
 	if err := gen.Serve(opts.OutputPath, opts.Port); err != nil {
@@ -199,7 +235,7 @@ will trigger a rebuild, and connected browsers will automatically reload.`,
 
   # Start with a specific theme
   leapsql docs dev --theme claude`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg := getConfig()
 			if opts.ModelsPath == "" {
 				opts.ModelsPath = cfg.ModelsDir
@@ -208,7 +244,7 @@ will trigger a rebuild, and connected browsers will automatically reload.`,
 			if opts.Theme == "" && cfg.Docs != nil && cfg.Docs.Theme != "" {
 				opts.Theme = cfg.Docs.Theme
 			}
-			return runDocsDev(opts)
+			return runDocsDev(cmd, opts)
 		},
 	}
 
@@ -220,13 +256,65 @@ will trigger a rebuild, and connected browsers will automatically reload.`,
 	return cmd
 }
 
-func runDocsDev(opts *DocsOptions) error {
+func runDocsDev(cmd *cobra.Command, opts *DocsOptions) error {
 	// Validate models directory exists
 	if _, err := os.Stat(opts.ModelsPath); os.IsNotExist(err) {
 		return fmt.Errorf("models directory does not exist: %s", opts.ModelsPath)
 	}
 
-	return docs.ServeDev(opts.ProjectName, opts.ModelsPath, opts.Port, opts.Theme)
+	// Create engine for state access and discover
+	eng, cleanup, err := createEngineForDocs(cmd, opts.ModelsPath)
+	if err != nil {
+		return err
+	}
+	// Note: We don't defer cleanup() here because ServeDevWithState runs indefinitely.
+	// The engine is closed via SIGINT/SIGTERM signal handler.
+
+	// Auto-run discover
+	fmt.Println("Discovering models...")
+	if _, err := eng.Discover(engine.DiscoveryOptions{}); err != nil {
+		cleanup()
+		return fmt.Errorf("discover failed: %w", err)
+	}
+
+	// Get store from engine
+	store := eng.GetStateStore()
+
+	err = docs.ServeDevWithState(
+		context.Background(),
+		opts.ProjectName,
+		opts.ModelsPath,
+		store,
+		eng,
+		opts.Port,
+		opts.Theme,
+	)
+
+	// Cleanup after server stops (signal received)
+	cleanup()
+	return err
+}
+
+// createEngineForDocs creates an engine configured for docs commands.
+func createEngineForDocs(cmd *cobra.Command, modelsPath string) (*engine.Engine, func(), error) {
+	cfg := getConfig()
+	logger := config.GetLogger(cmd.Context())
+
+	// Override models path if specified
+	if modelsPath != "" {
+		cfg.ModelsDir = modelsPath
+	}
+
+	eng, err := createEngine(cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cleanup := func() {
+		_ = eng.Close()
+	}
+
+	return eng, cleanup, nil
 }
 
 // Ensure config package is imported for getConfig usage
