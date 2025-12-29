@@ -131,7 +131,7 @@ export const ModelDetail: FunctionComponent<ModelDetailProps> = ({ path, dbReady
           <h1 class="model-title">{model.name}</h1>
           <div class="model-path">{model.path}</div>
           {model.description && (
-            <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+            <p style={{ marginTop: '1rem', color: 'var(--muted-foreground)' }}>
               {model.description}
             </p>
           )}
@@ -267,21 +267,21 @@ export const ModelDetail: FunctionComponent<ModelDetailProps> = ({ path, dbReady
           <div class="legend-item">
             <div
               class="legend-color"
-              style={{ background: 'var(--accent-green)' }}
+              style={{ background: 'var(--node-staging)' }}
             />
             <span>Current model</span>
           </div>
           <div class="legend-item">
             <div
               class="legend-color"
-              style={{ background: 'var(--accent-blue)' }}
+              style={{ background: 'var(--node-marts)' }}
             />
             <span>Source models</span>
           </div>
           <div class="legend-item">
             <div
               class="legend-color"
-              style={{ background: 'var(--accent-orange)' }}
+              style={{ background: 'var(--node-source)' }}
             />
             <span>External sources</span>
           </div>

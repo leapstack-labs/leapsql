@@ -11,7 +11,7 @@ export const SourceNode: FunctionComponent<NodeProps> = ({ data }) => {
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: '#d29922' }}
+        style={{ background: 'var(--node-source)' }}
       />
       <div
         style={{
@@ -25,15 +25,15 @@ export const SourceNode: FunctionComponent<NodeProps> = ({ data }) => {
             width: '16px',
             height: '10px',
             borderRadius: '3px',
-            backgroundColor: 'rgba(210, 153, 34, 0.2)',
-            border: '2px dashed #d29922',
+            backgroundColor: 'color-mix(in oklch, var(--node-source) 20%, transparent)',
+            border: '2px dashed var(--node-source)',
             flexShrink: 0,
           }}
         />
         <span
           style={{
             fontSize: '11px',
-            color: '#e6edf3',
+            color: 'var(--foreground)',
             whiteSpace: 'nowrap',
           }}
         >
@@ -43,7 +43,7 @@ export const SourceNode: FunctionComponent<NodeProps> = ({ data }) => {
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: '#d29922' }}
+        style={{ background: 'var(--node-source)' }}
       />
     </div>
   );

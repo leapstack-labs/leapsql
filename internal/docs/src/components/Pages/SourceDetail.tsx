@@ -70,7 +70,7 @@ export const SourceDetail: FunctionComponent<SourceDetailProps> = ({ name, dbRea
         <div>
           <div class="source-badge-header">SOURCE</div>
           <h1 class="model-title">{source.name}</h1>
-          <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+          <p style={{ marginTop: '1rem', color: 'var(--muted-foreground)' }}>
             External data source referenced by {source.referenced_by.length} model
             {source.referenced_by.length !== 1 ? 's' : ''}.
           </p>

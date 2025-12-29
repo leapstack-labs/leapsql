@@ -3,27 +3,27 @@ import type { FunctionComponent } from 'preact';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ModelNodeData } from '../../lib/types';
 
-// Get node color based on folder
-function getNodeColor(folder: string): string {
-  const colors: Record<string, string> = {
-    staging: '#3fb950',
-    marts: '#58a6ff',
-    intermediate: '#a371f7',
-    seeds: '#d29922',
+// Get node color CSS variable based on folder
+function getNodeColorVar(folder: string): string {
+  const varMap: Record<string, string> = {
+    staging: 'var(--node-staging)',
+    marts: 'var(--node-marts)',
+    intermediate: 'var(--node-intermediate)',
+    seeds: 'var(--node-seeds)',
   };
-  return colors[folder] || '#8b949e';
+  return varMap[folder] || 'var(--node-default)';
 }
 
 export const ModelNode: FunctionComponent<NodeProps> = ({ data }) => {
   const nodeData = data as ModelNodeData;
-  const color = getNodeColor(nodeData.folder);
+  const color = getNodeColorVar(nodeData.folder);
 
   return (
     <div class="dag-node">
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: '#30363d' }}
+        style={{ background: 'var(--graph-handle)' }}
       />
       <div
         style={{
@@ -45,7 +45,7 @@ export const ModelNode: FunctionComponent<NodeProps> = ({ data }) => {
         <span
           style={{
             fontSize: '11px',
-            color: '#e6edf3',
+            color: 'var(--foreground)',
             whiteSpace: 'nowrap',
           }}
         >
@@ -55,7 +55,7 @@ export const ModelNode: FunctionComponent<NodeProps> = ({ data }) => {
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: '#30363d' }}
+        style={{ background: 'var(--graph-handle)' }}
       />
     </div>
   );

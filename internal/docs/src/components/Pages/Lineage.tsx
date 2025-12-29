@@ -24,7 +24,7 @@ export const Lineage: FunctionComponent<LineageProps> = ({ dbReady }) => {
           style={{
             display: 'flex',
             gap: '2rem',
-            color: 'var(--text-secondary)',
+            color: 'var(--muted-foreground)',
             fontSize: '0.875rem',
             flexWrap: 'wrap',
           }}
@@ -69,7 +69,7 @@ export const Lineage: FunctionComponent<LineageProps> = ({ dbReady }) => {
                 height: '10px',
                 borderRadius: '2px',
                 background: 'transparent',
-                border: '2px dashed var(--accent-orange)',
+                border: '2px dashed var(--node-source)',
               }}
             />
             sources

@@ -1,6 +1,6 @@
 // Main lineage graph component using React Flow
 import type { FunctionComponent } from 'preact';
-import { useMemo, useCallback } from 'preact/hooks';
+import { useMemo, useCallback, useEffect, useState } from 'preact/hooks';
 import {
   ReactFlow,
   Background,
@@ -24,12 +24,34 @@ const nodeTypes = {
   source: SourceNode,
 };
 
+// Helper to get computed CSS color value
+function getComputedColor(varName: string): string {
+  const style = getComputedStyle(document.documentElement);
+  const value = style.getPropertyValue(varName).trim();
+  return value || '#8b949e';
+}
+
 interface LineageFlowProps {
   dbReady: boolean;
 }
 
 export const LineageFlow: FunctionComponent<LineageFlowProps> = ({ dbReady }) => {
   const { data: lineage, loading, error } = useLineage();
+  
+  // Cache computed colors for MiniMap (React Flow MiniMap needs actual color values)
+  const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    // Compute CSS variable values for MiniMap
+    setNodeColors({
+      source: getComputedColor('--node-source'),
+      staging: getComputedColor('--node-staging'),
+      marts: getComputedColor('--node-marts'),
+      intermediate: getComputedColor('--node-intermediate'),
+      seeds: getComputedColor('--node-seeds'),
+      default: getComputedColor('--node-default'),
+    });
+  }, []);
 
   // Convert lineage data to React Flow format
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -117,19 +139,13 @@ export const LineageFlow: FunctionComponent<LineageFlowProps> = ({ dbReady }) =>
         maxZoom={4}
         attributionPosition="bottom-left"
       >
-        <Background color="#30363d" gap={16} />
+        <Background color="var(--graph-bg)" gap={16} />
         <Controls />
         <MiniMap
           nodeColor={(node) => {
             const data = node.data as { folder: string; isSource: boolean };
-            if (data.isSource) return '#d29922';
-            const colors: Record<string, string> = {
-              staging: '#3fb950',
-              marts: '#58a6ff',
-              intermediate: '#a371f7',
-              seeds: '#d29922',
-            };
-            return colors[data.folder] || '#8b949e';
+            if (data.isSource) return nodeColors.source || '#d29922';
+            return nodeColors[data.folder] || nodeColors.default || '#8b949e';
           }}
           maskColor="rgba(0, 0, 0, 0.5)"
         />

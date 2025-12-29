@@ -42,7 +42,7 @@ function Root() {
       <div class="loading">
         <div>
           <h3>Failed to load database</h3>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+          <p style={{ color: 'var(--muted-foreground)', marginTop: '0.5rem' }}>
             {error.message}
           </p>
         </div>
@@ -74,7 +74,7 @@ function init() {
       <div class="loading">
         <div>
           <h3>Failed to load documentation</h3>
-          <p style="color: var(--text-secondary); margin-top: 0.5rem;">${error instanceof Error ? error.message : 'Unknown error'}</p>
+          <p style="color: var(--muted-foreground); margin-top: 0.5rem;">${error instanceof Error ? error.message : 'Unknown error'}</p>
         </div>
       </div>
     `;

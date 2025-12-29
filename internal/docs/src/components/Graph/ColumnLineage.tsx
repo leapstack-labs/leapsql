@@ -20,16 +20,16 @@ import '@xyflow/react/dist/style.css';
 const ColumnNode: FunctionComponent<NodeProps> = ({ data }) => {
   const nodeData = data as ColumnNodeData;
 
-  // Determine colors based on node type
-  let bgColor = 'rgba(210, 153, 34, 0.2)';
-  let borderColor = '#d29922';
+  // Determine colors based on node type using CSS variables
+  let bgColor = 'color-mix(in oklch, var(--node-source) 20%, transparent)';
+  let borderColor = 'var(--node-source)';
 
   if (nodeData.isCurrentModel) {
-    bgColor = 'rgba(63, 185, 80, 0.2)';
-    borderColor = '#3fb950';
+    bgColor = 'color-mix(in oklch, var(--node-staging) 20%, transparent)';
+    borderColor = 'var(--node-staging)';
   } else if (nodeData.isModelSource) {
-    bgColor = 'rgba(88, 166, 255, 0.2)';
-    borderColor = '#58a6ff';
+    bgColor = 'color-mix(in oklch, var(--node-marts) 20%, transparent)';
+    borderColor = 'var(--node-marts)';
   }
 
   return (
@@ -55,7 +55,7 @@ const ColumnNode: FunctionComponent<NodeProps> = ({ data }) => {
           <span
             style={{
               fontSize: '9px',
-              color: '#8b949e',
+              color: 'var(--muted-foreground)',
               marginBottom: '2px',
             }}
           >
@@ -65,7 +65,7 @@ const ColumnNode: FunctionComponent<NodeProps> = ({ data }) => {
         <span
           style={{
             fontSize: '11px',
-            color: '#e6edf3',
+            color: 'var(--foreground)',
             fontFamily: 'SF Mono, Consolas, monospace',
           }}
         >
@@ -161,7 +161,7 @@ export const ColumnLineageGraph: FunctionComponent<ColumnLineageGraphProps> = ({
       source: edge.source,
       target: edge.target,
       animated: false,
-      style: { stroke: '#8b949e', strokeWidth: 1 },
+      style: { stroke: 'var(--muted-foreground)', strokeWidth: 1 },
     }));
 
     return { initialNodes: nodes, initialEdges: edges };
@@ -216,7 +216,7 @@ export const ColumnLineageGraph: FunctionComponent<ColumnLineageGraphProps> = ({
         maxZoom={3}
         attributionPosition="bottom-left"
       >
-        <Background color="#30363d" gap={16} />
+        <Background color="var(--graph-bg)" gap={16} />
         <Controls />
       </ReactFlow>
     </div>

@@ -128,7 +128,7 @@ export const Overview: FunctionComponent<OverviewProps> = ({ dbReady }) => {
 
       <div class="section">
         <h2 class="section-title">Generated</h2>
-        <p style={{ color: 'var(--text-secondary)' }}>
+        <p style={{ color: 'var(--muted-foreground)' }}>
           {new Date(manifest.generated_at).toLocaleString()}
         </p>
       </div>
