@@ -78,6 +78,16 @@ tasks:
     cmds:
       - go run ./scripts/gendialect -dialect=duckdb -gen=all -outdir=pkg/adapters/duckdb/dialect
 
+  generate:databricks:
+    desc: Generate Databricks dialect metadata from documentation
+    cmds:
+      - go run ./scripts/gendatabricks -gen=all -outdir=pkg/dialects/databricks/
+
+  generate:snowflake:
+    desc: Generate Snowflake dialect metadata from documentation
+    cmds:
+      - go run ./scripts/gensnowflake -gen=all -outdir=pkg/dialects/snowflake/
+
   docs:generate:
     desc: Generate documentation from code
     cmds:
@@ -109,6 +119,8 @@ tasks:
     cmds:
       - task: generate
       - task: generate:dialect
+      - task: generate:databricks
+      - task: generate:snowflake
       - task: docs:generate
 
   run:
