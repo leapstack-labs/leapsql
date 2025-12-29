@@ -34,7 +34,7 @@ func TestRowsToQueryResponse_Empty(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.NotNil(t, resp.Columns)
-	assert.Nil(t, resp.Values) // Empty result
+	assert.Empty(t, resp.Values) // Empty result, but not nil (JSON serializes to [] not null)
 }
 
 func TestRowsToQueryResponse_SingleRow(t *testing.T) {

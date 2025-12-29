@@ -403,7 +403,7 @@ func rowsToQueryResponse(rows *sql.Rows) (*QueryResponse, error) {
 		return nil, err
 	}
 
-	var values [][]interface{}
+	values := [][]interface{}{}
 
 	// Create a slice of interface{}'s to represent each column,
 	// and a second slice to contain pointers to each item in the columns slice.
