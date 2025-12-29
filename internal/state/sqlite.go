@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/leapstack-labs/leapsql/internal/state/sqlcgen"
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
+	_ "modernc.org/sqlite" // sqlite3 driver (pure Go)
 )
 
 //go:embed schema.sql
@@ -48,7 +48,7 @@ func (s *SQLiteStore) Open(path string) error {
 		dsn = ":memory:?_foreign_keys=on"
 	}
 
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open sqlite database: %w", err)
 	}

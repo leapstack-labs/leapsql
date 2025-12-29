@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "modernc.org/sqlite" // SQLite driver (pure Go)
 )
 
 // memoryDBCounter is used to generate unique names for in-memory databases.
@@ -20,7 +20,6 @@ type MetadataDB struct {
 
 // Schema optimized for UI consumption with FTS5 for search.
 // FTS5 is a hard requirement - if not available, the build will fail.
-// For mattn/go-sqlite3, ensure you build with: -tags sqlite_fts5
 const metadataSchema = `
 -- Core tables
 CREATE TABLE models (
@@ -147,7 +146,7 @@ END;
 func OpenMetadataDB(path string) (*MetadataDB, error) {
 	// Use page_size=4096 for optimal range request performance
 	dsn := fmt.Sprintf("file:%s?_page_size=4096&_journal_mode=WAL", path)
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -179,7 +178,7 @@ func OpenMemoryDB() (*MetadataDB, error) {
 	// See: https://www.sqlite.org/inmemorydb.html
 	id := memoryDBCounter.Add(1)
 	dsn := fmt.Sprintf("file:memdb%d?mode=memory&cache=shared", id)
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open in-memory database: %w", err)
 	}
@@ -199,7 +198,6 @@ func (m *MetadataDB) DB() *sql.DB {
 
 // InitSchema creates the database schema including FTS5.
 // FTS5 is a hard requirement. If not available, this will return an error.
-// For mattn/go-sqlite3, build with: -tags sqlite_fts5
 func (m *MetadataDB) InitSchema() error {
 	ctx := context.Background()
 	if _, err := m.db.ExecContext(ctx, metadataSchema); err != nil {
