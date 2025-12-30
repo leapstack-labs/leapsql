@@ -303,6 +303,19 @@ CREATE VIEW IF NOT EXISTS v_column_sources AS
 SELECT model_path, column_name, source_table, source_column
 FROM column_lineage;
 
+-- Source columns view: shows which columns are referenced from external sources
+CREATE VIEW IF NOT EXISTS v_source_columns AS
+SELECT DISTINCT 
+    cl.source_table AS source_name, 
+    cl.source_column AS column_name
+FROM column_lineage cl
+WHERE cl.source_table != ''
+  AND NOT EXISTS (
+      SELECT 1 FROM models m
+      WHERE m.name = cl.source_table OR m.path = cl.source_table
+  )
+ORDER BY cl.source_table, cl.source_column;
+
 -- Macros view for catalog
 CREATE VIEW IF NOT EXISTS v_macros AS
 SELECT

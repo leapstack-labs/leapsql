@@ -68,6 +68,21 @@ export interface ModelDoc {
 export interface SourceDoc {
   name: string;
   referenced_by: string[];
+  columns: string[];
+}
+
+export interface MacroFunctionDoc {
+  name: string;
+  args: string[];
+  docstring: string;
+  line: number;
+}
+
+export interface MacroDoc {
+  namespace: string;
+  file_path: string;
+  package: string;
+  functions: MacroFunctionDoc[];
 }
 
 export interface LineageEdge {
@@ -111,6 +126,7 @@ export type Route =
   | { type: 'lineage' }
   | { type: 'model'; path: string }
   | { type: 'source'; name: string }
+  | { type: 'macro'; namespace: string }
   | { type: 'not-found' };
 
 // Node types for React Flow

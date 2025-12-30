@@ -1,6 +1,6 @@
 // Sidebar component with navigation and search
 import type { FunctionComponent } from 'preact';
-import { useManifest, useNavTree, useSources } from '../../lib/context';
+import { useManifest, useNavTree, useSources, useMacros } from '../../lib/context';
 import { SearchBox } from './SearchBox';
 import { NavGroup } from './NavGroup';
 
@@ -12,6 +12,7 @@ export const Sidebar: FunctionComponent<SidebarProps> = ({ dbReady }) => {
   const manifest = useManifest();
   const navTree = useNavTree();
   const sources = useSources();
+  const macros = useMacros();
 
   return (
     <aside class="sidebar">
@@ -45,6 +46,20 @@ export const Sidebar: FunctionComponent<SidebarProps> = ({ dbReady }) => {
                   id: src.name,
                   name: src.name,
                   type: 'source' as const,
+                }))}
+              />
+            )}
+
+            {/* Macros group - loads from database when ready */}
+            {macros.data && macros.data.length > 0 && (
+              <NavGroup
+                title="Macros"
+                groupId="macros"
+                items={macros.data.map(m => ({
+                  id: m.namespace,
+                  name: m.namespace,
+                  type: 'macro' as const,
+                  badge: m.functions.length > 0 ? `${m.functions.length}` : undefined,
                 }))}
               />
             )}

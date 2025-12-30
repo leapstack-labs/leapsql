@@ -571,6 +571,33 @@ func (q *Queries) GetModelsForDocs(ctx context.Context) ([]VModel, error) {
 	return items, nil
 }
 
+const getSourceColumns = `-- name: GetSourceColumns :many
+SELECT column_name FROM v_source_columns WHERE source_name = ? ORDER BY column_name
+`
+
+func (q *Queries) GetSourceColumns(ctx context.Context, sourceName string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getSourceColumns, sourceName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var column_name string
+		if err := rows.Scan(&column_name); err != nil {
+			return nil, err
+		}
+		items = append(items, column_name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSourceCount = `-- name: GetSourceCount :one
 SELECT COUNT(*) FROM v_sources
 `

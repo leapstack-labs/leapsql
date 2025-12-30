@@ -24,6 +24,11 @@ export function parseHash(hash: string): Route {
     return { type: 'source', name: sourceName };
   }
   
+  if (path.startsWith('/macros/')) {
+    const namespace = decodeURIComponent(path.slice(8));
+    return { type: 'macro', namespace };
+  }
+  
   return { type: 'not-found' };
 }
 
@@ -54,6 +59,10 @@ export function navigateToModel(modelPath: string): void {
 
 export function navigateToSource(sourceName: string): void {
   navigateTo(`/sources/${encodeURIComponent(sourceName)}`);
+}
+
+export function navigateToMacro(namespace: string): void {
+  navigateTo(`/macros/${encodeURIComponent(namespace)}`);
 }
 
 export function navigateToLineage(): void {

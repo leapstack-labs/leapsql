@@ -80,6 +80,11 @@ export const queries = {
     params: [name]
   }),
 
+  getSourceColumns: (name: string): QueryDef => ({
+    sql: `SELECT column_name FROM v_source_columns WHERE source_name = ? ORDER BY column_name`,
+    params: [name]
+  }),
+
   // Lineage queries
   getLineageEdges: (): QueryDef => ({
     sql: `SELECT source_node, target_node FROM v_lineage_edges`,
@@ -200,6 +205,28 @@ export const queries = {
     sql: `SELECT COUNT(DISTINCT folder) as count FROM v_models`,
     params: []
   }),
+
+  // Macro queries
+  getMacroNamespaces: (): QueryDef => ({
+    sql: `SELECT DISTINCT namespace, file_path, package FROM v_macros ORDER BY namespace`,
+    params: []
+  }),
+
+  getMacroFunctions: (namespace: string): QueryDef => ({
+    sql: `SELECT function_name, args, docstring, line 
+          FROM v_macros WHERE namespace = ? ORDER BY function_name`,
+    params: [namespace]
+  }),
+
+  getMacroCount: (): QueryDef => ({
+    sql: `SELECT COUNT(DISTINCT namespace) as count FROM v_macros`,
+    params: []
+  }),
+
+  getMacroFunctionCount: (): QueryDef => ({
+    sql: `SELECT COUNT(*) as count FROM macro_functions`,
+    params: []
+  }),
 };
 
 // Type definitions for query results
@@ -250,4 +277,17 @@ export interface SearchResultRow {
   folder: string;
   materialized: string;
   description: string | null;
+}
+
+export interface MacroNamespaceRow {
+  namespace: string;
+  file_path: string;
+  package: string;
+}
+
+export interface MacroFunctionRow {
+  function_name: string;
+  args: string;  // JSON array
+  docstring: string;
+  line: number;
 }

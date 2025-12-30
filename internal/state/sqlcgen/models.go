@@ -197,6 +197,11 @@ type VSource struct {
 	Name string `json:"name"`
 }
 
+type VSourceColumn struct {
+	SourceName string `json:"source_name"`
+	ColumnName string `json:"column_name"`
+}
+
 type VSourceRef struct {
 	SourceName string `json:"source_name"`
 	ModelPath  string `json:"model_path"`

@@ -44,6 +44,15 @@ export const SourceDetail: FunctionComponent<SourceDetailProps> = ({ name, dbRea
         </div>
 
         <div class="section">
+          <h2 class="section-title">Columns</h2>
+          <div class="dep-list">
+            <Skeleton width="80px" height="1.5rem" />
+            <Skeleton width="100px" height="1.5rem" />
+            <Skeleton width="90px" height="1.5rem" />
+          </div>
+        </div>
+
+        <div class="section">
           <h2 class="section-title">Referenced By</h2>
           <div class="dep-list">
             <Skeleton width="120px" height="1.5rem" />
@@ -71,27 +80,49 @@ export const SourceDetail: FunctionComponent<SourceDetailProps> = ({ name, dbRea
           <div class="source-badge-header">SOURCE</div>
           <h1 class="model-title">{source.name}</h1>
           <p style={{ marginTop: '1rem', color: 'var(--muted-foreground)' }}>
-            External data source referenced by {source.referenced_by.length} model
+            External data source with {source.columns.length} column
+            {source.columns.length !== 1 ? 's' : ''}, referenced by {source.referenced_by.length} model
             {source.referenced_by.length !== 1 ? 's' : ''}.
           </p>
         </div>
       </div>
 
+      {source.columns.length > 0 && (
+        <div class="section">
+          <h2 class="section-title">
+            Columns ({source.columns.length})
+          </h2>
+          <div class="column-list">
+            {source.columns.map((columnName) => (
+              <div key={columnName} class="column-item">
+                <span class="column-name">{columnName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div class="section">
         <h2 class="section-title">
           Referenced By ({source.referenced_by.length})
         </h2>
-        <div class="dep-list">
-          {source.referenced_by.map((modelPath) => (
-            <a
-              key={modelPath}
-              class="dep-tag"
-              onClick={() => navigateToModel(modelPath)}
-            >
-              {modelPath}
-            </a>
-          ))}
-        </div>
+        {source.referenced_by.length > 0 ? (
+          <div class="dep-list">
+            {source.referenced_by.map((modelPath) => (
+              <a
+                key={modelPath}
+                class="dep-tag"
+                onClick={() => navigateToModel(modelPath)}
+              >
+                {modelPath}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+            No models reference this source.
+          </p>
+        )}
       </div>
 
       <div class="section">

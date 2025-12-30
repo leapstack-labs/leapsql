@@ -24,6 +24,9 @@ SELECT name FROM v_sources ORDER BY name;
 -- name: GetSourceReferencedBy :many
 SELECT model_path FROM v_source_refs WHERE source_name = ?;
 
+-- name: GetSourceColumns :many
+SELECT column_name FROM v_source_columns WHERE source_name = ? ORDER BY column_name;
+
 -- Lineage
 -- name: GetLineageEdges :many
 SELECT source_node, target_node FROM v_lineage_edges;

@@ -13,4 +13,6 @@ export type {
   ColumnLineageNodeRow,
   ColumnLineageEdgeRow,
   SearchResultRow,
+  MacroNamespaceRow,
+  MacroFunctionRow,
 } from './queries';

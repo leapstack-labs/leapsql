@@ -1,12 +1,12 @@
 // Collapsible navigation group component
 import type { FunctionComponent } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import { navigateToModel, navigateToSource } from '../../lib/router';
+import { navigateToModel, navigateToSource, navigateToMacro } from '../../lib/router';
 
 interface NavItem {
   id: string;
   name: string;
-  type: 'model' | 'source';
+  type: 'model' | 'source' | 'macro';
   badge?: string;
 }
 
@@ -49,11 +49,14 @@ export const NavGroup: FunctionComponent<NavGroupProps> = ({ title, groupId, ite
       const hash = window.location.hash;
       const modelMatch = hash.match(/^#\/models\/(.+)$/);
       const sourceMatch = hash.match(/^#\/sources\/(.+)$/);
+      const macroMatch = hash.match(/^#\/macros\/(.+)$/);
       
       if (modelMatch) {
         setActiveId(decodeURIComponent(modelMatch[1]));
       } else if (sourceMatch) {
         setActiveId(decodeURIComponent(sourceMatch[1]));
+      } else if (macroMatch) {
+        setActiveId(decodeURIComponent(macroMatch[1]));
       } else {
         setActiveId(null);
       }
@@ -76,8 +79,10 @@ export const NavGroup: FunctionComponent<NavGroupProps> = ({ title, groupId, ite
   const handleItemClick = (item: NavItem) => {
     if (item.type === 'model') {
       navigateToModel(item.id);
-    } else {
+    } else if (item.type === 'source') {
       navigateToSource(item.id);
+    } else {
+      navigateToMacro(item.id);
     }
   };
 

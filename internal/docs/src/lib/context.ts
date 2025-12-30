@@ -11,6 +11,8 @@ import type {
   ColumnLineageNodeRow,
   ColumnLineageEdgeRow,
   SearchResultRow,
+  MacroNamespaceRow,
+  MacroFunctionRow,
 } from './db';
 import type { 
   Manifest, 
@@ -19,6 +21,8 @@ import type {
   SourceDoc, 
   ColumnDoc,
   SourceRef,
+  MacroDoc,
+  MacroFunctionDoc,
 } from './types';
 
 // ============================================
@@ -193,9 +197,14 @@ export function useSource(name: string): AsyncState<SourceDoc | null> {
     const refsResult = await db.query(...Object.values(queries.getSourceReferencedBy(name)));
     const referencedBy = refsResult.values.map(row => row[0] as string);
 
+    // Get columns
+    const colsResult = await db.query(...Object.values(queries.getSourceColumns(name)));
+    const columns = colsResult.values.map(row => row[0] as string);
+
     return {
       name,
       referenced_by: referencedBy,
+      columns,
     };
   }, [db, name]);
 }
@@ -211,13 +220,15 @@ export function useSources(): AsyncState<SourceDoc[]> {
     const result = await db.query(sql, params);
     const sourceNames = result.values.map(row => row[0] as string);
 
-    // Fetch referenced_by for each source
+    // Fetch referenced_by and columns for each source
     const sources: SourceDoc[] = [];
     for (const name of sourceNames) {
       const refsResult = await db.query(...Object.values(queries.getSourceReferencedBy(name)));
+      const colsResult = await db.query(...Object.values(queries.getSourceColumns(name)));
       sources.push({
         name,
         referenced_by: refsResult.values.map(row => row[0] as string),
+        columns: colsResult.values.map(row => row[0] as string),
       });
     }
 
@@ -364,4 +375,70 @@ export function useModelsByFolder(): Record<string, NavGroup['models']> {
     });
     return groups;
   }, [navTree]);
+}
+
+// Hook to get all macros (namespaces with their functions)
+export function useMacros(): AsyncState<MacroDoc[]> {
+  const db = useDB();
+
+  return useAsyncQuery(async () => {
+    if (!db || !db.isReady()) return [];
+
+    // Get all namespaces
+    const { sql, params } = queries.getMacroNamespaces();
+    const result = await db.query(sql, params);
+    const namespaces = rowsToObjects<MacroNamespaceRow>(result);
+
+    // Fetch functions for each namespace
+    const macros: MacroDoc[] = [];
+    for (const ns of namespaces) {
+      const funcsResult = await db.query(...Object.values(queries.getMacroFunctions(ns.namespace)));
+      const functions = rowsToObjects<MacroFunctionRow>(funcsResult).map(f => ({
+        name: f.function_name,
+        args: JSON.parse(f.args || '[]') as string[],
+        docstring: f.docstring || '',
+        line: f.line,
+      }));
+      macros.push({
+        namespace: ns.namespace,
+        file_path: ns.file_path,
+        package: ns.package,
+        functions,
+      });
+    }
+
+    return macros;
+  }, [db]);
+}
+
+// Hook to get a single macro namespace by name
+export function useMacro(namespace: string): AsyncState<MacroDoc | null> {
+  const db = useDB();
+
+  return useAsyncQuery(async () => {
+    if (!db || !db.isReady()) return null;
+
+    // Get namespace info
+    const { sql, params } = queries.getMacroNamespaces();
+    const result = await db.query(sql, params);
+    const namespaces = rowsToObjects<MacroNamespaceRow>(result);
+    const ns = namespaces.find(n => n.namespace === namespace);
+    if (!ns) return null;
+
+    // Get functions
+    const funcsResult = await db.query(...Object.values(queries.getMacroFunctions(namespace)));
+    const functions = rowsToObjects<MacroFunctionRow>(funcsResult).map(f => ({
+      name: f.function_name,
+      args: JSON.parse(f.args || '[]') as string[],
+      docstring: f.docstring || '',
+      line: f.line,
+    }));
+
+    return {
+      namespace: ns.namespace,
+      file_path: ns.file_path,
+      package: ns.package,
+      functions,
+    };
+  }, [db, namespace]);
 }

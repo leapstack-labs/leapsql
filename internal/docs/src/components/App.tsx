@@ -5,6 +5,7 @@ import { Layout } from './Layout';
 import { Overview } from './Pages/Overview';
 import { ModelDetail } from './Pages/ModelDetail';
 import { SourceDetail } from './Pages/SourceDetail';
+import { MacroDetail } from './Pages/MacroDetail';
 import { Lineage } from './Pages/Lineage';
 import { NotFound } from './Pages/NotFound';
 
@@ -25,6 +26,8 @@ export const App: FunctionComponent<AppProps> = ({ dbReady }) => {
         return <ModelDetail path={route.path} dbReady={dbReady} />;
       case 'source':
         return <SourceDetail name={route.name} dbReady={dbReady} />;
+      case 'macro':
+        return <MacroDetail namespace={route.namespace} dbReady={dbReady} />;
       case 'not-found':
       default:
         return <NotFound />;
