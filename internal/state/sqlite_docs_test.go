@@ -323,27 +323,51 @@ func TestDocsQueries_Stats(t *testing.T) {
 	})
 }
 
-func TestDocsQueries_SearchModelsByName(t *testing.T) {
+func TestDocsQueries_SearchModels(t *testing.T) {
 	store := setupDocsTestStore(t)
 	defer func() { _ = store.Close() }()
 
-	searchTerm := "customer"
-	results, err := store.queries.SearchModelsByName(context.Background(), sqlcgen.SearchModelsByNameParams{
-		Column1: &searchTerm,
-		Column2: &searchTerm,
-		Column3: &searchTerm,
+	t.Run("search_by_name", func(t *testing.T) {
+		// FTS5 syntax: use * for prefix matching
+		results, err := store.SearchModels("customer*")
+		require.NoError(t, err)
+
+		// Should find customers and customer_orders
+		assert.Len(t, results, 2)
+
+		names := make([]string, 0, len(results))
+		for _, r := range results {
+			names = append(names, r.Name)
+		}
+		assert.Contains(t, names, "customers")
+		assert.Contains(t, names, "customer_orders")
 	})
-	require.NoError(t, err)
 
-	// Should find customers and customer_orders
-	assert.Len(t, results, 2)
+	t.Run("search_by_description", func(t *testing.T) {
+		results, err := store.SearchModels("mart")
+		require.NoError(t, err)
 
-	names := make([]string, 0, len(results))
-	for _, r := range results {
-		names = append(names, r.Name)
-	}
-	assert.Contains(t, names, "customers")
-	assert.Contains(t, names, "customer_orders")
+		// Should find customer_orders (has "mart" in description)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "customer_orders", results[0].Name)
+	})
+
+	t.Run("search_no_results", func(t *testing.T) {
+		results, err := store.SearchModels("nonexistent")
+		require.NoError(t, err)
+		assert.Empty(t, results)
+	})
+
+	t.Run("search_ranking", func(t *testing.T) {
+		// Results should be ranked by relevance
+		results, err := store.SearchModels("orders")
+		require.NoError(t, err)
+
+		// Should find at least orders model
+		assert.NotEmpty(t, results)
+		// Model named "orders" should likely rank higher than customer_orders
+		// (though both should appear)
+	})
 }
 
 func TestDocsQueries_GetExternalSources(t *testing.T) {

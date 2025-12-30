@@ -609,7 +609,7 @@ func (q *Queries) GetSourceReferencedBy(ctx context.Context, sourceName string) 
 	return items, nil
 }
 
-const searchModelsByName = `-- name: SearchModelsByName :many
+const searchModelsLike = `-- name: SearchModelsLike :many
 SELECT path, name, 
     CASE WHEN instr(path, '.') > 0
          THEN substr(path, 1, instr(path, '.') - 1)
@@ -621,13 +621,13 @@ ORDER BY name
 LIMIT 20
 `
 
-type SearchModelsByNameParams struct {
+type SearchModelsLikeParams struct {
 	Column1 *string `json:"column_1"`
 	Column2 *string `json:"column_2"`
 	Column3 *string `json:"column_3"`
 }
 
-type SearchModelsByNameRow struct {
+type SearchModelsLikeRow struct {
 	Path         string  `json:"path"`
 	Name         string  `json:"name"`
 	Folder       string  `json:"folder"`
@@ -635,17 +635,16 @@ type SearchModelsByNameRow struct {
 	Description  *string `json:"description"`
 }
 
-// Search (FTS5) - Note: FTS queries need to be executed directly, not via SQLC
-// This query is here for documentation purposes; actual search uses raw SQL
-func (q *Queries) SearchModelsByName(ctx context.Context, arg SearchModelsByNameParams) ([]SearchModelsByNameRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchModelsByName, arg.Column1, arg.Column2, arg.Column3)
+// Search (FTS5 fallback with LIKE) - Used by SQLC. For proper FTS5, use SearchModels() method directly.
+func (q *Queries) SearchModelsLike(ctx context.Context, arg SearchModelsLikeParams) ([]SearchModelsLikeRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchModelsLike, arg.Column1, arg.Column2, arg.Column3)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SearchModelsByNameRow{}
+	items := []SearchModelsLikeRow{}
 	for rows.Next() {
-		var i SearchModelsByNameRow
+		var i SearchModelsLikeRow
 		if err := rows.Scan(
 			&i.Path,
 			&i.Name,

@@ -66,25 +66,6 @@ type LineageDoc struct {
 	Edges []LineageEdge `json:"edges"`
 }
 
-// ColumnLineageNode represents a node in the column lineage graph.
-type ColumnLineageNode struct {
-	ID     string `json:"id"`     // "model.column" format
-	Model  string `json:"model"`  // model path
-	Column string `json:"column"` // column name
-}
-
-// ColumnLineageEdge represents an edge in the column lineage graph.
-type ColumnLineageEdge struct {
-	Source string `json:"source"` // "model.column" format
-	Target string `json:"target"` // "model.column" format
-}
-
-// ColumnLineageDoc represents the full column-level lineage graph.
-type ColumnLineageDoc struct {
-	Nodes []ColumnLineageNode `json:"nodes"`
-	Edges []ColumnLineageEdge `json:"edges"`
-}
-
 // SourceDoc represents an external data source (not a model).
 type SourceDoc struct {
 	Name         string   `json:"name"`
@@ -92,13 +73,13 @@ type SourceDoc struct {
 }
 
 // Catalog represents the full documentation catalog.
+// Column lineage is queried directly from state.db views by the frontend.
 type Catalog struct {
-	GeneratedAt   time.Time        `json:"generated_at"`
-	ProjectName   string           `json:"project_name"`
-	Models        []*ModelDoc      `json:"models"`
-	Sources       []SourceDoc      `json:"sources"`
-	Lineage       LineageDoc       `json:"lineage"`
-	ColumnLineage ColumnLineageDoc `json:"column_lineage"`
+	GeneratedAt time.Time   `json:"generated_at"`
+	ProjectName string      `json:"project_name"`
+	Models      []*ModelDoc `json:"models"`
+	Sources     []SourceDoc `json:"sources"`
+	Lineage     LineageDoc  `json:"lineage"`
 }
 
 // Generator generates documentation from parsed models.
@@ -153,6 +134,8 @@ func (g *Generator) LoadFromState(store core.Store) error {
 
 // LoadFromStateWithPath loads models and stores the state DB path for later use.
 // The statePath is used by Build() to copy state.db to metadata.db.
+// Note: Dependencies and column lineage are queried directly from state.db views
+// by the frontend, so we only load what's needed for manifest generation.
 func (g *Generator) LoadFromStateWithPath(store core.Store, statePath string) error {
 	g.statePath = statePath
 
@@ -162,32 +145,22 @@ func (g *Generator) LoadFromStateWithPath(store core.Store, statePath string) er
 		return fmt.Errorf("list models: %w", err)
 	}
 
-	// 2. Get columns with lineage (BatchGetAllColumns already includes sources)
+	// 2. Get columns (needed for column count in manifest stats)
 	columnsMap, err := store.BatchGetAllColumns()
 	if err != nil {
 		return fmt.Errorf("get columns: %w", err)
 	}
 
-	// 3. Get dependencies for each model
-	depsMap, err := store.BatchGetAllDependencies()
-	if err != nil {
-		return fmt.Errorf("get dependencies: %w", err)
-	}
-
-	// 4. Convert PersistedModel -> core.Model with columns attached
+	// 3. Convert PersistedModel -> core.Model with columns attached
 	g.models = make([]*core.Model, 0, len(persistedModels))
 	for _, pm := range persistedModels {
 		model := pm.Model // embedded core.Model
 		if model == nil {
 			continue
 		}
-		// Attach columns with lineage
+		// Attach columns (needed for manifest column count)
 		if cols, ok := columnsMap[model.Path]; ok {
 			model.Columns = cols
-		}
-		// Attach dependencies (Sources field)
-		if deps, ok := depsMap[pm.ID]; ok {
-			model.Sources = deps
 		}
 		g.models = append(g.models, model)
 		g.registry.Register(model)
@@ -197,27 +170,19 @@ func (g *Generator) LoadFromStateWithPath(store core.Store, statePath string) er
 }
 
 // GenerateCatalog generates the documentation catalog.
+// Note: Dependencies, sources, and lineage are queried directly from state.db views
+// by the frontend. This method generates minimal data for manifest/nav tree.
 func (g *Generator) GenerateCatalog() *Catalog {
 	catalog := &Catalog{
 		GeneratedAt: time.Now().UTC(),
 		ProjectName: g.projectName,
 		Models:      make([]*ModelDoc, 0, len(g.models)),
-		Sources:     []SourceDoc{},
+		Sources:     []SourceDoc{}, // Populated from views by frontend
 	}
 
-	// Build model docs
+	// Build model docs with minimal data for manifest generation
 	modelDocs := make(map[string]*ModelDoc)
 	for _, model := range g.models {
-		deps, _ := g.registry.ResolveDependencies(model.Sources)
-		if deps == nil {
-			deps = []string{}
-		}
-
-		sources := model.Sources
-		if sources == nil {
-			sources = []string{}
-		}
-
 		doc := &ModelDoc{
 			ID:           model.Path, // Use path as ID for simplicity
 			Name:         model.Name,
@@ -226,9 +191,9 @@ func (g *Generator) GenerateCatalog() *Catalog {
 			UniqueKey:    model.UniqueKey,
 			SQL:          model.SQL,
 			FilePath:     model.FilePath,
-			Sources:      sources,
-			Dependencies: deps,
-			Dependents:   []string{},
+			Sources:      []string{}, // Populated from views by frontend
+			Dependencies: []string{}, // Populated from views by frontend
+			Dependents:   []string{}, // Populated from views by frontend
 			Columns:      convertColumns(model.Columns),
 			UpdatedAt:    time.Now().UTC(),
 		}
@@ -240,49 +205,12 @@ func (g *Generator) GenerateCatalog() *Catalog {
 		catalog.Models = append(catalog.Models, doc)
 	}
 
-	// Build dependents (reverse dependencies)
-	for _, doc := range modelDocs {
-		for _, depPath := range doc.Dependencies {
-			if depDoc, ok := modelDocs[depPath]; ok {
-				depDoc.Dependents = append(depDoc.Dependents, doc.Path)
-			}
-		}
-	}
-
-	// Collect external sources (tables that aren't models)
-	sourceRefs := make(map[string][]string) // source name -> models that reference it
-	for _, doc := range modelDocs {
-		for _, src := range doc.Sources {
-			// Check if this source is NOT a model
-			if _, isModel := modelDocs[src]; !isModel {
-				// Also check by name (in case the source uses just the table name)
-				isModelByName := false
-				for _, m := range g.models {
-					if m.Name == src {
-						isModelByName = true
-						break
-					}
-				}
-				if !isModelByName {
-					sourceRefs[src] = append(sourceRefs[src], doc.Path)
-				}
-			}
-		}
-	}
-
-	// Build Sources list
-	for srcName, refs := range sourceRefs {
-		catalog.Sources = append(catalog.Sources, SourceDoc{
-			Name:         srcName,
-			ReferencedBy: refs,
-		})
-	}
-
-	// Build lineage graph (now includes sources)
+	// Build minimal lineage graph (model nodes only, no edges)
+	// Full lineage with edges is queried from v_lineage_edges by frontend
 	catalog.Lineage = g.buildLineage(modelDocs, catalog.Sources)
 
-	// Build column lineage graph
-	catalog.ColumnLineage = g.buildColumnLineage(g.models, modelDocs)
+	// Note: Column lineage is queried directly from state.db views by the frontend
+	// (v_column_lineage_nodes, v_column_lineage_edges)
 
 	return catalog
 }
@@ -352,79 +280,6 @@ func convertColumns(columns []core.ColumnInfo) []ColumnDoc {
 		})
 	}
 	return result
-}
-
-// buildColumnLineage constructs the column-level lineage graph.
-func (g *Generator) buildColumnLineage(models []*core.Model, _ map[string]*ModelDoc) ColumnLineageDoc {
-	lineage := ColumnLineageDoc{
-		Nodes: []ColumnLineageNode{},
-		Edges: []ColumnLineageEdge{},
-	}
-
-	// Track which nodes we've added
-	nodeSet := make(map[string]bool)
-
-	for _, model := range models {
-		for _, col := range model.Columns {
-			// Add this column as a node
-			nodeID := model.Path + "." + col.Name
-			if !nodeSet[nodeID] {
-				lineage.Nodes = append(lineage.Nodes, ColumnLineageNode{
-					ID:     nodeID,
-					Model:  model.Path,
-					Column: col.Name,
-				})
-				nodeSet[nodeID] = true
-			}
-
-			// Add edges from source columns to this column
-			for _, src := range col.Sources {
-				if src.Table == "" || src.Column == "" {
-					continue
-				}
-
-				// Try to find the source model by name or path
-				sourceModelPath := ""
-				for _, m := range models {
-					if m.Name == src.Table || m.Path == src.Table {
-						sourceModelPath = m.Path
-						break
-					}
-				}
-
-				sourceNodeID := ""
-				if sourceModelPath != "" {
-					sourceNodeID = sourceModelPath + "." + src.Column
-				} else {
-					// External source (not a model)
-					sourceNodeID = src.Table + "." + src.Column
-				}
-
-				// Add source node if not exists
-				if !nodeSet[sourceNodeID] {
-					// Use resolved model path for known models, raw table name for external sources
-					nodeModel := src.Table
-					if sourceModelPath != "" {
-						nodeModel = sourceModelPath
-					}
-					lineage.Nodes = append(lineage.Nodes, ColumnLineageNode{
-						ID:     sourceNodeID,
-						Model:  nodeModel,
-						Column: src.Column,
-					})
-					nodeSet[sourceNodeID] = true
-				}
-
-				// Add edge from source to target
-				lineage.Edges = append(lineage.Edges, ColumnLineageEdge{
-					Source: sourceNodeID,
-					Target: nodeID,
-				})
-			}
-		}
-	}
-
-	return lineage
 }
 
 // extractDescription extracts description from SQL comments.

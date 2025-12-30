@@ -276,34 +276,8 @@ func TestPopulateFromCatalog_LineageEdges(t *testing.T) {
 	assert.Equal(t, "marts.summary", target)
 }
 
-func TestPopulateFromCatalog_ColumnLineage(t *testing.T) {
-	db := setupTestDB(t)
-	catalog := newTestCatalog()
-	catalog.ColumnLineage = ColumnLineageDoc{
-		Nodes: []ColumnLineageNode{
-			{ID: "staging.customers.id", Model: "staging.customers", Column: "id"},
-			{ID: "marts.summary.customer_id", Model: "marts.summary", Column: "customer_id"},
-		},
-		Edges: []ColumnLineageEdge{
-			{Source: "staging.customers.id", Target: "marts.summary.customer_id"},
-		},
-	}
-
-	err := db.PopulateFromCatalog(catalog)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	// Query column lineage nodes
-	var count int
-	err = db.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM column_lineage_nodes").Scan(&count)
-	require.NoError(t, err)
-	assert.Equal(t, 2, count)
-
-	// Query column lineage edges
-	err = db.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM column_lineage_edges").Scan(&count)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-}
+// Note: TestPopulateFromCatalog_ColumnLineage removed - column lineage is now
+// queried directly from state.db views, not populated from Catalog.
 
 func TestPopulateFromCatalog_CatalogMeta(t *testing.T) {
 	db := setupTestDB(t)

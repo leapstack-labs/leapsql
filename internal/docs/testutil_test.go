@@ -357,30 +357,8 @@ func (m *TestMetadataDB) PopulateFromCatalog(catalog *Catalog) error {
 		}
 	}
 
-	// Insert column lineage
-	colLineageNodeStmt, err := tx.PrepareContext(ctx, "INSERT INTO column_lineage_nodes (id, model, column_name) VALUES (?, ?, ?)")
-	if err != nil {
-		return fmt.Errorf("failed to prepare column_lineage_nodes statement: %w", err)
-	}
-	defer func() { _ = colLineageNodeStmt.Close() }()
-
-	colLineageEdgeStmt, err := tx.PrepareContext(ctx, "INSERT INTO column_lineage_edges (source_id, target_id) VALUES (?, ?)")
-	if err != nil {
-		return fmt.Errorf("failed to prepare column_lineage_edges statement: %w", err)
-	}
-	defer func() { _ = colLineageEdgeStmt.Close() }()
-
-	for _, node := range catalog.ColumnLineage.Nodes {
-		if _, err := colLineageNodeStmt.ExecContext(ctx, node.ID, node.Model, node.Column); err != nil {
-			return fmt.Errorf("failed to insert column lineage node: %w", err)
-		}
-	}
-
-	for _, edge := range catalog.ColumnLineage.Edges {
-		if _, err := colLineageEdgeStmt.ExecContext(ctx, edge.Source, edge.Target); err != nil {
-			return fmt.Errorf("failed to insert column lineage edge: %w", err)
-		}
-	}
+	// Note: Column lineage is now queried directly from state.db views,
+	// not from Catalog. Skipping column_lineage_nodes/edges insertion.
 
 	return tx.Commit()
 }
@@ -414,10 +392,6 @@ func newTestCatalog() *Catalog {
 		Models:      []*ModelDoc{},
 		Sources:     []SourceDoc{},
 		Lineage:     LineageDoc{Nodes: []string{}, Edges: []LineageEdge{}},
-		ColumnLineage: ColumnLineageDoc{
-			Nodes: []ColumnLineageNode{},
-			Edges: []ColumnLineageEdge{},
-		},
 	}
 }
 

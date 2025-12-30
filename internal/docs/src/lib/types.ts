@@ -102,7 +102,7 @@ export interface Catalog {
   models: ModelDoc[];
   sources: SourceDoc[];
   lineage: LineageDoc;
-  column_lineage: ColumnLineageDoc;
+  // Note: column_lineage removed - queried from v_column_lineage_* views
 }
 
 // Route types for the router

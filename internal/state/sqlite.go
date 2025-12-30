@@ -160,3 +160,47 @@ func deserializeJSON(data *string, target any) error {
 	}
 	return json.Unmarshal([]byte(*data), target)
 }
+
+// SearchModelResult represents a model search result from FTS5.
+type SearchModelResult struct {
+	Path         string
+	Name         string
+	Folder       string
+	Materialized string
+	Description  *string
+}
+
+// SearchModels searches for models using FTS5 full-text search.
+// The query uses FTS5 MATCH syntax (e.g., "customer*" for prefix match).
+func (s *SQLiteStore) SearchModels(query string) ([]SearchModelResult, error) {
+	const fts5Query = `
+		SELECT v.path, v.name, v.folder, v.materialized, v.description
+		FROM models m
+		JOIN models_fts fts ON m.rowid = fts.rowid
+		JOIN v_models v ON m.path = v.path
+		WHERE models_fts MATCH ?
+		ORDER BY rank
+		LIMIT 20
+	`
+
+	rows, err := s.db.QueryContext(ctx(), fts5Query, query)
+	if err != nil {
+		return nil, fmt.Errorf("search models: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var results []SearchModelResult
+	for rows.Next() {
+		var r SearchModelResult
+		if err := rows.Scan(&r.Path, &r.Name, &r.Folder, &r.Materialized, &r.Description); err != nil {
+			return nil, fmt.Errorf("scan search result: %w", err)
+		}
+		results = append(results, r)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate search results: %w", err)
+	}
+
+	return results, nil
+}

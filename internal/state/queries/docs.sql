@@ -65,9 +65,8 @@ FROM v_column_sources WHERE model_path = ? AND column_name = ?;
 SELECT column_name, source_table, source_column
 FROM v_column_sources WHERE model_path = ?;
 
--- Search (FTS5) - Note: FTS queries need to be executed directly, not via SQLC
--- This query is here for documentation purposes; actual search uses raw SQL
--- name: SearchModelsByName :many
+-- Search (FTS5 fallback with LIKE) - Used by SQLC. For proper FTS5, use SearchModels() method directly.
+-- name: SearchModelsLike :many
 SELECT path, name, 
     CASE WHEN instr(path, '.') > 0
          THEN substr(path, 1, instr(path, '.') - 1)

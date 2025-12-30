@@ -416,8 +416,7 @@ func TestGenerateCatalog_Empty(t *testing.T) {
 	assert.Empty(t, catalog.Models)
 	assert.Empty(t, catalog.Sources)
 	assert.Empty(t, catalog.Lineage.Edges)
-	assert.Empty(t, catalog.ColumnLineage.Nodes)
-	assert.Empty(t, catalog.ColumnLineage.Edges)
+	// Note: ColumnLineage removed from Catalog - queried from views
 }
 
 // =============================================================================
@@ -488,101 +487,8 @@ func TestBuildLineage_EdgesFromSources(t *testing.T) {
 	assert.Equal(t, "staging.customers", lineage.Edges[0].Target)
 }
 
-func TestBuildColumnLineage_NodesCreated(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path: "staging.customers",
-			Name: "customers",
-			Columns: []core.ColumnInfo{
-				{Name: "id", Index: 0},
-				{Name: "name", Index: 1},
-			},
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	assert.Len(t, lineage.Nodes, 2)
-
-	nodeIDs := make([]string, len(lineage.Nodes))
-	for i, n := range lineage.Nodes {
-		nodeIDs[i] = n.ID
-	}
-	assert.Contains(t, nodeIDs, "staging.customers.id")
-	assert.Contains(t, nodeIDs, "staging.customers.name")
-}
-
-func TestBuildColumnLineage_EdgesCreated(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path: "staging.customers",
-			Name: "customers",
-			Columns: []core.ColumnInfo{
-				{Name: "id", Index: 0},
-			},
-		},
-		{
-			Path: "marts.summary",
-			Name: "summary",
-			Columns: []core.ColumnInfo{
-				{
-					Name:  "customer_id",
-					Index: 0,
-					Sources: []core.SourceRef{
-						{Table: "customers", Column: "id"},
-					},
-				},
-			},
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	require.NotEmpty(t, lineage.Edges)
-
-	// Find the edge from customers.id to summary.customer_id
-	var foundEdge bool
-	for _, edge := range lineage.Edges {
-		if edge.Source == "staging.customers.id" && edge.Target == "marts.summary.customer_id" {
-			foundEdge = true
-			break
-		}
-	}
-	assert.True(t, foundEdge, "Expected edge from staging.customers.id to marts.summary.customer_id")
-}
-
-func TestBuildColumnLineage_ExternalSources(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path: "staging.customers",
-			Name: "customers",
-			Columns: []core.ColumnInfo{
-				{
-					Name:  "id",
-					Index: 0,
-					Sources: []core.SourceRef{
-						{Table: "raw_customers", Column: "customer_id"},
-					},
-				},
-			},
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	// Should create a node for the external source
-	nodeIDs := make([]string, len(lineage.Nodes))
-	for i, n := range lineage.Nodes {
-		nodeIDs[i] = n.ID
-	}
-	assert.Contains(t, nodeIDs, "raw_customers.customer_id")
-}
+// Note: TestBuildColumnLineage_* tests removed - buildColumnLineage was removed
+// as column lineage is now queried directly from state.db views.
 
 // =============================================================================
 // Phase 5: Edge Cases
@@ -599,79 +505,6 @@ func TestExtractDescription_OnlyPragmas(t *testing.T) {
 SELECT 1`
 	result := extractDescription(content)
 	assert.Empty(t, result)
-}
-
-func TestBuildColumnLineage_EmptyColumns(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path:    "staging.empty",
-			Name:    "empty",
-			Columns: []core.ColumnInfo{}, // No columns
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	assert.Empty(t, lineage.Nodes)
-	assert.Empty(t, lineage.Edges)
-}
-
-func TestBuildColumnLineage_EmptySources(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path: "staging.customers",
-			Name: "customers",
-			Columns: []core.ColumnInfo{
-				{
-					Name:    "id",
-					Index:   0,
-					Sources: []core.SourceRef{}, // No sources
-				},
-			},
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	// Should still have the node for the column
-	require.Len(t, lineage.Nodes, 1)
-	assert.Equal(t, "staging.customers.id", lineage.Nodes[0].ID)
-	// But no edges
-	assert.Empty(t, lineage.Edges)
-}
-
-func TestBuildColumnLineage_SkipsEmptyTableOrColumn(t *testing.T) {
-	g := &Generator{projectName: "test"}
-	models := []*core.Model{
-		{
-			Path: "staging.customers",
-			Name: "customers",
-			Columns: []core.ColumnInfo{
-				{
-					Name:  "id",
-					Index: 0,
-					Sources: []core.SourceRef{
-						{Table: "", Column: "id"},      // Empty table
-						{Table: "raw", Column: ""},     // Empty column
-						{Table: "", Column: ""},        // Both empty
-						{Table: "raw", Column: "name"}, // Valid
-					},
-				},
-			},
-		},
-	}
-	modelDocs := map[string]*ModelDoc{}
-
-	lineage := g.buildColumnLineage(models, modelDocs)
-
-	// Should only have 2 nodes: the target and one valid source
-	assert.Len(t, lineage.Nodes, 2)
-	// Should only have 1 edge (from the valid source)
-	assert.Len(t, lineage.Edges, 1)
 }
 
 func TestGenerateCatalog_DependentsCalculated(t *testing.T) {
