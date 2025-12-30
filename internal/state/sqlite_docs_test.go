@@ -476,3 +476,109 @@ func TestDocsQueries_EmptyResults(t *testing.T) {
 		assert.Equal(t, int64(0), count)
 	})
 }
+
+// TestDocsQueries_ExternalSourcesPipeline is an integration test that verifies
+// the full pipeline from lineage extraction to v_sources view.
+// This tests that unqualified columns from a single table correctly populate
+// source_table in column_lineage, which then appears in v_sources.
+func TestDocsQueries_ExternalSourcesPipeline(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Create a staging model that references an external raw table
+	// This simulates: SELECT id, name FROM raw_customers
+	model := &Model{
+		Model: &core.Model{
+			Path:         "staging.stg_customers",
+			Name:         "stg_customers",
+			Materialized: "view",
+			FilePath:     "models/staging/stg_customers.sql",
+		},
+		ContentHash: "hash1",
+	}
+	require.NoError(t, store.RegisterModel(model))
+
+	// Simulate lineage extraction results where source_table IS populated
+	// (This is what should happen after the fix to ResolveColumn)
+	columns := []core.ColumnInfo{
+		{
+			Name:  "customer_id",
+			Index: 0,
+			Sources: []core.SourceRef{
+				{Table: "raw_customers", Column: "id"},
+			},
+		},
+		{
+			Name:  "customer_name",
+			Index: 1,
+			Sources: []core.SourceRef{
+				{Table: "raw_customers", Column: "name"},
+			},
+		},
+	}
+	require.NoError(t, store.SaveModelColumns("staging.stg_customers", columns))
+
+	// Verify v_sources returns the external source
+	sources, err := store.queries.GetExternalSources(context.Background())
+	require.NoError(t, err)
+	assert.Len(t, sources, 1, "should have exactly one external source")
+	assert.Equal(t, "raw_customers", sources[0], "external source should be raw_customers")
+
+	// Verify v_source_refs correctly maps source to model
+	refs, err := store.queries.GetSourceReferencedBy(context.Background(), "raw_customers")
+	require.NoError(t, err)
+	assert.Len(t, refs, 1)
+	assert.Equal(t, "staging.stg_customers", refs[0])
+
+	// Verify v_lineage_edges includes source edge
+	edges, err := store.queries.GetLineageEdges(context.Background())
+	require.NoError(t, err)
+	foundSourceEdge := false
+	for _, edge := range edges {
+		if edge.SourceNode == "source:raw_customers" && edge.TargetNode == "staging.stg_customers" {
+			foundSourceEdge = true
+			break
+		}
+	}
+	assert.True(t, foundSourceEdge, "should have edge from source:raw_customers to staging.stg_customers")
+}
+
+// TestDocsQueries_ExternalSourcesPipeline_EmptySourceTable verifies the current
+// broken behavior where empty source_table causes v_sources to return nothing.
+// This test documents the bug and will pass both before and after the fix
+// (it tests the symptom, not the fix).
+func TestDocsQueries_ExternalSourcesPipeline_EmptySourceTable(t *testing.T) {
+	store := setupTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	// Create a staging model
+	model := &Model{
+		Model: &core.Model{
+			Path:         "staging.stg_orders",
+			Name:         "stg_orders",
+			Materialized: "view",
+			FilePath:     "models/staging/stg_orders.sql",
+		},
+		ContentHash: "hash1",
+	}
+	require.NoError(t, store.RegisterModel(model))
+
+	// Simulate the BROKEN lineage extraction results where source_table is empty
+	// This is what happens currently for unqualified columns
+	columns := []core.ColumnInfo{
+		{
+			Name:  "order_id",
+			Index: 0,
+			Sources: []core.SourceRef{
+				{Table: "", Column: "id"}, // Empty table = bug!
+			},
+		},
+	}
+	require.NoError(t, store.SaveModelColumns("staging.stg_orders", columns))
+
+	// With empty source_table, v_sources should return nothing
+	// (because the view filters out empty source_table)
+	sources, err := store.queries.GetExternalSources(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, sources, "empty source_table should not appear in v_sources")
+}

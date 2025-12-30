@@ -118,13 +118,14 @@ func runLineageTests(t *testing.T, tests []testCase) {
 func TestExtractLineage_BasicSelects(t *testing.T) {
 	runLineageTests(t, []testCase{
 		{
-			name:    "simple columns",
+			// Unqualified columns from single table should resolve to that table
+			name:    "unqualified columns single table",
 			sql:     `SELECT id, name, email FROM users`,
 			sources: []string{"users"},
 			cols: []colSpec{
-				{name: "id", transform: core.TransformDirect},
-				{name: "name", transform: core.TransformDirect},
-				{name: "email", transform: core.TransformDirect},
+				{name: "id", transform: core.TransformDirect, srcTable: "users"},
+				{name: "name", transform: core.TransformDirect, srcTable: "users"},
+				{name: "email", transform: core.TransformDirect, srcTable: "users"},
 			},
 		},
 		{
@@ -137,19 +138,21 @@ func TestExtractLineage_BasicSelects(t *testing.T) {
 			},
 		},
 		{
-			name:    "schema qualified table",
+			// Unqualified columns from schema.table should resolve with full path
+			name:    "unqualified columns schema qualified table",
 			sql:     `SELECT id, name FROM public.users`,
 			sources: []string{"public.users"},
 			cols: []colSpec{
-				{name: "id", transform: core.TransformDirect},
-				{name: "name", transform: core.TransformDirect},
+				{name: "id", transform: core.TransformDirect, srcTable: "public.users"},
+				{name: "name", transform: core.TransformDirect, srcTable: "public.users"},
 			},
 		},
 		{
-			name:    "catalog.schema.table",
+			// Unqualified columns from catalog.schema.table
+			name:    "unqualified columns catalog.schema.table",
 			sql:     `SELECT id FROM mydb.myschema.users`,
 			sources: []string{"mydb.myschema.users"},
-			cols:    []colSpec{{name: "id", transform: core.TransformDirect}},
+			cols:    []colSpec{{name: "id", transform: core.TransformDirect, srcTable: "mydb.myschema.users"}},
 		},
 	})
 }

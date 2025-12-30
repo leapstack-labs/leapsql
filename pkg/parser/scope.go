@@ -217,7 +217,7 @@ func (s *Scope) ResolveColumn(ref *core.ColumnRef) (*ScopeEntry, bool) {
 		return s.Lookup(ref.Table)
 	}
 
-	// Unqualified - search all entries
+	// Unqualified - search all entries by column name
 	// Return first match (ambiguous references would need more complex handling)
 	for _, entry := range s.entries {
 		for _, col := range entry.Columns {
@@ -225,6 +225,21 @@ func (s *Scope) ResolveColumn(ref *core.ColumnRef) (*ScopeEntry, bool) {
 				return entry, true
 			}
 		}
+	}
+
+	// No column match found - try single-table inference
+	// If there's exactly one physical table in scope with no schema info,
+	// assume unqualified columns belong to it (common for raw/seed tables)
+	var singleTable *ScopeEntry
+	tableCount := 0
+	for _, entry := range s.entries {
+		if entry.Type == ScopeTable {
+			tableCount++
+			singleTable = entry
+		}
+	}
+	if tableCount == 1 && singleTable != nil {
+		return singleTable, true
 	}
 
 	// Check parent scope
