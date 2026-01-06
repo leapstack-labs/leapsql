@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -14,12 +15,13 @@ func SetupRoutes(
 	eng *engine.Engine,
 	store core.Store,
 	sessionStore sessions.Store,
+	notify *notifier.Notifier,
 	isDev bool,
 ) error {
-	handlers := NewHandlers(eng, store, sessionStore, isDev)
+	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	router.Get("/", handlers.HomePage)
-	router.Get("/api/stats", handlers.StatsSSE)
+	router.Get("/sse", handlers.HomePageSSE)
 
 	return nil
 }

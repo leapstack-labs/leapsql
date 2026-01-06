@@ -1,10 +1,93 @@
 package components
 
-import "github.com/starfederation/datastar-go/datastar"
+import (
+	"fmt"
+)
+
+// TreeNode represents a node in the explorer tree.
+type TreeNode struct {
+	Name     string
+	Path     string
+	Type     string // "folder" or "model"
+	Children []TreeNode
+}
+
+// DashboardStats holds stats for the dashboard view.
+type DashboardStats struct {
+	ModelCount  int
+	SourceCount int
+	RunCount    int
+}
+
+// ModelViewData holds all data for the model view including all tab content.
+type ModelViewData struct {
+	// Model info
+	Path         string
+	Name         string
+	FilePath     string
+	Materialized string
+	Schema       string
+	Description  string
+	Owner        string
+	Tags         []string
+
+	// Tab content (all pre-rendered)
+	SourceSQL    string
+	CompiledSQL  string
+	CompileError string // If compilation failed
+
+	// Preview data (may be nil if not available)
+	Preview      *PreviewData
+	PreviewError string // If preview query failed
+}
+
+// PreviewData holds data preview results.
+type PreviewData struct {
+	Columns  []string
+	Rows     [][]string
+	RowCount int
+	Limited  bool
+}
+
+// ModelContext holds data for the context panel.
+type ModelContext struct {
+	Path       string
+	Name       string
+	Type       string
+	Schema     string
+	DependsOn  []string
+	Dependents []string
+	Columns    []ColumnData
+}
+
+// ColumnData holds column information.
+type ColumnData struct {
+	Name    string
+	Type    string
+	Sources []string
+}
+
+// AppData holds all data needed to render the full app container.
+type AppData struct {
+	// Current page context
+	CurrentPath string // e.g., "/models/staging.customers"
+
+	// Sidebar data
+	ExplorerTree []TreeNode
+
+	// Main content (varies by page)
+	Model *ModelViewData // nil if not on model page
+	Stats *DashboardStats // for dashboard page
+
+	// Context panel
+	Context *ModelContext // nil if no model selected
+}
 
 templ Header() {
 	<header class="ui-header">
-		<div class="ui-header__logo">LeapSQL</div>
+		<div class="ui-header__logo">
+			<a href="/">LeapSQL</a>
+		</div>
 		<div class="ui-header__search">
 			<input type="text" placeholder="Search models... (Cmd+K)"/>
 		</div>
@@ -14,18 +97,349 @@ templ Header() {
 	</header>
 }
 
-templ Sidebar() {
+templ Sidebar(explorerTree []TreeNode, currentPath string) {
 	<aside class="ui-sidebar">
 		<div class="ui-sidebar__section">
 			<div class="ui-sidebar__title">Explorer</div>
-			<div id="explorer-tree" class="ui-sidebar__tree" data-init={ datastar.GetSSE("/api/explorer/") }>
-				<p class="text-muted">Loading models...</p>
-			</div>
+			@ExplorerTreeView(explorerTree, currentPath)
 		</div>
 		<div class="ui-sidebar__section">
-			<div class="ui-sidebar__title">Database</div>
-			<div id="database-tree" class="ui-sidebar__tree" data-init={ datastar.GetSSE("/api/database/schemas") }>
-				<p class="text-muted">Loading schemas...</p>
+			<a 
+				href="/graph" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/graph") }
+			>
+				<span>View DAG</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/runs" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/runs") }
+			>
+				<span>Run History</span>
+			</a>
+		</div>
+	</aside>
+}
+
+templ ExplorerTreeView(nodes []TreeNode, currentPath string) {
+	<div class="ui-sidebar__tree">
+		if len(nodes) == 0 {
+			<p class="text-muted">No models found</p>
+		} else {
+			for _, node := range nodes {
+				@TreeItemView(node, currentPath)
+			}
+		}
+	</div>
+}
+
+templ TreeItemView(node TreeNode, currentPath string) {
+	if node.Type == "folder" {
+		<details class="tree-folder" open>
+			<summary class="tree-item tree-item--folder">
+				<span class="tree-item__icon">+</span>
+				<span>{ node.Name }</span>
+				<span class="tree-item__count">{ lenStr(node.Children) }</span>
+			</summary>
+			<div class="tree-folder__children">
+				for _, child := range node.Children {
+					@TreeItemView(child, currentPath)
+				}
+			</div>
+		</details>
+	} else {
+		{{
+			modelURL := fmt.Sprintf("/models/%s", node.Path)
+			isActive := currentPath == modelURL
+		}}
+		<a 
+			href={ templ.SafeURL(modelURL) }
+			class={ "tree-item", "tree-item--model", templ.KV("tree-item--active", isActive) }
+		>
+			<span class="tree-item__icon">~</span>
+			<span>{ node.Name }</span>
+		</a>
+	}
+}
+
+templ ContextPanel(mctx *ModelContext) {
+	<aside class="ui-context-panel">
+		<div class="ui-context-panel__header">Properties</div>
+		<div id="context-content">
+			if mctx != nil {
+				@ModelContextContent(*mctx)
+			} else {
+				<p class="text-muted">Select a model to view details</p>
+			}
+		</div>
+	</aside>
+}
+
+templ ModelContextContent(mctx ModelContext) {
+	<div class="model-context">
+		<div class="model-context__section">
+			<div class="model-context__label">Model</div>
+			<div class="model-context__value">{ mctx.Name }</div>
+		</div>
+		<div class="model-context__section">
+			<div class="model-context__label">Type</div>
+			<div class="model-context__value">{ materializationLabel(mctx.Type) }</div>
+		</div>
+		if mctx.Schema != "" {
+			<div class="model-context__section">
+				<div class="model-context__label">Schema</div>
+				<div class="model-context__value">{ mctx.Schema }</div>
+			</div>
+		}
+		if len(mctx.DependsOn) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Depends On</div>
+				<ul class="model-context__list">
+					for _, dep := range mctx.DependsOn {
+						<li>
+							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if len(mctx.Dependents) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Dependents</div>
+				<ul class="model-context__list">
+					for _, dep := range mctx.Dependents {
+						<li>
+							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if len(mctx.Columns) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Columns ({ itoa(len(mctx.Columns)) })</div>
+				<ul class="model-context__columns">
+					for _, col := range mctx.Columns {
+						<li class="model-context__column">
+							<span class="model-context__column-name">{ col.Name }</span>
+							if col.Type != "" {
+								<span class="model-context__column-type">{ col.Type }</span>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
+	</div>
+}
+
+templ LogDrawer() {
+	<div class="ui-log-drawer ui-log-drawer--collapsed">
+		<div class="ui-log-drawer__header">
+			<span>Logs</span>
+		</div>
+		<div class="ui-log-drawer__content">
+			<div id="log-content"></div>
+		</div>
+	</div>
+}
+
+// AppContainer is the fat morph target - the entire app UI.
+templ AppContainer(data AppData) {
+	<div id="app">
+		@Header()
+		<div class="ui-main">
+			@Sidebar(data.ExplorerTree, data.CurrentPath)
+			<main class="ui-content">
+				if data.Model != nil {
+					@ModelView(data.Model)
+				} else if data.Stats != nil {
+					@DashboardContent(data.Stats)
+				} else {
+					<div class="empty-state">
+						<p>Select a model from the explorer</p>
+					</div>
+				}
+			</main>
+			@ContextPanel(data.Context)
+		</div>
+		@LogDrawer()
+	</div>
+}
+
+templ DashboardContent(stats *DashboardStats) {
+	<div id="model-detail">
+		<h1>LeapSQL Dashboard</h1>
+		<div class="stats-grid">
+			<div class="stat-card">
+				<span class="stat-value">{ fmt.Sprint(stats.ModelCount) }</span>
+				<span class="stat-label">Models</span>
+			</div>
+		</div>
+	</div>
+}
+
+templ ModelView(data *ModelViewData) {
+	<div class="model-detail" data-signals="{view: 'source'}">
+		// Header
+		<div class="model-detail__header">
+			<h2 class="model-detail__title">{ data.Name }</h2>
+			<span class="model-detail__path">{ data.Path }</span>
+		</div>
+		
+		if data.Description != "" {
+			<p class="model-detail__description">{ data.Description }</p>
+		}
+		
+		// Metadata badges
+		<div class="model-detail__meta">
+			<span class="model-detail__badge">{ materializationLabel(data.Materialized) }</span>
+			if data.Schema != "" {
+				<span class="model-detail__schema">{ data.Schema }</span>
+			}
+			if data.Owner != "" {
+				<span class="model-detail__owner">Owner: { data.Owner }</span>
+			}
+		</div>
+		
+		if len(data.Tags) > 0 {
+			<div class="model-detail__tags">
+				for _, tag := range data.Tags {
+					<span class="model-detail__tag">{ tag }</span>
+				}
+			</div>
+		}
+		
+		// Tab buttons
+		<div class="model-detail__tabs">
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'source'"
+				data-class:tab-btn--active="$view === 'source'"
+			>
+				Source SQL
+			</button>
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'compiled'"
+				data-class:tab-btn--active="$view === 'compiled'"
+			>
+				Compiled SQL
+			</button>
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'preview'"
+				data-class:tab-btn--active="$view === 'preview'"
+			>
+				Preview Data
+			</button>
+		</div>
+		
+		// Tab content
+		<div class="model-detail__content">
+			// Source SQL tab
+			<div data-show="$view === 'source'">
+				<pre class="sql-code"><code>{ data.SourceSQL }</code></pre>
+			</div>
+			
+			// Compiled SQL tab
+			<div data-show="$view === 'compiled'">
+				if data.CompileError != "" {
+					<div class="error-message">{ data.CompileError }</div>
+				} else {
+					<pre class="sql-code"><code>{ data.CompiledSQL }</code></pre>
+				}
+			</div>
+			
+			// Preview tab
+			<div data-show="$view === 'preview'">
+				if data.PreviewError != "" {
+					<div class="error-message">{ data.PreviewError }</div>
+				} else if data.Preview != nil {
+					@DataPreviewTable(data.Preview)
+				} else {
+					<p class="text-muted">Run the model to preview data</p>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ DataPreviewTable(preview *PreviewData) {
+	<div class="data-preview">
+		<div class="data-preview__header">
+			<span class="data-preview__count">
+				{ itoa(preview.RowCount) } rows
+				if preview.Limited {
+					(limited to 50)
+				}
+			</span>
+		</div>
+		if len(preview.Columns) > 0 {
+			<div class="data-preview__table-wrapper">
+				<table class="data-preview__table">
+					<thead>
+						<tr>
+							for _, col := range preview.Columns {
+								<th>{ col }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range preview.Rows {
+							<tr>
+								for _, cell := range row {
+									<td>{ cell }</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+func materializationLabel(mat string) string {
+	switch mat {
+	case "table":
+		return "Table"
+	case "view":
+		return "View"
+	case "incremental":
+		return "Incremental"
+	case "":
+		return "View"
+	default:
+		return mat
+	}
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string('0'+byte(n%10)) + result
+		n /= 10
+	}
+	return result
+}
+
+func lenStr(nodes []TreeNode) string {
+	return "(" + itoa(len(nodes)) + ")"
+}
+
+// SimpleSidebar renders a sidebar that loads data via SSE (for backward compatibility).
+// New pages should use the fat morph AppContainer pattern instead.
+templ SimpleSidebar() {
+	<aside class="ui-sidebar">
+		<div class="ui-sidebar__section">
+			<div class="ui-sidebar__title">Explorer</div>
+			<div id="explorer-tree" class="ui-sidebar__tree" data-init="@get('/api/explorer/')">
+				<p class="text-muted">Loading models...</p>
 			</div>
 		</div>
 		<div class="ui-sidebar__section">
@@ -39,24 +453,4 @@ templ Sidebar() {
 			</a>
 		</div>
 	</aside>
-}
-
-templ ContextPanel() {
-	<aside class="ui-context-panel">
-		<div class="ui-context-panel__header">Properties</div>
-		<div id="context-content">
-			<p class="text-muted">Select a model to view details</p>
-		</div>
-	</aside>
-}
-
-templ LogDrawer() {
-	<div class="ui-log-drawer ui-log-drawer--collapsed">
-		<div class="ui-log-drawer__header">
-			<span>Logs</span>
-		</div>
-		<div class="ui-log-drawer__content">
-			<div id="log-content"></div>
-		</div>
-	</div>
 }

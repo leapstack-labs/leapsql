@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -14,15 +15,16 @@ func SetupRoutes(
 	eng *engine.Engine,
 	store core.Store,
 	sessionStore sessions.Store,
+	notify *notifier.Notifier,
+	isDev bool,
 ) error {
-	handlers := NewHandlers(eng, store, sessionStore)
+	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	router.Route("/api/models", func(r chi.Router) {
-		r.Get("/{path}", handlers.ModelSSE)             // Model details (patches content + context)
-		r.Get("/{path}/sql", handlers.SQLViewSSE)       // Raw SQL only
-		r.Get("/{path}/compiled", handlers.CompiledSSE) // Compiled SQL only
-		r.Get("/{path}/preview", handlers.PreviewSSE)   // Data preview from database
-	})
+	// Page routes (full page render)
+	router.Get("/models/{path}", handlers.ModelPage)
+
+	// SSE routes (long-lived streams)
+	router.Get("/models/{path}/sse", handlers.ModelPageSSE)
 
 	return nil
 }

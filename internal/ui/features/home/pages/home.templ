@@ -2,43 +2,14 @@ package pages
 
 import (
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
-	"github.com/starfederation/datastar-go/datastar"
-	"fmt"
 )
 
-type Stats struct {
-	ModelCount  int
-	SourceCount int
-	RunCount    int
-}
-
+// HomePage renders the home page shell.
+// The actual content is loaded via SSE into #app.
 templ HomePage(title string, isDev bool) {
 	@layouts.Base(title, isDev) {
-		<div class="ui-layout">
-			@components.Header()
-			<div class="ui-main">
-				@components.Sidebar()
-				<main class="ui-content">
-					<div id="model-detail">
-						<h1>LeapSQL Dashboard</h1>
-						<div id="stats-container" data-init={ datastar.GetSSE("/api/stats") }>
-							<p>Loading stats...</p>
-						</div>
-					</div>
-				</main>
-				@components.ContextPanel()
-			</div>
-			@components.LogDrawer()
+		<div id="app" data-init="@get('/sse')">
+			<div class="loading">Loading dashboard...</div>
 		</div>
 	}
-}
-
-templ StatsView(stats Stats) {
-	<div id="stats-container" class="stats-grid">
-		<div class="stat-card">
-			<span class="stat-value">{ fmt.Sprint(stats.ModelCount) }</span>
-			<span class="stat-label">Models</span>
-		</div>
-	</div>
 }

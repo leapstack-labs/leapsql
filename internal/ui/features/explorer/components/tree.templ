@@ -1,6 +1,6 @@
 package components
 
-import "github.com/starfederation/datastar-go/datastar"
+import "fmt"
 
 // TreeNode represents a node in the explorer tree.
 type TreeNode struct {
@@ -10,6 +10,8 @@ type TreeNode struct {
 	Children []TreeNode
 }
 
+// ExplorerTree renders the explorer tree with anchor-based navigation.
+// This version is used by the legacy /api/explorer/ endpoint.
 templ ExplorerTree(nodes []TreeNode) {
 	<div id="explorer-tree" class="ui-sidebar__tree">
 		if len(nodes) == 0 {
@@ -37,13 +39,13 @@ templ TreeItem(node TreeNode) {
 			</div>
 		</details>
 	} else {
-		<div 
+		<a 
+			href={ templ.SafeURL(fmt.Sprintf("/models/%s", node.Path)) }
 			class="tree-item tree-item--model"
-			data-on:click={ datastar.GetSSE("/api/models/%s", node.Path) }
 		>
 			<span class="tree-item__icon">~</span>
 			<span>{ node.Name }</span>
-		</div>
+		</a>
 	}
 }
 

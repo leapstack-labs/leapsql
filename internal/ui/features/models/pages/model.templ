@@ -1,0 +1,16 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+)
+
+// ModelPage renders the full model detail page shell.
+// The actual content is loaded via SSE into #app.
+templ ModelPage(title string, modelPath string, isDev bool) {
+	@layouts.Base(title, isDev) {
+		<div id="app" data-init={ fmt.Sprintf("@get('/models/%s/sse')", modelPath) }>
+			<div class="loading">Loading model...</div>
+		</div>
+	}
+}

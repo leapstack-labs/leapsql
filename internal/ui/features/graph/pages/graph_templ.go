@@ -79,7 +79,7 @@ func GraphPage(title string, isDev bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.Sidebar().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.SimpleSidebar().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

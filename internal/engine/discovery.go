@@ -372,6 +372,9 @@ func (e *Engine) saveModelToStore(m *core.Model, absPath, hash string) error {
 			Tags:           m.Tags,
 			Meta:           m.Meta,
 			UsesSelectStar: m.UsesSelectStar,
+			SQL:            m.SQL,
+			RawContent:     m.RawContent,
+			Description:    m.Description,
 		},
 		ContentHash: computeHash(m.RawContent),
 	}

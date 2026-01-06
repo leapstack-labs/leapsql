@@ -14,6 +14,7 @@ import (
 	homeFeature "github.com/leapstack-labs/leapsql/internal/ui/features/home"
 	modelsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/models"
 	runsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/runs"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/internal/ui/resources"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -25,6 +26,7 @@ func SetupRoutes(
 	eng *engine.Engine,
 	store core.Store,
 	sessionStore *sessions.CookieStore,
+	notify *notifier.Notifier,
 	isDev bool,
 ) error {
 	// Hot reload endpoint for dev mode
@@ -36,15 +38,15 @@ func SetupRoutes(
 	router.Handle("/static/*", resources.Handler())
 
 	// Feature routes
-	if err := homeFeature.SetupRoutes(router, eng, store, sessionStore, isDev); err != nil {
+	if err := homeFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 
-	if err := explorerFeature.SetupRoutes(router, eng, store, sessionStore); err != nil {
+	if err := explorerFeature.SetupRoutes(router, eng, store, sessionStore, notify); err != nil {
 		return err
 	}
 
-	if err := modelsFeature.SetupRoutes(router, eng, store, sessionStore); err != nil {
+	if err := modelsFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 

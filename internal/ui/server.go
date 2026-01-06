@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/internal/ui/router"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"golang.org/x/sync/errgroup"
@@ -31,10 +31,7 @@ type Server struct {
 	watch        bool
 	modelsDir    string
 	logger       *slog.Logger
-
-	// SSE clients for live reload
-	clients   map[chan struct{}]struct{}
-	clientsMu sync.Mutex
+	notifier     *notifier.Notifier
 }
 
 // Config holds configuration for the UI server.
@@ -64,7 +61,7 @@ func NewServer(cfg Config) *Server {
 		watch:        cfg.Watch,
 		modelsDir:    cfg.ModelsDir,
 		logger:       cfg.Logger,
-		clients:      make(map[chan struct{}]struct{}),
+		notifier:     notifier.New(),
 	}
 }
 
@@ -82,7 +79,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		middleware.Compress(5),
 	)
 
-	if err := router.SetupRoutes(r, s.engine, s.store, s.sessionStore, s.IsDev()); err != nil {
+	if err := router.SetupRoutes(r, s.engine, s.store, s.sessionStore, s.notifier, s.IsDev()); err != nil {
 		return fmt.Errorf("failed to setup routes: %w", err)
 	}
 
@@ -127,6 +124,11 @@ func (s *Server) Serve(ctx context.Context) error {
 func (s *Server) IsDev() bool {
 	// Can be determined by build tag or config
 	return true // For now, always dev mode
+}
+
+// Notifier returns the server's notifier for SSE updates.
+func (s *Server) Notifier() *notifier.Notifier {
+	return s.notifier
 }
 
 // watchFiles watches for file changes in the models directory.
@@ -185,15 +187,7 @@ func (s *Server) watchFiles(ctx context.Context) error {
 
 // notifyClients sends a notification to all connected SSE clients.
 func (s *Server) notifyClients() {
-	s.clientsMu.Lock()
-	defer s.clientsMu.Unlock()
-
-	for ch := range s.clients {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
+	s.notifier.Broadcast()
 }
 
 // watchDirRecursive adds a directory and all subdirectories to the watcher.

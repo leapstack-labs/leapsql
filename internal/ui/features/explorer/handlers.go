@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/explorer/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -19,14 +20,16 @@ type Handlers struct {
 	engine       *engine.Engine
 	store        core.Store
 	sessionStore sessions.Store
+	notifier     *notifier.Notifier
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Store) *Handlers {
+func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Store, notify *notifier.Notifier) *Handlers {
 	return &Handlers{
 		engine:       eng,
 		store:        store,
 		sessionStore: sessionStore,
+		notifier:     notify,
 	}
 }
 
