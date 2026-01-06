@@ -4,6 +4,7 @@ package statequery
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -12,8 +13,10 @@ func SetupRoutes(
 	router chi.Router,
 	store core.Store,
 	sessionStore sessions.Store,
+	notify *notifier.Notifier,
+	isDev bool,
 ) error {
-	handlers := NewHandlers(store, sessionStore)
+	handlers := NewHandlers(store, sessionStore, notify, isDev)
 
 	// Page routes
 	router.Get("/query", handlers.QueryPage)

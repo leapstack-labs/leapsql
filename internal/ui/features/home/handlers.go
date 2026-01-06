@@ -2,12 +2,10 @@ package home
 
 import (
 	"net/http"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/home/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
@@ -92,7 +90,7 @@ func (h *Handlers) buildDashboardAppData() (components.AppData, error) {
 	if err != nil {
 		return data, err
 	}
-	data.ExplorerTree = buildExplorerTree(models)
+	data.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Get stats for dashboard
 	data.Stats = &components.DashboardStats{
@@ -100,54 +98,4 @@ func (h *Handlers) buildDashboardAppData() (components.AppData, error) {
 	}
 
 	return data, nil
-}
-
-// buildExplorerTree groups models into a tree structure by folder.
-func buildExplorerTree(models []*core.PersistedModel) []components.TreeNode {
-	folders := make(map[string]*components.TreeNode)
-
-	for _, m := range models {
-		folder := extractFolder(m.Path)
-
-		if _, ok := folders[folder]; !ok {
-			folders[folder] = &components.TreeNode{
-				Name:     folder,
-				Path:     folder,
-				Type:     "folder",
-				Children: []components.TreeNode{},
-			}
-		}
-
-		folders[folder].Children = append(folders[folder].Children, components.TreeNode{
-			Name: m.Name,
-			Path: m.Path,
-			Type: "model",
-		})
-	}
-
-	// Convert map to sorted slice
-	result := make([]components.TreeNode, 0, len(folders))
-	for _, node := range folders {
-		// Sort children by name
-		sort.Slice(node.Children, func(i, j int) bool {
-			return node.Children[i].Name < node.Children[j].Name
-		})
-		result = append(result, *node)
-	}
-
-	// Sort folders by name
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-
-	return result
-}
-
-// extractFolder extracts the folder name from a model path.
-func extractFolder(modelPath string) string {
-	parts := strings.Split(modelPath, ".")
-	if len(parts) <= 1 {
-		return "models"
-	}
-	return filepath.Join(parts[:len(parts)-1]...)
 }

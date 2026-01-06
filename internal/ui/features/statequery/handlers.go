@@ -11,8 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	commonComponents "github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/statequery/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/statequery/pages"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -31,13 +34,17 @@ type QuerySignals struct {
 type Handlers struct {
 	store        core.Store
 	sessionStore sessions.Store
+	notifier     *notifier.Notifier
+	isDev        bool
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(store core.Store, sessionStore sessions.Store) *Handlers {
+func NewHandlers(store core.Store, sessionStore sessions.Store, notify *notifier.Notifier, isDev bool) *Handlers {
 	return &Handlers{
 		store:        store,
 		sessionStore: sessionStore,
+		notifier:     notify,
+		isDev:        isDev,
 	}
 }
 
@@ -52,36 +59,96 @@ func (h *Handlers) getDB() (*sql.DB, error) {
 
 // QueryPage renders the query page shell.
 func (h *Handlers) QueryPage(w http.ResponseWriter, r *http.Request) {
-	isDev := true // TODO: Get from context
-	if err := pages.QueryPage("State Query", isDev).Render(r.Context(), w); err != nil {
+	if err := pages.QueryPage("State Query", h.isDev).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// QueryPageSSE sends initial page data (table list).
+// QueryPageSSE sends the full app view for the query page using fat morph pattern.
 func (h *Handlers) QueryPageSSE(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 
-	db, err := h.getDB()
+	appData, err := h.buildQueryAppData(r.Context())
 	if err != nil {
 		_ = sse.ConsoleError(err)
 		return
 	}
 
-	tables, views, err := h.listTablesAndViews(r.Context(), db)
-	if err != nil {
-		_ = sse.ConsoleError(fmt.Errorf("failed to list tables: %w", err))
-		return
+	if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
+		_ = sse.ConsoleError(err)
+	}
+}
+
+// buildQueryAppData assembles all data needed for the query view.
+func (h *Handlers) buildQueryAppData(ctx context.Context) (commonComponents.AppData, error) {
+	data := commonComponents.AppData{
+		CurrentPath: "/query",
 	}
 
-	data := components.TableListData{
+	// Build explorer tree
+	models, err := h.store.ListModels()
+	if err != nil {
+		return data, err
+	}
+	data.ExplorerTree = common.BuildExplorerTree(models)
+
+	// Get tables and views
+	db, err := h.getDB()
+	if err != nil {
+		// If we can't get the DB, still render the page with empty table list
+		data.Query = &commonComponents.QueryViewData{
+			Tables: []commonComponents.TableItem{},
+			Views:  []commonComponents.TableItem{},
+		}
+		return data, nil
+	}
+
+	tables, views, err := h.listTablesAndViewsForAppData(ctx, db)
+	if err != nil {
+		return data, err
+	}
+
+	data.Query = &commonComponents.QueryViewData{
 		Tables: tables,
 		Views:  views,
 	}
 
-	if err := sse.PatchElementTempl(components.TableList(data)); err != nil {
-		_ = sse.ConsoleError(err)
+	return data, nil
+}
+
+// listTablesAndViewsForAppData returns tables/views in the format for AppData.
+func (h *Handlers) listTablesAndViewsForAppData(ctx context.Context, db *sql.DB) ([]commonComponents.TableItem, []commonComponents.TableItem, error) {
+	query := `
+		SELECT name, type 
+		FROM sqlite_master 
+		WHERE type IN ('table', 'view') 
+		AND name NOT LIKE 'sqlite_%'
+		AND name NOT LIKE '%_fts%'
+		AND name NOT LIKE 'goose_%'
+		ORDER BY type, name
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, nil, err
 	}
+	defer rows.Close()
+
+	var tables, views []commonComponents.TableItem
+	for rows.Next() {
+		var name, objType string
+		if err := rows.Scan(&name, &objType); err != nil {
+			continue
+		}
+		item := commonComponents.TableItem{Name: name, Type: objType}
+		if objType == "view" {
+			views = append(views, item)
+		} else {
+			tables = append(tables, item)
+		}
+	}
+
+	return tables, views, nil
 }
 
 // ExecuteQuerySSE executes a SQL query and returns results.
@@ -228,40 +295,6 @@ func (h *Handlers) SearchSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper functions
-
-func (h *Handlers) listTablesAndViews(ctx context.Context, db *sql.DB) ([]components.TableItem, []components.TableItem, error) {
-	query := `
-		SELECT name, type 
-		FROM sqlite_master 
-		WHERE type IN ('table', 'view') 
-		AND name NOT LIKE 'sqlite_%'
-		AND name NOT LIKE '%_fts%'
-		AND name NOT LIKE 'goose_%'
-		ORDER BY type, name
-	`
-
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer rows.Close()
-
-	var tables, views []components.TableItem
-	for rows.Next() {
-		var name, objType string
-		if err := rows.Scan(&name, &objType); err != nil {
-			continue
-		}
-		item := components.TableItem{Name: name, Type: objType}
-		if objType == "view" {
-			views = append(views, item)
-		} else {
-			tables = append(tables, item)
-		}
-	}
-
-	return tables, views, nil
-}
 
 func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName string) (components.SchemaData, error) {
 	// Get object type

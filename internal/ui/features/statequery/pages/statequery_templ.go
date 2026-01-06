@@ -9,7 +9,6 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -47,49 +46,20 @@ func QueryPage(title string, isDev bool) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"ui-layout\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = components.Header().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"ui-main\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = components.SimpleSidebar().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<main class=\"ui-content ui-content--full\"><div id=\"query-page\" class=\"query-page\" data-signals=\"{sql: ''}\" data-on:editor-change=\"$sql = evt.detail\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"app\" data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/query/sse"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/statequery/pages/statequery.templ`, Line: 21, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/statequery/pages/statequery.templ`, Line: 10, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><div class=\"query-page__main\"><div class=\"query-page__editor-section\"><div class=\"query-page__editor-header\"><h1 class=\"query-page__title\">State Query</h1><p class=\"text-muted\">Query the LeapSQL state database</p></div><div class=\"query-editor\"><sql-editor id=\"sql-editor\" initial-value=\"\" placeholder=\"SELECT * FROM models LIMIT 10;\" data-on:editor-execute=\"document.getElementById('execute-btn').click()\"></sql-editor></div><div class=\"query-page__actions\"><button type=\"button\" id=\"execute-btn\" class=\"btn btn--primary\" data-on:click=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/api/query/execute"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/statequery/pages/statequery.templ`, Line: 42, Col: 64}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">Execute <kbd>Cmd+Enter</kbd></button> <button type=\"button\" class=\"btn btn--secondary\" id=\"clear-btn\" data-on:click=\"document.getElementById('sql-editor').clear(); $sql = ''\">Clear</button></div></div><div id=\"query-results\" class=\"query-results\"><div class=\"query-results__empty\"><p class=\"text-muted\">Enter a query and press Execute</p></div></div></div><aside class=\"query-page__sidebar\"><div id=\"query-sidebar-tables\" class=\"query-sidebar__tables\"><p class=\"text-muted\">Loading tables...</p></div><div id=\"query-schema-panel\" class=\"query-sidebar__schema\"><p class=\"text-muted\">Click a table to view schema</p></div></aside></div></main></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

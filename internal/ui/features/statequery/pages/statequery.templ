@@ -2,75 +2,11 @@ package pages
 
 import (
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/starfederation/datastar-go/datastar"
 )
 
 templ QueryPage(title string, isDev bool) {
 	@layouts.Base(title, isDev) {
-		<div class="ui-layout">
-			@components.Header()
-			<div class="ui-main">
-				@components.SimpleSidebar()
-				<main class="ui-content ui-content--full">
-					<div
-						id="query-page"
-						class="query-page"
-						data-signals="{sql: ''}"
-						data-on:editor-change="$sql = evt.detail"
-						data-init={ datastar.GetSSE("/query/sse") }
-					>
-						<div class="query-page__main">
-							<div class="query-page__editor-section">
-								<div class="query-page__editor-header">
-									<h1 class="query-page__title">State Query</h1>
-									<p class="text-muted">Query the LeapSQL state database</p>
-								</div>
-								<div class="query-editor">
-									<sql-editor
-										id="sql-editor"
-										initial-value=""
-										placeholder="SELECT * FROM models LIMIT 10;"
-										data-on:editor-execute="document.getElementById('execute-btn').click()"
-									></sql-editor>
-								</div>
-								<div class="query-page__actions">
-									<button
-										type="button"
-										id="execute-btn"
-										class="btn btn--primary"
-										data-on:click={ datastar.PostSSE("/api/query/execute") }
-									>
-										Execute
-										<kbd>Cmd+Enter</kbd>
-									</button>
-									<button
-										type="button"
-										class="btn btn--secondary"
-										id="clear-btn"
-										data-on:click="document.getElementById('sql-editor').clear(); $sql = ''"
-									>
-										Clear
-									</button>
-								</div>
-							</div>
-							<div id="query-results" class="query-results">
-								<div class="query-results__empty">
-									<p class="text-muted">Enter a query and press Execute</p>
-								</div>
-							</div>
-						</div>
-						<aside class="query-page__sidebar">
-							<div id="query-sidebar-tables" class="query-sidebar__tables">
-								<p class="text-muted">Loading tables...</p>
-							</div>
-							<div id="query-schema-panel" class="query-sidebar__schema">
-								<p class="text-muted">Click a table to view schema</p>
-							</div>
-						</aside>
-					</div>
-				</main>
-			</div>
-		</div>
+		<div id="app" data-init={ datastar.GetSSE("/query/sse") }></div>
 	}
 }

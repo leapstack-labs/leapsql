@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -14,13 +15,18 @@ func SetupRoutes(
 	eng *engine.Engine,
 	store core.Store,
 	sessionStore sessions.Store,
+	notify *notifier.Notifier,
+	isDev bool,
 ) error {
-	handlers := NewHandlers(eng, store, sessionStore)
+	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	// Page routes
+	// Page route
 	router.Get("/runs", handlers.RunsPage)
 
-	// API routes for run history
+	// Fat morph SSE endpoint
+	router.Get("/runs/sse", handlers.RunsPageSSE)
+
+	// API routes for run history (kept for backward compatibility)
 	router.Route("/api/runs", func(r chi.Router) {
 		r.Get("/", handlers.RunsListSSE)             // List recent runs
 		r.Get("/{id}", handlers.RunDetailSSE)        // Run details

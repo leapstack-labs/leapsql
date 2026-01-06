@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	databaseFeature "github.com/leapstack-labs/leapsql/internal/ui/features/database"
-	explorerFeature "github.com/leapstack-labs/leapsql/internal/ui/features/explorer"
 	graphFeature "github.com/leapstack-labs/leapsql/internal/ui/features/graph"
 	homeFeature "github.com/leapstack-labs/leapsql/internal/ui/features/home"
 	modelsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/models"
@@ -43,15 +42,11 @@ func SetupRoutes(
 		return err
 	}
 
-	if err := explorerFeature.SetupRoutes(router, eng, store, sessionStore, notify); err != nil {
-		return err
-	}
-
 	if err := modelsFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 
-	if err := graphFeature.SetupRoutes(router, eng, store, sessionStore); err != nil {
+	if err := graphFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 
@@ -59,11 +54,11 @@ func SetupRoutes(
 		return err
 	}
 
-	if err := runsFeature.SetupRoutes(router, eng, store, sessionStore); err != nil {
+	if err := runsFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 
-	if err := statequeryFeature.SetupRoutes(router, store, sessionStore); err != nil {
+	if err := statequeryFeature.SetupRoutes(router, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 

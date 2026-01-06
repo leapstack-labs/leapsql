@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -13,13 +14,18 @@ func SetupRoutes(
 	eng *engine.Engine,
 	store core.Store,
 	sessionStore sessions.Store,
+	notify *notifier.Notifier,
+	isDev bool,
 ) error {
-	handlers := NewHandlers(eng, store, sessionStore)
+	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	// Page route
 	router.Get("/graph", handlers.GraphPage)
 
-	// API routes
+	// Fat morph SSE endpoint
+	router.Get("/graph/sse", handlers.GraphPageSSE)
+
+	// API routes (kept for backward compatibility)
 	router.Route("/api/graph", func(r chi.Router) {
 		r.Get("/", handlers.FullGraphSSE)              // Full DAG
 		r.Get("/model/{path}", handlers.ModelGraphSSE) // Model neighborhood (parents + children)

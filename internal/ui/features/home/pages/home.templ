@@ -8,8 +8,6 @@ import (
 // The actual content is loaded via SSE into #app.
 templ HomePage(title string, isDev bool) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init="@get('/sse')">
-			<div class="loading">Loading dashboard...</div>
-		</div>
+		<div id="app" data-init="@get('/sse')"></div>
 	}
 }

@@ -8,7 +8,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/graph/pages"
+	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -18,26 +21,137 @@ type Handlers struct {
 	engine       *engine.Engine
 	store        core.Store
 	sessionStore sessions.Store
+	notifier     *notifier.Notifier
+	isDev        bool
 }
 
 // NewHandlers creates a new Handlers instance.
-func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Store) *Handlers {
+func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Store, notify *notifier.Notifier, isDev bool) *Handlers {
 	return &Handlers{
 		engine:       eng,
 		store:        store,
 		sessionStore: sessionStore,
+		notifier:     notify,
+		isDev:        isDev,
 	}
 }
 
-// GraphPage renders the graph visualization page.
+// GraphPage renders the graph visualization page shell.
 func (h *Handlers) GraphPage(w http.ResponseWriter, r *http.Request) {
-	isDev := true // TODO: Get from context
-	if err := pages.GraphPage("DAG", isDev).Render(r.Context(), w); err != nil {
+	if err := pages.GraphPage("DAG", h.isDev).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// FullGraphSSE sends the full DAG via SSE.
+// GraphPageSSE is the long-lived SSE endpoint for the graph page.
+// It sends the initial view and then pushes updates when the store changes.
+func (h *Handlers) GraphPageSSE(w http.ResponseWriter, r *http.Request) {
+	sse := datastar.NewSSE(w, r)
+
+	// Subscribe to updates
+	updates := h.notifier.Subscribe()
+	defer h.notifier.Unsubscribe(updates)
+
+	// Send initial state
+	if err := h.sendGraphView(sse); err != nil {
+		_ = sse.ConsoleError(err)
+		return
+	}
+
+	// Wait for updates
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-updates:
+			if err := h.sendGraphView(sse); err != nil {
+				_ = sse.ConsoleError(err)
+			}
+		}
+	}
+}
+
+// sendGraphView builds and sends the full app view for the graph page.
+func (h *Handlers) sendGraphView(sse *datastar.ServerSentEventGenerator) error {
+	appData, err := h.buildGraphAppData()
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(components.AppContainer(appData))
+}
+
+// buildGraphAppData assembles all data needed for the graph view.
+func (h *Handlers) buildGraphAppData() (components.AppData, error) {
+	data := components.AppData{
+		CurrentPath: "/graph",
+	}
+
+	// Get all models
+	models, err := h.store.ListModels()
+	if err != nil {
+		return data, err
+	}
+
+	// Build explorer tree
+	data.ExplorerTree = common.BuildExplorerTree(models)
+
+	// Build graph data
+	graphData := h.buildFullGraphData(models)
+	data.Graph = &graphData
+
+	return data, nil
+}
+
+// buildFullGraphData creates graph view data from all models and their dependencies.
+func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) components.GraphViewData {
+	// Create a map for quick lookup
+	modelMap := make(map[string]*core.PersistedModel)
+	for _, m := range models {
+		modelMap[m.ID] = m
+	}
+
+	// Build nodes
+	nodes := make([]components.GraphNode, 0, len(models))
+	for _, m := range models {
+		nodes = append(nodes, components.GraphNode{
+			ID:    m.Path,
+			Label: m.Name,
+			Type:  nodeType(m),
+		})
+	}
+
+	// Sort nodes for consistent display
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].ID < nodes[j].ID
+	})
+
+	// Build edges from dependencies
+	edges := make([]components.GraphEdge, 0)
+	for _, m := range models {
+		deps, err := h.store.GetDependencies(m.ID)
+		if err != nil {
+			continue
+		}
+		for _, depID := range deps {
+			depModel, ok := modelMap[depID]
+			if !ok {
+				continue
+			}
+			edges = append(edges, components.GraphEdge{
+				Source: depModel.Path,
+				Target: m.Path,
+			})
+		}
+	}
+
+	return components.GraphViewData{
+		Nodes: nodes,
+		Edges: edges,
+	}
+}
+
+// FullGraphSSE sends the full DAG via SSE (legacy endpoint for backward compatibility).
 func (h *Handlers) FullGraphSSE(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 

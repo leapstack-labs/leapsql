@@ -67,17 +67,91 @@ type ColumnData struct {
 	Sources []string
 }
 
+// GraphViewData holds data for the DAG visualization page.
+type GraphViewData struct {
+	Nodes []GraphNode
+	Edges []GraphEdge
+}
+
+// GraphNode represents a node in the graph.
+type GraphNode struct {
+	ID    string
+	Label string
+	Type  string // "view", "table", "incremental", "source"
+}
+
+// GraphEdge represents an edge between nodes.
+type GraphEdge struct {
+	Source string
+	Target string
+}
+
+// RunsViewData holds data for the runs history page.
+type RunsViewData struct {
+	Runs          []RunItem
+	SelectedRunID string
+	SelectedRun   *RunDetail
+}
+
+// RunItem represents a run in the list.
+type RunItem struct {
+	ID          string
+	Environment string
+	Status      string
+	StartedAt   string // formatted time string
+	Duration    string // formatted duration
+	Error       string
+}
+
+// RunDetail holds detailed run information.
+type RunDetail struct {
+	ID          string
+	Environment string
+	Status      string
+	StartedAt   string
+	CompletedAt string
+	Duration    string
+	Error       string
+	ModelRuns   []ModelRunItem
+}
+
+// ModelRunItem represents a model run within a pipeline run.
+type ModelRunItem struct {
+	ID           string
+	ModelID      string
+	ModelName    string
+	Status       string
+	RowsAffected string
+	ExecutionMS  string
+	Error        string
+}
+
+// QueryViewData holds data for the state query page.
+type QueryViewData struct {
+	Tables []TableItem
+	Views  []TableItem
+}
+
+// TableItem represents a table or view in the sidebar.
+type TableItem struct {
+	Name string
+	Type string // "table" or "view"
+}
+
 // AppData holds all data needed to render the full app container.
 type AppData struct {
 	// Current page context
-	CurrentPath string // e.g., "/models/staging.customers"
+	CurrentPath string // e.g., "/models/staging.customers", "/graph", "/runs"
 
 	// Sidebar data
 	ExplorerTree []TreeNode
 
-	// Main content (varies by page)
-	Model *ModelViewData // nil if not on model page
-	Stats *DashboardStats // for dashboard page
+	// Main content (only one should be set)
+	Model *ModelViewData   // for model page
+	Stats *DashboardStats  // for dashboard
+	Graph *GraphViewData   // for graph page
+	Runs  *RunsViewData    // for runs page
+	Query *QueryViewData   // for query page
 
 	// Context panel
 	Context *ModelContext // nil if no model selected
@@ -320,21 +394,38 @@ templ AppContainer(data AppData) {
 		@Header()
 		<div class="ui-main">
 			@Sidebar(data.ExplorerTree, data.CurrentPath)
-			<main class="ui-content">
+			<main class={ mainContentClass(data) }>
 				if data.Model != nil {
 					@ModelView(data.Model)
 				} else if data.Stats != nil {
 					@DashboardContent(data.Stats)
+				} else if data.Graph != nil {
+					@GraphContent(data.Graph)
+				} else if data.Runs != nil {
+					@RunsContent(data.Runs)
+				} else if data.Query != nil {
+					@QueryContent(data.Query)
 				} else {
 					<div class="empty-state">
 						<p>Select a model from the explorer</p>
 					</div>
 				}
 			</main>
-			@ContextPanel(data.Context)
+			if data.Model != nil {
+				@ContextPanel(data.Context)
+			}
 		</div>
 		@LogDrawer()
 	</div>
+}
+
+// mainContentClass determines the CSS class for main content based on page type.
+func mainContentClass(data AppData) string {
+	// Full-width for graph, runs, query pages (no context panel)
+	if data.Graph != nil || data.Runs != nil || data.Query != nil {
+		return "ui-content ui-content--full"
+	}
+	return "ui-content"
 }
 
 templ DashboardContent(stats *DashboardStats) {
@@ -470,6 +561,318 @@ templ DataPreviewTable(preview *PreviewData) {
 	</div>
 }
 
+// GraphContent renders the DAG visualization page content.
+templ GraphContent(data *GraphViewData) {
+	<div class="graph-page">
+		<div class="graph-header">
+			<h1>DAG</h1>
+			<p class="text-muted">Model dependency graph</p>
+		</div>
+		<div class="graph-container">
+			@GraphView(data)
+		</div>
+	</div>
+}
+
+// GraphView renders the graph visualization with nodes and edges.
+templ GraphView(data *GraphViewData) {
+	<div class="graph-view">
+		<div class="graph-view__canvas">
+			if len(data.Nodes) == 0 {
+				<div class="graph-empty">
+					<p>No models found</p>
+					<p class="text-muted">Run discovery to populate the graph</p>
+				</div>
+			} else {
+				<div class="graph-nodes">
+					for _, node := range data.Nodes {
+						<div class={ "graph-node", graphNodeClass(node.Type) } data-node-id={ node.ID }>
+							<span class="graph-node__label">{ node.Label }</span>
+							<span class="graph-node__type">{ node.Type }</span>
+						</div>
+					}
+				</div>
+				if len(data.Edges) > 0 {
+					<div class="graph-edges-info">
+						<p class="text-muted">Dependencies:</p>
+						<ul class="graph-edges-list">
+							for _, edge := range data.Edges {
+								<li>{ extractModelName(edge.Source) } -> { extractModelName(edge.Target) }</li>
+							}
+						</ul>
+					</div>
+				}
+			}
+		</div>
+		<div class="graph-view__legend">
+			<div class="graph-legend">
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--view"></span>
+					<span>View</span>
+				</div>
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--table"></span>
+					<span>Table</span>
+				</div>
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--incremental"></span>
+					<span>Incremental</span>
+				</div>
+			</div>
+		</div>
+		<div class="graph-view__stats">
+			{ itoa(len(data.Nodes)) } models, { itoa(len(data.Edges)) } dependencies
+		</div>
+	</div>
+}
+
+// RunsContent renders the runs history page content.
+templ RunsContent(data *RunsViewData) {
+	<div class="runs-page">
+		<div class="runs-header">
+			<h1>Run History</h1>
+			<p class="text-muted">View past pipeline executions</p>
+		</div>
+		<div class="runs-container">
+			<div class="runs-list-container">
+				@RunsListView(data.Runs)
+			</div>
+			<div class="runs-detail-container">
+				<div id="run-detail">
+					if data.SelectedRun != nil {
+						@RunDetailView(data.SelectedRun)
+					} else {
+						<p class="text-muted">Select a run to view details</p>
+					}
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// RunsListView renders the list of runs.
+templ RunsListView(runs []RunItem) {
+	<div id="runs-list" class="runs-list">
+		if len(runs) == 0 {
+			<div class="runs-empty">
+				<p>No runs found</p>
+				<p class="text-muted">Execute a run to see history here</p>
+			</div>
+		} else {
+			<table class="runs-table">
+				<thead>
+					<tr>
+						<th>Status</th>
+						<th>Environment</th>
+						<th>Started</th>
+						<th>Duration</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, run := range runs {
+						@RunRowView(run)
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}
+
+// RunRowView renders a single run row.
+templ RunRowView(run RunItem) {
+	<tr class={ "run-row", runStatusRowClass(run.Status) }>
+		<td>
+			<span class={ "run-status", runStatusBadgeClass(run.Status) }>
+				{ run.Status }
+			</span>
+		</td>
+		<td class="run-env">{ run.Environment }</td>
+		<td class="run-time">{ run.StartedAt }</td>
+		<td class="run-duration">{ run.Duration }</td>
+		<td class="run-actions">
+			<button 
+				class="btn btn--sm"
+				data-on:click={ fmt.Sprintf("@get('/api/runs/%s')", run.ID) }
+			>
+				View
+			</button>
+		</td>
+	</tr>
+}
+
+// RunDetailView renders detailed information about a run.
+templ RunDetailView(run *RunDetail) {
+	<div class="run-detail">
+		<div class="run-detail__header">
+			<h2>Run Details</h2>
+			<span class={ "run-status", runStatusBadgeClass(run.Status) }>
+				{ run.Status }
+			</span>
+		</div>
+		<div class="run-detail__info">
+			<div class="run-detail__row">
+				<span class="run-detail__label">ID:</span>
+				<span class="run-detail__value">{ run.ID }</span>
+			</div>
+			<div class="run-detail__row">
+				<span class="run-detail__label">Environment:</span>
+				<span class="run-detail__value">{ run.Environment }</span>
+			</div>
+			<div class="run-detail__row">
+				<span class="run-detail__label">Started:</span>
+				<span class="run-detail__value">{ run.StartedAt }</span>
+			</div>
+			if run.CompletedAt != "" {
+				<div class="run-detail__row">
+					<span class="run-detail__label">Completed:</span>
+					<span class="run-detail__value">{ run.CompletedAt }</span>
+				</div>
+			}
+			<div class="run-detail__row">
+				<span class="run-detail__label">Duration:</span>
+				<span class="run-detail__value">{ run.Duration }</span>
+			</div>
+			if run.Error != "" {
+				<div class="run-detail__row run-detail__row--error">
+					<span class="run-detail__label">Error:</span>
+					<span class="run-detail__value run-detail__error">{ run.Error }</span>
+				</div>
+			}
+		</div>
+		if len(run.ModelRuns) > 0 {
+			<div class="run-detail__models">
+				<h3>Model Runs</h3>
+				<table class="model-runs-table">
+					<thead>
+						<tr>
+							<th>Status</th>
+							<th>Model</th>
+							<th>Rows</th>
+							<th>Time (ms)</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, mr := range run.ModelRuns {
+							<tr class={ "model-run-row", modelRunStatusRowClass(mr.Status) }>
+								<td>
+									<span class={ "model-run-status", modelRunStatusBadgeClass(mr.Status) }>
+										{ mr.Status }
+									</span>
+								</td>
+								<td class="model-run-name" title={ mr.ModelID }>{ mr.ModelName }</td>
+								<td class="model-run-rows">{ mr.RowsAffected }</td>
+								<td class="model-run-time">{ mr.ExecutionMS }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+// QueryContent renders the state query page content.
+templ QueryContent(data *QueryViewData) {
+	<div
+		class="query-page"
+		data-signals="{sql: ''}"
+		data-on:editor-change="$sql = evt.detail"
+	>
+		<div class="query-page__main">
+			<div class="query-page__editor-section">
+				<div class="query-page__editor-header">
+					<h1 class="query-page__title">State Query</h1>
+					<p class="text-muted">Query the LeapSQL state database</p>
+				</div>
+				<div class="query-editor">
+					<sql-editor
+						id="sql-editor"
+						initial-value=""
+						placeholder="SELECT * FROM models LIMIT 10;"
+						data-on:editor-execute="document.getElementById('execute-btn').click()"
+					></sql-editor>
+				</div>
+				<div class="query-page__actions">
+					<button
+						type="button"
+						id="execute-btn"
+						class="btn btn--primary"
+						data-on:click="@post('/api/query/execute')"
+					>
+						Execute
+						<kbd>Cmd+Enter</kbd>
+					</button>
+					<button
+						type="button"
+						class="btn btn--secondary"
+						id="clear-btn"
+						data-on:click="document.getElementById('sql-editor').clear(); $sql = ''"
+					>
+						Clear
+					</button>
+				</div>
+			</div>
+			<div id="query-results" class="query-results">
+				<div class="query-results__empty">
+					<p class="text-muted">Enter a query and press Execute</p>
+				</div>
+			</div>
+		</div>
+		<aside class="query-page__sidebar">
+			@QueryTablesList(data.Tables, data.Views)
+			<div id="query-schema-panel" class="query-sidebar__schema">
+				<p class="text-muted">Click a table to view schema</p>
+			</div>
+		</aside>
+	</div>
+}
+
+// QueryTablesList renders the list of tables and views in the query sidebar.
+templ QueryTablesList(tables, views []TableItem) {
+	<div id="query-sidebar-tables" class="query-sidebar__tables">
+		if len(tables) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Tables ({ itoa(len(tables)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, t := range tables {
+						<li>
+							<button 
+								class="query-sidebar__item"
+								data-on:click={ fmt.Sprintf("@get('/api/query/schema/%s')", t.Name) }
+							>
+								<span class="query-sidebar__icon">T</span>
+								{ t.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(views) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Views ({ itoa(len(views)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, v := range views {
+						<li>
+							<button 
+								class="query-sidebar__item"
+								data-on:click={ fmt.Sprintf("@get('/api/query/schema/%s')", v.Name) }
+							>
+								<span class="query-sidebar__icon">V</span>
+								{ v.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(tables) == 0 && len(views) == 0 {
+			<p class="text-muted">No tables found</p>
+		}
+	</div>
+}
+
 func materializationLabel(mat string) string {
 	switch mat {
 	case "table":
@@ -501,30 +904,83 @@ func lenStr(nodes []TreeNode) string {
 	return "(" + itoa(len(nodes)) + ")"
 }
 
-// SimpleSidebar renders a sidebar that loads data via SSE (for backward compatibility).
-// New pages should use the fat morph AppContainer pattern instead.
-templ SimpleSidebar() {
-	<aside class="ui-sidebar">
-		<div class="ui-sidebar__section">
-			<div class="ui-sidebar__title">Explorer</div>
-			<div id="explorer-tree" class="ui-sidebar__tree" data-init="@get('/api/explorer/')">
-				<p class="text-muted">Loading models...</p>
-			</div>
-		</div>
-		<div class="ui-sidebar__section">
-			<a href="/graph" class="tree-item">
-				<span>View DAG</span>
-			</a>
-		</div>
-		<div class="ui-sidebar__section">
-			<a href="/runs" class="tree-item">
-				<span>Run History</span>
-			</a>
-		</div>
-		<div class="ui-sidebar__section">
-			<a href="/query" class="tree-item">
-				<span>State Query</span>
-			</a>
-		</div>
-	</aside>
+// Graph helper functions
+
+func graphNodeClass(nodeType string) string {
+	switch nodeType {
+	case "table":
+		return "graph-node--table"
+	case "incremental":
+		return "graph-node--incremental"
+	case "source":
+		return "graph-node--source"
+	default:
+		return "graph-node--view"
+	}
+}
+
+func extractModelName(path string) string {
+	// Extract name from path like "staging.orders" -> "orders"
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '.' {
+			return path[i+1:]
+		}
+	}
+	return path
+}
+
+// Run helper functions
+
+func runStatusBadgeClass(status string) string {
+	switch status {
+	case "completed":
+		return "run-status--completed"
+	case "running":
+		return "run-status--running"
+	case "failed":
+		return "run-status--failed"
+	case "cancelled":
+		return "run-status--cancelled"
+	default:
+		return ""
+	}
+}
+
+func runStatusRowClass(status string) string {
+	switch status {
+	case "failed":
+		return "run-row--failed"
+	case "running":
+		return "run-row--running"
+	default:
+		return ""
+	}
+}
+
+func modelRunStatusBadgeClass(status string) string {
+	switch status {
+	case "success":
+		return "model-run-status--success"
+	case "running":
+		return "model-run-status--running"
+	case "failed":
+		return "model-run-status--failed"
+	case "skipped":
+		return "model-run-status--skipped"
+	case "pending":
+		return "model-run-status--pending"
+	default:
+		return ""
+	}
+}
+
+func modelRunStatusRowClass(status string) string {
+	switch status {
+	case "failed":
+		return "model-run-row--failed"
+	case "running":
+		return "model-run-row--running"
+	default:
+		return ""
+	}
 }
