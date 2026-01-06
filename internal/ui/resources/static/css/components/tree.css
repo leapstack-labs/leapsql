@@ -1,0 +1,73 @@
+/* css/components/tree.css - Tree View Styles */
+
+/* Tree Item */
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--foreground);
+}
+
+.tree-item:hover {
+  background: var(--muted);
+}
+
+.tree-item--selected,
+.tree-item--active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.tree-item__icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.tree-item__count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* Tree Folder */
+.tree-folder {
+  margin-bottom: 2px;
+}
+
+.tree-folder > summary {
+  list-style: none;
+}
+
+.tree-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-folder > summary .tree-item__icon::before {
+  content: "+";
+}
+
+.tree-folder[open] > summary .tree-item__icon::before {
+  content: "-";
+}
+
+.tree-folder__children {
+  margin-left: 16px;
+  border-left: 1px solid var(--border);
+  padding-left: 4px;
+}
+
+.tree-item--folder {
+  font-weight: 500;
+}
+
+.tree-item--model {
+  padding-left: 8px;
+}

@@ -1,0 +1,262 @@
+/* css/components/runs.css - Run History Styles */
+
+.runs-header {
+  margin-bottom: 24px;
+}
+
+.runs-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.runs-container {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  height: calc(100vh - 180px);
+}
+
+.runs-list-container {
+  overflow: auto;
+}
+
+.runs-detail-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  padding: 16px;
+  overflow: auto;
+}
+
+.runs-empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--muted-foreground);
+}
+
+/* Runs Table */
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.runs-table th,
+.runs-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.runs-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.runs-table tbody tr:hover {
+  background: var(--muted);
+}
+
+/* Run Row States */
+.run-row--failed {
+  background: color-mix(in oklch, var(--destructive) 5%, transparent);
+}
+
+.run-row--running {
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+}
+
+/* Run Status Badge */
+.run-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.run-status--completed {
+  background: color-mix(in oklch, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.run-status--running {
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.run-status--failed {
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+.run-status--cancelled {
+  background: color-mix(in oklch, var(--muted-foreground) 15%, transparent);
+  color: var(--muted-foreground);
+}
+
+.run-env {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.run-time {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.run-duration {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.run-actions {
+  text-align: right;
+}
+
+/* Run Detail View */
+.run-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.run-detail__header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.run-detail__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.run-detail__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.run-detail__row--error {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.run-detail__label {
+  color: var(--muted-foreground);
+}
+
+.run-detail__value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.run-detail__error {
+  color: var(--destructive);
+  word-break: break-word;
+  max-width: 250px;
+  text-align: right;
+}
+
+.run-detail__models h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+/* Model Runs Table */
+.model-runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.model-runs-table th,
+.model-runs-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-runs-table th {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Model Run Row States */
+.model-run-row--failed {
+  background: color-mix(in oklch, var(--destructive) 5%, transparent);
+}
+
+.model-run-row--running {
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+}
+
+/* Model Run Status Badge */
+.model-run-status {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.model-run-status--success {
+  background: color-mix(in oklch, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.model-run-status--running {
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.model-run-status--failed {
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+.model-run-status--skipped {
+  background: color-mix(in oklch, var(--muted-foreground) 15%, transparent);
+  color: var(--muted-foreground);
+}
+
+.model-run-status--pending {
+  background: color-mix(in oklch, var(--chart-4, oklch(0.692 0.2041 42.4293)) 15%, transparent);
+  color: var(--chart-4, oklch(0.692 0.2041 42.4293));
+}
+
+.model-run-name {
+  font-family: var(--font-mono);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-run-rows,
+.model-run-time {
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  text-align: right;
+}

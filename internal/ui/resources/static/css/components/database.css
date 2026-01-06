@@ -1,0 +1,199 @@
+/* css/components/database.css - Database Browser Styles */
+
+.db-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.db-status__indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.db-status__indicator--connected {
+  background: var(--accent);
+}
+
+.db-status__indicator--disconnected {
+  background: var(--destructive);
+}
+
+.db-status__text {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.db-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.db-schema {
+  margin-bottom: 2px;
+}
+
+.db-schema > summary {
+  list-style: none;
+}
+
+.db-schema > summary::-webkit-details-marker {
+  display: none;
+}
+
+.db-schema__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.db-schema__header:hover {
+  background: var(--muted);
+}
+
+.db-schema__icon {
+  width: 16px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.db-schema[open] > summary .db-schema__icon::before {
+  content: "-";
+}
+
+.db-schema:not([open]) > summary .db-schema__icon::before {
+  content: "+";
+}
+
+.db-schema__name {
+  color: var(--foreground);
+}
+
+.db-schema__tables {
+  margin-left: 16px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.db-table {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.db-table:hover {
+  background: var(--muted);
+}
+
+.db-table__icon {
+  width: 16px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.db-table--table .db-table__icon {
+  color: var(--accent);
+}
+
+.db-table--view .db-table__icon {
+  color: var(--primary);
+}
+
+.db-table__name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Database Table Detail */
+.db-table-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.db-table-detail__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db-table-detail__name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.db-table-detail__schema {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+
+.db-table-detail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.db-table-detail__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.db-table-detail__columns {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.db-table-detail__column {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.db-table-detail__column:last-child {
+  border-bottom: none;
+}
+
+.db-table-detail__column-name {
+  font-family: var(--font-mono);
+  flex: 1;
+}
+
+.db-table-detail__column-type {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--muted);
+  border-radius: 3px;
+  color: var(--muted-foreground);
+}
+
+.db-table-detail__column-nullable {
+  font-size: 10px;
+  color: var(--chart-4, oklch(0.692 0.2041 42.4293));
+  font-weight: 600;
+}

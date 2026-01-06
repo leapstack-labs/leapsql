@@ -1,0 +1,26 @@
+/* css/components/content.css - Main Content Area */
+
+.ui-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: var(--background);
+}
+
+.ui-content h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.ui-content--full {
+  padding: 16px;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted-foreground);
+}

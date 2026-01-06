@@ -29,20 +29,20 @@ func Base(title string, isDev bool) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" data-signals=\"{theme: 'claude', darkMode: false}\" data-init=\"\n\t\t\t$theme = localStorage.getItem('theme') || 'claude';\n\t\t\t$darkMode = localStorage.getItem('darkMode') === 'true' || \n\t\t\t\t(!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)\n\t\t\" data-class:dark=\"$darkMode\" data-attr:data-theme=\"$theme\"><head><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/common/layouts/base.templ`, Line: 7, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/common/layouts/base.templ`, Line: 17, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - LeapSQL</title><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><link rel=\"icon\" type=\"image/x-icon\" href=\"/static/assets/favicon.ico\"><script defer type=\"module\" src=\"/static/datastar/datastar.js\"></script><link href=\"/static/css/main.css\" rel=\"stylesheet\" type=\"text/css\"></head><body class=\"ui-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - LeapSQL</title><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><link rel=\"icon\" type=\"image/x-icon\" href=\"/static/assets/favicon.ico\"><!-- Anti-FOUC: Set theme before render --><script>\n\t\t\t\t(function() {\n\t\t\t\t\tvar theme = localStorage.getItem('theme') || 'claude';\n\t\t\t\t\tvar darkMode = localStorage.getItem('darkMode');\n\t\t\t\t\tvar prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\tif (darkMode === 'true' || (darkMode === null && prefersDark)) {\n\t\t\t\t\t\tdocument.documentElement.classList.add('dark');\n\t\t\t\t\t}\n\t\t\t\t\tdocument.documentElement.setAttribute('data-theme', theme);\n\t\t\t\t})();\n\t\t\t</script><!-- All themes loaded - CSS cascade selects active --><link href=\"/static/css/base.css\" rel=\"stylesheet\" type=\"text/css\"><script defer type=\"module\" src=\"/static/datastar/datastar.js\"></script></head><body class=\"ui-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,0 +1,121 @@
+/* css/components/model-detail.css - Model Detail View */
+
+.model-detail {
+  max-width: 900px;
+}
+
+.model-detail__header {
+  margin-bottom: 16px;
+}
+
+.model-detail__title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.model-detail__path {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+
+.model-detail__description {
+  color: var(--muted-foreground);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.model-detail__meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.model-detail__badge {
+  padding: 2px 8px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.model-detail__schema,
+.model-detail__owner {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.model-detail__tags {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.model-detail__tag {
+  padding: 2px 8px;
+  background: var(--primary);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+  color: var(--primary-foreground);
+}
+
+.model-detail__sql {
+  margin-top: 24px;
+}
+
+.model-detail__sql-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.model-detail__sql-code,
+.sql-code {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.model-detail__sql-code code,
+.sql-code code {
+  font-family: inherit;
+}
+
+.model-detail__content {
+  margin-top: 16px;
+}
+
+.model-detail__actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.model-detail__preview {
+  margin-top: 24px;
+}
+
+.error-message {
+  padding: 12px 16px;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-radius: var(--radius, 6px);
+  font-size: 13px;
+}

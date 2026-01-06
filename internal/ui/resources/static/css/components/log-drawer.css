@@ -1,0 +1,33 @@
+/* css/components/log-drawer.css - Bottom Log Panel */
+
+.ui-log-drawer {
+  height: var(--log-drawer-height);
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-log-drawer--collapsed {
+  height: 32px;
+}
+
+.ui-log-drawer__header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ui-log-drawer__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

@@ -1,0 +1,96 @@
+/* css/components/context-panel.css - Right Sidebar Panel */
+
+.ui-context-panel {
+  width: var(--context-panel-width);
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.ui-context-panel__header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 12px;
+}
+
+/* Model Context */
+.model-context {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.model-context__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.model-context__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.model-context__value {
+  font-size: 13px;
+}
+
+.model-context__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.model-context__list li {
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.model-context__list li:hover {
+  text-decoration: underline;
+}
+
+.model-context__list li a {
+  color: inherit;
+}
+
+.model-context__columns {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.model-context__column {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-context__column:last-child {
+  border-bottom: none;
+}
+
+.model-context__column-name {
+  font-family: var(--font-mono);
+}
+
+.model-context__column-type {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--muted);
+  border-radius: 3px;
+  color: var(--muted-foreground);
+}

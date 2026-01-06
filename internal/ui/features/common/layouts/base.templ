@@ -2,14 +2,37 @@ package layouts
 
 templ Base(title string, isDev bool) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html
+		lang="en"
+		data-signals="{theme: 'claude', darkMode: false}"
+		data-init="
+			$theme = localStorage.getItem('theme') || 'claude';
+			$darkMode = localStorage.getItem('darkMode') === 'true' || 
+				(!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)
+		"
+		data-class:dark="$darkMode"
+		data-attr:data-theme="$theme"
+	>
 		<head>
 			<title>{ title } - LeapSQL</title>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico"/>
+			<!-- Anti-FOUC: Set theme before render -->
+			<script>
+				(function() {
+					var theme = localStorage.getItem('theme') || 'claude';
+					var darkMode = localStorage.getItem('darkMode');
+					var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					if (darkMode === 'true' || (darkMode === null && prefersDark)) {
+						document.documentElement.classList.add('dark');
+					}
+					document.documentElement.setAttribute('data-theme', theme);
+				})();
+			</script>
+			<!-- All themes loaded - CSS cascade selects active -->
+			<link href="/static/css/base.css" rel="stylesheet" type="text/css"/>
 			<script defer type="module" src="/static/datastar/datastar.js"></script>
-			<link href="/static/css/main.css" rel="stylesheet" type="text/css"/>
 		</head>
 		<body class="ui-body">
 			if isDev {

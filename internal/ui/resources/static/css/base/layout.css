@@ -1,0 +1,19 @@
+/* css/base/layout.css - Grid, Flexbox & Layout Utilities */
+.ui-body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.ui-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ui-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}

@@ -1,0 +1,34 @@
+/* css/base.css - Main Entry Point */
+
+/* ===== Themes (all loaded, CSS cascade selects active) ===== */
+@import url('./themes/claude.css');
+@import url('./themes/vercel.css');
+@import url('./themes/catppuccin.css');
+
+/* ===== Base ===== */
+@import url('./base/reset.css');
+@import url('./base/variables.css');
+@import url('./base/typography.css');
+@import url('./base/layout.css');
+@import url('./base/utilities.css');
+
+/* ===== Components ===== */
+@import url('./components/header.css');
+@import url('./components/sidebar.css');
+@import url('./components/tree.css');
+@import url('./components/content.css');
+@import url('./components/cards.css');
+@import url('./components/buttons.css');
+@import url('./components/forms.css');
+@import url('./components/tables.css');
+@import url('./components/model-detail.css');
+@import url('./components/context-panel.css');
+@import url('./components/log-drawer.css');
+@import url('./components/graph.css');
+@import url('./components/database.css');
+@import url('./components/runs.css');
+
+/* View Transitions API - must come after all @import rules */
+@view-transition {
+  navigation: auto;
+}

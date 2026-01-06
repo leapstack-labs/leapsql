@@ -1,0 +1,168 @@
+/* css/components/graph.css - DAG View Styles */
+
+.graph-header {
+  margin-bottom: 16px;
+}
+
+.graph-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.graph-container {
+  flex: 1;
+  min-height: 400px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.graph-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-view__canvas {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.graph-view__legend {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--muted);
+}
+
+.graph-view__stats {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}
+
+.graph-legend {
+  display: flex;
+  gap: 16px;
+}
+
+.graph-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.graph-legend__color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.graph-legend__color--view {
+  background: var(--primary);
+}
+
+.graph-legend__color--table {
+  background: var(--accent);
+}
+
+.graph-legend__color--incremental {
+  background: var(--chart-4, oklch(0.692 0.2041 42.4293));
+}
+
+/* Graph Nodes */
+.graph-svg-container {
+  width: 100%;
+}
+
+.graph-empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--muted-foreground);
+}
+
+.graph-nodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.graph-node {
+  padding: 12px;
+  background: var(--muted);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.graph-node:hover {
+  border-color: var(--muted-foreground);
+  transform: translateY(-2px);
+}
+
+.graph-node__label {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.graph-node__type {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.graph-node--view {
+  border-left-color: var(--primary);
+  border-left-width: 4px;
+}
+
+.graph-node--table {
+  border-left-color: var(--accent);
+  border-left-width: 4px;
+}
+
+.graph-node--incremental {
+  border-left-color: var(--chart-4, oklch(0.692 0.2041 42.4293));
+  border-left-width: 4px;
+}
+
+.graph-node--source {
+  border-left-color: var(--muted-foreground);
+  border-left-width: 4px;
+}
+
+/* Graph Edges Info */
+.graph-edges-info {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.graph-edges-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.graph-edges-list li {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  background: var(--muted);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--muted-foreground);
+}
