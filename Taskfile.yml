@@ -228,12 +228,18 @@ tasks:
       - rm -rf context/sqlmesh
       - git clone --depth 1 https://github.com/TobikoData/sqlmesh.git context/sqlmesh
 
+  context:datastar:
+    desc: Sync Datastar documentation into context/
+    cmds:
+      - go run ./scripts/syncdatastardocs
+
   context:all:
     desc: Shallow clone all context repositories
     cmds:
       - task: context:sqlglot
       - task: context:dbt-core
       - task: context:sqlmesh
+      - task: context:datastar
 
   # UI Development
   ui:
