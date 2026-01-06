@@ -31,7 +31,7 @@ func Handler() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Disable caching in dev so changes apply immediately
-		w.Header().Set("Cache-Control", "no-store")
+		// w.Header().Set("Cache-Control", "no-store")
 		// Strip the prefix and serve from the absolute computed path
 		http.StripPrefix("/static/", http.FileServer(http.FS(os.DirFS(staticDir)))).ServeHTTP(w, r)
 	})
