@@ -97,6 +97,7 @@ type ModelRun struct {
 	StartedAt    time.Time  `json:"started_at"`
 	CompletedAt  *time.Time `json:"completed_at"`
 	Error        *string    `json:"error"`
+	RenderMs     *int64     `json:"render_ms"`
 	ExecutionMs  *int64     `json:"execution_ms"`
 }
 

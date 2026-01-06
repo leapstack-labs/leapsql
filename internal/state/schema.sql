@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS model_runs (
     started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
     error TEXT,
+    render_ms INTEGER DEFAULT 0,
     execution_ms INTEGER DEFAULT 0,
     
     FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,

@@ -275,12 +275,13 @@ func (s *SQLiteStore) RecordModelRun(modelRun *core.ModelRun) error {
 		RowsAffected: &modelRun.RowsAffected,
 		StartedAt:    modelRun.StartedAt,
 		Error:        errorPtr,
+		RenderMs:     &modelRun.RenderMS,
 		ExecutionMs:  &modelRun.ExecutionMS,
 	})
 }
 
 // UpdateModelRun updates the status of a model run.
-func (s *SQLiteStore) UpdateModelRun(id string, status core.ModelRunStatus, rowsAffected int64, errMsg string) error {
+func (s *SQLiteStore) UpdateModelRun(id string, status core.ModelRunStatus, rowsAffected int64, errMsg string, renderMS int64, executionMS int64) error {
 	if s.db == nil {
 		return fmt.Errorf("database not opened")
 	}
@@ -291,19 +292,12 @@ func (s *SQLiteStore) UpdateModelRun(id string, status core.ModelRunStatus, rows
 		errorPtr = &errMsg
 	}
 
-	// Get started_at to calculate execution time
-	startedAt, err := s.queries.GetModelRunStartedAt(ctx(), id)
-	if err != nil {
-		return fmt.Errorf("failed to get model run start time: %w", err)
-	}
-
-	executionMS := now.Sub(startedAt).Milliseconds()
-
 	return s.queries.UpdateModelRun(ctx(), sqlcgen.UpdateModelRunParams{
 		Status:       string(status),
 		RowsAffected: &rowsAffected,
 		CompletedAt:  &now,
 		Error:        errorPtr,
+		RenderMs:     &renderMS,
 		ExecutionMs:  &executionMS,
 		ID:           id,
 	})
@@ -419,6 +413,9 @@ func convertModelRun(row sqlcgen.ModelRun) *core.ModelRun {
 	}
 	if row.Error != nil {
 		mr.Error = *row.Error
+	}
+	if row.RenderMs != nil {
+		mr.RenderMS = *row.RenderMs
 	}
 	if row.ExecutionMs != nil {
 		mr.ExecutionMS = *row.ExecutionMs

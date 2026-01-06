@@ -11,7 +11,7 @@ import (
 )
 
 const getLatestModelRun = `-- name: GetLatestModelRun :one
-SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, execution_ms
+SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, render_ms, execution_ms
 FROM model_runs
 WHERE model_id = ?
 ORDER BY started_at DESC
@@ -30,6 +30,7 @@ func (q *Queries) GetLatestModelRun(ctx context.Context, modelID string) (ModelR
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.Error,
+		&i.RenderMs,
 		&i.ExecutionMs,
 	)
 	return i, err
@@ -47,7 +48,7 @@ func (q *Queries) GetModelRunStartedAt(ctx context.Context, id string) (time.Tim
 }
 
 const getModelRunsForRun = `-- name: GetModelRunsForRun :many
-SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, execution_ms
+SELECT id, run_id, model_id, status, rows_affected, started_at, completed_at, error, render_ms, execution_ms
 FROM model_runs
 WHERE run_id = ?
 ORDER BY started_at
@@ -71,6 +72,7 @@ func (q *Queries) GetModelRunsForRun(ctx context.Context, runID string) ([]Model
 			&i.StartedAt,
 			&i.CompletedAt,
 			&i.Error,
+			&i.RenderMs,
 			&i.ExecutionMs,
 		); err != nil {
 			return nil, err
@@ -87,8 +89,8 @@ func (q *Queries) GetModelRunsForRun(ctx context.Context, runID string) ([]Model
 }
 
 const recordModelRun = `-- name: RecordModelRun :exec
-INSERT INTO model_runs (id, run_id, model_id, status, rows_affected, started_at, error, execution_ms)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO model_runs (id, run_id, model_id, status, rows_affected, started_at, error, render_ms, execution_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type RecordModelRunParams struct {
@@ -99,6 +101,7 @@ type RecordModelRunParams struct {
 	RowsAffected *int64    `json:"rows_affected"`
 	StartedAt    time.Time `json:"started_at"`
 	Error        *string   `json:"error"`
+	RenderMs     *int64    `json:"render_ms"`
 	ExecutionMs  *int64    `json:"execution_ms"`
 }
 
@@ -111,6 +114,7 @@ func (q *Queries) RecordModelRun(ctx context.Context, arg RecordModelRunParams) 
 		arg.RowsAffected,
 		arg.StartedAt,
 		arg.Error,
+		arg.RenderMs,
 		arg.ExecutionMs,
 	)
 	return err
@@ -118,7 +122,7 @@ func (q *Queries) RecordModelRun(ctx context.Context, arg RecordModelRunParams) 
 
 const updateModelRun = `-- name: UpdateModelRun :exec
 UPDATE model_runs
-SET status = ?, rows_affected = ?, completed_at = ?, error = ?, execution_ms = ?
+SET status = ?, rows_affected = ?, completed_at = ?, error = ?, render_ms = ?, execution_ms = ?
 WHERE id = ?
 `
 
@@ -127,6 +131,7 @@ type UpdateModelRunParams struct {
 	RowsAffected *int64     `json:"rows_affected"`
 	CompletedAt  *time.Time `json:"completed_at"`
 	Error        *string    `json:"error"`
+	RenderMs     *int64     `json:"render_ms"`
 	ExecutionMs  *int64     `json:"execution_ms"`
 	ID           string     `json:"id"`
 }
@@ -137,6 +142,7 @@ func (q *Queries) UpdateModelRun(ctx context.Context, arg UpdateModelRunParams) 
 		arg.RowsAffected,
 		arg.CompletedAt,
 		arg.Error,
+		arg.RenderMs,
 		arg.ExecutionMs,
 		arg.ID,
 	)

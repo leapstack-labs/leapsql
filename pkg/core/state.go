@@ -29,7 +29,7 @@ type Store interface {
 
 	// Model run operations
 	RecordModelRun(modelRun *ModelRun) error
-	UpdateModelRun(id string, status ModelRunStatus, rowsAffected int64, errMsg string) error
+	UpdateModelRun(id string, status ModelRunStatus, rowsAffected int64, errMsg string, renderMS int64, executionMS int64) error
 	GetModelRunsForRun(runID string) ([]*ModelRun, error)
 	GetLatestModelRun(modelID string) (*ModelRun, error)
 
@@ -143,7 +143,8 @@ type ModelRun struct {
 	StartedAt    time.Time
 	CompletedAt  *time.Time
 	Error        string
-	ExecutionMS  int64
+	RenderMS     int64 // Time spent rendering template
+	ExecutionMS  int64 // Time spent executing SQL
 }
 
 // Dependency represents an edge in the model dependency graph.

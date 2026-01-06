@@ -202,7 +202,8 @@ func TestBuildSQL(t *testing.T) {
 		ID: "test-id",
 	}
 
-	sql := engine.buildSQL(modelCfg, model)
+	sql, err := engine.buildSQL(modelCfg, model)
+	require.NoError(t, err, "buildSQL() should not fail")
 
 	// Check that {{ this.schema }}.{{ this.name }} was replaced
 	assert.NotContains(t, sql, "{{ this.schema }}", "{{ this.schema }} should be replaced")

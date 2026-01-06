@@ -5,11 +5,19 @@ package engine
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
+
+// RenderResult contains rendered SQL and timing information.
+type RenderResult struct {
+	SQL      string
+	RenderMS int64
+	Error    error
+}
 
 // RenderModel renders the SQL for a model with all templates expanded.
 // This is the public API for SQL rendering.
@@ -27,34 +35,39 @@ func (e *Engine) RenderModel(modelPath string) (string, error) {
 		}
 	}
 
-	return e.buildSQL(m, model), nil
+	return e.buildSQL(m, model)
+}
+
+// RenderModelTimed renders a model and returns timing information.
+func (e *Engine) RenderModelTimed(modelPath string) RenderResult {
+	start := time.Now()
+
+	sql, err := e.RenderModel(modelPath)
+
+	return RenderResult{
+		SQL:      sql,
+		RenderMS: time.Since(start).Milliseconds(),
+		Error:    err,
+	}
 }
 
 // buildSQL prepares the SQL for execution using template rendering.
-func (e *Engine) buildSQL(m *core.Model, model *core.PersistedModel) string {
+// Returns an error if template rendering fails - no silent fallback.
+func (e *Engine) buildSQL(m *core.Model, model *core.PersistedModel) (string, error) {
 	// Create execution context for this model
 	ctx := e.createExecutionContext(m)
 
 	// Render the template
 	rendered, err := template.RenderString(m.SQL, m.FilePath, ctx)
 	if err != nil {
-		// Fallback to legacy string replacement if template fails
-		// This provides backward compatibility
-		return e.buildSQLLegacy(m, model)
+		e.logger.Error("template render failed",
+			"model", m.Path,
+			"file", m.FilePath,
+			"error", err)
+		return "", fmt.Errorf("render %s: %w", m.Path, err)
 	}
 
-	return rendered
-}
-
-// buildSQLLegacy provides backward compatibility with simple string replacement.
-func (e *Engine) buildSQLLegacy(m *core.Model, _ *core.PersistedModel) string {
-	sql := m.SQL
-
-	// Replace {{ this }} with the model's table name
-	tableName := pathToTableName(m.Path)
-	sql = strings.ReplaceAll(sql, "{{ this }}", tableName)
-
-	return sql
+	return rendered, nil
 }
 
 // createExecutionContext builds a Starlark execution context for template rendering.

@@ -568,7 +568,7 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 
 				time.Sleep(10 * time.Millisecond)
 
-				require.NoError(t, store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, ""))
+				require.NoError(t, store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, "", 0, 50))
 				return modelRun
 			},
 			verify: func(t *testing.T, store *SQLiteStore, run *Run, _ *ModelRun) {
