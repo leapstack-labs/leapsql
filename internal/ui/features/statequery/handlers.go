@@ -86,16 +86,17 @@ func (h *Handlers) QueryPageSSE(w http.ResponseWriter, r *http.Request) {
 
 // ExecuteQuerySSE executes a SQL query and returns results.
 func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-
-	// Read signals from Datastar (replaces r.ParseForm + r.FormValue)
+	// Read signals BEFORE creating SSE (SSE consumes the request body)
 	var signals QuerySignals
 	if err := datastar.ReadSignals(r, &signals); err != nil {
+		sse := datastar.NewSSE(w, r)
 		_ = sse.PatchElementTempl(components.QueryResults(components.QueryResult{
 			Error: "Failed to read signals: " + err.Error(),
 		}))
 		return
 	}
+
+	sse := datastar.NewSSE(w, r)
 
 	query := strings.TrimSpace(signals.SQL)
 	if query == "" {
