@@ -180,6 +180,14 @@ templ Sidebar(explorerTree []TreeNode, currentPath string) {
 				<span>Run History</span>
 			</a>
 		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/query" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/query") }
+			>
+				<span>State Query</span>
+			</a>
+		</div>
 	</aside>
 }
 
@@ -511,6 +519,11 @@ templ SimpleSidebar() {
 		<div class="ui-sidebar__section">
 			<a href="/runs" class="tree-item">
 				<span>Run History</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a href="/query" class="tree-item">
+				<span>State Query</span>
 			</a>
 		</div>
 	</aside>

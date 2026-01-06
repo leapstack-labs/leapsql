@@ -22,6 +22,11 @@ const (
 	queryTimeout = 30 * time.Second
 )
 
+// QuerySignals represents the signals sent from the frontend.
+type QuerySignals struct {
+	SQL string `json:"sql"`
+}
+
 // Handlers provides HTTP handlers for the state query feature.
 type Handlers struct {
 	store        core.Store
@@ -83,15 +88,16 @@ func (h *Handlers) QueryPageSSE(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 
-	// Parse form data
-	if err := r.ParseForm(); err != nil {
+	// Read signals from Datastar (replaces r.ParseForm + r.FormValue)
+	var signals QuerySignals
+	if err := datastar.ReadSignals(r, &signals); err != nil {
 		_ = sse.PatchElementTempl(components.QueryResults(components.QueryResult{
-			Error: "Failed to parse form data",
+			Error: "Failed to read signals: " + err.Error(),
 		}))
 		return
 	}
 
-	query := strings.TrimSpace(r.FormValue("sql"))
+	query := strings.TrimSpace(signals.SQL)
 	if query == "" {
 		_ = sse.PatchElementTempl(components.QueryResults(components.QueryResult{
 			Error: "Query cannot be empty",

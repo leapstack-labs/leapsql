@@ -13,36 +13,42 @@ templ QueryPage(title string, isDev bool) {
 			<div class="ui-main">
 				@components.SimpleSidebar()
 				<main class="ui-content ui-content--full">
-					<div id="query-page" class="query-page" data-init={ datastar.GetSSE("/query/sse") }>
+					<div
+						id="query-page"
+						class="query-page"
+						data-signals="{sql: ''}"
+						data-on:editor-change="$sql = evt.detail"
+						data-init={ datastar.GetSSE("/query/sse") }
+					>
 						<div class="query-page__main">
 							<div class="query-page__editor-section">
 								<div class="query-page__editor-header">
 									<h1 class="query-page__title">State Query</h1>
 									<p class="text-muted">Query the LeapSQL state database</p>
 								</div>
-								<div id="sql-editor" class="query-editor">
-									<textarea 
-										id="sql-input" 
-										name="sql" 
-										class="query-editor__textarea"
+								<div class="query-editor">
+									<sql-editor
+										id="sql-editor"
+										initial-value=""
 										placeholder="SELECT * FROM models LIMIT 10;"
-										rows="8"
-									></textarea>
+										data-on:editor-execute="document.getElementById('execute-btn').click()"
+									></sql-editor>
 								</div>
 								<div class="query-page__actions">
-									<button 
-										type="button" 
-										id="execute-btn" 
+									<button
+										type="button"
+										id="execute-btn"
 										class="btn btn--primary"
 										data-on:click={ datastar.PostSSE("/api/query/execute") }
 									>
 										Execute
 										<kbd>Cmd+Enter</kbd>
 									</button>
-									<button 
-										type="button" 
-										class="btn btn--secondary" 
+									<button
+										type="button"
+										class="btn btn--secondary"
 										id="clear-btn"
+										data-on:click="document.getElementById('sql-editor').clear(); $sql = ''"
 									>
 										Clear
 									</button>
@@ -66,91 +72,5 @@ templ QueryPage(title string, isDev bool) {
 				</main>
 			</div>
 		</div>
-		@codemirrorScript()
 	}
-}
-
-// CodeMirror script for SQL editing with syntax highlighting
-templ codemirrorScript() {
-	<script type="module">
-		import {EditorView, basicSetup} from 'https://esm.sh/codemirror@6'
-		import {sql, SQLite} from 'https://esm.sh/@codemirror/lang-sql@6'
-		import {keymap} from 'https://esm.sh/@codemirror/view@6'
-		import {oneDark} from 'https://esm.sh/@codemirror/theme-one-dark@6'
-
-		document.addEventListener('DOMContentLoaded', initCodeMirror);
-		if (document.readyState !== 'loading') {
-			initCodeMirror();
-		}
-
-		function initCodeMirror() {
-			const container = document.getElementById('sql-editor');
-			const textarea = document.getElementById('sql-input');
-			const clearBtn = document.getElementById('clear-btn');
-			
-			if (!container || !textarea || container.querySelector('.cm-editor')) {
-				return;
-			}
-
-			const isDark = document.documentElement.getAttribute('data-theme')?.includes('dark') ||
-				window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-			const executeQuery = (view) => {
-				document.getElementById('execute-btn').click();
-				return true;
-			};
-
-			const queryKeymap = keymap.of([{
-				key: 'Mod-Enter',
-				run: executeQuery
-			}]);
-
-			const extensions = [
-				basicSetup,
-				sql({dialect: SQLite}),
-				queryKeymap,
-				EditorView.updateListener.of(update => {
-					if (update.docChanged) {
-						textarea.value = update.state.doc.toString();
-					}
-				}),
-				EditorView.lineWrapping
-			];
-
-			if (isDark) {
-				extensions.push(oneDark);
-			}
-
-			textarea.style.display = 'none';
-
-			const editor = new EditorView({
-				doc: textarea.value,
-				parent: container,
-				extensions: extensions
-			});
-
-			window.sqlEditor = editor;
-
-			// Clear button handler
-			if (clearBtn) {
-				clearBtn.addEventListener('click', () => {
-					editor.dispatch({
-						changes: {from: 0, to: editor.state.doc.length, insert: ''}
-					});
-					const results = document.getElementById('query-results');
-					if (results) {
-						results.innerHTML = '<div class="query-results__empty"><p class="text-muted">Enter a query and press Execute</p></div>';
-					}
-				});
-			}
-
-			// Keyboard shortcut for textarea fallback
-			textarea.addEventListener('keydown', (e) => {
-				if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-					e.preventDefault();
-					document.getElementById('execute-btn').click();
-				}
-			});
-		}
-	</script>
 }

@@ -1,0 +1,24 @@
+{
+  "name": "@leapsql/ui-components",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "build:dev": "node build.js --dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3.3.2",
+    "codemirror": "^6.0.1",
+    "@codemirror/lang-sql": "^6.8.0",
+    "@codemirror/view": "^6.36.0",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/language": "^6.10.0",
+    "@lezer/highlight": "^1.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2",
+    "typescript": "^5.9.3"
+  }
+}
