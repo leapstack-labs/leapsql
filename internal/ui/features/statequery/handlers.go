@@ -57,25 +57,45 @@ func (h *Handlers) getDB() (*sql.DB, error) {
 	return qstore.DB(), nil
 }
 
-// QueryPage renders the query page shell.
+// QueryPage renders the query page with full content.
 func (h *Handlers) QueryPage(w http.ResponseWriter, r *http.Request) {
-	if err := pages.QueryPage("State Query", h.isDev).Render(r.Context(), w); err != nil {
+	appData, err := h.buildQueryAppData(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := pages.QueryPage("State Query", h.isDev, appData).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// QueryPageSSE sends the full app view for the query page using fat morph pattern.
-func (h *Handlers) QueryPageSSE(w http.ResponseWriter, r *http.Request) {
+// QueryPageUpdates is the long-lived SSE endpoint for the query page.
+// It subscribes to updates and pushes changes when the store changes.
+// Unlike the old pattern, it does NOT send initial state - that's rendered by QueryPage.
+func (h *Handlers) QueryPageUpdates(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 
-	appData, err := h.buildQueryAppData(r.Context())
-	if err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
+	// Subscribe to updates
+	updates := h.notifier.Subscribe()
+	defer h.notifier.Unsubscribe(updates)
 
-	if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
-		_ = sse.ConsoleError(err)
+	// Wait for updates (no initial send - content is already rendered)
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-updates:
+			appData, err := h.buildQueryAppData(ctx)
+			if err != nil {
+				_ = sse.ConsoleError(err)
+				continue
+			}
+			if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
+				_ = sse.ConsoleError(err)
+			}
+		}
 	}
 }
 
@@ -241,8 +261,18 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 
 // TablesSSE sends the list of tables and views.
 func (h *Handlers) TablesSSE(w http.ResponseWriter, r *http.Request) {
-	// Same as QueryPageSSE
-	h.QueryPageSSE(w, r)
+	// Same as QueryPageUpdates but sends initial state
+	sse := datastar.NewSSE(w, r)
+
+	appData, err := h.buildQueryAppData(r.Context())
+	if err != nil {
+		_ = sse.ConsoleError(err)
+		return
+	}
+
+	if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
+		_ = sse.ConsoleError(err)
+	}
 }
 
 // SchemaSSE returns schema for a table.

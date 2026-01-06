@@ -34,7 +34,7 @@ func setupTestHandlers(t *testing.T, models ...features.TestModel) (*Handlers, *
 }
 
 // =============================================================================
-// ModelPage Tests - Full HTML page responses
+// ModelPage Tests - Full HTML page responses with server-rendered content
 // =============================================================================
 
 func TestModelPage(t *testing.T) {
@@ -53,23 +53,26 @@ func TestModelPage(t *testing.T) {
 		wantBody   []string // strings that should be present in response
 	}{
 		{
-			name:       "returns HTML with model name in title",
+			name:       "returns HTML with model name in title and full content",
 			modelPath:  "staging.customers",
 			wantStatus: http.StatusOK,
 			wantBody: []string{
 				"<!doctype html>",
 				"<title>customers - LeapSQL</title>", // Uses model.Name, not path
 				"data-init",
-				"/models/staging.customers/sse",
+				"/models/staging.customers/updates",
+				"customers",                          // Model name in content
+				"SELECT id, name FROM raw_customers", // Source SQL rendered
 			},
 		},
 		{
-			name:       "non-existent model still returns page shell",
+			name:       "non-existent model still returns page with empty state",
 			modelPath:  "does.not.exist",
 			wantStatus: http.StatusOK,
 			wantBody: []string{
 				"<!doctype html>",
 				"data-init",
+				"/models/does.not.exist/updates",
 			},
 		},
 	}
@@ -93,11 +96,8 @@ func TestModelPage(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// ModelPageSSE Tests - SSE responses with HTML fragments
-// =============================================================================
-
-func TestModelPageSSE(t *testing.T) {
+func TestModelPage_FullContent(t *testing.T) {
+	// Test that full content is server-rendered (no flicker)
 	testModels := []features.TestModel{
 		{
 			Path:        "staging.customers",
@@ -112,99 +112,34 @@ func TestModelPageSSE(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
-		name      string
-		modelPath string
-		wantBody  []string // strings that should be present in SSE response
-	}{
-		{
-			name:      "contains model name in response",
-			modelPath: "staging.customers",
-			wantBody:  []string{"customers"},
-		},
-		{
-			name:      "contains source SQL",
-			modelPath: "staging.customers",
-			wantBody:  []string{"SELECT id, name FROM raw_customers"},
-		},
-		{
-			name:      "contains explorer tree with model links",
-			modelPath: "staging.customers",
-			wantBody: []string{
-				`href="/models/staging.customers"`,
-				`href="/models/staging.orders"`,
-			},
-		},
-		{
-			name:      "contains navigation links",
-			modelPath: "staging.customers",
-			wantBody: []string{
-				`href="/graph"`,
-				`href="/runs"`,
-			},
-		},
-		{
-			name:      "contains tab buttons for model view",
-			modelPath: "staging.customers",
-			wantBody: []string{
-				"Source SQL",
-				"Compiled SQL",
-				"Preview Data",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h, _ := setupTestHandlers(t, testModels...)
-
-			req := httptest.NewRequest(http.MethodGet, "/models/"+tt.modelPath+"/sse", nil)
-			req = features.RequestWithPathParam(req, "path", tt.modelPath)
-
-			// Add timeout to prevent test from hanging - use req.Context() to preserve chi params
-			ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-			defer cancel()
-			req = req.WithContext(ctx)
-
-			rec := httptest.NewRecorder()
-			h.ModelPageSSE(rec, req)
-
-			body := rec.Body.String()
-			for _, want := range tt.wantBody {
-				assert.Contains(t, body, want, "SSE response should contain %q", want)
-			}
-		})
-	}
-}
-
-func TestModelPageSSE_NonExistentModel(t *testing.T) {
-	testModels := []features.TestModel{
-		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
-	}
-
 	h, _ := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/models/does.not.exist/sse", nil)
-	req = features.RequestWithPathParam(req, "path", "does.not.exist")
-
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-	defer cancel()
-	req = req.WithContext(ctx)
-
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers", nil)
+	req = features.RequestWithPathParam(req, "path", "staging.customers")
 	rec := httptest.NewRecorder()
-	h.ModelPageSSE(rec, req)
 
-	// Should still return something (error handling via SSE)
-	// The exact behavior depends on implementation - it might show an error or empty state
+	h.ModelPage(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
-	assert.NotEmpty(t, body, "should return some response even for non-existent model")
+
+	// Full content should be server-rendered
+	assert.Contains(t, body, "customers", "should contain model name")
+	assert.Contains(t, body, "SELECT id, name FROM raw_customers", "should contain source SQL")
+	assert.Contains(t, body, `href="/models/staging.customers"`, "explorer should contain model links")
+	assert.Contains(t, body, `href="/models/staging.orders"`, "explorer should contain model links")
+	assert.Contains(t, body, `href="/graph"`, "should contain navigation links")
+	assert.Contains(t, body, `href="/runs"`, "should contain navigation links")
+	assert.Contains(t, body, "Source SQL", "should contain tab buttons")
+	assert.Contains(t, body, "Compiled SQL", "should contain tab buttons")
+	assert.Contains(t, body, "Preview Data", "should contain tab buttons")
 }
 
 // =============================================================================
-// State Change Tests - Verify updates propagate
+// ModelPageUpdates Tests - SSE endpoint for live updates only
 // =============================================================================
 
-func TestModelPageSSE_UpdateOnBroadcast(t *testing.T) {
+func TestModelPageUpdates_SendsUpdateOnBroadcast(t *testing.T) {
 	testModels := []features.TestModel{
 		{
 			Path: "staging.customers",
@@ -215,7 +150,7 @@ func TestModelPageSSE_UpdateOnBroadcast(t *testing.T) {
 
 	h, fixture := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/updates", nil)
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
 
 	// Use longer timeout to allow for broadcast
@@ -228,14 +163,12 @@ func TestModelPageSSE_UpdateOnBroadcast(t *testing.T) {
 	// Run handler in goroutine
 	done := make(chan struct{})
 	go func() {
-		h.ModelPageSSE(rec, req)
+		h.ModelPageUpdates(rec, req)
 		close(done)
 	}()
 
-	// Wait for initial render
+	// Wait a bit then trigger broadcast
 	time.Sleep(50 * time.Millisecond)
-
-	// Trigger broadcast (simulating a state change)
 	fixture.Notifier.Broadcast()
 
 	// Wait for handler to complete (context timeout)
@@ -243,45 +176,84 @@ func TestModelPageSSE_UpdateOnBroadcast(t *testing.T) {
 
 	body := rec.Body.String()
 
-	// Should have received at least 2 SSE events (initial + broadcast)
-	// Each event in datastar format contains "event:" line
+	// Should have received at least 1 SSE event from the broadcast
+	// (No initial event - content is server-rendered by ModelPage)
 	eventCount := strings.Count(body, "event:")
-	assert.GreaterOrEqual(t, eventCount, 2, "should have at least 2 SSE events (initial + broadcast)")
+	assert.GreaterOrEqual(t, eventCount, 1, "should have at least 1 SSE event from broadcast")
+
+	// The update should contain the model content
+	assert.Contains(t, body, "customers", "update should contain model name")
 }
 
-func TestModelPageSSE_MultipleModelsInExplorer(t *testing.T) {
-	// Test with multiple models to verify explorer tree shows all
+func TestModelPageUpdates_NoInitialState(t *testing.T) {
+	// Verify that ModelPageUpdates does NOT send initial state
+	testModels := []features.TestModel{
+		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
+	}
+
+	h, _ := setupTestHandlers(t, testModels...)
+
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/updates", nil)
+	req = features.RequestWithPathParam(req, "path", "staging.customers")
+
+	// Short timeout - no broadcast, so should timeout with no events
+	ctx, cancel := context.WithTimeout(req.Context(), 50*time.Millisecond)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.ModelPageUpdates(rec, req)
+
+	body := rec.Body.String()
+
+	// Should NOT have any SSE events (no initial state, no broadcast)
+	eventCount := strings.Count(body, "event:")
+	assert.Equal(t, 0, eventCount, "should have no SSE events without broadcast")
+}
+
+func TestModelPageUpdates_MultipleModelsOnBroadcast(t *testing.T) {
+	// Test with multiple models to verify explorer tree shows all on update
 	testModels := []features.TestModel{
 		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
 		{Path: "staging.orders", Name: "orders", SQL: "SELECT 2"},
 		{Path: "marts.summary", Name: "summary", SQL: "SELECT 3"},
 	}
 
-	h, _ := setupTestHandlers(t, testModels...)
+	h, fixture := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/updates", nil)
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
 
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(req.Context(), 300*time.Millisecond)
 	defer cancel()
 	req = req.WithContext(ctx)
 
 	rec := httptest.NewRecorder()
-	h.ModelPageSSE(rec, req)
+
+	done := make(chan struct{})
+	go func() {
+		h.ModelPageUpdates(rec, req)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	fixture.Notifier.Broadcast()
+
+	<-done
 
 	body := rec.Body.String()
 
-	// All models should appear in explorer links
+	// All models should appear in the update
 	assert.Contains(t, body, "/models/staging.customers")
 	assert.Contains(t, body, "/models/staging.orders")
 	assert.Contains(t, body, "/models/marts.summary")
 }
 
 // =============================================================================
-// Context Panel Tests
+// Context Panel Tests (via ModelPage - server-rendered)
 // =============================================================================
 
-func TestModelPageSSE_ContextPanel(t *testing.T) {
+func TestModelPage_ContextPanel(t *testing.T) {
 	testModels := []features.TestModel{
 		{
 			Path:         "staging.customers",
@@ -294,15 +266,11 @@ func TestModelPageSSE_ContextPanel(t *testing.T) {
 
 	h, _ := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers", nil)
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
-
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-	defer cancel()
-	req = req.WithContext(ctx)
-
 	rec := httptest.NewRecorder()
-	h.ModelPageSSE(rec, req)
+
+	h.ModelPage(rec, req)
 
 	body := rec.Body.String()
 
@@ -312,11 +280,11 @@ func TestModelPageSSE_ContextPanel(t *testing.T) {
 }
 
 // =============================================================================
-// Compiled SQL Tests
+// Compiled SQL Tests (via ModelPage - server-rendered)
 // =============================================================================
 
-func TestModelPageSSE_CompiledSQL(t *testing.T) {
-	// Test that compiled SQL is included in response
+func TestModelPage_CompiledSQL(t *testing.T) {
+	// Test that compiled SQL is included in server-rendered response
 	testModels := []features.TestModel{
 		{
 			Path: "staging.customers",
@@ -327,15 +295,11 @@ func TestModelPageSSE_CompiledSQL(t *testing.T) {
 
 	h, _ := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/models/staging.customers", nil)
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
-
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-	defer cancel()
-	req = req.WithContext(ctx)
-
 	rec := httptest.NewRecorder()
-	h.ModelPageSSE(rec, req)
+
+	h.ModelPage(rec, req)
 
 	body := rec.Body.String()
 

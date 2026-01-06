@@ -2,13 +2,16 @@ package pages
 
 import (
 	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
 )
 
-// ModelPage renders the full model detail page shell.
-// The actual content is loaded via SSE into #app.
-templ ModelPage(title string, modelPath string, isDev bool) {
+// ModelPage renders the model detail page with full content.
+// SSE is used only for live updates, not initial content.
+templ ModelPage(title string, isDev bool, data components.AppData, updatePath string) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ fmt.Sprintf("@get('/models/%s/sse')", modelPath) }></div>
+		<div id="app" data-init={ fmt.Sprintf("@get('%s')", updatePath) }>
+			@components.AppContainer(data)
+		</div>
 	}
 }

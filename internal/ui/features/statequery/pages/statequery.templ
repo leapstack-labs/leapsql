@@ -1,12 +1,17 @@
 package pages
 
 import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
 	"github.com/starfederation/datastar-go/datastar"
 )
 
-templ QueryPage(title string, isDev bool) {
+// QueryPage renders the query page with full content.
+// SSE is used only for live updates, not initial content.
+templ QueryPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ datastar.GetSSE("/query/sse") }></div>
+		<div id="app" data-init={ datastar.GetSSE("/query/updates") }>
+			@components.AppContainer(data)
+		</div>
 	}
 }

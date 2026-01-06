@@ -20,11 +20,11 @@ func SetupRoutes(
 ) error {
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	// Page routes (full page render)
+	// Page routes (full page render with content)
 	router.Get("/models/{path}", handlers.ModelPage)
 
-	// SSE routes (long-lived streams)
-	router.Get("/models/{path}/sse", handlers.ModelPageSSE)
+	// SSE routes (live updates only)
+	router.Get("/models/{path}/updates", handlers.ModelPageUpdates)
 
 	return nil
 }

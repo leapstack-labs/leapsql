@@ -20,11 +20,11 @@ func SetupRoutes(
 ) error {
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	// Page route
+	// Page route (full page render with content)
 	router.Get("/runs", handlers.RunsPage)
 
-	// Fat morph SSE endpoint
-	router.Get("/runs/sse", handlers.RunsPageSSE)
+	// SSE route (live updates only)
+	router.Get("/runs/updates", handlers.RunsPageUpdates)
 
 	// API routes for run history (kept for backward compatibility)
 	router.Route("/api/runs", func(r chi.Router) {

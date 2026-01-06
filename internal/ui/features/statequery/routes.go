@@ -18,9 +18,11 @@ func SetupRoutes(
 ) error {
 	handlers := NewHandlers(store, sessionStore, notify, isDev)
 
-	// Page routes
+	// Page routes (full page render with content)
 	router.Get("/query", handlers.QueryPage)
-	router.Get("/query/sse", handlers.QueryPageSSE)
+
+	// SSE routes (live updates only)
+	router.Get("/query/updates", handlers.QueryPageUpdates)
 
 	// API routes for query execution
 	router.Route("/api/query", func(r chi.Router) {

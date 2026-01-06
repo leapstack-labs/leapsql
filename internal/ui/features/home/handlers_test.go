@@ -34,7 +34,7 @@ func setupTestHandlers(t *testing.T, models ...features.TestModel) (*Handlers, *
 }
 
 // =============================================================================
-// HomePage Tests - Full HTML page responses
+// HomePage Tests - Full HTML page responses with server-rendered content
 // =============================================================================
 
 func TestHomePage(t *testing.T) {
@@ -44,13 +44,14 @@ func TestHomePage(t *testing.T) {
 		wantBody   []string // strings that should be present in response
 	}{
 		{
-			name:       "returns HTML with dashboard title",
+			name:       "returns HTML with dashboard title and full content",
 			wantStatus: http.StatusOK,
 			wantBody: []string{
 				"<!doctype html>",
 				"<title>Dashboard - LeapSQL</title>",
 				"data-init",
-				"/sse",
+				"/updates",
+				"ui-content", // Content is now rendered immediately
 			},
 		},
 	}
@@ -73,11 +74,8 @@ func TestHomePage(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// HomePageSSE Tests - SSE responses with HTML fragments
-// =============================================================================
-
-func TestHomePageSSE(t *testing.T) {
+func TestHomePage_WithModels(t *testing.T) {
+	// Test that models appear in the server-rendered content
 	testModels := []features.TestModel{
 		{
 			Path: "staging.customers",
@@ -91,78 +89,29 @@ func TestHomePageSSE(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
-		name     string
-		wantBody []string // strings that should be present in SSE response
-	}{
-		{
-			name: "contains explorer tree with model links",
-			wantBody: []string{
-				`href="/models/staging.customers"`,
-				`href="/models/staging.orders"`,
-			},
-		},
-		{
-			name: "contains navigation links",
-			wantBody: []string{
-				`href="/graph"`,
-				`href="/runs"`,
-			},
-		},
-		{
-			name: "contains dashboard content area",
-			wantBody: []string{
-				"ui-content",
-			},
-		},
-	}
+	h, _ := setupTestHandlers(t, testModels...)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h, _ := setupTestHandlers(t, testModels...)
-
-			req := httptest.NewRequest(http.MethodGet, "/sse", nil)
-
-			// Add timeout to prevent test from hanging
-			ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-			defer cancel()
-			req = req.WithContext(ctx)
-
-			rec := httptest.NewRecorder()
-			h.HomePageSSE(rec, req)
-
-			body := rec.Body.String()
-			for _, want := range tt.wantBody {
-				assert.Contains(t, body, want, "SSE response should contain %q", want)
-			}
-		})
-	}
-}
-
-func TestHomePageSSE_EmptyProject(t *testing.T) {
-	// Test with no models
-	h, _ := setupTestHandlers(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/sse", nil)
-
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
-	defer cancel()
-	req = req.WithContext(ctx)
-
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	h.HomePageSSE(rec, req)
 
-	// Should still return a valid response
+	h.HomePage(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
-	assert.NotEmpty(t, body, "should return some response even for empty project")
-	assert.Contains(t, body, "event:", "should be a valid SSE response")
+
+	// Full content should be server-rendered (no flicker)
+	assert.Contains(t, body, `href="/models/staging.customers"`, "explorer should contain model links")
+	assert.Contains(t, body, `href="/models/staging.orders"`, "explorer should contain model links")
+	assert.Contains(t, body, `href="/graph"`, "should contain navigation links")
+	assert.Contains(t, body, `href="/runs"`, "should contain navigation links")
+	assert.Contains(t, body, "ui-content", "should contain dashboard content area")
 }
 
 // =============================================================================
-// State Change Tests - Verify updates propagate
+// HomePageUpdates Tests - SSE endpoint for live updates only
 // =============================================================================
 
-func TestHomePageSSE_UpdateOnBroadcast(t *testing.T) {
+func TestHomePageUpdates_SendsUpdateOnBroadcast(t *testing.T) {
 	testModels := []features.TestModel{
 		{
 			Path: "staging.customers",
@@ -173,7 +122,7 @@ func TestHomePageSSE_UpdateOnBroadcast(t *testing.T) {
 
 	h, fixture := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/updates", nil)
 
 	// Use longer timeout to allow for broadcast
 	ctx, cancel := context.WithTimeout(req.Context(), 300*time.Millisecond)
@@ -185,14 +134,12 @@ func TestHomePageSSE_UpdateOnBroadcast(t *testing.T) {
 	// Run handler in goroutine
 	done := make(chan struct{})
 	go func() {
-		h.HomePageSSE(rec, req)
+		h.HomePageUpdates(rec, req)
 		close(done)
 	}()
 
-	// Wait for initial render
+	// Wait a bit then trigger broadcast (simulating a state change)
 	time.Sleep(50 * time.Millisecond)
-
-	// Trigger broadcast (simulating a state change)
 	fixture.Notifier.Broadcast()
 
 	// Wait for handler to complete (context timeout)
@@ -200,13 +147,42 @@ func TestHomePageSSE_UpdateOnBroadcast(t *testing.T) {
 
 	body := rec.Body.String()
 
-	// Should have received at least 2 SSE events (initial + broadcast)
-	// Each event in datastar format contains "event:" line
+	// Should have received at least 1 SSE event from the broadcast
+	// (No initial event - content is server-rendered by HomePage)
 	eventCount := strings.Count(body, "event:")
-	assert.GreaterOrEqual(t, eventCount, 2, "should have at least 2 SSE events (initial + broadcast)")
+	assert.GreaterOrEqual(t, eventCount, 1, "should have at least 1 SSE event from broadcast")
+
+	// The update should contain the app content
+	assert.Contains(t, body, "/models/staging.customers", "update should contain model links")
 }
 
-func TestHomePageSSE_MultipleModelsInExplorer(t *testing.T) {
+func TestHomePageUpdates_NoInitialState(t *testing.T) {
+	// Verify that HomePageUpdates does NOT send initial state
+	// (that's now handled by HomePage's server render)
+	testModels := []features.TestModel{
+		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
+	}
+
+	h, _ := setupTestHandlers(t, testModels...)
+
+	req := httptest.NewRequest(http.MethodGet, "/updates", nil)
+
+	// Short timeout - no broadcast, so should timeout with no events
+	ctx, cancel := context.WithTimeout(req.Context(), 50*time.Millisecond)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.HomePageUpdates(rec, req)
+
+	body := rec.Body.String()
+
+	// Should NOT have any SSE events (no initial state, no broadcast)
+	eventCount := strings.Count(body, "event:")
+	assert.Equal(t, 0, eventCount, "should have no SSE events without broadcast")
+}
+
+func TestHomePageUpdates_MultipleModelsOnBroadcast(t *testing.T) {
 	// Test with multiple models in different folders
 	testModels := []features.TestModel{
 		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
@@ -214,20 +190,30 @@ func TestHomePageSSE_MultipleModelsInExplorer(t *testing.T) {
 		{Path: "marts.summary", Name: "summary", SQL: "SELECT 3"},
 	}
 
-	h, _ := setupTestHandlers(t, testModels...)
+	h, fixture := setupTestHandlers(t, testModels...)
 
-	req := httptest.NewRequest(http.MethodGet, "/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/updates", nil)
 
-	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(req.Context(), 300*time.Millisecond)
 	defer cancel()
 	req = req.WithContext(ctx)
 
 	rec := httptest.NewRecorder()
-	h.HomePageSSE(rec, req)
+
+	done := make(chan struct{})
+	go func() {
+		h.HomePageUpdates(rec, req)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	fixture.Notifier.Broadcast()
+
+	<-done
 
 	body := rec.Body.String()
 
-	// All models should appear in explorer links
+	// All models should appear in the update
 	assert.Contains(t, body, "/models/staging.customers")
 	assert.Contains(t, body, "/models/staging.orders")
 	assert.Contains(t, body, "/models/marts.summary")

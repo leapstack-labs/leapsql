@@ -1,13 +1,17 @@
 package pages
 
 import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/starfederation/datastar-go/datastar"
 )
 
-// RunsPage renders the runs history page shell.
-// The actual content is loaded via SSE into #app.
-templ RunsPage(title string, isDev bool) {
+// RunsPage renders the runs history page with full content.
+// SSE is used only for live updates, not initial content.
+templ RunsPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init="@get('/runs/sse')"></div>
+		<div id="app" data-init={ datastar.GetSSE("/runs/updates") }>
+			@components.AppContainer(data)
+		</div>
 	}
 }

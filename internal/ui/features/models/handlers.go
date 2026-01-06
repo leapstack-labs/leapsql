@@ -35,25 +35,32 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// ModelPage renders the model detail page shell.
+// ModelPage renders the model detail page with full content.
 func (h *Handlers) ModelPage(w http.ResponseWriter, r *http.Request) {
 	modelPath := chi.URLParam(r, "path")
 
-	// Get model name for title
-	model, err := h.store.GetModelByPath(modelPath)
-	title := modelPath
-	if err == nil && model != nil {
-		title = model.Name
+	appData, err := h.buildAppData(modelPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	if err := pages.ModelPage(title, modelPath, h.isDev).Render(r.Context(), w); err != nil {
+	// Get model name for title
+	title := modelPath
+	if appData.Model != nil {
+		title = appData.Model.Name
+	}
+
+	updatePath := "/models/" + modelPath + "/updates"
+	if err := pages.ModelPage(title, h.isDev, appData, updatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// ModelPageSSE is the long-lived SSE endpoint for a model page.
-// It sends the initial view and then pushes updates when the store changes.
-func (h *Handlers) ModelPageSSE(w http.ResponseWriter, r *http.Request) {
+// ModelPageUpdates is the long-lived SSE endpoint for a model page.
+// It subscribes to updates and pushes changes when the store changes.
+// Unlike the old pattern, it does NOT send initial state - that's rendered by ModelPage.
+func (h *Handlers) ModelPageUpdates(w http.ResponseWriter, r *http.Request) {
 	modelPath := chi.URLParam(r, "path")
 	sse := datastar.NewSSE(w, r)
 
@@ -61,13 +68,7 @@ func (h *Handlers) ModelPageSSE(w http.ResponseWriter, r *http.Request) {
 	updates := h.notifier.Subscribe()
 	defer h.notifier.Unsubscribe(updates)
 
-	// Send initial state
-	if err := h.sendAppView(sse, modelPath); err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
-
-	// Wait for updates
+	// Wait for updates (no initial send - content is already rendered)
 	ctx := r.Context()
 	for {
 		select {

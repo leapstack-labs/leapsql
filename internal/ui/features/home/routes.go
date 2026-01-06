@@ -21,7 +21,7 @@ func SetupRoutes(
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	router.Get("/", handlers.HomePage)
-	router.Get("/sse", handlers.HomePageSSE)
+	router.Get("/updates", handlers.HomePageUpdates)
 
 	return nil
 }

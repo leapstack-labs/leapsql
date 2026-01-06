@@ -39,29 +39,30 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// RunsPage renders the runs history page shell.
+// RunsPage renders the runs history page with full content.
 func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
-	if err := pages.RunsPage("Run History", h.isDev).Render(r.Context(), w); err != nil {
+	appData, err := h.buildRunsAppData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := pages.RunsPage("Run History", h.isDev, appData).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// RunsPageSSE is the long-lived SSE endpoint for the runs page.
-// It sends the initial view and then pushes updates when the store changes.
-func (h *Handlers) RunsPageSSE(w http.ResponseWriter, r *http.Request) {
+// RunsPageUpdates is the long-lived SSE endpoint for the runs page.
+// It subscribes to updates and pushes changes when the store changes.
+// Unlike the old pattern, it does NOT send initial state - that's rendered by RunsPage.
+func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 
 	// Subscribe to updates
 	updates := h.notifier.Subscribe()
 	defer h.notifier.Unsubscribe(updates)
 
-	// Send initial state
-	if err := h.sendRunsView(sse); err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
-
-	// Wait for updates
+	// Wait for updates (no initial send - content is already rendered)
 	ctx := r.Context()
 	for {
 		select {

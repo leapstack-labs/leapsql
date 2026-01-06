@@ -36,29 +36,30 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// GraphPage renders the graph visualization page shell.
+// GraphPage renders the graph visualization page with full content.
 func (h *Handlers) GraphPage(w http.ResponseWriter, r *http.Request) {
-	if err := pages.GraphPage("DAG", h.isDev).Render(r.Context(), w); err != nil {
+	appData, err := h.buildGraphAppData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := pages.GraphPage("DAG", h.isDev, appData).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// GraphPageSSE is the long-lived SSE endpoint for the graph page.
-// It sends the initial view and then pushes updates when the store changes.
-func (h *Handlers) GraphPageSSE(w http.ResponseWriter, r *http.Request) {
+// GraphPageUpdates is the long-lived SSE endpoint for the graph page.
+// It subscribes to updates and pushes changes when the store changes.
+// Unlike the old pattern, it does NOT send initial state - that's rendered by GraphPage.
+func (h *Handlers) GraphPageUpdates(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 
 	// Subscribe to updates
 	updates := h.notifier.Subscribe()
 	defer h.notifier.Unsubscribe(updates)
 
-	// Send initial state
-	if err := h.sendGraphView(sse); err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
-
-	// Wait for updates
+	// Wait for updates (no initial send - content is already rendered)
 	ctx := r.Context()
 	for {
 		select {

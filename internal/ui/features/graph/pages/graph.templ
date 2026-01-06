@@ -1,7 +1,9 @@
 package pages
 
 import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/starfederation/datastar-go/datastar"
 	"encoding/json"
 )
 
@@ -24,11 +26,13 @@ type GraphEdge struct {
 	Target string `json:"target"`
 }
 
-// GraphPage renders the graph page shell.
-// The actual content is loaded via SSE into #app.
-templ GraphPage(title string, isDev bool) {
+// GraphPage renders the graph page with full content.
+// SSE is used only for live updates, not initial content.
+templ GraphPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init="@get('/graph/sse')"></div>
+		<div id="app" data-init={ datastar.GetSSE("/graph/updates") }>
+			@components.AppContainer(data)
+		</div>
 	}
 }
 
