@@ -271,3 +271,16 @@ func (e *Engine) GetStatePath() string {
 func (e *Engine) GetDialect() *dialect.Dialect {
 	return e.dialect
 }
+
+// GetAdapter returns the database adapter.
+// Returns nil if the database is not yet connected.
+// Call Query() on the returned adapter to execute SQL queries.
+func (e *Engine) GetAdapter() adapter.Adapter {
+	return e.db
+}
+
+// EnsureConnected ensures the database adapter is connected.
+// This is useful when you need to run queries without running models.
+func (e *Engine) EnsureConnected(ctx context.Context) error {
+	return e.ensureDBConnected(ctx)
+}

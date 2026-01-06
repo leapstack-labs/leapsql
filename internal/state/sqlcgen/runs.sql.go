@@ -106,3 +106,40 @@ func (q *Queries) GetRun(ctx context.Context, id string) (Run, error) {
 	)
 	return i, err
 }
+
+const listRuns = `-- name: ListRuns :many
+SELECT id, environment, status, started_at, completed_at, error
+FROM runs
+ORDER BY started_at DESC
+LIMIT ?
+`
+
+func (q *Queries) ListRuns(ctx context.Context, limit int64) ([]Run, error) {
+	rows, err := q.db.QueryContext(ctx, listRuns, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Run{}
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.Environment,
+			&i.Status,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.Error,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

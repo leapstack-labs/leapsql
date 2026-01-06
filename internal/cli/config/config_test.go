@@ -420,8 +420,9 @@ target:
 	cfg, err := LoadConfigWithTarget(cfgPath, "", flags)
 	require.NoError(t, err)
 
-	// Flag should win
-	assert.Equal(t, "from_flag", cfg.ModelsDir, "flag value should override config file and env var")
+	// Flag should win - path is resolved relative to config file directory
+	expectedPath := filepath.Join(tmpDir, "from_flag")
+	assert.Equal(t, expectedPath, cfg.ModelsDir, "flag value should override config file and env var")
 }
 
 // TestLoadConfigWithTarget_EnvPrecedenceOverFile tests that env vars override config file.
@@ -445,8 +446,9 @@ target:
 	cfg, err := LoadConfigWithTarget(cfgPath, "", nil)
 	require.NoError(t, err)
 
-	// Env should win over file
-	assert.Equal(t, "from_env", cfg.ModelsDir, "env var should override config file")
+	// Env should win over file - path is resolved relative to config file directory
+	expectedPath := filepath.Join(tmpDir, "from_env")
+	assert.Equal(t, expectedPath, cfg.ModelsDir, "env var should override config file")
 }
 
 // TestLoadConfigWithTarget_FlagNotSetUsesEnv tests that unset flags fall back to env vars.
@@ -475,6 +477,7 @@ target:
 	cfg, err := LoadConfigWithTarget(cfgPath, "", flags)
 	require.NoError(t, err)
 
-	// Env should win since flag wasn't explicitly set
-	assert.Equal(t, "from_env", cfg.ModelsDir, "env var should be used when flag is not set")
+	// Env should win since flag wasn't explicitly set - path is resolved relative to config file directory
+	expectedPath := filepath.Join(tmpDir, "from_env")
+	assert.Equal(t, expectedPath, cfg.ModelsDir, "env var should be used when flag is not set")
 }

@@ -1,0 +1,62 @@
+package components
+
+import "github.com/starfederation/datastar-go/datastar"
+
+templ Header() {
+	<header class="ui-header">
+		<div class="ui-header__logo">LeapSQL</div>
+		<div class="ui-header__search">
+			<input type="text" placeholder="Search models... (Cmd+K)"/>
+		</div>
+		<div class="ui-header__actions">
+			<!-- Future: Target selector, settings -->
+		</div>
+	</header>
+}
+
+templ Sidebar() {
+	<aside class="ui-sidebar">
+		<div class="ui-sidebar__section">
+			<div class="ui-sidebar__title">Explorer</div>
+			<div id="explorer-tree" class="ui-sidebar__tree" data-init={ datastar.GetSSE("/api/explorer/") }>
+				<p class="text-muted">Loading models...</p>
+			</div>
+		</div>
+		<div class="ui-sidebar__section">
+			<div class="ui-sidebar__title">Database</div>
+			<div id="database-tree" class="ui-sidebar__tree" data-init={ datastar.GetSSE("/api/database/schemas") }>
+				<p class="text-muted">Loading schemas...</p>
+			</div>
+		</div>
+		<div class="ui-sidebar__section">
+			<a href="/graph" class="tree-item">
+				<span>View DAG</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a href="/runs" class="tree-item">
+				<span>Run History</span>
+			</a>
+		</div>
+	</aside>
+}
+
+templ ContextPanel() {
+	<aside class="ui-context-panel">
+		<div class="ui-context-panel__header">Properties</div>
+		<div id="context-content">
+			<p class="text-muted">Select a model to view details</p>
+		</div>
+	</aside>
+}
+
+templ LogDrawer() {
+	<div class="ui-log-drawer ui-log-drawer--collapsed">
+		<div class="ui-log-drawer__header">
+			<span>Logs</span>
+		</div>
+		<div class="ui-log-drawer__content">
+			<div id="log-content"></div>
+		</div>
+	</div>
+}

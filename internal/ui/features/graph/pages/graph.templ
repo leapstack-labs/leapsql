@@ -1,0 +1,149 @@
+package pages
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/starfederation/datastar-go/datastar"
+	"encoding/json"
+)
+
+// GraphData holds the data for the graph visualization.
+type GraphData struct {
+	Nodes []GraphNode
+	Edges []GraphEdge
+}
+
+// GraphNode represents a node in the graph.
+type GraphNode struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Type  string `json:"type"` // "view", "table", "incremental", "source"
+}
+
+// GraphEdge represents an edge between two nodes.
+type GraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
+templ GraphPage(title string, isDev bool) {
+	@layouts.Base(title, isDev) {
+		<div class="ui-layout">
+			@components.Header()
+			<div class="ui-main">
+				@components.Sidebar()
+				<main class="ui-content ui-content--full">
+					<div class="graph-header">
+						<h1>DAG</h1>
+						<p class="text-muted">Model dependency graph</p>
+					</div>
+					<div id="graph-container" class="graph-container" data-init={ datastar.GetSSE("/api/graph/") }>
+						<p class="text-muted">Loading graph...</p>
+					</div>
+				</main>
+			</div>
+		</div>
+	}
+}
+
+templ GraphView(data GraphData) {
+	<div id="graph-container" class="graph-view">
+		<div class="graph-view__canvas">
+			@SVGGraph(data)
+		</div>
+		<div class="graph-view__legend">
+			<div class="graph-legend">
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--view"></span>
+					<span>View</span>
+				</div>
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--table"></span>
+					<span>Table</span>
+				</div>
+				<div class="graph-legend__item">
+					<span class="graph-legend__color graph-legend__color--incremental"></span>
+					<span>Incremental</span>
+				</div>
+			</div>
+		</div>
+		<div class="graph-view__stats">
+			{ itoa(len(data.Nodes)) } models, { itoa(len(data.Edges)) } dependencies
+		</div>
+	</div>
+}
+
+// SVGGraph renders an SVG-based graph visualization using CSS grid layout.
+// This is a simplified version - can be replaced with React Flow/D3 later.
+templ SVGGraph(data GraphData) {
+	{{
+		nodesJSON, _ := json.Marshal(data.Nodes)
+		edgesJSON, _ := json.Marshal(data.Edges)
+	}}
+	<div 
+		class="graph-svg-container"
+		data-graph-nodes={ string(nodesJSON) }
+		data-graph-edges={ string(edgesJSON) }
+	>
+		if len(data.Nodes) == 0 {
+			<div class="graph-empty">
+				<p>No models found</p>
+				<p class="text-muted">Run discovery to populate the graph</p>
+			</div>
+		} else {
+			<div class="graph-nodes">
+				for _, node := range data.Nodes {
+					<div class={ "graph-node", nodeClass(node.Type) } data-node-id={ node.ID }>
+						<span class="graph-node__label">{ node.Label }</span>
+						<span class="graph-node__type">{ node.Type }</span>
+					</div>
+				}
+			</div>
+			if len(data.Edges) > 0 {
+				<div class="graph-edges-info">
+					<p class="text-muted">Dependencies:</p>
+					<ul class="graph-edges-list">
+						for _, edge := range data.Edges {
+							<li>{ extractName(edge.Source) } -> { extractName(edge.Target) }</li>
+						}
+					</ul>
+				</div>
+			}
+		}
+	</div>
+}
+
+func nodeClass(nodeType string) string {
+	switch nodeType {
+	case "table":
+		return "graph-node--table"
+	case "incremental":
+		return "graph-node--incremental"
+	case "source":
+		return "graph-node--source"
+	default:
+		return "graph-node--view"
+	}
+}
+
+func extractName(path string) string {
+	// Extract name from path like "staging.orders" -> "orders"
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '.' {
+			return path[i+1:]
+		}
+	}
+	return path
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string('0'+byte(n%10)) + result
+		n /= 10
+	}
+	return result
+}

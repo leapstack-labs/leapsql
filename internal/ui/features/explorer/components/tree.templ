@@ -1,0 +1,64 @@
+package components
+
+import "github.com/starfederation/datastar-go/datastar"
+
+// TreeNode represents a node in the explorer tree.
+type TreeNode struct {
+	Name     string
+	Path     string
+	Type     string // "folder" or "model"
+	Children []TreeNode
+}
+
+templ ExplorerTree(nodes []TreeNode) {
+	<div id="explorer-tree" class="ui-sidebar__tree">
+		if len(nodes) == 0 {
+			<p class="text-muted">No models found</p>
+		} else {
+			for _, node := range nodes {
+				@TreeItem(node)
+			}
+		}
+	</div>
+}
+
+templ TreeItem(node TreeNode) {
+	if node.Type == "folder" {
+		<details class="tree-folder" open>
+			<summary class="tree-item tree-item--folder">
+				<span class="tree-item__icon">+</span>
+				<span>{ node.Name }</span>
+				<span class="tree-item__count">{ lenStr(node.Children) }</span>
+			</summary>
+			<div class="tree-folder__children">
+				for _, child := range node.Children {
+					@TreeItem(child)
+				}
+			</div>
+		</details>
+	} else {
+		<div 
+			class="tree-item tree-item--model"
+			data-on:click={ datastar.GetSSE("/api/models/%s", node.Path) }
+		>
+			<span class="tree-item__icon">~</span>
+			<span>{ node.Name }</span>
+		</div>
+	}
+}
+
+func lenStr(nodes []TreeNode) string {
+	return "(" + itoa(len(nodes)) + ")"
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string('0'+byte(n%10)) + result
+		n /= 10
+	}
+	return result
+}

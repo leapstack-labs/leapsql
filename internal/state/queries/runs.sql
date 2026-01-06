@@ -19,3 +19,9 @@ FROM runs
 WHERE environment = ?
 ORDER BY started_at DESC
 LIMIT 1;
+
+-- name: ListRuns :many
+SELECT id, environment, status, started_at, completed_at, error
+FROM runs
+ORDER BY started_at DESC
+LIMIT ?;

@@ -89,6 +89,25 @@ func (s *SQLiteStore) GetLatestRun(env string) (*core.Run, error) {
 	return convertRun(row), nil
 }
 
+// ListRuns retrieves the most recent runs up to the given limit.
+func (s *SQLiteStore) ListRuns(limit int) ([]*core.Run, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.queries.ListRuns(ctx(), int64(limit))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	runs := make([]*core.Run, len(rows))
+	for i, row := range rows {
+		runs[i] = convertRun(row)
+	}
+
+	return runs, nil
+}
+
 // convertRun converts a sqlcgen.Run to a core.Run.
 func convertRun(row sqlcgen.Run) *core.Run {
 	run := &core.Run{

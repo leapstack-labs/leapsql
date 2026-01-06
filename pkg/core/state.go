@@ -16,6 +16,7 @@ type Store interface {
 	GetRun(id string) (*Run, error)
 	CompleteRun(id string, status RunStatus, errMsg string) error
 	GetLatestRun(env string) (*Run, error)
+	ListRuns(limit int) ([]*Run, error)
 
 	// Model operations (uses PersistedModel for storage)
 	RegisterModel(model *PersistedModel) error

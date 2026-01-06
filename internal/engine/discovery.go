@@ -344,9 +344,14 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 func (e *Engine) reconstructModelConfig(_ *core.PersistedModel, filePath string, content []byte) *core.Model {
 	// We need to re-parse the file to get the full SQL and sources
 	// But we can skip the full parse validation since we know it was valid before
-	scanner := loader.NewScanner(e.modelsDir, e.dialect)
-	config, err := scanner.ParseContent(filePath, content)
+	// Use absolute path for consistent model path computation
+	absModelsDir, err := filepath.Abs(e.modelsDir)
 	if err != nil {
+		return nil
+	}
+	scanner := loader.NewScanner(absModelsDir, e.dialect)
+	config, parseErr := scanner.ParseContent(filePath, content)
+	if parseErr != nil {
 		// If parsing fails now, return nil to trigger full re-parse
 		return nil
 	}

@@ -1,0 +1,11 @@
+name: testdata
+version: "1"
+
+models_dir: models
+seeds_dir: seeds
+macros_dir: macros
+
+target:
+  type: duckdb
+  database: ":memory:"
+  schema: main

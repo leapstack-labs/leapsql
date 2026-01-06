@@ -27,6 +27,41 @@ type RuleOptions = core.RuleOptions
 // This allows CLI code to use config.DocsConfig without importing pkg/core.
 type DocsConfig = core.DocsConfig
 
+// UIConfig holds configuration for the UI server.
+type UIConfig struct {
+	Port             int    `koanf:"port"`
+	AutoOpen         bool   `koanf:"auto_open"`
+	Watch            bool   `koanf:"watch"`
+	Theme            string `koanf:"theme"`
+	DataPreviewLimit int    `koanf:"data_preview_limit"`
+}
+
+// DefaultUIConfig returns a UIConfig with default values.
+func DefaultUIConfig() *UIConfig {
+	return &UIConfig{
+		Port:             8765,
+		AutoOpen:         true,
+		Watch:            true,
+		Theme:            "default",
+		DataPreviewLimit: 50,
+	}
+}
+
+// GetUIConfig returns the UI config with defaults applied for any unset values.
+func (c *Config) GetUIConfig() *UIConfig {
+	if c.UI == nil {
+		return DefaultUIConfig()
+	}
+	ui := c.UI
+	if ui.Port == 0 {
+		ui.Port = 8765
+	}
+	if ui.DataPreviewLimit == 0 {
+		ui.DataPreviewLimit = 50
+	}
+	return ui
+}
+
 // Config holds all CLI configuration options.
 type Config struct {
 	ModelsDir    string               `koanf:"models_dir"`
@@ -40,6 +75,7 @@ type Config struct {
 	Target       *TargetConfig        `koanf:"target"`
 	Lint         *LintConfig          `koanf:"lint"`
 	Docs         *DocsConfig          `koanf:"docs"`
+	UI           *UIConfig            `koanf:"ui"`
 	Environments map[string]EnvConfig `koanf:"environments"`
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -42,6 +43,15 @@ func findConfigFile(explicit string) string {
 		return "leapsql.yml"
 	}
 	return ""
+}
+
+// resolvePathRelativeTo resolves a path relative to baseDir if it's not absolute.
+// Returns the path unchanged if it's empty or already absolute.
+func resolvePathRelativeTo(path, baseDir string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(baseDir, path)
 }
 
 // ResetConfig resets the koanf instance. Used for testing.
@@ -112,6 +122,20 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	var cfg Config
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %w", err)
+	}
+
+	// 6. Resolve relative paths in config relative to config file directory.
+	// This ensures paths like "models/" in a config file at "/projects/app/leapsql.yaml"
+	// resolve to "/projects/app/models/" rather than being relative to CWD.
+	if configFileUsed != "" {
+		configDir := filepath.Dir(configFileUsed)
+		if absDir, err := filepath.Abs(configDir); err == nil {
+			configDir = absDir
+		}
+		cfg.ModelsDir = resolvePathRelativeTo(cfg.ModelsDir, configDir)
+		cfg.SeedsDir = resolvePathRelativeTo(cfg.SeedsDir, configDir)
+		cfg.MacrosDir = resolvePathRelativeTo(cfg.MacrosDir, configDir)
+		cfg.StatePath = resolvePathRelativeTo(cfg.StatePath, configDir)
 	}
 
 	// Determine which environment to use for target selection

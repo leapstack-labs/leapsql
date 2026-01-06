@@ -234,3 +234,25 @@ tasks:
       - task: context:sqlglot
       - task: context:dbt-core
       - task: context:sqlmesh
+
+  # UI Development
+  ui:
+    desc: Start UI development server
+    deps: [build]
+    cmds:
+      - ./leapsql ui --models-dir {{.MODELS_DIR}}
+
+  ui:dev:
+    desc: Start UI dev server with hot reload (requires templ watch)
+    cmds:
+      - go run -tags dev ./cmd/leapsql ui --models-dir {{.MODELS_DIR}}
+
+  templ:
+    desc: Generate templ files
+    cmds:
+      - templ generate ./internal/ui/...
+
+  templ:watch:
+    desc: Watch templ files and regenerate on change
+    cmds:
+      - templ generate --watch ./internal/ui/...

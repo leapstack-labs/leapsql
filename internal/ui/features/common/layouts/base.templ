@@ -1,0 +1,21 @@
+package layouts
+
+templ Base(title string, isDev bool) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<title>{ title } - LeapSQL</title>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico"/>
+			<script defer type="module" src="/static/datastar/datastar.js"></script>
+			<link href="/static/css/main.css" rel="stylesheet" type="text/css"/>
+		</head>
+		<body class="ui-body">
+			if isDev {
+				<div data-init="@get('/reload', {retryMaxCount: 1000, retryInterval:20, retryMaxWaitMs:200})"></div>
+			}
+			{ children... }
+		</body>
+	</html>
+}
