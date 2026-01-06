@@ -14,6 +14,7 @@ import (
 	homeFeature "github.com/leapstack-labs/leapsql/internal/ui/features/home"
 	modelsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/models"
 	runsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/runs"
+	statequeryFeature "github.com/leapstack-labs/leapsql/internal/ui/features/statequery"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/internal/ui/resources"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -59,6 +60,10 @@ func SetupRoutes(
 	}
 
 	if err := runsFeature.SetupRoutes(router, eng, store, sessionStore); err != nil {
+		return err
+	}
+
+	if err := statequeryFeature.SetupRoutes(router, store, sessionStore); err != nil {
 		return err
 	}
 

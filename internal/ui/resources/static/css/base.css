@@ -27,6 +27,7 @@
 @import url('./components/graph.css');
 @import url('./components/database.css');
 @import url('./components/runs.css');
+@import url('./components/query.css');
 
 /* View Transitions API - must come after all @import rules */
 @view-transition {

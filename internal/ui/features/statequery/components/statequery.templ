@@ -1,0 +1,196 @@
+package components
+
+import (
+	"fmt"
+	"github.com/starfederation/datastar-go/datastar"
+)
+
+// QueryResult represents execution results.
+type QueryResult struct {
+	Columns   []string
+	Rows      [][]string
+	RowCount  int
+	Truncated bool
+	QueryMS   int64
+	Error     string
+}
+
+// TableListData for sidebar.
+type TableListData struct {
+	Tables []TableItem
+	Views  []TableItem
+}
+
+// TableItem represents a table or view in the list.
+type TableItem struct {
+	Name string
+	Type string
+}
+
+// SchemaData for table schema display.
+type SchemaData struct {
+	Name    string
+	Type    string
+	Columns []ColumnSchema
+}
+
+// ColumnSchema represents a column in a table schema.
+type ColumnSchema struct {
+	Name     string
+	Type     string
+	Nullable bool
+	Default  string
+	IsPK     bool
+}
+
+// SearchResultItem represents a search result.
+type SearchResultItem struct {
+	Path        string
+	Name        string
+	Description string
+}
+
+templ QueryResults(result QueryResult) {
+	<div id="query-results" class="query-results">
+		if result.Error != "" {
+			<div class="query-results__error">
+				<span class="query-results__error-icon">x</span>
+				<span class="query-results__error-message">{ result.Error }</span>
+			</div>
+		} else if result.RowCount == 0 && len(result.Columns) == 0 {
+			<div class="query-results__empty">
+				<p class="text-muted">Enter a query and press Execute</p>
+			</div>
+		} else if result.RowCount == 0 {
+			<div class="query-results__empty">
+				<p>(0 rows)</p>
+			</div>
+		} else {
+			<div class="query-results__header">
+				<span class="query-results__count">
+					{ itoa(result.RowCount) } rows
+					if result.Truncated {
+						<span class="query-results__truncated">(limited to 1000)</span>
+					}
+				</span>
+				<span class="query-results__time">{ itoa(int(result.QueryMS)) }ms</span>
+			</div>
+			<div class="query-results__table-wrapper">
+				<table class="query-results__table">
+					<thead>
+						<tr>
+							for _, col := range result.Columns {
+								<th>{ col }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range result.Rows {
+							<tr>
+								for _, cell := range row {
+									<td title={ cell }>{ cell }</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ TableList(data TableListData) {
+	<div id="query-sidebar-tables" class="query-sidebar__tables">
+		if len(data.Tables) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Tables ({ itoa(len(data.Tables)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, t := range data.Tables {
+						<li>
+							<button 
+								class="query-sidebar__item"
+								data-on:click={ datastar.GetSSE("/api/query/schema/%s", t.Name) }
+							>
+								<span class="query-sidebar__icon">T</span>
+								{ t.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(data.Views) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Views ({ itoa(len(data.Views)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, v := range data.Views {
+						<li>
+							<button 
+								class="query-sidebar__item"
+								data-on:click={ datastar.GetSSE("/api/query/schema/%s", v.Name) }
+							>
+								<span class="query-sidebar__icon">V</span>
+								{ v.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(data.Tables) == 0 && len(data.Views) == 0 {
+			<p class="text-muted">No tables found</p>
+		}
+	</div>
+}
+
+templ SchemaPanel(schema SchemaData) {
+	<div id="query-schema-panel" class="query-sidebar__schema">
+		<div class="schema-panel__header">
+			<span class="schema-panel__type">{ schema.Type }</span>
+			<span class="schema-panel__name">{ schema.Name }</span>
+		</div>
+		if len(schema.Columns) > 0 {
+			<ul class="schema-panel__columns">
+				for _, col := range schema.Columns {
+					<li class="schema-panel__column">
+						<span class="schema-panel__col-name">
+							{ col.Name }
+							if col.IsPK {
+								<span class="schema-panel__pk">PK</span>
+							}
+						</span>
+						<span class="schema-panel__col-type">{ col.Type }</span>
+					</li>
+				}
+			</ul>
+		} else {
+			<p class="text-muted">No columns</p>
+		}
+	</div>
+}
+
+templ SearchResults(results []SearchResultItem) {
+	<div id="query-search-results" class="query-search-results">
+		if len(results) == 0 {
+			<p class="text-muted">No results found</p>
+		} else {
+			<ul class="query-search-results__list">
+				for _, r := range results {
+					<li class="query-search-results__item">
+						<span class="query-search-results__name">{ r.Name }</span>
+						<span class="query-search-results__path">{ r.Path }</span>
+						if r.Description != "" {
+							<span class="query-search-results__desc">{ r.Description }</span>
+						}
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+// Helper functions
+
+func itoa(n int) string {
+	return fmt.Sprintf("%d", n)
+}
