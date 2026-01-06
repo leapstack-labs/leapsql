@@ -11,6 +11,7 @@
 @import url('./base/typography.css');
 @import url('./base/layout.css');
 @import url('./base/utilities.css');
+@import url('./base/transitions.css');
 
 /* ===== Components ===== */
 @import url('./components/header.css');

@@ -1,0 +1,102 @@
+/* css/base/transitions.css - View Transitions */
+
+/* ===== Stable Elements (pinned, no crossfade) ===== */
+.ui-header {
+  view-transition-name: header;
+}
+
+.ui-sidebar {
+  view-transition-name: sidebar;
+}
+
+.ui-context-panel {
+  view-transition-name: context-panel;
+}
+
+/* ===== Main Content Transition ===== */
+.ui-content {
+  view-transition-name: main-content;
+}
+
+/* ===== Snappy Timing (125ms) ===== */
+::view-transition-group(root),
+::view-transition-group(main-content) {
+  animation-duration: 125ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Keep stable elements pinned - no animation */
+::view-transition-old(header),
+::view-transition-new(header),
+::view-transition-old(sidebar),
+::view-transition-new(sidebar),
+::view-transition-old(context-panel),
+::view-transition-new(context-panel) {
+  animation: none;
+}
+
+/* ===== Default: Slide Up (for non-directional nav) ===== */
+::view-transition-new(main-content) {
+  animation: 125ms cubic-bezier(0, 0, 0.2, 1) content-enter;
+}
+
+::view-transition-old(main-content) {
+  animation: 125ms cubic-bezier(0.4, 0, 1, 1) content-exit;
+}
+
+@keyframes content-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes content-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ===== Directional: Forward Navigation (slide left) ===== */
+html.nav-forward ::view-transition-new(main-content) {
+  animation-name: slide-in-from-right;
+}
+
+html.nav-forward ::view-transition-old(main-content) {
+  animation-name: slide-out-to-left;
+}
+
+@keyframes slide-in-from-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out-to-left {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-16px); }
+}
+
+/* ===== Directional: Back Navigation (slide right) ===== */
+html.nav-back ::view-transition-new(main-content) {
+  animation-name: slide-in-from-left;
+}
+
+html.nav-back ::view-transition-old(main-content) {
+  animation-name: slide-out-to-right;
+}
+
+@keyframes slide-in-from-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out-to-right {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(16px); }
+}
+
+/* ===== Accessibility ===== */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
