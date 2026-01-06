@@ -23,6 +23,13 @@
   --input: oklch(0.76 0.02 98.35);
   --ring: oklch(0.59 0.17 253.06);
   
+  /* Chart colors */
+  --chart-1: oklch(0.56 0.13 43.00);
+  --chart-2: oklch(0.69 0.16 290.41);
+  --chart-3: oklch(0.88 0.03 93.13);
+  --chart-4: oklch(0.88 0.04 298.18);
+  --chart-5: oklch(0.56 0.13 42.06);
+  
   /* Typography - Source Serif 4 for elegant, readable headings */
   --font-display: 'Source Serif 4', Georgia, serif;
   --font-sans: 'DM Sans', system-ui, sans-serif;
@@ -106,6 +113,13 @@
   --border: oklch(0.36 0.01 106.89);
   --input: oklch(0.43 0.01 100.22);
   --ring: oklch(0.59 0.17 253.06);
+  
+  /* Chart colors */
+  --chart-1: oklch(0.56 0.13 43.00);
+  --chart-2: oklch(0.69 0.16 290.41);
+  --chart-3: oklch(0.21 0.01 95.42);
+  --chart-4: oklch(0.31 0.05 289.32);
+  --chart-5: oklch(0.56 0.13 42.06);
   
   /* Adjusted for dark mode */
   --shadow-color: 30 30% 5%;
