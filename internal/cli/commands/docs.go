@@ -318,6 +318,3 @@ func createEngineForDocs(cmd *cobra.Command, modelsPath string) (*engine.Engine,
 
 	return eng, cleanup, nil
 }
-
-// Ensure config package is imported for getConfig usage
-var _ = config.DefaultModelsDir

@@ -87,11 +87,9 @@ type EnvConfig struct {
 	Target       *TargetConfig `koanf:"target"`
 }
 
-// Default configuration values
+// CLI-specific default configuration values.
+// Shared defaults (ModelsDir, SeedsDir, MacrosDir) come from internal/config.
 const (
-	DefaultModelsDir = "models"
-	DefaultSeedsDir  = "seeds"
-	DefaultMacrosDir = "macros"
 	DefaultStateFile = ".leapsql/state.db"
 	DefaultEnv       = "dev"
 	DefaultOutput    = "auto" // Auto-detect: TTY=text, non-TTY=markdown

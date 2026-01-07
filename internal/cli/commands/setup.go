@@ -7,6 +7,7 @@ import (
 
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
+	intconfig "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -72,9 +73,9 @@ func getConfig() *config.Config {
 	}
 
 	// Fallback: read from environment with defaults
-	modelsDir := getEnvOrDefault("LEAPSQL_MODELS_DIR", config.DefaultModelsDir)
-	seedsDir := getEnvOrDefault("LEAPSQL_SEEDS_DIR", config.DefaultSeedsDir)
-	macrosDir := getEnvOrDefault("LEAPSQL_MACROS_DIR", config.DefaultMacrosDir)
+	modelsDir := getEnvOrDefault("LEAPSQL_MODELS_DIR", intconfig.DefaultModelsDir)
+	seedsDir := getEnvOrDefault("LEAPSQL_SEEDS_DIR", intconfig.DefaultSeedsDir)
+	macrosDir := getEnvOrDefault("LEAPSQL_MACROS_DIR", intconfig.DefaultMacrosDir)
 	database := os.Getenv("LEAPSQL_DATABASE")
 	statePath := getEnvOrDefault("LEAPSQL_STATE_PATH", config.DefaultStateFile)
 	environment := getEnvOrDefault("LEAPSQL_ENVIRONMENT", config.DefaultEnv)

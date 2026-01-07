@@ -109,23 +109,43 @@ func isOrchestrator(path string) bool {
 	return orchestrators[path]
 }
 
-// isUtility returns true for specialized worker packages.
-func isUtility(path string) bool {
-	utilities := map[string]bool{
-		"internal/loader":        true,
-		"internal/lineage":       true,
-		"internal/state":         true,
-		"internal/state/sqlcgen": true,
-		"internal/dag":           true,
-		"internal/template":      true,
-		"internal/starlark":      true,
-		"internal/config":        true,
-		"internal/macro":         true,
-		"internal/registry":      true,
-		"internal/testutil":      true,
-		"internal/cli/config":    true,
+// =============================================================================
+// UTILITY TIER CLASSIFICATION
+// =============================================================================
+
+// isSharedUtility returns true for foundational utility packages that provide
+// core mechanisms used across multiple entry points (CLI, LSP, Engine).
+// These packages must remain decoupled from application-specific concerns.
+func isSharedUtility(path string) bool {
+	shared := map[string]bool{
+		"internal/config":        true, // Shared config loading/defaults
+		"internal/loader":        true, // Model/seed loading
+		"internal/lineage":       true, // SQL lineage extraction
+		"internal/state":         true, // State persistence
+		"internal/state/sqlcgen": true, // Generated SQL code
+		"internal/dag":           true, // Dependency graph
+		"internal/template":      true, // Template rendering
+		"internal/starlark":      true, // Starlark execution
+		"internal/macro":         true, // Macro definitions
+		"internal/registry":      true, // Generic registry
+		"internal/testutil":      true, // Test utilities
 	}
-	return utilities[path]
+	return shared[path]
+}
+
+// isContextualUtility returns true for application entry-point specific
+// utilities that extend shared utilities with context (CLI flags, etc.).
+// Contextual utilities are allowed to import Shared utilities.
+func isContextualUtility(path string) bool {
+	contextual := map[string]bool{
+		"internal/cli/config": true, // CLI-specific config (flags, env vars)
+	}
+	return contextual[path]
+}
+
+// isUtility returns true for any utility package (shared or contextual).
+func isUtility(path string) bool {
+	return isSharedUtility(path) || isContextualUtility(path)
 }
 
 // isAllowedUtilityException returns true for explicitly allowed utility-to-utility imports.
@@ -372,6 +392,12 @@ func checkInternalTierImport(t *testing.T, from, to string) {
 
 	// Utilities have strict rules
 	if isUtility(from) {
+		// Contextual utilities MAY import shared utilities
+		// This is the "Three-Tier" model: Core → Shared → Contextual
+		if isContextualUtility(from) && isSharedUtility(to) {
+			return // Allowed: cli/config → config
+		}
+
 		// Check for allowed exceptions
 		if isAllowedUtilityException(from, to) {
 			return

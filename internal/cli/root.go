@@ -11,6 +11,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/cli/commands"
 	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
+	intconfig "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	starctx "github.com/leapstack-labs/leapsql/internal/starlark"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -161,9 +162,9 @@ func GetConfig(ctx context.Context) *config.Config {
 	}
 	// Return default config if none in context
 	return &config.Config{
-		ModelsDir:   config.DefaultModelsDir,
-		SeedsDir:    config.DefaultSeedsDir,
-		MacrosDir:   config.DefaultMacrosDir,
+		ModelsDir:   intconfig.DefaultModelsDir,
+		SeedsDir:    intconfig.DefaultSeedsDir,
+		MacrosDir:   intconfig.DefaultMacrosDir,
 		StatePath:   config.DefaultStateFile,
 		Environment: config.DefaultEnv,
 	}
