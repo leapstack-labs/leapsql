@@ -31,7 +31,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -43,11 +42,11 @@ type Parser struct {
 	peek    Token // lookahead token
 	peek2   Token // second lookahead token
 	errors  []error
-	dialect *dialect.Dialect // required
+	dialect *core.Dialect // required
 }
 
 // NewParser creates a new parser for the given SQL input with dialect support.
-func NewParser(sql string, d *dialect.Dialect) *Parser {
+func NewParser(sql string, d *core.Dialect) *Parser {
 	p := &Parser{
 		lexer:   NewLexerWithDialect(sql, d),
 		dialect: d,
@@ -60,7 +59,7 @@ func NewParser(sql string, d *dialect.Dialect) *Parser {
 }
 
 // ParseWithDialect parses the SQL with a specific dialect and returns the AST.
-func ParseWithDialect(sql string, d *dialect.Dialect) (*core.SelectStmt, error) {
+func ParseWithDialect(sql string, d *core.Dialect) (*core.SelectStmt, error) {
 	p := NewParser(sql, d)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {
@@ -70,7 +69,7 @@ func ParseWithDialect(sql string, d *dialect.Dialect) (*core.SelectStmt, error) 
 }
 
 // Dialect returns the parser's dialect, if any.
-func (p *Parser) Dialect() *dialect.Dialect {
+func (p *Parser) Dialect() *core.Dialect {
 	return p.dialect
 }
 
@@ -162,7 +161,7 @@ func (p *Parser) isKeyword(tok Token) bool {
 		return true
 	}
 	// Check global registry (for keywords from other dialects)
-	if _, isKnown := dialect.IsKnownClause(tok.Type); isKnown {
+	if _, isKnown := core.IsKnownClause(tok.Type); isKnown {
 		return true
 	}
 	return false
@@ -194,7 +193,7 @@ func (p *Parser) isClauseKeyword(tok Token) bool {
 		return true
 	}
 	// Check global registry
-	if _, isKnown := dialect.IsKnownClause(tok.Type); isKnown {
+	if _, isKnown := core.IsKnownClause(tok.Type); isKnown {
 		return true
 	}
 	return false
@@ -313,7 +312,7 @@ func (p *Parser) Comments() []*token.Comment {
 }
 
 // ParseWithDialectAndComments parses SQL and returns both AST and comments.
-func ParseWithDialectAndComments(sql string, d *dialect.Dialect) (*core.SelectStmt, []*token.Comment, error) {
+func ParseWithDialectAndComments(sql string, d *core.Dialect) (*core.SelectStmt, []*token.Comment, error) {
 	p := NewParser(sql, d)
 	stmt := p.parseStatement()
 	if len(p.errors) > 0 {

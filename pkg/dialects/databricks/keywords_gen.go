@@ -2,7 +2,7 @@
 // Source: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-reserved-words
 // Generated: 2026-01-05
 
-package dialect
+package databricks
 
 // databricksCompletionKeywords contains all keywords for LSP completions.
 var databricksCompletionKeywords = []string{

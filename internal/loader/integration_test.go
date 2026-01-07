@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leapstack-labs/leapsql/internal/dag"
+	"github.com/leapstack-labs/leapsql/internal/lineage"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 
@@ -23,6 +24,44 @@ func getTestDialect(t *testing.T) *dialect.Dialect {
 	return d
 }
 
+// integrationLineageExtractor implements LineageExtractor for integration tests.
+type integrationLineageExtractor struct{}
+
+func (e *integrationLineageExtractor) Extract(sql string, d *core.Dialect) (*LineageResult, error) {
+	result, err := lineage.ExtractLineageWithOptions(sql, lineage.ExtractLineageOptions{
+		Dialect: d,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert lineage.ColumnLineage to core.ColumnInfo
+	columns := make([]core.ColumnInfo, 0, len(result.Columns))
+	for i, col := range result.Columns {
+		columns = append(columns, core.ColumnInfo{
+			Name:          col.Name,
+			Index:         i,
+			TransformType: col.Transform,
+			Function:      col.Function,
+			Sources:       col.Sources,
+		})
+	}
+
+	return &LineageResult{
+		Sources:        result.Sources,
+		Columns:        columns,
+		UsesSelectStar: result.UsesSelectStar,
+	}, nil
+}
+
+// testScanner creates a Scanner with lineage extraction enabled for testing.
+func testScanner(t *testing.T, baseDir string) *Scanner {
+	t.Helper()
+	scanner := NewScanner(baseDir, getTestDialect(t))
+	scanner.GetLoader().LineageExtractor = &integrationLineageExtractor{}
+	return scanner
+}
+
 // TestIntegration_ScanTestDataset tests the parser with the actual test dataset.
 func TestIntegration_ScanTestDataset(t *testing.T) {
 	// Get the path to testdata relative to this file
@@ -32,7 +71,7 @@ func TestIntegration_ScanTestDataset(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath, getTestDialect(t))
+	scanner := testScanner(t, testdataPath)
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)
@@ -102,7 +141,7 @@ func TestIntegration_BuildDAG(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath, getTestDialect(t))
+	scanner := testScanner(t, testdataPath)
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)
@@ -230,7 +269,7 @@ func TestIntegration_AffectedNodes(t *testing.T) {
 	}
 	testdataPath := filepath.Join(filepath.Dir(filename), "..", "..", "testdata", "models")
 
-	scanner := NewScanner(testdataPath, getTestDialect(t))
+	scanner := testScanner(t, testdataPath)
 	models, err := scanner.ScanDir(testdataPath)
 	if err != nil {
 		t.Fatalf("failed to scan testdata: %v", err)

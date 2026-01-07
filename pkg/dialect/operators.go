@@ -5,44 +5,35 @@
 package dialect
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-// OperatorDef defines an infix operator with precedence.
-// Symbol is optional - if provided, it's registered with the lexer.
-type OperatorDef struct {
-	Token      token.TokenType  // The token type for this operator
-	Symbol     string           // Optional symbol for lexer registration (e.g. "::")
-	Precedence int              // Operator precedence level
-	Handler    spi.InfixHandler // Optional custom handler (nil for standard binary ops)
-}
-
 // ANSIOperators contains standard SQL operators with their precedence.
-var ANSIOperators = []OperatorDef{
+var ANSIOperators = []core.OperatorDef{
 	// Logical operators (lowest precedence)
-	{Token: token.OR, Precedence: spi.PrecedenceOr},
-	{Token: token.AND, Precedence: spi.PrecedenceAnd},
+	{Token: token.OR, Precedence: core.PrecedenceOr},
+	{Token: token.AND, Precedence: core.PrecedenceAnd},
 
 	// Comparison operators
-	{Token: token.EQ, Precedence: spi.PrecedenceComparison},
-	{Token: token.NE, Precedence: spi.PrecedenceComparison},
-	{Token: token.LT, Precedence: spi.PrecedenceComparison},
-	{Token: token.GT, Precedence: spi.PrecedenceComparison},
-	{Token: token.LE, Precedence: spi.PrecedenceComparison},
-	{Token: token.GE, Precedence: spi.PrecedenceComparison},
-	{Token: token.LIKE, Precedence: spi.PrecedenceComparison},
-	{Token: token.IN, Precedence: spi.PrecedenceComparison},
-	{Token: token.BETWEEN, Precedence: spi.PrecedenceComparison},
-	{Token: token.IS, Precedence: spi.PrecedenceComparison},
+	{Token: token.EQ, Precedence: core.PrecedenceComparison},
+	{Token: token.NE, Precedence: core.PrecedenceComparison},
+	{Token: token.LT, Precedence: core.PrecedenceComparison},
+	{Token: token.GT, Precedence: core.PrecedenceComparison},
+	{Token: token.LE, Precedence: core.PrecedenceComparison},
+	{Token: token.GE, Precedence: core.PrecedenceComparison},
+	{Token: token.LIKE, Precedence: core.PrecedenceComparison},
+	{Token: token.IN, Precedence: core.PrecedenceComparison},
+	{Token: token.BETWEEN, Precedence: core.PrecedenceComparison},
+	{Token: token.IS, Precedence: core.PrecedenceComparison},
 
 	// Arithmetic operators
-	{Token: token.PLUS, Precedence: spi.PrecedenceAddition},
-	{Token: token.MINUS, Precedence: spi.PrecedenceAddition},
-	{Token: token.DPIPE, Precedence: spi.PrecedenceAddition}, // || string concatenation
+	{Token: token.PLUS, Precedence: core.PrecedenceAddition},
+	{Token: token.MINUS, Precedence: core.PrecedenceAddition},
+	{Token: token.DPIPE, Precedence: core.PrecedenceAddition}, // || string concatenation
 
 	// Multiplicative operators (highest precedence for binary ops)
-	{Token: token.STAR, Precedence: spi.PrecedenceMultiply},
-	{Token: token.SLASH, Precedence: spi.PrecedenceMultiply},
-	{Token: token.MOD, Precedence: spi.PrecedenceMultiply},
+	{Token: token.STAR, Precedence: core.PrecedenceMultiply},
+	{Token: token.SLASH, Precedence: core.PrecedenceMultiply},
+	{Token: token.MOD, Precedence: core.PrecedenceMultiply},
 }

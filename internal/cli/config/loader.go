@@ -15,7 +15,9 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/v2"
-	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
+	"github.com/leapstack-labs/leapsql/pkg/adapter"
+	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/spf13/pflag"
 )
 
@@ -179,7 +181,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	}
 
 	// Apply defaults based on target type
-	sharedcfg.ApplyTargetDefaults(cfg.Target)
+	applyTargetDefaults(cfg.Target)
 
 	// Expand environment variables in target
 	expandTargetEnvVars(cfg.Target)
@@ -192,7 +194,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	}
 
 	// Validate target configuration
-	if err := sharedcfg.ValidateTarget(cfg.Target); err != nil {
+	if err := validateTarget(cfg.Target); err != nil {
 		return nil, fmt.Errorf("invalid target configuration: %w", err)
 	}
 
@@ -333,4 +335,54 @@ func MergeTargetConfig(base, override *TargetConfig) *TargetConfig {
 	}
 
 	return merged
+}
+
+// defaultSchemaForType returns the default schema for a database type.
+// It looks up the dialect in the registry; if not found, returns "main" as fallback.
+func defaultSchemaForType(dbType string) string {
+	if d, ok := dialect.Get(dbType); ok && d.DefaultSchema != "" {
+		return d.DefaultSchema
+	}
+	// Fallback for unknown types or dialects without a default schema
+	return "main"
+}
+
+// applyTargetDefaults applies default values to a TargetConfig based on the target type.
+func applyTargetDefaults(t *core.TargetConfig) {
+	if t == nil {
+		return
+	}
+
+	// Apply default schema based on type
+	if t.Schema == "" {
+		t.Schema = defaultSchemaForType(t.Type)
+	}
+
+	// Apply type-specific defaults
+	if t.Type == "postgres" {
+		if t.Port == 0 {
+			t.Port = 5432
+		}
+	}
+}
+
+// validateTarget checks if the target configuration is valid.
+// It uses the adapter registry to determine which adapter types are available.
+func validateTarget(t *core.TargetConfig) error {
+	if t == nil {
+		return nil
+	}
+	if t.Type == "" {
+		return fmt.Errorf("target type is required")
+	}
+
+	// Use adapter registry as single source of truth
+	if !adapter.IsRegistered(strings.ToLower(t.Type)) {
+		return &adapter.UnknownAdapterError{
+			Type:      t.Type,
+			Available: adapter.ListAdapters(),
+		}
+	}
+
+	return nil
 }

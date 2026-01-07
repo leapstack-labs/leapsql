@@ -239,7 +239,7 @@ func TestNewContext_WithOptions(t *testing.T) {
 	assert.True(t, ok, "datetime macro not found in globals")
 }
 
-func TestNewContext_WithMacroRegistry(t *testing.T) {
+func TestNewContext_WithMacroProvider(t *testing.T) {
 	config := starlark.NewDict(0)
 
 	// Create a registry with a module
@@ -254,7 +254,7 @@ func TestNewContext_WithMacroRegistry(t *testing.T) {
 	err := registry.Register(module)
 	require.NoError(t, err, "failed to register module")
 
-	ctx := NewContext(config, "prod", nil, nil, WithMacroRegistry(registry))
+	ctx := NewContext(config, "prod", nil, nil, WithMacroProvider(registry))
 
 	globals := ctx.Globals()
 	utilsVal, ok := globals["utils"]
@@ -269,11 +269,11 @@ func TestNewContext_WithMacroRegistry(t *testing.T) {
 	assert.Equal(t, `"greet_func"`, greet.String(), "greet value")
 }
 
-func TestNewContext_WithMacroRegistry_Nil(t *testing.T) {
+func TestNewContext_WithMacroProvider_Nil(t *testing.T) {
 	config := starlark.NewDict(0)
 
 	// Nil registry should not cause panic
-	ctx := NewContext(config, "prod", nil, nil, WithMacroRegistry(nil))
+	ctx := NewContext(config, "prod", nil, nil, WithMacroProvider(nil))
 
 	globals := ctx.Globals()
 	// Should have standard globals

@@ -13,9 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/lineage"
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Loader parses SQL model files and extracts pragmas.
@@ -23,12 +21,15 @@ type Loader struct {
 	// BaseDir is the models directory root
 	BaseDir string
 	// Dialect is the SQL dialect for lineage extraction (optional)
-	Dialect *dialect.Dialect
+	Dialect *core.Dialect
+	// LineageExtractor extracts table/column lineage from SQL (optional)
+	// If nil, lineage extraction will be skipped.
+	LineageExtractor LineageExtractor
 }
 
 // NewLoader creates a new loader with the given base directory and dialect.
 // If dialect is nil, lineage extraction will be skipped.
-func NewLoader(baseDir string, d *dialect.Dialect) *Loader {
+func NewLoader(baseDir string, d *core.Dialect) *Loader {
 	return &Loader{BaseDir: baseDir, Dialect: d}
 }
 
@@ -169,9 +170,9 @@ func (p *Loader) ParseContent(filePath string, content string) (*core.Model, err
 
 	model.SQL = strings.TrimSpace(strings.Join(sqlLines, "\n"))
 
-	// Auto-detect table sources and column lineage using the lineage parser
-	// Only if dialect is available
-	if model.SQL != "" && p.Dialect != nil {
+	// Auto-detect table sources and column lineage using the lineage extractor
+	// Only if dialect and lineage extractor are available
+	if model.SQL != "" && p.Dialect != nil && p.LineageExtractor != nil {
 		result, err := p.extractLineage(model.SQL)
 		if err == nil {
 			model.Sources = result.Sources
@@ -192,35 +193,24 @@ type lineageResult struct {
 	UsesSelectStar bool
 }
 
-// extractLineage uses the lineage parser to extract all table sources and column lineage from SQL.
+// extractLineage uses the lineage extractor to extract all table sources and column lineage from SQL.
 func (p *Loader) extractLineage(sql string) (*lineageResult, error) {
 	if p.Dialect == nil {
 		return nil, fmt.Errorf("dialect is required for lineage extraction")
 	}
+	if p.LineageExtractor == nil {
+		return nil, fmt.Errorf("lineage extractor is required for lineage extraction")
+	}
 
-	modelLineage, err := lineage.ExtractLineageWithOptions(sql, lineage.ExtractLineageOptions{
-		Dialect: p.Dialect,
-	})
+	result, err := p.LineageExtractor.Extract(sql, p.Dialect)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert lineage.ColumnLineage to core.ColumnInfo
-	columns := make([]core.ColumnInfo, 0, len(modelLineage.Columns))
-	for i, col := range modelLineage.Columns {
-		columns = append(columns, core.ColumnInfo{
-			Name:          col.Name,
-			Index:         i,
-			TransformType: col.Transform, // Both use core.TransformType now
-			Function:      col.Function,
-			Sources:       col.Sources, // Both use []core.SourceRef now
-		})
-	}
-
 	return &lineageResult{
-		Sources:        modelLineage.Sources,
-		Columns:        columns,
-		UsesSelectStar: modelLineage.UsesSelectStar,
+		Sources:        result.Sources,
+		Columns:        result.Columns,
+		UsesSelectStar: result.UsesSelectStar,
 	}, nil
 }
 
@@ -266,7 +256,7 @@ type Scanner struct {
 
 // NewScanner creates a new directory scanner with the given dialect.
 // If dialect is nil, lineage extraction will be skipped.
-func NewScanner(baseDir string, d *dialect.Dialect) *Scanner {
+func NewScanner(baseDir string, d *core.Dialect) *Scanner {
 	return &Scanner{
 		loader: NewLoader(baseDir, d),
 	}

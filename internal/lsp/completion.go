@@ -61,7 +61,7 @@ func getSQLKeywordCompletions(d *dialect.Dialect, prefix string) []CompletionIte
 		return nil
 	}
 
-	keywords := d.Keywords()
+	keywords := dialect.Keywords(d)
 	if len(keywords) == 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ func getSQLFunctionCompletions(d *dialect.Dialect, prefix string) []CompletionIt
 		return nil
 	}
 
-	funcs := d.AllFunctions()
+	funcs := dialect.AllFunctions(d)
 	sort.Strings(funcs)
 
 	var items []CompletionItem
@@ -437,7 +437,7 @@ func (s *Server) getHover(params HoverParams) *Hover {
 			}
 
 			// Show function classification
-			lineageType := s.dialect.FunctionLineageType(word)
+			lineageType := s.dialect.FunctionLineageTypeOf(word)
 			switch lineageType {
 			case dialect.LineageAggregate:
 				content.WriteString("\n\n*Aggregate function*")

@@ -7,6 +7,36 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
+// Re-export core precedence constants for backward compatibility
+const (
+	PrecedenceNone       = core.PrecedenceNone
+	PrecedenceOr         = core.PrecedenceOr
+	PrecedenceAnd        = core.PrecedenceAnd
+	PrecedenceNot        = core.PrecedenceNot
+	PrecedenceComparison = core.PrecedenceComparison
+	PrecedenceAddition   = core.PrecedenceAddition
+	PrecedenceMultiply   = core.PrecedenceMultiply
+	PrecedenceUnary      = core.PrecedenceUnary
+	PrecedencePostfix    = core.PrecedencePostfix
+)
+
+// Re-export ClauseSlot constants
+const (
+	SlotWhere      = core.SlotWhere
+	SlotGroupBy    = core.SlotGroupBy
+	SlotHaving     = core.SlotHaving
+	SlotWindow     = core.SlotWindow
+	SlotOrderBy    = core.SlotOrderBy
+	SlotLimit      = core.SlotLimit
+	SlotOffset     = core.SlotOffset
+	SlotQualify    = core.SlotQualify
+	SlotFetch      = core.SlotFetch
+	SlotExtensions = core.SlotExtensions
+)
+
+// ClauseSlot type alias for backward compatibility
+type ClauseSlot = core.ClauseSlot
+
 // ParserOps exposes parser operations to dialect clause handlers.
 // This interface allows dialect-specific code to interact with the parser
 // without creating circular dependencies.
@@ -76,19 +106,6 @@ type Expr = core.Expr
 // This is an alias to core.OrderByItem for use in handler signatures.
 type OrderByItem = core.OrderByItem
 
-// Precedence constants for operator precedence parsing.
-const (
-	PrecedenceNone       = 0
-	PrecedenceOr         = 1
-	PrecedenceAnd        = 2
-	PrecedenceNot        = 3
-	PrecedenceComparison = 4 // =, <>, <, >, <=, >=, LIKE, ILIKE, IN, BETWEEN
-	PrecedenceAddition   = 5 // +, -, ||
-	PrecedenceMultiply   = 6 // *, /, %
-	PrecedenceUnary      = 7 // -, +, NOT
-	PrecedencePostfix    = 8 // ::, [], ()
-)
-
 // GroupByAllMarker is an interface to identify GROUP BY ALL markers from dialect handlers.
 // Implement this interface in dialect-specific marker types.
 type GroupByAllMarker interface {
@@ -100,50 +117,4 @@ type GroupByAllMarker interface {
 type OrderByAllMarker interface {
 	IsOrderByAll() bool
 	IsDesc() bool
-}
-
-// ClauseSlot specifies where a parsed clause result should be stored in SelectCore.
-// This enables dialects to declaratively specify storage locations for their clauses.
-type ClauseSlot int
-
-// ClauseSlot constants define where parsed clause results are stored in SelectCore.
-const (
-	SlotWhere ClauseSlot = iota
-	SlotGroupBy
-	SlotHaving
-	SlotWindow
-	SlotOrderBy
-	SlotLimit
-	SlotOffset
-	SlotQualify
-	SlotFetch      // FETCH FIRST/NEXT clause
-	SlotExtensions // Default for custom/dialect-specific clauses
-)
-
-// String returns the slot name for debugging.
-func (s ClauseSlot) String() string {
-	switch s {
-	case SlotWhere:
-		return "WHERE"
-	case SlotGroupBy:
-		return "GROUP BY"
-	case SlotHaving:
-		return "HAVING"
-	case SlotWindow:
-		return "WINDOW"
-	case SlotOrderBy:
-		return "ORDER BY"
-	case SlotLimit:
-		return "LIMIT"
-	case SlotOffset:
-		return "OFFSET"
-	case SlotQualify:
-		return "QUALIFY"
-	case SlotFetch:
-		return "FETCH"
-	case SlotExtensions:
-		return "EXTENSIONS"
-	default:
-		return "UNKNOWN"
-	}
 }

@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,7 +80,7 @@ func TestTargetConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := sharedcfg.ValidateTarget(&tt.target)
+			err := validateTarget(&tt.target)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")
 				if tt.errSubstr != "" {
@@ -98,7 +97,7 @@ func TestTargetConfig_Validate(t *testing.T) {
 // include the list of available adapters.
 func TestTargetConfig_Validate_ErrorContainsAvailable(t *testing.T) {
 	target := TargetConfig{Type: "invalid_db"}
-	err := sharedcfg.ValidateTarget(&target)
+	err := validateTarget(&target)
 	require.Error(t, err, "expected error for invalid type")
 
 	errStr := err.Error()
@@ -258,17 +257,17 @@ func TestMergeTargetConfig(t *testing.T) {
 	})
 }
 
-// TestTargetConfig_ApplyDefaults tests the ApplyTargetDefaults function.
+// TestTargetConfig_ApplyDefaults tests the applyTargetDefaults function.
 func TestTargetConfig_ApplyDefaults(t *testing.T) {
 	t.Run("sets default schema for duckdb", func(t *testing.T) {
 		target := &TargetConfig{Type: "duckdb"}
-		sharedcfg.ApplyTargetDefaults(target)
+		applyTargetDefaults(target)
 		assert.Equal(t, "main", target.Schema)
 	})
 
 	t.Run("preserves existing schema", func(t *testing.T) {
 		target := &TargetConfig{Type: "duckdb", Schema: "custom"}
-		sharedcfg.ApplyTargetDefaults(target)
+		applyTargetDefaults(target)
 		assert.Equal(t, "custom", target.Schema)
 	})
 }

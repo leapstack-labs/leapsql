@@ -275,6 +275,7 @@ func (e *Engine) discoverModels(opts DiscoveryOptions, result *DiscoveryResult) 
 	seenFiles := make(map[string]bool)
 
 	scanner := loader.NewScanner(absModelsDir, e.dialect)
+	scanner.GetLoader().LineageExtractor = NewLineageExtractor()
 
 	err := filepath.Walk(absModelsDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".sql") {
@@ -350,6 +351,7 @@ func (e *Engine) reconstructModelConfig(_ *core.PersistedModel, filePath string,
 		return nil
 	}
 	scanner := loader.NewScanner(absModelsDir, e.dialect)
+	scanner.GetLoader().LineageExtractor = NewLineageExtractor()
 	config, parseErr := scanner.ParseContent(filePath, content)
 	if parseErr != nil {
 		// If parsing fails now, return nil to trigger full re-parse

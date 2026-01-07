@@ -386,19 +386,19 @@ func TestDialectIsClauseToken(t *testing.T) {
 
 func TestDialectClauseDef(t *testing.T) {
 	// DuckDB should have a ClauseDef for QUALIFY
-	def, ok := duckdbDialect.DuckDB.ClauseDef(token.QUALIFY)
+	def, ok := duckdbDialect.DuckDB.ClauseDefFor(token.QUALIFY)
 	require.True(t, ok, "DuckDB should have ClauseDef for QUALIFY")
 	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
 
 	// DuckDB should have ClauseDef for WHERE
-	def, ok = duckdbDialect.DuckDB.ClauseDef(parser.TOKEN_WHERE)
+	def, ok = duckdbDialect.DuckDB.ClauseDefFor(parser.TOKEN_WHERE)
 	require.True(t, ok, "DuckDB should have ClauseDef for WHERE")
 	require.NotNil(t, def.Handler, "ClauseDef should have a Handler")
 }
 
 func TestAllClauseTokens(t *testing.T) {
 	// DuckDB should return all clause tokens including QUALIFY
-	duckdbTokens := duckdbDialect.DuckDB.AllClauseTokens()
+	duckdbTokens := dialect.AllClauseTokens(duckdbDialect.DuckDB)
 	require.NotEmpty(t, duckdbTokens)
 
 	// Should include standard clauses

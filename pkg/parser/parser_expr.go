@@ -152,7 +152,8 @@ func (p *Parser) parseInfixExpr(left core.Expr, prec int) core.Expr {
 
 	// Check for custom infix handler (dialect-specific operators like ::)
 	if p.dialect != nil {
-		if handler := p.dialect.InfixHandler(p.token.Type); handler != nil {
+		if h := p.dialect.InfixHandler(p.token.Type); h != nil {
+			handler := h.(spi.InfixHandler)
 			op := p.token
 			p.nextToken()
 			result, err := handler(p, left)

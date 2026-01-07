@@ -3,8 +3,6 @@ package parser
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"strings"
-
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Schema maps table names to their columns.
@@ -45,15 +43,15 @@ func (e *ScopeEntry) EffectiveName() string {
 type Scope struct {
 	parent  *Scope                 // Parent scope (for nested queries)
 	entries map[string]*ScopeEntry // Name/alias -> entry (normalized to lowercase)
-	dialect *dialect.Dialect       // For name normalization
+	dialect *core.Dialect          // For name normalization
 	schema  Schema                 // External schema information
 }
 
 // NewScope creates a new root scope.
 // Returns an error if dialect is nil.
-func NewScope(d *dialect.Dialect, schema Schema) (*Scope, error) {
+func NewScope(d *core.Dialect, schema Schema) (*Scope, error) {
 	if d == nil {
-		return nil, dialect.ErrDialectRequired
+		return nil, core.ErrDialectRequired
 	}
 	return &Scope{
 		entries: make(map[string]*ScopeEntry),

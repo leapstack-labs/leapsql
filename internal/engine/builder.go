@@ -95,7 +95,7 @@ func (e *Engine) createExecutionContext(m *core.Model) *starctx.ExecutionContext
 		e.environment,
 		e.target,
 		thisInfo,
-		starctx.WithMacroRegistry(e.macroRegistry),
+		starctx.WithMacroProvider(e.macroRegistry),
 	)
 
 	return ctx

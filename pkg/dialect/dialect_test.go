@@ -60,7 +60,7 @@ func TestFunctionLineageType_TableFunctionPriority(t *testing.T) {
 		TableFunctions("sum"). // Same function as both - table should win
 		Build()
 
-	assert.Equal(t, LineageTable, d.FunctionLineageType("sum"))
+	assert.Equal(t, LineageTable, d.FunctionLineageTypeOf("sum"))
 }
 
 func TestGetDoc(t *testing.T) {
@@ -114,7 +114,7 @@ func TestAllFunctions(t *testing.T) {
 		}).
 		Build()
 
-	funcs := d.AllFunctions()
+	funcs := AllFunctions(d)
 
 	// Should include all functions from all categories
 	expected := []string{"sum", "count", "avg", "now", "uuid", "row_number", "rank", "read_csv", "generate_series", "coalesce"}
@@ -129,7 +129,7 @@ func TestKeywords(t *testing.T) {
 		WithKeywords("SELECT", "FROM", "WHERE", "JOIN").
 		Build()
 
-	keywords := d.Keywords()
+	keywords := Keywords(d)
 	sort.Strings(keywords)
 
 	// Keywords are normalized to lowercase
@@ -141,7 +141,7 @@ func TestDataTypes(t *testing.T) {
 		WithDataTypes("BIGINT", "VARCHAR", "BOOLEAN", "DATE").
 		Build()
 
-	types := d.DataTypes()
+	types := d.DataTypes
 
 	assert.Equal(t, []string{"BIGINT", "VARCHAR", "BOOLEAN", "DATE"}, types)
 }
@@ -215,7 +215,7 @@ func TestFormatPlaceholder(t *testing.T) {
 				PlaceholderStyle(tt.style).
 				Build()
 
-			assert.Equal(t, tt.want, d.FormatPlaceholder(tt.index))
+			assert.Equal(t, tt.want, FormatPlaceholder(d, tt.index))
 		})
 	}
 }
@@ -337,7 +337,7 @@ func TestBuilderWithAllNewMethods(t *testing.T) {
 	assert.Equal(t, "postgres", d.Name)
 	assert.Equal(t, "public", d.DefaultSchema)
 	assert.Equal(t, core.PlaceholderDollar, d.Placeholder)
-	assert.Equal(t, "$1", d.FormatPlaceholder(1))
+	assert.Equal(t, "$1", FormatPlaceholder(d, 1))
 	assert.True(t, d.IsReservedWord("user"))
 	assert.True(t, d.IsReservedWord("ORDER"))
 	assert.False(t, d.IsReservedWord("foo"))

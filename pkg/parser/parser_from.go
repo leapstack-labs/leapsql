@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/spi"
 )
 
 // FROM clause parsing: table references, derived tables, lateral joins, JOINs.
@@ -48,10 +49,11 @@ func (p *Parser) parseFromItemExtensions(source core.TableRef) core.TableRef {
 	}
 
 	for {
-		handler := p.dialect.FromItemHandler(p.token.Type)
-		if handler == nil {
+		h := p.dialect.FromItemHandler(p.token.Type)
+		if h == nil {
 			break
 		}
+		handler := h.(spi.FromItemHandler)
 
 		p.nextToken() // consume the keyword (PIVOT, UNPIVOT, etc.)
 
@@ -216,7 +218,7 @@ func (p *Parser) parseJoin() *core.Join {
 
 	// Try dialect join type lookup (covers standard + extensions)
 	if p.dialect != nil {
-		if def, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
+		if def, ok := p.dialect.JoinTypeDefFor(p.token.Type); ok {
 			join.Type = core.JoinType(def.Type)
 			p.nextToken()
 
@@ -226,7 +228,7 @@ func (p *Parser) parseJoin() *core.Join {
 			}
 
 			// Check for compound syntax (LEFT SEMI, LEFT ANTI)
-			if subDef, ok := p.dialect.JoinTypeDef(p.token.Type); ok {
+			if subDef, ok := p.dialect.JoinTypeDefFor(p.token.Type); ok {
 				join.Type = core.JoinType(subDef.Type)
 				p.nextToken()
 			}

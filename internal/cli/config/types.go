@@ -7,7 +7,6 @@
 package config
 
 import (
-	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
@@ -88,11 +87,11 @@ type EnvConfig struct {
 	Target       *TargetConfig `koanf:"target"`
 }
 
-// Default configuration values - uses shared defaults from internal/config
+// Default configuration values
 const (
-	DefaultModelsDir = sharedcfg.DefaultModelsDir
-	DefaultSeedsDir  = sharedcfg.DefaultSeedsDir
-	DefaultMacrosDir = sharedcfg.DefaultMacrosDir
+	DefaultModelsDir = "models"
+	DefaultSeedsDir  = "seeds"
+	DefaultMacrosDir = "macros"
 	DefaultStateFile = ".leapsql/state.db"
 	DefaultEnv       = "dev"
 	DefaultOutput    = "auto" // Auto-detect: TTY=text, non-TTY=markdown

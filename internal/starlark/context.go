@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/leapstack-labs/leapsql/internal/macro"
 	"go.starlark.net/starlark"
 )
 
@@ -196,12 +195,20 @@ func WithMacros(macros starlark.StringDict) ContextOption {
 	}
 }
 
-// WithMacroRegistry sets macros from a macro.Registry.
+// MacroProvider provides macros as a Starlark dictionary.
+// This interface allows the starlark package to be decoupled from the macro package.
+// Implementations (like macro.Registry) are wired in internal/engine.
+type MacroProvider interface {
+	// ToStarlarkDict returns the macros as a Starlark StringDict.
+	ToStarlarkDict() starlark.StringDict
+}
+
+// WithMacroProvider sets macros from a MacroProvider.
 // This is the preferred way to inject macros loaded from .star files.
-func WithMacroRegistry(registry *macro.Registry) ContextOption {
+func WithMacroProvider(provider MacroProvider) ContextOption {
 	return func(ctx *ExecutionContext) {
-		if registry != nil {
-			ctx.Macros = registry.ToStarlarkDict()
+		if provider != nil {
+			ctx.Macros = provider.ToStarlarkDict()
 		}
 	}
 }

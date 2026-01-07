@@ -3,11 +3,22 @@ package format
 import (
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	duckdbdialect "github.com/leapstack-labs/leapsql/pkg/dialects/duckdb"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// formatSQL is a test helper that combines parsing and formatting.
+// The public SQL() function has been moved to internal/engine.FormatSQL.
+func formatSQL(sql string, d *core.Dialect) (string, error) {
+	stmt, comments, err := parser.ParseWithDialectAndComments(sql, d)
+	if err != nil {
+		return "", err
+	}
+	return WithComments(stmt, comments, d), nil
+}
 
 func TestFormat_BasicSelect(t *testing.T) {
 	d := duckdbdialect.DuckDB
@@ -372,7 +383,7 @@ func TestFormatSQL_Integration(t *testing.T) {
 
 	// Test the one-call API
 	input := "select id,   sum(val) from   my_table where active=true"
-	result, err := SQL(input, d)
+	result, err := formatSQL(input, d)
 	require.NoError(t, err)
 
 	expected := `SELECT
@@ -392,7 +403,7 @@ func TestFormat_CommentPreservation(t *testing.T) {
 	input := `-- Leading comment
 SELECT id FROM users`
 
-	result, err := SQL(input, d)
+	result, err := formatSQL(input, d)
 	require.NoError(t, err)
 
 	// Comment should be preserved in output

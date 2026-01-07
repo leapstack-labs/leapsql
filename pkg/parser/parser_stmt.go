@@ -1,10 +1,9 @@
 package parser
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/core"
 	"fmt"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 )
 
@@ -179,7 +178,7 @@ func (p *Parser) parseClausesWithDialect(sc *core.SelectCore) {
 		// Try to match against any clause in the sequence
 		for _, clauseType := range sequence {
 			if p.check(clauseType) {
-				def, ok := p.dialect.ClauseDef(clauseType)
+				def, ok := p.dialect.ClauseDefFor(clauseType)
 				if !ok {
 					p.addError(fmt.Sprintf("no definition for clause %s in dialect %s", clauseType, p.dialect.Name))
 					p.nextToken()
@@ -189,7 +188,8 @@ func (p *Parser) parseClausesWithDialect(sc *core.SelectCore) {
 
 				p.nextToken() // consume clause keyword
 
-				result, err := def.Handler(p)
+				handler := def.Handler.(spi.ClauseHandler)
+				result, err := handler(p)
 				if err != nil {
 					p.addError(err.Error())
 				}
@@ -203,7 +203,7 @@ func (p *Parser) parseClausesWithDialect(sc *core.SelectCore) {
 
 		// Check for unsupported clause (known globally but not in this dialect)
 		if !matched {
-			if name, isKnown := dialect.IsKnownClause(p.token.Type); isKnown {
+			if name, isKnown := core.IsKnownClause(p.token.Type); isKnown {
 				// Check if it's in this dialect's sequence
 				inSequence := false
 				for _, tok := range sequence {
@@ -406,10 +406,11 @@ func (p *Parser) parseStarModifiers() []core.StarModifier {
 	var modifiers []core.StarModifier
 
 	for {
-		handler := p.dialect.StarModifierHandler(p.token.Type)
-		if handler == nil {
+		h := p.dialect.StarModifierHandler(p.token.Type)
+		if h == nil {
 			break
 		}
+		handler := h.(spi.StarModifierHandler)
 
 		p.nextToken() // consume modifier keyword
 

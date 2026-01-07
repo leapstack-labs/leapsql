@@ -3,14 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
-
-	sharedcfg "github.com/leapstack-labs/leapsql/internal/config"
 )
 
 // DefaultSchemaForType returns the default schema for a database type.
-// This is a convenience wrapper around the shared config function.
+// This is a convenience wrapper that delegates to the local function.
 func DefaultSchemaForType(dbType string) string {
-	return sharedcfg.DefaultSchemaForType(dbType)
+	return defaultSchemaForType(dbType)
 }
 
 // Validate checks if the configuration is valid.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -19,7 +19,7 @@ type Lexer struct {
 	col     int  // current column number (1-based)
 
 	// Dialect support (optional)
-	dialect *dialect.Dialect
+	dialect *core.Dialect
 
 	// Comments collected during lexing (for formatter)
 	Comments []*token.Comment
@@ -37,7 +37,7 @@ func NewLexer(input string) *Lexer {
 }
 
 // NewLexerWithDialect creates a new dialect-aware Lexer for the given input.
-func NewLexerWithDialect(input string, d *dialect.Dialect) *Lexer {
+func NewLexerWithDialect(input string, d *core.Dialect) *Lexer {
 	l := &Lexer{
 		input:   input,
 		line:    1,
@@ -227,7 +227,7 @@ func (l *Lexer) matchDialectSymbol(pos Position) (Token, bool) {
 		return Token{}, false
 	}
 
-	symbols := l.dialect.Symbols()
+	symbols := l.dialect.SymbolsMap()
 	if len(symbols) == 0 {
 		return Token{}, false
 	}

@@ -1,10 +1,11 @@
 package parser
 
 import (
-	"github.com/leapstack-labs/leapsql/pkg/core"
 	"fmt"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
+	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -21,7 +22,8 @@ import (
 func (p *Parser) parsePrimary() core.Expr {
 	// Check for dialect-specific prefix handlers first
 	if p.dialect != nil {
-		if handler := p.dialect.PrefixHandler(p.token.Type); handler != nil {
+		if h := p.dialect.PrefixHandler(p.token.Type); h != nil {
+			handler := h.(spi.PrefixHandler)
 			p.nextToken() // consume the prefix token
 			expr, err := handler(p)
 			if err != nil {

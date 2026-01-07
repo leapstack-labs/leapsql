@@ -320,7 +320,7 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		lineage.Sources = sources
 
 		// Determine transform type based on function classification
-		funcType := e.dialect.FunctionLineageType(ex.Name)
+		funcType := e.dialect.FunctionLineageTypeOf(ex.Name)
 		funcName := e.dialect.NormalizeName(ex.Name)
 		switch funcType {
 		case dialect.LineageTable:

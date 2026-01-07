@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -13,13 +13,13 @@ const indentSize = 2
 
 // Printer handles SQL formatting with proper indentation and style.
 type Printer struct {
-	dialect     *dialect.Dialect
+	dialect     *core.Dialect
 	output      *bytes.Buffer
 	depth       int
 	atLineStart bool
 }
 
-func newPrinter(d *dialect.Dialect) *Printer {
+func newPrinter(d *core.Dialect) *Printer {
 	return &Printer{
 		dialect:     d,
 		output:      &bytes.Buffer{},

@@ -5,21 +5,12 @@
 package dialect
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-// Standard ANSI SQL join type values.
-// These are defined as untyped string constants for easy use.
-const (
-	JoinInner = "INNER"
-	JoinLeft  = "LEFT"
-	JoinRight = "RIGHT"
-	JoinFull  = "FULL"
-	JoinCross = "CROSS"
-)
-
 // ANSIJoinTypes contains standard SQL join types.
-var ANSIJoinTypes = []JoinTypeDef{
+var ANSIJoinTypes = []core.JoinTypeDef{
 	{
 		Token:       token.INNER,
 		Type:        JoinInner,

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/internal/lineage"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,44 @@ func testDialect(t *testing.T) *dialect.Dialect {
 	d, ok := dialect.Get("duckdb")
 	require.True(t, ok, "DuckDB dialect not found - ensure duckdb/dialect package is imported")
 	return d
+}
+
+// testLineageExtractor implements LineageExtractor for tests using internal/lineage.
+type testLineageExtractor struct{}
+
+func (e *testLineageExtractor) Extract(sql string, d *core.Dialect) (*LineageResult, error) {
+	result, err := lineage.ExtractLineageWithOptions(sql, lineage.ExtractLineageOptions{
+		Dialect: d,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert lineage.ColumnLineage to core.ColumnInfo
+	columns := make([]core.ColumnInfo, 0, len(result.Columns))
+	for i, col := range result.Columns {
+		columns = append(columns, core.ColumnInfo{
+			Name:          col.Name,
+			Index:         i,
+			TransformType: col.Transform,
+			Function:      col.Function,
+			Sources:       col.Sources,
+		})
+	}
+
+	return &LineageResult{
+		Sources:        result.Sources,
+		Columns:        columns,
+		UsesSelectStar: result.UsesSelectStar,
+	}, nil
+}
+
+// testLoader creates a Loader configured for testing with lineage extraction enabled.
+func testLoader(t *testing.T, baseDir string) *Loader {
+	t.Helper()
+	l := NewLoader(baseDir, testDialect(t))
+	l.LineageExtractor = &testLineageExtractor{}
+	return l
 }
 
 func TestParser_ParseContent(t *testing.T) {
@@ -220,7 +259,7 @@ FROM staging.stg_customers`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewLoader("/models", testDialect(t))
+			p := testLoader(t, "/models")
 			config, err := p.ParseContent("/models/test.sql", tt.sql)
 			require.NoError(t, err)
 
@@ -328,7 +367,7 @@ func TestScanner_ScanDir_SkipsHiddenFiles(t *testing.T) {
 }
 
 func TestParser_ParseContent_ColumnLineage(t *testing.T) {
-	p := NewLoader("/models", testDialect(t))
+	p := testLoader(t, "/models")
 
 	content := `SELECT 
 		c.customer_id,

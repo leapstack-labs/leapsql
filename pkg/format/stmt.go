@@ -2,8 +2,6 @@ package format
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -121,7 +119,7 @@ func (p *Printer) formatSelectCore(sc *core.SelectCore) {
 	// Dynamic clauses
 	sequence := p.dialect.ClauseSequence()
 	for _, clauseType := range sequence {
-		def, ok := p.dialect.ClauseDef(clauseType)
+		def, ok := p.dialect.ClauseDefFor(clauseType)
 		if !ok {
 			continue
 		}
@@ -130,9 +128,9 @@ func (p *Printer) formatSelectCore(sc *core.SelectCore) {
 	}
 }
 
-func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, sc *core.SelectCore) {
+func (p *Printer) formatClause(t token.TokenType, def core.ClauseDef, sc *core.SelectCore) {
 	// Handle GROUP BY ALL (DuckDB extension)
-	if def.Slot == spi.SlotGroupBy && sc.GroupByAll {
+	if def.Slot == core.SlotGroupBy && sc.GroupByAll {
 		p.kw(token.GROUP)
 		p.space()
 		p.kw(token.BY)
@@ -143,7 +141,7 @@ func (p *Printer) formatClause(t token.TokenType, def dialect.ClauseDef, sc *cor
 	}
 
 	// Handle ORDER BY ALL (DuckDB extension)
-	if def.Slot == spi.SlotOrderBy && sc.OrderByAll {
+	if def.Slot == core.SlotOrderBy && sc.OrderByAll {
 		p.kw(token.ORDER)
 		p.space()
 		p.kw(token.BY)
@@ -201,45 +199,45 @@ func hasValue(val any) bool {
 	return true
 }
 
-func (p *Printer) getClauseValue(sc *core.SelectCore, slot spi.ClauseSlot) any {
+func (p *Printer) getClauseValue(sc *core.SelectCore, slot core.ClauseSlot) any {
 	switch slot {
-	case spi.SlotWhere:
+	case core.SlotWhere:
 		return sc.Where
-	case spi.SlotGroupBy:
+	case core.SlotGroupBy:
 		return sc.GroupBy
-	case spi.SlotHaving:
+	case core.SlotHaving:
 		return sc.Having
-	case spi.SlotWindow:
+	case core.SlotWindow:
 		return nil // TODO
-	case spi.SlotOrderBy:
+	case core.SlotOrderBy:
 		return sc.OrderBy
-	case spi.SlotLimit:
+	case core.SlotLimit:
 		return sc.Limit
-	case spi.SlotOffset:
+	case core.SlotOffset:
 		return sc.Offset
-	case spi.SlotQualify:
+	case core.SlotQualify:
 		return sc.Qualify
-	case spi.SlotFetch:
+	case core.SlotFetch:
 		return sc.Fetch
 	}
 	return nil
 }
 
-func (p *Printer) formatSlotValue(slot spi.ClauseSlot, val any) {
+func (p *Printer) formatSlotValue(slot core.ClauseSlot, val any) {
 	switch slot {
-	case spi.SlotWhere, spi.SlotHaving, spi.SlotLimit, spi.SlotOffset, spi.SlotQualify:
+	case core.SlotWhere, core.SlotHaving, core.SlotLimit, core.SlotOffset, core.SlotQualify:
 		if expr, ok := val.(core.Expr); ok {
 			p.formatExpr(expr)
 		}
-	case spi.SlotGroupBy:
+	case core.SlotGroupBy:
 		if exprs, ok := val.([]core.Expr); ok {
 			p.formatList(len(exprs), func(i int) { p.formatExpr(exprs[i]) }, ",", true)
 		}
-	case spi.SlotOrderBy:
+	case core.SlotOrderBy:
 		if items, ok := val.([]core.OrderByItem); ok {
 			p.formatList(len(items), func(i int) { p.formatOrderByItem(items[i]) }, ",", true)
 		}
-	case spi.SlotFetch:
+	case core.SlotFetch:
 		if fetch, ok := val.(*core.FetchClause); ok {
 			p.formatFetchClause(fetch)
 		}

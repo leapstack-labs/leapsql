@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
 // Resolver walks the AST and resolves:
@@ -11,16 +10,16 @@ import (
 // - Column references to their source tables
 // - Star expansion (SELECT * and t.*)
 type Resolver struct {
-	dialect *dialect.Dialect
+	dialect *core.Dialect
 	schema  Schema
 	errors  []error //nolint:unused // Reserved for future error collection
 }
 
 // NewResolver creates a new resolver with the given dialect and schema.
 // Returns an error if dialect is nil.
-func NewResolver(d *dialect.Dialect, schema Schema) (*Resolver, error) {
+func NewResolver(d *core.Dialect, schema Schema) (*Resolver, error) {
 	if d == nil {
-		return nil, dialect.ErrDialectRequired
+		return nil, core.ErrDialectRequired
 	}
 	return &Resolver{
 		dialect: d,
@@ -357,14 +356,14 @@ func (e *ResolveError) Error() string {
 // Used during lineage extraction to find all source columns.
 type ColumnResolver struct {
 	scope   *Scope
-	dialect *dialect.Dialect
+	dialect *core.Dialect
 }
 
 // NewColumnResolver creates a column resolver for the given scope.
 // Returns an error if dialect is nil.
-func NewColumnResolver(scope *Scope, d *dialect.Dialect) (*ColumnResolver, error) {
+func NewColumnResolver(scope *Scope, d *core.Dialect) (*ColumnResolver, error) {
 	if d == nil {
-		return nil, dialect.ErrDialectRequired
+		return nil, core.ErrDialectRequired
 	}
 	return &ColumnResolver{
 		scope:   scope,
