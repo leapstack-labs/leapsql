@@ -1,6 +1,11 @@
 package core_test
 
 import (
+	"go/ast"
+	"go/parser"
+	gotoken "go/token"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -8,6 +13,160 @@ import (
 )
 
 const modulePath = "github.com/leapstack-labs/leapsql"
+
+// =============================================================================
+// NO TYPE ALIAS RE-EXPORTS TEST
+// =============================================================================
+
+// TestArchitecture_NoTypeAliasReexports ensures no package re-exports core types via aliases.
+// This prevents "type smuggling" where multiple packages appear to provide the same type.
+func TestArchitecture_NoTypeAliasReexports(t *testing.T) {
+	projectRoot := findProjectRoot(t)
+
+	dirsToScan := []string{
+		filepath.Join(projectRoot, "pkg"),
+		filepath.Join(projectRoot, "internal"),
+	}
+
+	for _, root := range dirsToScan {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				return nil
+			}
+
+			// Skip pkg/core itself - it's the canonical source
+			relPath, _ := filepath.Rel(projectRoot, path)
+			if relPath == "pkg/core" || strings.HasPrefix(relPath, "pkg/core/") {
+				return nil
+			}
+
+			checkNoCoreReexports(t, path, relPath)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to walk directory %s: %v", root, err)
+		}
+	}
+}
+
+// checkNoCoreReexports scans a directory for forbidden core type aliases and re-exports.
+func checkNoCoreReexports(t *testing.T, dir, relPath string) {
+	t.Helper()
+
+	fset := gotoken.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, dir, func(fi os.FileInfo) bool {
+		// Include all .go files (including _test.go and generated)
+		return strings.HasSuffix(fi.Name(), ".go")
+	}, parser.ParseComments)
+
+	if err != nil {
+		// Skip directories that can't be parsed (e.g., no Go files)
+		return
+	}
+
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			// Find local name for core package in this file's imports
+			coreLocalName := findCoreImportName(file)
+			if coreLocalName == "" {
+				continue // File doesn't import core, skip
+			}
+
+			ast.Inspect(file, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.TypeSpec:
+					// Catch: type T = core.T
+					if x.Assign.IsValid() && isCoreReference(x.Type, coreLocalName) {
+						typeName := extractTypeName(x.Type)
+						t.Errorf("ALIAS VIOLATION: %s\n"+
+							"    Type alias '%s = %s.%s' re-exports a core type.\n"+
+							"    pkg/core is the canonical source for domain types.\n"+
+							"    Fix: Delete this alias and use 'core.%s' directly in consuming packages.",
+							fset.Position(x.Pos()), x.Name.Name, coreLocalName, typeName, typeName)
+					}
+
+				case *ast.ValueSpec:
+					// Catch: var V = core.V or const C = core.C
+					for i, val := range x.Values {
+						if isCoreReference(val, coreLocalName) {
+							varName := ""
+							if i < len(x.Names) {
+								varName = x.Names[i].Name
+							}
+							typeName := extractTypeName(val)
+							t.Errorf("ALIAS VIOLATION: %s\n"+
+								"    Re-export '%s = %s.%s' smuggles a core value.\n"+
+								"    pkg/core is the canonical source for domain values.\n"+
+								"    Fix: Delete this re-export and use 'core.%s' directly.",
+								fset.Position(val.Pos()), varName, coreLocalName, typeName, typeName)
+						}
+					}
+				}
+				return true
+			})
+		}
+	}
+}
+
+// findCoreImportName returns the local name used for the core package in this file.
+// Returns "core" for `import "...pkg/core"` or the alias for `import c "...pkg/core"`.
+// Returns "" if core is not imported.
+func findCoreImportName(file *ast.File) string {
+	for _, imp := range file.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		if strings.HasSuffix(path, "pkg/core") {
+			if imp.Name != nil {
+				return imp.Name.Name
+			}
+			return "core" // Default import name
+		}
+	}
+	return ""
+}
+
+// isCoreReference checks if an expression is a selector like `core.X` (or `c.X` if aliased).
+func isCoreReference(expr ast.Expr, coreLocalName string) bool {
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	return ok && ident.Name == coreLocalName
+}
+
+// extractTypeName extracts the type/value name from a core.X selector expression.
+func extractTypeName(expr ast.Expr) string {
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return "?"
+	}
+	return sel.Sel.Name
+}
+
+// findProjectRoot locates the project root by looking for go.mod.
+func findProjectRoot(t *testing.T) string {
+	t.Helper()
+
+	// Start from the test file location and walk up
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("Could not find project root (no go.mod found)")
+		}
+		dir = parent
+	}
+}
 
 // =============================================================================
 // PKG LAYER CLASSIFICATION
