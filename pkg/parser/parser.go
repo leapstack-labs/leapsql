@@ -28,10 +28,9 @@ package parser
 
 import (
 	"fmt"
-	"github.com/leapstack-labs/leapsql/pkg/core"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/pkg/spi"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -240,7 +239,7 @@ func (p *Parser) Check(t token.TokenType) bool {
 }
 
 // ParseExpression parses an expression (implements spi.ParserOps).
-func (p *Parser) ParseExpression() (spi.Expr, error) {
+func (p *Parser) ParseExpression() (core.Expr, error) {
 	expr := p.parseExpression()
 	if len(p.errors) > 0 {
 		return nil, p.errors[len(p.errors)-1]
@@ -249,22 +248,22 @@ func (p *Parser) ParseExpression() (spi.Expr, error) {
 }
 
 // ParseExpressionList parses a comma-separated list of expressions (implements spi.ParserOps).
-func (p *Parser) ParseExpressionList() ([]spi.Expr, error) {
+func (p *Parser) ParseExpressionList() ([]core.Expr, error) {
 	exprs := p.parseExpressionList()
 	if len(p.errors) > 0 {
 		return nil, p.errors[len(p.errors)-1]
 	}
-	// []Expr and []spi.Expr are the same type (both alias to []core.Expr)
+	// []Expr and []core.Expr are the same type (both alias to []core.Expr)
 	return exprs, nil
 }
 
 // ParseOrderByList parses an ORDER BY list (implements spi.ParserOps).
-func (p *Parser) ParseOrderByList() ([]spi.OrderByItem, error) {
+func (p *Parser) ParseOrderByList() ([]core.OrderByItem, error) {
 	items := p.parseOrderByList()
 	if len(p.errors) > 0 {
 		return nil, p.errors[len(p.errors)-1]
 	}
-	// []OrderByItem and []spi.OrderByItem are the same type (both alias to []core.OrderByItem)
+	// []OrderByItem and []core.OrderByItem are the same type (both alias to []core.OrderByItem)
 	return items, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	intconfig "github.com/leapstack-labs/leapsql/internal/config"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
@@ -19,61 +20,61 @@ import (
 func TestTargetConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name      string
-		target    TargetConfig
+		target    core.TargetConfig
 		wantErr   bool
 		errSubstr string
 	}{
 		{
 			name:      "empty type",
-			target:    TargetConfig{Type: ""},
+			target:    core.TargetConfig{Type: ""},
 			wantErr:   true,
 			errSubstr: "target type is required",
 		},
 		{
 			name:      "valid duckdb",
-			target:    TargetConfig{Type: "duckdb"},
+			target:    core.TargetConfig{Type: "duckdb"},
 			wantErr:   false,
 			errSubstr: "",
 		},
 		{
 			name:      "valid duckdb uppercase",
-			target:    TargetConfig{Type: "DuckDB"},
+			target:    core.TargetConfig{Type: "DuckDB"},
 			wantErr:   false,
 			errSubstr: "",
 		},
 		{
 			name:      "valid postgres",
-			target:    TargetConfig{Type: "postgres"},
+			target:    core.TargetConfig{Type: "postgres"},
 			wantErr:   false,
 			errSubstr: "",
 		},
 		{
 			name:      "unknown type mysql",
-			target:    TargetConfig{Type: "mysql"},
+			target:    core.TargetConfig{Type: "mysql"},
 			wantErr:   true,
 			errSubstr: "unknown adapter type",
 		},
 		{
 			name:      "unknown type snowflake (not yet implemented)",
-			target:    TargetConfig{Type: "snowflake"},
+			target:    core.TargetConfig{Type: "snowflake"},
 			wantErr:   true,
 			errSubstr: "unknown adapter type",
 		},
 		{
 			name:      "unknown type bigquery (not yet implemented)",
-			target:    TargetConfig{Type: "bigquery"},
+			target:    core.TargetConfig{Type: "bigquery"},
 			wantErr:   true,
 			errSubstr: "unknown adapter type",
 		},
 		{
 			name:      "unknown type redshift",
-			target:    TargetConfig{Type: "redshift"},
+			target:    core.TargetConfig{Type: "redshift"},
 			wantErr:   true,
 			errSubstr: "unknown adapter type",
 		},
 		{
 			name:      "unknown type oracle",
-			target:    TargetConfig{Type: "oracle"},
+			target:    core.TargetConfig{Type: "oracle"},
 			wantErr:   true,
 			errSubstr: "unknown adapter type",
 		},
@@ -97,7 +98,7 @@ func TestTargetConfig_Validate(t *testing.T) {
 // TestTargetConfig_Validate_ErrorContainsAvailable verifies that validation errors
 // include the list of available adapters.
 func TestTargetConfig_Validate_ErrorContainsAvailable(t *testing.T) {
-	target := TargetConfig{Type: "invalid_db"}
+	target := core.TargetConfig{Type: "invalid_db"}
 	err := intconfig.ValidateTarget(&target)
 	require.Error(t, err, "expected error for invalid type")
 
@@ -199,13 +200,13 @@ func TestExpandEnvVars(t *testing.T) {
 // TestMergeTargetConfig tests the MergeTargetConfig function.
 func TestMergeTargetConfig(t *testing.T) {
 	t.Run("nil base returns override", func(t *testing.T) {
-		override := &TargetConfig{Type: "duckdb", Database: "test.db"}
+		override := &core.TargetConfig{Type: "duckdb", Database: "test.db"}
 		result := MergeTargetConfig(nil, override)
 		assert.Equal(t, override, result, "nil base should return override")
 	})
 
 	t.Run("nil override returns base", func(t *testing.T) {
-		base := &TargetConfig{Type: "duckdb", Database: "test.db"}
+		base := &core.TargetConfig{Type: "duckdb", Database: "test.db"}
 		result := MergeTargetConfig(base, nil)
 		assert.Equal(t, base, result, "nil override should return base")
 	})
@@ -216,13 +217,13 @@ func TestMergeTargetConfig(t *testing.T) {
 	})
 
 	t.Run("override replaces base fields", func(t *testing.T) {
-		base := &TargetConfig{
+		base := &core.TargetConfig{
 			Type:     "duckdb",
 			Database: "base.db",
 			Schema:   "main",
 			Host:     "localhost",
 		}
-		override := &TargetConfig{
+		override := &core.TargetConfig{
 			Database: "override.db",
 			Schema:   "custom",
 		}
@@ -236,14 +237,14 @@ func TestMergeTargetConfig(t *testing.T) {
 	})
 
 	t.Run("options are merged", func(t *testing.T) {
-		base := &TargetConfig{
+		base := &core.TargetConfig{
 			Type: "duckdb",
 			Options: map[string]string{
 				"key1": "base_value1",
 				"key2": "base_value2",
 			},
 		}
-		override := &TargetConfig{
+		override := &core.TargetConfig{
 			Options: map[string]string{
 				"key2": "override_value2",
 				"key3": "override_value3",
@@ -261,13 +262,13 @@ func TestMergeTargetConfig(t *testing.T) {
 // TestTargetConfig_ApplyDefaults tests the ApplyTargetDefaults function.
 func TestTargetConfig_ApplyDefaults(t *testing.T) {
 	t.Run("sets default schema for duckdb", func(t *testing.T) {
-		target := &TargetConfig{Type: "duckdb"}
+		target := &core.TargetConfig{Type: "duckdb"}
 		intconfig.ApplyTargetDefaults(target)
 		assert.Equal(t, "main", target.Schema)
 	})
 
 	t.Run("preserves existing schema", func(t *testing.T) {
-		target := &TargetConfig{Type: "duckdb", Schema: "custom"}
+		target := &core.TargetConfig{Type: "duckdb", Schema: "custom"}
 		intconfig.ApplyTargetDefaults(target)
 		assert.Equal(t, "custom", target.Schema)
 	})

@@ -198,7 +198,7 @@ func TestDialectSpecificFeatures(t *testing.T) {
 	testCases := []struct {
 		name    string
 		sql     string
-		dialect *dialect.Dialect
+		dialect *core.Dialect
 	}{
 		{
 			name:    "DuckDB QUALIFY",

@@ -17,53 +17,6 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
-// Dialect is an alias to core.Dialect for backward compatibility.
-// New code should use core.Dialect directly.
-type Dialect = core.Dialect
-
-// ClauseDef is an alias to core.ClauseDef for backward compatibility.
-type ClauseDef = core.ClauseDef
-
-// JoinTypeDef is an alias to core.JoinTypeDef for backward compatibility.
-type JoinTypeDef = core.JoinTypeDef
-
-// OperatorDef is an alias to core.OperatorDef for backward compatibility.
-type OperatorDef = core.OperatorDef
-
-// FunctionDoc is an alias to core.FunctionDoc for backward compatibility.
-// FunctionDoc is an alias to core.FunctionDoc for backward compatibility.
-type FunctionDoc = core.FunctionDoc
-
-// ErrDialectRequired is returned when a dialect is required but not provided.
-var ErrDialectRequired = core.ErrDialectRequired
-
-// Re-export join constants
-const (
-	JoinInner = core.JoinInner
-	JoinLeft  = core.JoinLeft
-	JoinRight = core.JoinRight
-	JoinFull  = core.JoinFull
-	JoinCross = core.JoinCross
-)
-
-// Type classifies how a function affects lineage.
-// This is kept for backward compatibility.
-type Type = core.FunctionLineageType
-
-// Lineage type constants classify function behavior for lineage analysis.
-const (
-	// LineagePassthrough indicates the function passes through columns unchanged.
-	LineagePassthrough = core.LineagePassthrough
-	// LineageAggregate indicates an aggregate function.
-	LineageAggregate = core.LineageAggregate
-	// LineageGenerator indicates a function that generates values without input columns.
-	LineageGenerator = core.LineageGenerator
-	// LineageWindow indicates a window function.
-	LineageWindow = core.LineageWindow
-	// LineageTable indicates a table-valued function.
-	LineageTable = core.LineageTable
-)
-
 // ClauseOption configures a ClauseDef.
 type ClauseOption func(*core.ClauseDef)
 
@@ -197,7 +150,7 @@ func (b *Builder) TableFunctions(funcs ...string) *Builder {
 }
 
 // WithDocs registers documentation for functions.
-func (b *Builder) WithDocs(docs map[string]FunctionDoc) *Builder {
+func (b *Builder) WithDocs(docs map[string]core.FunctionDoc) *Builder {
 	for name, doc := range docs {
 		b.dialect.Docs[b.dialect.NormalizeName(name)] = doc
 	}
@@ -259,7 +212,7 @@ func (b *Builder) ClauseSequence(tokens ...token.TokenType) *Builder {
 }
 
 // ClauseHandler registers a handler for a clause token with storage slot.
-func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, opts ...ClauseOption) *Builder {
+func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, slot core.ClauseSlot, opts ...ClauseOption) *Builder {
 	def := core.ClauseDef{Token: t, Handler: handler, Slot: slot}
 	for _, opt := range opts {
 		opt(&def)
@@ -270,7 +223,7 @@ func (b *Builder) ClauseHandler(t token.TokenType, handler spi.ClauseHandler, sl
 }
 
 // AddClauseAfter inserts a clause into the sequence after another clause.
-func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler, slot spi.ClauseSlot, opts ...ClauseOption) *Builder {
+func (b *Builder) AddClauseAfter(after, t token.TokenType, handler spi.ClauseHandler, slot core.ClauseSlot, opts ...ClauseOption) *Builder {
 	for i, tok := range b.dialect.ClauseSeq {
 		if tok == after {
 			newSeq := make([]token.TokenType, 0, len(b.dialect.ClauseSeq)+1)
@@ -322,7 +275,7 @@ func (b *Builder) AddPrefix(t token.TokenType, handler spi.PrefixHandler) *Build
 }
 
 // AddJoinType registers a dialect-specific join type.
-func (b *Builder) AddJoinType(t token.TokenType, def JoinTypeDef) *Builder {
+func (b *Builder) AddJoinType(t token.TokenType, def core.JoinTypeDef) *Builder {
 	b.dialect.JoinTypes[t] = def
 	return b
 }
@@ -342,7 +295,7 @@ func (b *Builder) AddFromItem(t token.TokenType, handler spi.FromItemHandler) *B
 // ---------- Bulk Builder Methods (Toolbox Composition) ----------
 
 // Clauses sets the clause sequence from a list of ClauseDefs.
-func (b *Builder) Clauses(defs ...ClauseDef) *Builder {
+func (b *Builder) Clauses(defs ...core.ClauseDef) *Builder {
 	b.dialect.ClauseSeq = make([]token.TokenType, len(defs))
 	for i, def := range defs {
 		b.dialect.ClauseSeq[i] = def.Token
@@ -353,7 +306,7 @@ func (b *Builder) Clauses(defs ...ClauseDef) *Builder {
 }
 
 // Operators adds operator definitions in bulk.
-func (b *Builder) Operators(sets ...[]OperatorDef) *Builder {
+func (b *Builder) Operators(sets ...[]core.OperatorDef) *Builder {
 	for _, set := range sets {
 		for _, op := range set {
 			b.dialect.Precedences[op.Token] = op.Precedence
@@ -369,7 +322,7 @@ func (b *Builder) Operators(sets ...[]OperatorDef) *Builder {
 }
 
 // JoinTypes adds join type definitions in bulk.
-func (b *Builder) JoinTypes(sets ...[]JoinTypeDef) *Builder {
+func (b *Builder) JoinTypes(sets ...[]core.JoinTypeDef) *Builder {
 	for _, set := range sets {
 		for _, jt := range set {
 			b.dialect.JoinTypes[jt.Token] = jt
@@ -380,7 +333,7 @@ func (b *Builder) JoinTypes(sets ...[]JoinTypeDef) *Builder {
 
 // Build returns the constructed dialect.
 // If the builder was created with New(cfg), this auto-wires features based on config flags.
-func (b *Builder) Build() *Dialect {
+func (b *Builder) Build() *core.Dialect {
 	cfg := b.config
 	if cfg == nil {
 		return b.dialect
@@ -425,25 +378,25 @@ func (b *Builder) Build() *Dialect {
 	// Auto-wire operator extensions
 	if cfg.SupportsIlike {
 		b.AddKeyword("ILIKE", token.ILIKE)
-		b.dialect.Precedences[token.ILIKE] = spi.PrecedenceComparison
+		b.dialect.Precedences[token.ILIKE] = core.PrecedenceComparison
 	}
 
 	if cfg.SupportsCastOperator {
 		b.AddOperator("::", token.DCOLON)
-		b.dialect.Precedences[token.DCOLON] = spi.PrecedencePostfix
+		b.dialect.Precedences[token.DCOLON] = core.PrecedencePostfix
 	}
 
 	// Auto-wire join extensions
 	if cfg.SupportsSemiAntiJoins {
 		b.AddKeyword("SEMI", token.SEMI)
 		b.AddKeyword("ANTI", token.ANTI)
-		b.AddJoinType(token.SEMI, JoinTypeDef{
+		b.AddJoinType(token.SEMI, core.JoinTypeDef{
 			Token:       token.SEMI,
 			Type:        "SEMI",
 			RequiresOn:  true,
 			AllowsUsing: true,
 		})
-		b.AddJoinType(token.ANTI, JoinTypeDef{
+		b.AddJoinType(token.ANTI, core.JoinTypeDef{
 			Token:       token.ANTI,
 			Type:        "ANTI",
 			RequiresOn:  true,
@@ -455,7 +408,7 @@ func (b *Builder) Build() *Dialect {
 }
 
 // replaceOrAddClause replaces an existing clause handler or adds a new one.
-func (b *Builder) replaceOrAddClause(t token.TokenType, def ClauseDef) {
+func (b *Builder) replaceOrAddClause(t token.TokenType, def core.ClauseDef) {
 	def.Token = t
 	b.dialect.ClauseDefs[t] = def
 	recordClause(t, t.String())
@@ -472,7 +425,7 @@ func (b *Builder) replaceOrAddClause(t token.TokenType, def ClauseDef) {
 }
 
 // addClauseIfMissing adds a clause only if not already registered.
-func (b *Builder) addClauseIfMissing(t token.TokenType, def ClauseDef) {
+func (b *Builder) addClauseIfMissing(t token.TokenType, def core.ClauseDef) {
 	if _, exists := b.dialect.ClauseDefs[t]; !exists {
 		def.Token = t
 		b.dialect.ClauseDefs[t] = def
@@ -493,7 +446,7 @@ func (b *Builder) addClauseIfMissing(t token.TokenType, def ClauseDef) {
 // ---------- Helper Methods for Dialect ----------
 
 // FormatPlaceholder returns a placeholder for the given parameter index (1-based).
-func FormatPlaceholder(d *Dialect, index int) string {
+func FormatPlaceholder(d *core.Dialect, index int) string {
 	switch d.Placeholder {
 	case core.PlaceholderDollar:
 		return "$" + strconv.Itoa(index)
@@ -503,12 +456,12 @@ func FormatPlaceholder(d *Dialect, index int) string {
 }
 
 // FunctionLineageType returns the lineage classification for a function.
-func FunctionLineageType(d *Dialect, name string) Type {
+func FunctionLineageType(d *core.Dialect, name string) core.FunctionLineageType {
 	return d.FunctionLineageTypeOf(name)
 }
 
 // ClauseHandler returns the handler for a clause token type.
-func ClauseHandler(d *Dialect, t token.TokenType) spi.ClauseHandler {
+func ClauseHandler(d *core.Dialect, t token.TokenType) spi.ClauseHandler {
 	if def, ok := d.ClauseDefs[t]; ok {
 		if h, ok := def.Handler.(spi.ClauseHandler); ok {
 			return h
@@ -518,7 +471,7 @@ func ClauseHandler(d *Dialect, t token.TokenType) spi.ClauseHandler {
 }
 
 // InfixHandler returns the custom infix handler for an operator token.
-func InfixHandler(d *Dialect, t token.TokenType) spi.InfixHandler {
+func InfixHandler(d *core.Dialect, t token.TokenType) spi.InfixHandler {
 	if h := d.InfixHandler(t); h != nil {
 		if handler, ok := h.(spi.InfixHandler); ok {
 			return handler
@@ -528,7 +481,7 @@ func InfixHandler(d *Dialect, t token.TokenType) spi.InfixHandler {
 }
 
 // PrefixHandler returns the custom prefix handler for an operator token.
-func PrefixHandler(d *Dialect, t token.TokenType) spi.PrefixHandler {
+func PrefixHandler(d *core.Dialect, t token.TokenType) spi.PrefixHandler {
 	if h := d.PrefixHandler(t); h != nil {
 		if handler, ok := h.(spi.PrefixHandler); ok {
 			return handler
@@ -538,7 +491,7 @@ func PrefixHandler(d *Dialect, t token.TokenType) spi.PrefixHandler {
 }
 
 // StarModifierHandler returns the handler for a star modifier token type.
-func StarModifierHandler(d *Dialect, t token.TokenType) spi.StarModifierHandler {
+func StarModifierHandler(d *core.Dialect, t token.TokenType) spi.StarModifierHandler {
 	if h := d.StarModifierHandler(t); h != nil {
 		if handler, ok := h.(spi.StarModifierHandler); ok {
 			return handler
@@ -548,7 +501,7 @@ func StarModifierHandler(d *Dialect, t token.TokenType) spi.StarModifierHandler 
 }
 
 // FromItemHandler returns the handler for a FROM item token type.
-func FromItemHandler(d *Dialect, t token.TokenType) spi.FromItemHandler {
+func FromItemHandler(d *core.Dialect, t token.TokenType) spi.FromItemHandler {
 	if h := d.FromItemHandler(t); h != nil {
 		if handler, ok := h.(spi.FromItemHandler); ok {
 			return handler
@@ -558,7 +511,7 @@ func FromItemHandler(d *Dialect, t token.TokenType) spi.FromItemHandler {
 }
 
 // AllFunctions returns all known function names.
-func AllFunctions(d *Dialect) []string {
+func AllFunctions(d *core.Dialect) []string {
 	seen := make(map[string]struct{})
 	var funcs []string
 
@@ -596,7 +549,7 @@ func AllFunctions(d *Dialect) []string {
 }
 
 // Keywords returns all reserved keywords.
-func Keywords(d *Dialect) []string {
+func Keywords(d *core.Dialect) []string {
 	kws := make([]string, 0, len(d.Keywords))
 	for kw := range d.Keywords {
 		kws = append(kws, kw)
@@ -605,7 +558,7 @@ func Keywords(d *Dialect) []string {
 }
 
 // AllClauseTokens returns all clause tokens registered in this dialect.
-func AllClauseTokens(d *Dialect) []token.TokenType {
+func AllClauseTokens(d *core.Dialect) []token.TokenType {
 	tokens := make([]token.TokenType, 0, len(d.ClauseDefs))
 	for t := range d.ClauseDefs {
 		tokens = append(tokens, t)
@@ -614,7 +567,7 @@ func AllClauseTokens(d *Dialect) []token.TokenType {
 }
 
 // AllJoinTypeTokens returns all join type tokens registered in this dialect.
-func AllJoinTypeTokens(d *Dialect) []token.TokenType {
+func AllJoinTypeTokens(d *core.Dialect) []token.TokenType {
 	tokens := make([]token.TokenType, 0, len(d.JoinTypes))
 	for t := range d.JoinTypes {
 		tokens = append(tokens, t)

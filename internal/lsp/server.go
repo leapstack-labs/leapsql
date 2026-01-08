@@ -47,7 +47,7 @@ type Server struct {
 	cacheMu             sync.RWMutex
 
 	// SQL dialect for validation (never nil after initialization)
-	dialect           *dialect.Dialect
+	dialect           *core.Dialect
 	dialectFromConfig bool // true if dialect was loaded from config, false if ANSI default
 
 	// Project health analyzer for DAG/architecture linting

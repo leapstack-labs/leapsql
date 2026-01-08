@@ -12,11 +12,11 @@ import (
 // Dialect registry
 var (
 	dialectsMu sync.RWMutex
-	dialects   = make(map[string]*Dialect)
+	dialects   = make(map[string]*core.Dialect)
 )
 
 // Get returns a dialect by name.
-func Get(name string) (*Dialect, bool) {
+func Get(name string) (*core.Dialect, bool) {
 	dialectsMu.RLock()
 	defer dialectsMu.RUnlock()
 	d, ok := dialects[strings.ToLower(name)]
@@ -25,7 +25,7 @@ func Get(name string) (*Dialect, bool) {
 
 // Register registers a dialect in the global registry.
 // Called by dialect implementations in their init() functions.
-func Register(d *Dialect) {
+func Register(d *core.Dialect) {
 	dialectsMu.Lock()
 	defer dialectsMu.Unlock()
 	dialects[strings.ToLower(d.Name)] = d

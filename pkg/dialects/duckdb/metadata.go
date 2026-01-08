@@ -4,7 +4,7 @@
 // exposed via duckdb_functions() or require manual documentation.
 package duckdb
 
-import "github.com/leapstack-labs/leapsql/pkg/dialect"
+import "github.com/leapstack-labs/leapsql/pkg/core"
 
 // duckDBWindows contains window function names.
 // DuckDB doesn't expose window function metadata via duckdb_functions(),
@@ -24,7 +24,7 @@ var duckDBWindows = []string{
 }
 
 // duckDBWindowDocs provides documentation for window functions.
-var duckDBWindowDocs = map[string]dialect.FunctionDoc{
+var duckDBWindowDocs = map[string]core.FunctionDoc{
 	"row_number": {
 		Description: "Sequential row number starting from 1",
 		Signatures:  []string{"row_number() OVER(...) -> BIGINT"},

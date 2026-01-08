@@ -11,15 +11,15 @@ import (
 
 func TestLineageTypeString(t *testing.T) {
 	tests := []struct {
-		lineageType Type
+		lineageType core.FunctionLineageType
 		want        string
 	}{
-		{LineagePassthrough, "passthrough"},
-		{LineageAggregate, "aggregate"},
-		{LineageGenerator, "generator"},
-		{LineageWindow, "window"},
-		{LineageTable, "table"},
-		{Type(99), "unknown"},
+		{core.LineagePassthrough, "passthrough"},
+		{core.LineageAggregate, "aggregate"},
+		{core.LineageGenerator, "generator"},
+		{core.LineageWindow, "window"},
+		{core.LineageTable, "table"},
+		{core.FunctionLineageType(99), "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -60,11 +60,11 @@ func TestFunctionLineageType_TableFunctionPriority(t *testing.T) {
 		TableFunctions("sum"). // Same function as both - table should win
 		Build()
 
-	assert.Equal(t, LineageTable, d.FunctionLineageTypeOf("sum"))
+	assert.Equal(t, core.LineageTable, d.FunctionLineageTypeOf("sum"))
 }
 
 func TestGetDoc(t *testing.T) {
-	docs := map[string]FunctionDoc{
+	docs := map[string]core.FunctionDoc{
 		"COUNT": {
 			Description: "Count non-null values",
 			Signatures:  []string{"count(expr) -> BIGINT", "count(*) -> BIGINT"},
@@ -109,7 +109,7 @@ func TestAllFunctions(t *testing.T) {
 		Generators("now", "uuid").
 		Windows("row_number", "rank").
 		TableFunctions("read_csv", "generate_series").
-		WithDocs(map[string]FunctionDoc{
+		WithDocs(map[string]core.FunctionDoc{
 			"coalesce": {Description: "Return first non-null value"}, // Not in any category
 		}).
 		Build()
@@ -154,7 +154,7 @@ func TestBuilderChaining(t *testing.T) {
 		Generators("now").
 		Windows("row_number").
 		TableFunctions("read_csv").
-		WithDocs(map[string]FunctionDoc{"sum": {Description: "Sum"}}).
+		WithDocs(map[string]core.FunctionDoc{"sum": {Description: "Sum"}}).
 		WithKeywords("SELECT", "FROM").
 		WithDataTypes("INTEGER", "VARCHAR").
 		Build()

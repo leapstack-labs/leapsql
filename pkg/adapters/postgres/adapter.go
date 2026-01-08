@@ -15,14 +15,13 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leapstack-labs/leapsql/pkg/adapter"
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	pgdialect "github.com/leapstack-labs/leapsql/pkg/dialects/postgres"
 )
 
 // Adapter implements the adapter.Adapter interface for PostgreSQL.
 type Adapter struct {
 	adapter.BaseSQLAdapter
-	dialect *dialect.Dialect // internal reference for full dialect functionality
+	dialect *core.Dialect // internal reference for full dialect functionality
 }
 
 // New creates a new PostgreSQL adapter instance.
@@ -195,7 +194,7 @@ func (a *Adapter) copyFromCSV(ctx context.Context, tableName string, file *os.Fi
 }
 
 // sanitizeIdentifier makes a column name safe for SQL using the dialect's reserved word list.
-func sanitizeIdentifier(name string, d *dialect.Dialect) string {
+func sanitizeIdentifier(name string, d *core.Dialect) string {
 	// Replace problematic characters
 	safe := strings.ReplaceAll(name, " ", "_")
 	safe = strings.ReplaceAll(safe, "-", "_")

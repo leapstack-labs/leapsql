@@ -8,7 +8,6 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/loader"
 	"github.com/leapstack-labs/leapsql/internal/template"
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	pkgparser "github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
@@ -38,7 +37,7 @@ type ParsedDocument struct {
 }
 
 // Parse creates a ParsedDocument from content, performing all parse phases once.
-func Parse(content string, uri string, version int, d *dialect.Dialect) *ParsedDocument {
+func Parse(content string, uri string, version int, d *core.Dialect) *ParsedDocument {
 	doc := &ParsedDocument{
 		URI:      uri,
 		Version:  version,

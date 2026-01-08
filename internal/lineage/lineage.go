@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/parser"
 )
 
@@ -26,16 +25,16 @@ type ModelLineage struct {
 
 // ExtractLineageOptions configures the lineage extraction.
 type ExtractLineageOptions struct {
-	Dialect *dialect.Dialect // SQL dialect (required)
+	Dialect *core.Dialect // SQL dialect (required)
 	Schema  parser.Schema    // Schema information for star expansion
 }
 
 // ExtractLineageWithOptions extracts lineage with full configuration options.
-// Returns dialect.ErrDialectRequired if opts.Dialect is nil.
+// Returns core.ErrDialectRequired if opts.Dialect is nil.
 func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*ModelLineage, error) {
 	d := opts.Dialect
 	if d == nil {
-		return nil, dialect.ErrDialectRequired
+		return nil, core.ErrDialectRequired
 	}
 
 	// Parse the SQL with the specified dialect
@@ -57,7 +56,7 @@ func ExtractLineageWithOptions(sqlStr string, opts ExtractLineageOptions) (*Mode
 
 // lineageExtractor walks the AST to extract lineage information.
 type lineageExtractor struct {
-	dialect        *dialect.Dialect
+	dialect        *core.Dialect
 	schema         parser.Schema
 	sources        map[string]struct{} // Collected source tables
 	usesSelectStar bool                // Track star usage during extraction
@@ -323,19 +322,19 @@ func (e *lineageExtractor) extractExprLineage(scope *parser.Scope, colResolver *
 		funcType := e.dialect.FunctionLineageTypeOf(ex.Name)
 		funcName := e.dialect.NormalizeName(ex.Name)
 		switch funcType {
-		case dialect.LineageTable:
+		case core.LineageTable:
 			// Table function acts as a data source, not a transformation
 			// SELECT * FROM read_csv('file.csv') - the CSV is the source, not upstream columns
 			lineage.Sources = nil
 			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
-		case dialect.LineageAggregate:
+		case core.LineageAggregate:
 			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
-		case dialect.LineageWindow:
+		case core.LineageWindow:
 			lineage.Transform = core.TransformExpression
 			lineage.Function = funcName
-		case dialect.LineageGenerator:
+		case core.LineageGenerator:
 			// Generator functions have no source columns
 			lineage.Sources = nil
 			lineage.Transform = core.TransformExpression

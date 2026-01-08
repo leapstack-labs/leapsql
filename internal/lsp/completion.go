@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
@@ -56,7 +57,7 @@ var builtinGlobals = []CompletionItem{
 
 // getSQLKeywordCompletions returns keyword completions from the dialect.
 // Returns nil if no dialect is set - adapters should be properly configured.
-func getSQLKeywordCompletions(d *dialect.Dialect, prefix string) []CompletionItem {
+func getSQLKeywordCompletions(d *core.Dialect, prefix string) []CompletionItem {
 	if d == nil {
 		return nil
 	}
@@ -82,7 +83,7 @@ func getSQLKeywordCompletions(d *dialect.Dialect, prefix string) []CompletionIte
 }
 
 // getSQLFunctionCompletions returns SQL function completions from the dialect.
-func getSQLFunctionCompletions(d *dialect.Dialect, prefix string) []CompletionItem {
+func getSQLFunctionCompletions(d *core.Dialect, prefix string) []CompletionItem {
 	if d == nil {
 		return nil
 	}
@@ -439,13 +440,13 @@ func (s *Server) getHover(params HoverParams) *Hover {
 			// Show function classification
 			lineageType := s.dialect.FunctionLineageTypeOf(word)
 			switch lineageType {
-			case dialect.LineageAggregate:
+			case core.LineageAggregate:
 				content.WriteString("\n\n*Aggregate function*")
-			case dialect.LineageWindow:
+			case core.LineageWindow:
 				content.WriteString("\n\n*Window function*")
-			case dialect.LineageTable:
+			case core.LineageTable:
 				content.WriteString("\n\n*Table-valued function*")
-			case dialect.LineageGenerator:
+			case core.LineageGenerator:
 				content.WriteString("\n\n*Generator function*")
 			}
 

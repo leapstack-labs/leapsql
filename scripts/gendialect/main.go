@@ -428,7 +428,7 @@ func classifyFunctions(functions []FunctionInfo) (aggregates, tableFuncs []strin
 	return
 }
 
-// FunctionDoc matches the dialect.FunctionDoc struct for code generation.
+// FunctionDoc matches the core.FunctionDoc struct for code generation.
 type FunctionDoc struct {
 	Description string
 	Signatures  []string
@@ -478,7 +478,7 @@ func generateFunctionsCode(version string, aggregates, tableFuncs []string, docs
 
 	// Generate docs map
 	buf.WriteString("// duckDBFunctionDocs contains documentation for all DuckDB functions.\n")
-	buf.WriteString("var duckDBFunctionDocs = map[string]dialect.FunctionDoc{\n")
+	buf.WriteString("var duckDBFunctionDocs = map[string]core.FunctionDoc{\n")
 
 	// Sort docs by name for consistent output
 	docNames := make([]string, 0, len(docs))

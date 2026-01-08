@@ -15,7 +15,7 @@ import (
 )
 
 // getTestDialect returns the DuckDB dialect for integration tests.
-func getTestDialect(t *testing.T) *dialect.Dialect {
+func getTestDialect(t *testing.T) *core.Dialect {
 	t.Helper()
 	d, ok := dialect.Get("duckdb")
 	if !ok {

@@ -10,7 +10,7 @@ import (
 
 // parseListLiteral handles [expr, expr, ...].
 // The opening [ has already been consumed.
-func parseListLiteral(p spi.ParserOps) (spi.Expr, error) {
+func parseListLiteral(p spi.ParserOps) (core.Expr, error) {
 	list := &core.ListLiteral{}
 
 	if !p.Check(token.RBRACKET) {
@@ -36,7 +36,7 @@ func parseListLiteral(p spi.ParserOps) (spi.Expr, error) {
 
 // parseStructLiteral handles {'key': value, ...}.
 // The opening { has already been consumed.
-func parseStructLiteral(p spi.ParserOps) (spi.Expr, error) {
+func parseStructLiteral(p spi.ParserOps) (core.Expr, error) {
 	s := &core.StructLiteral{}
 
 	if !p.Check(token.RBRACE) {
@@ -85,7 +85,7 @@ func parseStructLiteral(p spi.ParserOps) (spi.Expr, error) {
 // parseIndexOrSlice handles expr[index] or expr[start:end].
 // This is an infix handler - left is the expression being indexed.
 // The opening [ has already been consumed.
-func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
+func parseIndexOrSlice(p spi.ParserOps, left core.Expr) (core.Expr, error) {
 	idx := &core.IndexExpr{
 		Expr: left,
 	}
@@ -137,7 +137,7 @@ func parseIndexOrSlice(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 // parseLambdaBody handles -> expr after lambda params.
 // The -> has already been consumed.
 // left is the parameter(s) - either ColumnRef or ParenExpr containing params.
-func parseLambdaBody(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
+func parseLambdaBody(p spi.ParserOps, left core.Expr) (core.Expr, error) {
 	lambda := &core.LambdaExpr{}
 
 	// Extract parameter names from left
@@ -159,18 +159,18 @@ func parseLambdaBody(p spi.ParserOps, left spi.Expr) (spi.Expr, error) {
 
 // extractLambdaParams extracts parameter names from a lambda parameter expression.
 // Uses type assertions on the underlying AST types via interface checks.
-func extractLambdaParams(expr spi.Expr) ([]string, error) {
+func extractLambdaParams(expr core.Expr) ([]string, error) {
 	// Use interface checks to extract parameter info without importing parser
 	type columnRef interface {
 		GetTable() string
 		GetColumn() string
 	}
 	type parenExpr interface {
-		GetExpr() spi.Expr
+		GetExpr() core.Expr
 	}
 	type binaryExpr interface {
-		GetLeft() spi.Expr
-		GetRight() spi.Expr
+		GetLeft() core.Expr
+		GetRight() core.Expr
 		GetOp() token.TokenType
 	}
 

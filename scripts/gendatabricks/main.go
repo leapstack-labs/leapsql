@@ -652,9 +652,9 @@ func generateFunctionsCode(scalars, aggregates, windows, tableFuncs []string, do
 	// Generate function docs map
 	buf.WriteString("// databricksFunctionDocs contains documentation for Databricks functions.\n")
 	if len(docs) == 0 {
-		buf.WriteString("var databricksFunctionDocs = map[string]dialect.FunctionDoc{}\n")
+		buf.WriteString("var databricksFunctionDocs = map[string]core.FunctionDoc{}\n")
 	} else {
-		buf.WriteString("var databricksFunctionDocs = map[string]dialect.FunctionDoc{\n")
+		buf.WriteString("var databricksFunctionDocs = map[string]core.FunctionDoc{\n")
 		// Sort keys for deterministic output
 		keys := make([]string, 0, len(docs))
 		for k := range docs {

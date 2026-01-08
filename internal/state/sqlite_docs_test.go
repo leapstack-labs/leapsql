@@ -16,7 +16,7 @@ func setupDocsTestStore(t *testing.T) *SQLiteStore {
 	store := setupTestStore(t)
 
 	// Create some test models with different folders
-	models := []*Model{
+	models := []*core.PersistedModel{
 		{
 			Model: &core.Model{
 				Path:         "staging.customers",
@@ -375,7 +375,7 @@ func TestDocsQueries_GetExternalSources(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// Create a model that references an external source
-	model := &Model{
+	model := &core.PersistedModel{
 		Model: &core.Model{
 			Path:         "staging.data",
 			Name:         "data",
@@ -411,7 +411,7 @@ func TestDocsQueries_GetSourceReferencedBy(t *testing.T) {
 
 	// Create two models that reference the same external source
 	for i, path := range []string{"staging.a", "staging.b"} {
-		model := &Model{
+		model := &core.PersistedModel{
 			Model: &core.Model{
 				Path:         path,
 				Name:         path[8:], // "a" or "b"
@@ -487,7 +487,7 @@ func TestDocsQueries_ExternalSourcesPipeline(t *testing.T) {
 
 	// Create a staging model that references an external raw table
 	// This simulates: SELECT id, name FROM raw_customers
-	model := &Model{
+	model := &core.PersistedModel{
 		Model: &core.Model{
 			Path:         "staging.stg_customers",
 			Name:         "stg_customers",
@@ -552,7 +552,7 @@ func TestDocsQueries_ExternalSourcesPipeline_EmptySourceTable(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// Create a staging model
-	model := &Model{
+	model := &core.PersistedModel{
 		Model: &core.Model{
 			Path:         "staging.stg_orders",
 			Name:         "stg_orders",

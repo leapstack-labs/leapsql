@@ -28,7 +28,7 @@ type Engine struct {
 	dbMu        sync.Mutex
 
 	// SQL dialect for the connected adapter (set after connection)
-	dialect *dialect.Dialect
+	dialect *core.Dialect
 
 	// Structured logger
 	logger *slog.Logger
@@ -268,7 +268,7 @@ func (e *Engine) GetStatePath() string {
 
 // GetDialect returns the SQL dialect for the connected adapter.
 // Returns nil if the database is not yet connected.
-func (e *Engine) GetDialect() *dialect.Dialect {
+func (e *Engine) GetDialect() *core.Dialect {
 	return e.dialect
 }
 

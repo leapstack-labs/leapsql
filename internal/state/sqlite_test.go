@@ -11,28 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Local type aliases for test convenience
-type (
-	Model      = core.PersistedModel
-	Run        = core.Run
-	ModelRun   = core.ModelRun
-	ColumnInfo = core.ColumnInfo
-	SourceRef  = core.SourceRef
-
-	TestConfig           = core.TestConfig
-	AcceptedValuesConfig = core.AcceptedValuesConfig
-)
-
-// Local constant aliases for test convenience
-const (
-	RunStatusRunning   = core.RunStatusRunning
-	RunStatusCompleted = core.RunStatusCompleted
-	RunStatusFailed    = core.RunStatusFailed
-
-	ModelRunStatusRunning = core.ModelRunStatusRunning
-	ModelRunStatusSuccess = core.ModelRunStatusSuccess
-	ModelRunStatusFailed  = core.ModelRunStatusFailed
-)
 
 func setupTestStore(t *testing.T) *SQLiteStore {
 	t.Helper()
@@ -44,8 +22,8 @@ func setupTestStore(t *testing.T) *SQLiteStore {
 
 // newTestModel creates a Model (core.PersistedModel) for testing.
 // This helper uses the composition pattern required by core.PersistedModel.
-func newTestModel(path, name, materialized, contentHash string) *Model {
-	return &Model{
+func newTestModel(path, name, materialized, contentHash string) *core.PersistedModel {
+	return &core.PersistedModel{
 		Model: &core.Model{
 			Path:         path,
 			Name:         name,
@@ -56,8 +34,8 @@ func newTestModel(path, name, materialized, contentHash string) *Model {
 }
 
 // newTestModelFull creates a Model with all core fields for testing.
-func newTestModelFull(coreModel *core.Model, contentHash string) *Model {
-	return &Model{
+func newTestModelFull(coreModel *core.Model, contentHash string) *core.PersistedModel {
+	return &core.PersistedModel{
 		Model:       coreModel,
 		ContentHash: contentHash,
 	}
@@ -96,31 +74,31 @@ func TestSQLiteStore_InitSchema(t *testing.T) {
 func TestSQLiteStore_RunLifecycle(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T, store *SQLiteStore) *Run
-		operation func(t *testing.T, store *SQLiteStore, run *Run)
-		verify    func(t *testing.T, store *SQLiteStore, run *Run)
+		setup     func(t *testing.T, store *SQLiteStore) *core.Run
+		operation func(t *testing.T, store *SQLiteStore, run *core.Run)
+		verify    func(t *testing.T, store *SQLiteStore, run *core.Run)
 	}{
 		{
 			name: "create run",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(t *testing.T, store *SQLiteStore) *core.Run {
 				run, err := store.CreateRun("production")
 				require.NoError(t, err)
 				return run
 			},
-			verify: func(t *testing.T, _ *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, _ *SQLiteStore, run *core.Run) {
 				assert.NotEmpty(t, run.ID)
 				assert.Equal(t, "production", run.Environment)
-				assert.Equal(t, RunStatusRunning, run.Status)
+				assert.Equal(t, core.RunStatusRunning, run.Status)
 			},
 		},
 		{
 			name: "get run",
-			setup: func(t *testing.T, store *SQLiteStore) *Run {
+			setup: func(t *testing.T, store *SQLiteStore) *core.Run {
 				run, err := store.CreateRun("staging")
 				require.NoError(t, err)
 				return run
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run) {
 				retrieved, err := store.GetRun(run.ID)
 				require.NoError(t, err)
 				assert.Equal(t, run.ID, retrieved.ID)
@@ -129,53 +107,53 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "get run not found",
-			setup: func(_ *testing.T, _ *SQLiteStore) *Run {
+			setup: func(_ *testing.T, _ *SQLiteStore) *core.Run {
 				return nil
 			},
-			operation: func(t *testing.T, store *SQLiteStore, _ *Run) {
+			operation: func(t *testing.T, store *SQLiteStore, _ *core.Run) {
 				_, err := store.GetRun("nonexistent-id")
 				assert.Error(t, err)
 			},
 		},
 		{
 			name: "complete run success",
-			setup: func(_ *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.Run {
 				run, _ := store.CreateRun("dev")
 				return run
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
-				require.NoError(t, store.CompleteRun(run.ID, RunStatusCompleted, ""))
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run) {
+				require.NoError(t, store.CompleteRun(run.ID, core.RunStatusCompleted, ""))
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, store *SQLiteStore, run *core.Run) {
 				retrieved, _ := store.GetRun(run.ID)
-				assert.Equal(t, RunStatusCompleted, retrieved.Status)
+				assert.Equal(t, core.RunStatusCompleted, retrieved.Status)
 				assert.NotNil(t, retrieved.CompletedAt)
 			},
 		},
 		{
 			name: "complete run with error",
-			setup: func(_ *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.Run {
 				run, _ := store.CreateRun("dev")
 				return run
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run) {
-				require.NoError(t, store.CompleteRun(run.ID, RunStatusFailed, "something went wrong"))
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run) {
+				require.NoError(t, store.CompleteRun(run.ID, core.RunStatusFailed, "something went wrong"))
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, store *SQLiteStore, run *core.Run) {
 				retrieved, _ := store.GetRun(run.ID)
-				assert.Equal(t, RunStatusFailed, retrieved.Status)
+				assert.Equal(t, core.RunStatusFailed, retrieved.Status)
 				assert.Equal(t, "something went wrong", retrieved.Error)
 			},
 		},
 		{
 			name: "get latest run",
-			setup: func(_ *testing.T, store *SQLiteStore) *Run {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.Run {
 				_, _ = store.CreateRun("prod")
 				time.Sleep(10 * time.Millisecond)
 				run2, _ := store.CreateRun("prod")
 				return run2
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run) {
+			verify: func(t *testing.T, store *SQLiteStore, run *core.Run) {
 				latest, err := store.GetLatestRun("prod")
 				require.NoError(t, err)
 				assert.Equal(t, run.ID, latest.ID)
@@ -183,10 +161,10 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 		},
 		{
 			name: "get latest run no runs",
-			setup: func(_ *testing.T, _ *SQLiteStore) *Run {
+			setup: func(_ *testing.T, _ *SQLiteStore) *core.Run {
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Run) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.Run) {
 				latest, err := store.GetLatestRun("nonexistent")
 				require.NoError(t, err)
 				assert.Nil(t, latest)
@@ -199,7 +177,7 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 			store := setupTestStore(t)
 			defer func() { _ = store.Close() }()
 
-			var run *Run
+			var run *core.Run
 			if tt.setup != nil {
 				run = tt.setup(t, store)
 			}
@@ -218,45 +196,45 @@ func TestSQLiteStore_RunLifecycle(t *testing.T) {
 func TestSQLiteStore_ModelOperations(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T, store *SQLiteStore) *Model
-		operation func(t *testing.T, store *SQLiteStore, model *Model)
-		verify    func(t *testing.T, store *SQLiteStore, model *Model)
+		setup     func(t *testing.T, store *SQLiteStore) *core.PersistedModel
+		operation func(t *testing.T, store *SQLiteStore, model *core.PersistedModel)
+		verify    func(t *testing.T, store *SQLiteStore, model *core.PersistedModel)
 	}{
 		{
 			name: "register model",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(t *testing.T, store *SQLiteStore) *core.PersistedModel {
 				model := newTestModel("models.staging.stg_users", "stg_users", "table", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
-			verify: func(t *testing.T, _ *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, _ *SQLiteStore, model *core.PersistedModel) {
 				assert.NotEmpty(t, model.ID)
 			},
 		},
 		{
 			name: "register model upsert",
-			setup: func(_ *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.PersistedModel {
 				model := newTestModel("models.staging.stg_users", "stg_users", "table", "abc123")
 				_ = store.RegisterModel(model)
 				return model
 			},
-			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
+			operation: func(t *testing.T, store *SQLiteStore, model *core.PersistedModel) {
 				model.ContentHash = "def456"
 				require.NoError(t, store.RegisterModel(model))
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.PersistedModel) {
 				retrieved, _ := store.GetModelByPath("models.staging.stg_users")
 				assert.Equal(t, "def456", retrieved.ContentHash)
 			},
 		},
 		{
 			name: "get model by ID",
-			setup: func(_ *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.PersistedModel {
 				model := newTestModel("models.staging.stg_orders", "stg_orders", "view", "hash123")
 				_ = store.RegisterModel(model)
 				return model
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, model *core.PersistedModel) {
 				retrieved, err := store.GetModelByID(model.ID)
 				require.NoError(t, err)
 				assert.Equal(t, "stg_orders", retrieved.Name)
@@ -264,7 +242,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		},
 		{
 			name: "get model by path",
-			setup: func(_ *testing.T, store *SQLiteStore) *Model {
+			setup: func(_ *testing.T, store *SQLiteStore) *core.PersistedModel {
 				model := newTestModelFull(&core.Model{
 					Path:         "models.marts.revenue",
 					Name:         "revenue",
@@ -274,7 +252,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 				_ = store.RegisterModel(model)
 				return model
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.PersistedModel) {
 				retrieved, err := store.GetModelByPath("models.marts.revenue")
 				require.NoError(t, err)
 				assert.Equal(t, "incremental", retrieved.Materialized)
@@ -283,10 +261,10 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		},
 		{
 			name: "get model by path not found",
-			setup: func(_ *testing.T, _ *SQLiteStore) *Model {
+			setup: func(_ *testing.T, _ *SQLiteStore) *core.PersistedModel {
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.PersistedModel) {
 				retrieved, err := store.GetModelByPath("nonexistent.model")
 				require.NoError(t, err)
 				assert.Nil(t, retrieved)
@@ -294,23 +272,23 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 		},
 		{
 			name: "update model hash",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
+			setup: func(t *testing.T, store *SQLiteStore) *core.PersistedModel {
 				model := newTestModel("models.test", "test", "table", "original")
 				require.NoError(t, store.RegisterModel(model))
 				return model
 			},
-			operation: func(t *testing.T, store *SQLiteStore, model *Model) {
+			operation: func(t *testing.T, store *SQLiteStore, model *core.PersistedModel) {
 				require.NoError(t, store.UpdateModelHash(model.ID, "updated"))
 			},
-			verify: func(t *testing.T, store *SQLiteStore, model *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, model *core.PersistedModel) {
 				retrieved, _ := store.GetModelByID(model.ID)
 				assert.Equal(t, "updated", retrieved.ContentHash)
 			},
 		},
 		{
 			name: "list models",
-			setup: func(t *testing.T, store *SQLiteStore) *Model {
-				models := []*Model{
+			setup: func(t *testing.T, store *SQLiteStore) *core.PersistedModel {
+				models := []*core.PersistedModel{
 					newTestModel("models.a", "a", "table", "1"),
 					newTestModel("models.b", "b", "table", "2"),
 					newTestModel("models.c", "c", "table", "3"),
@@ -320,7 +298,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 				}
 				return nil
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Model) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.PersistedModel) {
 				list, err := store.ListModels()
 				require.NoError(t, err)
 				assert.Len(t, list, 3)
@@ -333,7 +311,7 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 			store := setupTestStore(t)
 			defer func() { _ = store.Close() }()
 
-			var model *Model
+			var model *core.PersistedModel
 			if tt.setup != nil {
 				model = tt.setup(t, store)
 			}
@@ -352,8 +330,8 @@ func TestSQLiteStore_ModelOperations(t *testing.T) {
 func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 	tests := []struct {
 		name   string
-		model  *Model
-		verify func(t *testing.T, retrieved *Model)
+		model  *core.PersistedModel
+		verify func(t *testing.T, retrieved *core.PersistedModel)
 	}{
 		{
 			name: "with all frontmatter fields",
@@ -365,7 +343,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				Owner:        "data-team",
 				Schema:       "analytics",
 				Tags:         []string{"pii", "daily"},
-				Tests: []TestConfig{
+				Tests: []core.TestConfig{
 					{Unique: []string{"user_id"}},
 					{NotNull: []string{"user_id", "email"}},
 				},
@@ -374,7 +352,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 					"sla":      24,
 				},
 			}, "abc123"),
-			verify: func(t *testing.T, retrieved *Model) {
+			verify: func(t *testing.T, retrieved *core.PersistedModel) {
 				assert.Equal(t, "data-team", retrieved.Owner)
 				assert.Equal(t, "analytics", retrieved.Schema)
 				assert.Equal(t, []string{"pii", "daily"}, retrieved.Tags)
@@ -387,7 +365,7 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 		{
 			name:  "with empty optional fields",
 			model: newTestModel("models.simple", "simple", "table", "hash123"),
-			verify: func(t *testing.T, retrieved *Model) {
+			verify: func(t *testing.T, retrieved *core.PersistedModel) {
 				assert.Empty(t, retrieved.Owner)
 				assert.Empty(t, retrieved.Schema)
 				assert.Empty(t, retrieved.Tags)
@@ -401,16 +379,16 @@ func TestSQLiteStore_ModelFrontmatter(t *testing.T) {
 				Path:         "models.accepted_values_test",
 				Name:         "accepted_values_test",
 				Materialized: "table",
-				Tests: []TestConfig{
+				Tests: []core.TestConfig{
 					{
-						AcceptedValues: &AcceptedValuesConfig{
+						AcceptedValues: &core.AcceptedValuesConfig{
 							Column: "status",
 							Values: []string{"active", "inactive", "pending"},
 						},
 					},
 				},
 			}, "hash"),
-			verify: func(t *testing.T, retrieved *Model) {
+			verify: func(t *testing.T, retrieved *core.PersistedModel) {
 				require.Len(t, retrieved.Tests, 1)
 				require.NotNil(t, retrieved.Tests[0].AcceptedValues)
 				assert.Equal(t, "status", retrieved.Tests[0].AcceptedValues.Column)
@@ -453,7 +431,7 @@ func TestSQLiteStore_ModelFrontmatter_Update(t *testing.T) {
 	model.Owner = "team-b"
 	model.Schema = "new_schema"
 	model.Tags = []string{"updated", "v2"}
-	model.Tests = []TestConfig{{NotNull: []string{"id"}}}
+	model.Tests = []core.TestConfig{{NotNull: []string{"id"}}}
 	model.Meta = map[string]any{"version": 2}
 
 	require.NoError(t, store.RegisterModel(model))
@@ -496,7 +474,7 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 	store := setupTestStore(t)
 	defer func() { _ = store.Close() }()
 
-	models := []*Model{
+	models := []*core.PersistedModel{
 		newTestModelFull(&core.Model{
 			Path: "models.list_a", Name: "list_a", Materialized: "table",
 			Owner: "team-a", Tags: []string{"tag-a"},
@@ -525,63 +503,63 @@ func TestSQLiteStore_ListModels_WithFrontmatterFields(t *testing.T) {
 func TestSQLiteStore_ModelRun(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T, store *SQLiteStore) (*Run, *Model)
-		operation func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun
-		verify    func(t *testing.T, store *SQLiteStore, run *Run, modelRun *ModelRun)
+		setup     func(t *testing.T, store *SQLiteStore) (*core.Run, *core.PersistedModel)
+		operation func(t *testing.T, store *SQLiteStore, run *core.Run, model *core.PersistedModel) *core.ModelRun
+		verify    func(t *testing.T, store *SQLiteStore, run *core.Run, modelRun *core.ModelRun)
 	}{
 		{
 			name: "record model run",
-			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+			setup: func(t *testing.T, store *SQLiteStore) (*core.Run, *core.PersistedModel) {
 				run, _ := store.CreateRun("test")
 				model := newTestModel("models.test", "test", "table", "hash")
 				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
-				modelRun := &ModelRun{
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run, model *core.PersistedModel) *core.ModelRun {
+				modelRun := &core.ModelRun{
 					RunID:   run.ID,
 					ModelID: model.ID,
-					Status:  ModelRunStatusRunning,
+					Status:  core.ModelRunStatusRunning,
 				}
 				require.NoError(t, store.RecordModelRun(modelRun))
 				return modelRun
 			},
-			verify: func(t *testing.T, _ *SQLiteStore, _ *Run, modelRun *ModelRun) {
+			verify: func(t *testing.T, _ *SQLiteStore, _ *core.Run, modelRun *core.ModelRun) {
 				assert.NotEmpty(t, modelRun.ID)
 			},
 		},
 		{
 			name: "update model run",
-			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+			setup: func(t *testing.T, store *SQLiteStore) (*core.Run, *core.PersistedModel) {
 				run, _ := store.CreateRun("test")
 				model := newTestModel("models.test", "test", "table", "hash")
 				require.NoError(t, store.RegisterModel(model))
 				return run, model
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
-				modelRun := &ModelRun{
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run, model *core.PersistedModel) *core.ModelRun {
+				modelRun := &core.ModelRun{
 					RunID:   run.ID,
 					ModelID: model.ID,
-					Status:  ModelRunStatusRunning,
+					Status:  core.ModelRunStatusRunning,
 				}
 				require.NoError(t, store.RecordModelRun(modelRun))
 
 				time.Sleep(10 * time.Millisecond)
 
-				require.NoError(t, store.UpdateModelRun(modelRun.ID, ModelRunStatusSuccess, 100, "", 0, 50))
+				require.NoError(t, store.UpdateModelRun(modelRun.ID, core.ModelRunStatusSuccess, 100, "", 0, 50))
 				return modelRun
 			},
-			verify: func(t *testing.T, store *SQLiteStore, run *Run, _ *ModelRun) {
+			verify: func(t *testing.T, store *SQLiteStore, run *core.Run, _ *core.ModelRun) {
 				runs, _ := store.GetModelRunsForRun(run.ID)
 				require.Len(t, runs, 1)
-				assert.Equal(t, ModelRunStatusSuccess, runs[0].Status)
+				assert.Equal(t, core.ModelRunStatusSuccess, runs[0].Status)
 				assert.Equal(t, int64(100), runs[0].RowsAffected)
 				assert.Positive(t, runs[0].ExecutionMS)
 			},
 		},
 		{
 			name: "get latest model run",
-			setup: func(t *testing.T, store *SQLiteStore) (*Run, *Model) {
+			setup: func(t *testing.T, store *SQLiteStore) (*core.Run, *core.PersistedModel) {
 				run1, err := store.CreateRun("test")
 				require.NoError(t, err)
 				run2, err := store.CreateRun("test")
@@ -589,19 +567,19 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 				model := newTestModel("models.test", "test", "", "hash")
 				require.NoError(t, store.RegisterModel(model))
 
-				mr1 := &ModelRun{RunID: run1.ID, ModelID: model.ID, Status: ModelRunStatusSuccess}
+				mr1 := &core.ModelRun{RunID: run1.ID, ModelID: model.ID, Status: core.ModelRunStatusSuccess}
 				require.NoError(t, store.RecordModelRun(mr1))
 
 				time.Sleep(10 * time.Millisecond)
 
 				return run2, model
 			},
-			operation: func(t *testing.T, store *SQLiteStore, run *Run, model *Model) *ModelRun {
-				mr2 := &ModelRun{RunID: run.ID, ModelID: model.ID, Status: ModelRunStatusRunning}
+			operation: func(t *testing.T, store *SQLiteStore, run *core.Run, model *core.PersistedModel) *core.ModelRun {
+				mr2 := &core.ModelRun{RunID: run.ID, ModelID: model.ID, Status: core.ModelRunStatusRunning}
 				require.NoError(t, store.RecordModelRun(mr2))
 				return mr2
 			},
-			verify: func(t *testing.T, store *SQLiteStore, _ *Run, modelRun *ModelRun) {
+			verify: func(t *testing.T, store *SQLiteStore, _ *core.Run, modelRun *core.ModelRun) {
 				model, _ := store.GetModelByPath("models.test")
 				latest, err := store.GetLatestModelRun(model.ID)
 				require.NoError(t, err)
@@ -616,12 +594,12 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 			store := setupTestStore(t)
 			defer func() { _ = store.Close() }()
 
-			var run *Run
-			var model *Model
+			var run *core.Run
+			var model *core.PersistedModel
 			if tt.setup != nil {
 				run, model = tt.setup(t, store)
 			}
-			var modelRun *ModelRun
+			var modelRun *core.ModelRun
 			if tt.operation != nil {
 				modelRun = tt.operation(t, store, run, model)
 			}
@@ -637,12 +615,12 @@ func TestSQLiteStore_ModelRun(t *testing.T) {
 func TestSQLiteStore_Dependencies(t *testing.T) {
 	tests := []struct {
 		name   string
-		setup  func(t *testing.T, store *SQLiteStore) []*Model
-		verify func(t *testing.T, store *SQLiteStore, models []*Model)
+		setup  func(t *testing.T, store *SQLiteStore) []*core.PersistedModel
+		verify func(t *testing.T, store *SQLiteStore, models []*core.PersistedModel)
 	}{
 		{
 			name: "set dependencies",
-			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+			setup: func(t *testing.T, store *SQLiteStore) []*core.PersistedModel {
 				parent1 := newTestModel("models.parent1", "parent1", "", "1")
 				parent2 := newTestModel("models.parent2", "parent2", "", "2")
 				child := newTestModel("models.child", "child", "", "3")
@@ -652,9 +630,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				_ = store.RegisterModel(child)
 
 				require.NoError(t, store.SetDependencies(child.ID, []string{parent1.ID, parent2.ID}))
-				return []*Model{parent1, parent2, child}
+				return []*core.PersistedModel{parent1, parent2, child}
 			},
-			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+			verify: func(t *testing.T, store *SQLiteStore, models []*core.PersistedModel) {
 				child := models[2]
 				deps, _ := store.GetDependencies(child.ID)
 				assert.Len(t, deps, 2)
@@ -662,7 +640,7 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		},
 		{
 			name: "replace dependencies",
-			setup: func(t *testing.T, store *SQLiteStore) []*Model {
+			setup: func(t *testing.T, store *SQLiteStore) []*core.PersistedModel {
 				parent1 := newTestModel("models.p1", "p1", "", "1")
 				parent2 := newTestModel("models.p2", "p2", "", "2")
 				child := newTestModel("models.c", "c", "", "3")
@@ -673,9 +651,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 
 				_ = store.SetDependencies(child.ID, []string{parent1.ID})
 				require.NoError(t, store.SetDependencies(child.ID, []string{parent2.ID}))
-				return []*Model{parent1, parent2, child}
+				return []*core.PersistedModel{parent1, parent2, child}
 			},
-			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+			verify: func(t *testing.T, store *SQLiteStore, models []*core.PersistedModel) {
 				parent2 := models[1]
 				child := models[2]
 				deps, _ := store.GetDependencies(child.ID)
@@ -685,7 +663,7 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 		},
 		{
 			name: "get dependents",
-			setup: func(_ *testing.T, store *SQLiteStore) []*Model {
+			setup: func(_ *testing.T, store *SQLiteStore) []*core.PersistedModel {
 				parent := newTestModel("models.parent", "parent", "", "1")
 				child1 := newTestModel("models.child1", "child1", "", "2")
 				child2 := newTestModel("models.child2", "child2", "", "3")
@@ -697,9 +675,9 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 				_ = store.SetDependencies(child1.ID, []string{parent.ID})
 				_ = store.SetDependencies(child2.ID, []string{parent.ID})
 
-				return []*Model{parent, child1, child2}
+				return []*core.PersistedModel{parent, child1, child2}
 			},
-			verify: func(t *testing.T, store *SQLiteStore, models []*Model) {
+			verify: func(t *testing.T, store *SQLiteStore, models []*core.PersistedModel) {
 				parent := models[0]
 				dependents, err := store.GetDependents(parent.ID)
 				require.NoError(t, err)
@@ -713,7 +691,7 @@ func TestSQLiteStore_Dependencies(t *testing.T) {
 			store := setupTestStore(t)
 			defer func() { _ = store.Close() }()
 
-			var models []*Model
+			var models []*core.PersistedModel
 			if tt.setup != nil {
 				models = tt.setup(t, store)
 			}
@@ -790,13 +768,13 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 				model := newTestModel("staging.stg_customers", "stg_customers", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
-				columns := []ColumnInfo{
+				columns := []core.ColumnInfo{
 					{
 						Name:          "customer_id",
 						Index:         0,
 						TransformType: "",
 						Function:      "",
-						Sources: []SourceRef{
+						Sources: []core.SourceRef{
 							{Table: "raw_customers", Column: "id"},
 						},
 					},
@@ -805,7 +783,7 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 						Index:         1,
 						TransformType: "EXPR",
 						Function:      "concat",
-						Sources: []SourceRef{
+						Sources: []core.SourceRef{
 							{Table: "raw_customers", Column: "first_name"},
 							{Table: "raw_customers", Column: "last_name"},
 						},
@@ -834,14 +812,14 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 				model := newTestModel("staging.stg_orders", "stg_orders", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
-				initialColumns := []ColumnInfo{
-					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
+				initialColumns := []core.ColumnInfo{
+					{Name: "order_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_orders", Column: "id"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("staging.stg_orders", initialColumns))
 
-				updatedColumns := []ColumnInfo{
-					{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "order_id"}}},
-					{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
+				updatedColumns := []core.ColumnInfo{
+					{Name: "order_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_orders", Column: "order_id"}}},
+					{Name: "total", Index: 1, TransformType: "EXPR", Function: "sum", Sources: []core.SourceRef{{Table: "raw_orders", Column: "amount"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("staging.stg_orders", updatedColumns))
 			},
@@ -868,9 +846,9 @@ func TestSQLiteStore_ColumnLineage(t *testing.T) {
 				model := newTestModel("staging.stg_products", "stg_products", "", "abc123")
 				require.NoError(t, store.RegisterModel(model))
 
-				columns := []ColumnInfo{
-					{Name: "product_id", Index: 0, Sources: []SourceRef{{Table: "raw_products", Column: "id"}}},
-					{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_products", Column: "name"}}},
+				columns := []core.ColumnInfo{
+					{Name: "product_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_products", Column: "id"}}},
+					{Name: "name", Index: 1, Sources: []core.SourceRef{{Table: "raw_products", Column: "name"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("staging.stg_products", columns))
 				require.NoError(t, store.DeleteModelColumns("staging.stg_products"))
@@ -914,13 +892,13 @@ func TestSQLiteStore_Trace(t *testing.T) {
 				require.NoError(t, store.RegisterModel(stgModel))
 				require.NoError(t, store.RegisterModel(martModel))
 
-				stgColumns := []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
+				stgColumns := []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_customers", Column: "id"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("staging.stg_customers", stgColumns))
 
-				martColumns := []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				martColumns := []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("marts.customer_summary", martColumns))
 			},
@@ -954,15 +932,15 @@ func TestSQLiteStore_Trace(t *testing.T) {
 				require.NoError(t, store.RegisterModel(stgModel))
 				require.NoError(t, store.RegisterModel(martModel))
 
-				stgColumns := []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
-					{Name: "email", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "email"}}},
+				stgColumns := []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_customers", Column: "id"}}},
+					{Name: "email", Index: 1, Sources: []core.SourceRef{{Table: "raw_customers", Column: "email"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("staging.stg_customers", stgColumns))
 
-				martColumns := []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-					{Name: "contact", Index: 1, Sources: []SourceRef{{Table: "stg_customers", Column: "email"}}},
+				martColumns := []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+					{Name: "contact", Index: 1, Sources: []core.SourceRef{{Table: "stg_customers", Column: "email"}}},
 				}
 				require.NoError(t, store.SaveModelColumns("marts.customer_summary", martColumns))
 			},
@@ -988,19 +966,19 @@ func TestSQLiteStore_Trace(t *testing.T) {
 				summaryModel := newTestModel("marts.customer_summary", "customer_summary", "", "def")
 				metricsModel := newTestModel("marts.customer_metrics", "customer_metrics", "", "ghi")
 
-				for _, m := range []*Model{stgModel, summaryModel, metricsModel} {
+				for _, m := range []*core.PersistedModel{stgModel, summaryModel, metricsModel} {
 					require.NoError(t, store.RegisterModel(m))
 				}
 
-				require.NoError(t, store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw", Column: "id"}}},
+				require.NoError(t, store.SaveModelColumns("staging.stg_customers", []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "raw", Column: "id"}}},
 				}))
 
-				require.NoError(t, store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
-					{Name: "cust_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				require.NoError(t, store.SaveModelColumns("marts.customer_summary", []core.ColumnInfo{
+					{Name: "cust_id", Index: 0, Sources: []core.SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
 				}))
-				require.NoError(t, store.SaveModelColumns("marts.customer_metrics", []ColumnInfo{
-					{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+				require.NoError(t, store.SaveModelColumns("marts.customer_metrics", []core.ColumnInfo{
+					{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
 				}))
 			},
 			verify: func(t *testing.T, store *SQLiteStore) {
@@ -1060,7 +1038,7 @@ func TestSQLiteStore_BatchGetAllColumns(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// Setup: Register models and save columns
-	models := []*Model{
+	models := []*core.PersistedModel{
 		newTestModel("staging.stg_customers", "stg_customers", "", "abc"),
 		newTestModel("staging.stg_orders", "stg_orders", "", "def"),
 		newTestModel("marts.customer_summary", "customer_summary", "", "ghi"),
@@ -1070,20 +1048,20 @@ func TestSQLiteStore_BatchGetAllColumns(t *testing.T) {
 	}
 
 	// Save columns for each model
-	require.NoError(t, store.SaveModelColumns("staging.stg_customers", []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "raw_customers", Column: "id"}}},
-		{Name: "name", Index: 1, Sources: []SourceRef{{Table: "raw_customers", Column: "name"}}},
+	require.NoError(t, store.SaveModelColumns("staging.stg_customers", []core.ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_customers", Column: "id"}}},
+		{Name: "name", Index: 1, Sources: []core.SourceRef{{Table: "raw_customers", Column: "name"}}},
 	}))
 
-	require.NoError(t, store.SaveModelColumns("staging.stg_orders", []ColumnInfo{
-		{Name: "order_id", Index: 0, Sources: []SourceRef{{Table: "raw_orders", Column: "id"}}},
-		{Name: "customer_id", Index: 1, Sources: []SourceRef{{Table: "raw_orders", Column: "customer_id"}}},
-		{Name: "total", Index: 2, TransformType: "EXPR", Function: "sum", Sources: []SourceRef{{Table: "raw_orders", Column: "amount"}}},
+	require.NoError(t, store.SaveModelColumns("staging.stg_orders", []core.ColumnInfo{
+		{Name: "order_id", Index: 0, Sources: []core.SourceRef{{Table: "raw_orders", Column: "id"}}},
+		{Name: "customer_id", Index: 1, Sources: []core.SourceRef{{Table: "raw_orders", Column: "customer_id"}}},
+		{Name: "total", Index: 2, TransformType: "EXPR", Function: "sum", Sources: []core.SourceRef{{Table: "raw_orders", Column: "amount"}}},
 	}))
 
-	require.NoError(t, store.SaveModelColumns("marts.customer_summary", []ColumnInfo{
-		{Name: "customer_id", Index: 0, Sources: []SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
-		{Name: "order_count", Index: 1, TransformType: "EXPR", Function: "count", Sources: []SourceRef{{Table: "stg_orders", Column: "order_id"}}},
+	require.NoError(t, store.SaveModelColumns("marts.customer_summary", []core.ColumnInfo{
+		{Name: "customer_id", Index: 0, Sources: []core.SourceRef{{Table: "stg_customers", Column: "customer_id"}}},
+		{Name: "order_count", Index: 1, TransformType: "EXPR", Function: "count", Sources: []core.SourceRef{{Table: "stg_orders", Column: "order_id"}}},
 	}))
 
 	// Test: BatchGetAllColumns
@@ -1120,7 +1098,7 @@ func TestSQLiteStore_BatchGetAllDependencies(t *testing.T) {
 	//   stg_orders (no deps)
 	//   customer_summary (depends on stg_customers, stg_orders)
 	//   order_summary (depends on stg_orders)
-	models := []*Model{
+	models := []*core.PersistedModel{
 		newTestModel("staging.stg_customers", "stg_customers", "", "1"),
 		newTestModel("staging.stg_orders", "stg_orders", "", "2"),
 		newTestModel("marts.customer_summary", "customer_summary", "", "3"),
@@ -1157,7 +1135,7 @@ func TestSQLiteStore_BatchGetAllDependents(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// Setup: Same as BatchGetAllDependencies test
-	models := []*Model{
+	models := []*core.PersistedModel{
 		newTestModel("staging.stg_customers", "stg_customers", "", "1"),
 		newTestModel("staging.stg_orders", "stg_orders", "", "2"),
 		newTestModel("marts.customer_summary", "customer_summary", "", "3"),

@@ -5,8 +5,8 @@
 package snowflake
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -31,9 +31,9 @@ var (
 
 // --- Snowflake-specific Operators ---
 
-var snowflakeOperators = []dialect.OperatorDef{
-	{Token: TokenRlike, Precedence: spi.PrecedenceComparison},
-	{Token: TokenRegexp, Precedence: spi.PrecedenceComparison},
+var snowflakeOperators = []core.OperatorDef{
+	{Token: TokenRlike, Precedence: core.PrecedenceComparison},
+	{Token: TokenRegexp, Precedence: core.PrecedenceComparison},
 }
 
 // Snowflake is the Snowflake SQL dialect.

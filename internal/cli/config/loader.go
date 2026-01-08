@@ -16,6 +16,7 @@ import (
 	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/v2"
 	intconfig "github.com/leapstack-labs/leapsql/internal/config"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/spf13/pflag"
 )
 
@@ -172,7 +173,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 
 	// Initialize default target if not specified
 	if cfg.Target == nil {
-		cfg.Target = &TargetConfig{
+		cfg.Target = &core.TargetConfig{
 			Type:     "duckdb",
 			Database: cfg.DatabasePath, // Use legacy database path
 		}
@@ -244,7 +245,7 @@ func expandEnvVars(s string) string {
 }
 
 // expandTargetEnvVars expands environment variables in sensitive target fields.
-func expandTargetEnvVars(t *TargetConfig) {
+func expandTargetEnvVars(t *core.TargetConfig) {
 	if t == nil {
 		return
 	}
@@ -256,7 +257,7 @@ func expandTargetEnvVars(t *TargetConfig) {
 }
 
 // MergeTargetConfig merges two target configs, with override taking precedence.
-func MergeTargetConfig(base, override *TargetConfig) *TargetConfig {
+func MergeTargetConfig(base, override *core.TargetConfig) *core.TargetConfig {
 	if base == nil {
 		return override
 	}
@@ -265,7 +266,7 @@ func MergeTargetConfig(base, override *TargetConfig) *TargetConfig {
 	}
 
 	// Start with a copy of base
-	merged := &TargetConfig{
+	merged := &core.TargetConfig{
 		Type:      base.Type,
 		Database:  base.Database,
 		Host:      base.Host,

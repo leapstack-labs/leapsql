@@ -57,7 +57,7 @@ type FunctionDoc struct {
 // This is pure data — no handler functions.
 //
 // The runtime behavior (clause handlers, infix handlers, etc.) lives in
-// pkg/dialect.Dialect, which embeds this config.
+// pkg/core.Dialect, which embeds this config.
 type DialectConfig struct {
 	// Name is the dialect identifier (e.g., "duckdb", "postgres")
 	Name string
@@ -190,7 +190,7 @@ type Dialect struct {
 	InfixHandlers  map[token.TokenType]any // spi.InfixHandler
 	PrefixHandlers map[token.TokenType]any // spi.PrefixHandler
 	JoinTypes      map[token.TokenType]JoinTypeDef
-	StarModifiers  map[token.TokenType]any // spi.StarModifierHandler
+	StarModifiers  map[token.TokenType]any // core.StarModifierHandler
 	FromItems      map[token.TokenType]any // spi.FromItemHandler
 }
 

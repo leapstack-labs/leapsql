@@ -5,8 +5,8 @@
 package databricks
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -50,12 +50,12 @@ const (
 
 // --- Databricks-specific Operators ---
 
-var databricksOperators = []dialect.OperatorDef{
-	{Token: TokenRlike, Precedence: spi.PrecedenceComparison},
-	{Token: TokenRegexp, Precedence: spi.PrecedenceComparison},
-	{Token: TokenColon, Symbol: ":", Precedence: spi.PrecedencePostfix},
-	{Token: TokenQDcolon, Symbol: "?::", Precedence: spi.PrecedencePostfix},
-	{Token: TokenDiv, Symbol: "DIV", Precedence: spi.PrecedenceMultiply},
+var databricksOperators = []core.OperatorDef{
+	{Token: TokenRlike, Precedence: core.PrecedenceComparison},
+	{Token: TokenRegexp, Precedence: core.PrecedenceComparison},
+	{Token: TokenColon, Symbol: ":", Precedence: core.PrecedencePostfix},
+	{Token: TokenQDcolon, Symbol: "?::", Precedence: core.PrecedencePostfix},
+	{Token: TokenDiv, Symbol: "DIV", Precedence: core.PrecedenceMultiply},
 }
 
 // Databricks is the Databricks SQL dialect.

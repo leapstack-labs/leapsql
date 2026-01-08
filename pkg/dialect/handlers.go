@@ -6,6 +6,7 @@
 package dialect
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -66,17 +67,17 @@ func ParseOffset(p spi.ParserOps) (spi.Node, error) {
 // FetchClause represents FETCH FIRST/NEXT n ROWS ONLY/WITH TIES (SQL:2008).
 // This is defined here to avoid import cycles with the parser package.
 type FetchClause struct {
-	First    bool     // true = FIRST, false = NEXT (semantically identical)
-	Count    spi.Expr // Number of rows (nil = 1 row implied)
-	Percent  bool     // FETCH FIRST n PERCENT ROWS
-	WithTies bool     // true = WITH TIES, false = ONLY
+	First    bool      // true = FIRST, false = NEXT (semantically identical)
+	Count    core.Expr // Number of rows (nil = 1 row implied)
+	Percent  bool      // FETCH FIRST n PERCENT ROWS
+	WithTies bool      // true = WITH TIES, false = ONLY
 }
 
 // GetFirst implements FetchClauseData.
 func (f *FetchClause) GetFirst() bool { return f.First }
 
 // GetCount implements FetchClauseData.
-func (f *FetchClause) GetCount() spi.Expr { return f.Count }
+func (f *FetchClause) GetCount() core.Expr { return f.Count }
 
 // GetPercent implements FetchClauseData.
 func (f *FetchClause) GetPercent() bool { return f.Percent }

@@ -228,18 +228,18 @@ func (p *Parser) parseClausesWithDialect(sc *core.SelectCore) {
 
 // assignToSlot stores the parsed clause result in the appropriate SelectCore field.
 // This uses the declarative ClauseSlot enum to determine where to store data.
-func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result any) {
+func (p *Parser) assignToSlot(sc *core.SelectCore, slot core.ClauseSlot, result any) {
 	if result == nil {
 		return
 	}
 
 	switch slot {
-	case spi.SlotWhere:
+	case core.SlotWhere:
 		if expr, ok := result.(core.Expr); ok {
 			sc.Where = expr
 		}
 
-	case spi.SlotGroupBy:
+	case core.SlotGroupBy:
 		// Check for GROUP BY ALL marker (DuckDB extension)
 		if marker, ok := result.(spi.GroupByAllMarker); ok && marker.IsGroupByAll() {
 			sc.GroupByAll = true
@@ -258,16 +258,16 @@ func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result a
 			sc.GroupBy = exprs
 		}
 
-	case spi.SlotHaving:
+	case core.SlotHaving:
 		if expr, ok := result.(core.Expr); ok {
 			sc.Having = expr
 		}
 
-	case spi.SlotWindow:
+	case core.SlotWindow:
 		// Window definitions are complex - for now skip
 		// TODO: Add window definitions support
 
-	case spi.SlotOrderBy:
+	case core.SlotOrderBy:
 		// Check for ORDER BY ALL marker (DuckDB extension)
 		if marker, ok := result.(spi.OrderByAllMarker); ok && marker.IsOrderByAll() {
 			sc.OrderByAll = true
@@ -287,22 +287,22 @@ func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result a
 			sc.OrderBy = items
 		}
 
-	case spi.SlotLimit:
+	case core.SlotLimit:
 		if expr, ok := result.(core.Expr); ok {
 			sc.Limit = expr
 		}
 
-	case spi.SlotOffset:
+	case core.SlotOffset:
 		if expr, ok := result.(core.Expr); ok {
 			sc.Offset = expr
 		}
 
-	case spi.SlotQualify:
+	case core.SlotQualify:
 		if expr, ok := result.(core.Expr); ok {
 			sc.Qualify = expr
 		}
 
-	case spi.SlotFetch:
+	case core.SlotFetch:
 		// Handle both parser.FetchClause and dialect-defined FetchClause types
 		if fetch, ok := result.(*core.FetchClause); ok {
 			sc.Fetch = fetch
@@ -311,7 +311,7 @@ func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result a
 			sc.Fetch = convertToFetchClause(result)
 		}
 
-	case spi.SlotExtensions:
+	case core.SlotExtensions:
 		if node, ok := result.(core.Node); ok {
 			sc.Extensions = append(sc.Extensions, node)
 		}
@@ -321,7 +321,7 @@ func (p *Parser) assignToSlot(sc *core.SelectCore, slot spi.ClauseSlot, result a
 // FetchClauseData is an interface for extracting data from dialect-defined FetchClause types.
 type FetchClauseData interface {
 	GetFirst() bool
-	GetCount() spi.Expr
+	GetCount() core.Expr
 	GetPercent() bool
 	GetWithTies() bool
 }

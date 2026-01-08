@@ -26,7 +26,7 @@ import (
 
 // parseExpression parses an expression using precedence climbing.
 func (p *Parser) parseExpression() core.Expr {
-	return p.parseExpressionWithPrecedence(spi.PrecedenceNone + 1)
+	return p.parseExpressionWithPrecedence(core.PrecedenceNone + 1)
 }
 
 // parseExpressionWithPrecedence implements Pratt parsing with dialect-aware precedence.
@@ -58,17 +58,17 @@ func (p *Parser) parsePrefixExpr() core.Expr {
 	switch p.token.Type {
 	case TOKEN_NOT:
 		p.nextToken()
-		expr := p.parseExpressionWithPrecedence(spi.PrecedenceNot)
+		expr := p.parseExpressionWithPrecedence(core.PrecedenceNot)
 		return &core.UnaryExpr{Op: token.NOT, Expr: expr}
 
 	case TOKEN_MINUS:
 		p.nextToken()
-		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
+		expr := p.parseExpressionWithPrecedence(core.PrecedenceUnary)
 		return &core.UnaryExpr{Op: token.MINUS, Expr: expr}
 
 	case TOKEN_PLUS:
 		p.nextToken()
-		expr := p.parseExpressionWithPrecedence(spi.PrecedenceUnary)
+		expr := p.parseExpressionWithPrecedence(core.PrecedenceUnary)
 		return &core.UnaryExpr{Op: token.PLUS, Expr: expr}
 
 	default:
@@ -95,26 +95,26 @@ func (p *Parser) getInfixPrecedence() int {
 func (p *Parser) defaultPrecedence(t TokenType) int {
 	switch t {
 	case TOKEN_OR:
-		return spi.PrecedenceOr
+		return core.PrecedenceOr
 	case TOKEN_AND:
-		return spi.PrecedenceAnd
+		return core.PrecedenceAnd
 	case TOKEN_EQ, TOKEN_NE, TOKEN_LT, TOKEN_GT, TOKEN_LE, TOKEN_GE:
-		return spi.PrecedenceComparison
+		return core.PrecedenceComparison
 	case TOKEN_IS, TOKEN_IN, TOKEN_BETWEEN, TOKEN_LIKE:
-		return spi.PrecedenceComparison
+		return core.PrecedenceComparison
 	case TOKEN_PLUS, TOKEN_MINUS, TOKEN_DPIPE:
-		return spi.PrecedenceAddition
+		return core.PrecedenceAddition
 	case TOKEN_STAR, TOKEN_SLASH, TOKEN_MOD:
-		return spi.PrecedenceMultiply
+		return core.PrecedenceMultiply
 	case TOKEN_NOT:
 		// NOT as infix (for NOT IN, NOT LIKE, etc.) - handled specially
-		return spi.PrecedenceComparison
+		return core.PrecedenceComparison
 	default:
 		// Check dynamically registered ILIKE
 		if ilike := tokenIlike(); ilike != TOKEN_ILLEGAL && t == ilike {
-			return spi.PrecedenceComparison
+			return core.PrecedenceComparison
 		}
-		return spi.PrecedenceNone
+		return core.PrecedenceNone
 	}
 }
 
@@ -162,7 +162,7 @@ func (p *Parser) parseInfixExpr(left core.Expr, prec int) core.Expr {
 				return left
 			}
 			if result != nil {
-				// result is already Expr type (spi.Expr = core.Expr = Expr)
+				// result is already Expr type (core.Expr = core.Expr = Expr)
 				return result
 			}
 			// If handler returned nil, fall through to standard handling
@@ -259,10 +259,10 @@ func (p *Parser) parseInExpr(left core.Expr, not bool) core.Expr {
 func (p *Parser) parseBetweenExpr(left core.Expr, not bool) core.Expr {
 	between := &core.BetweenExpr{Expr: left, Not: not}
 	// Parse low bound at addition precedence to avoid capturing AND
-	between.Low = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
+	between.Low = p.parseExpressionWithPrecedence(core.PrecedenceAddition)
 	p.expect(TOKEN_AND)
 	// Parse high bound at addition precedence
-	between.High = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
+	between.High = p.parseExpressionWithPrecedence(core.PrecedenceAddition)
 	return between
 }
 
@@ -270,6 +270,6 @@ func (p *Parser) parseBetweenExpr(left core.Expr, not bool) core.Expr {
 func (p *Parser) parseLikeExpr(left core.Expr, not bool, op token.TokenType) core.Expr {
 	like := &core.LikeExpr{Expr: left, Not: not, Op: op}
 	// Parse pattern at addition precedence
-	like.Pattern = p.parseExpressionWithPrecedence(spi.PrecedenceAddition)
+	like.Pattern = p.parseExpressionWithPrecedence(core.PrecedenceAddition)
 	return like
 }

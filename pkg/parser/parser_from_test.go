@@ -26,31 +26,31 @@ func TestNaturalJoin(t *testing.T) {
 		{
 			name:     "natural inner join",
 			sql:      "SELECT * FROM t1 NATURAL JOIN t2",
-			wantType: core.JoinType(dialect.JoinInner),
+			wantType: core.JoinType(core.JoinInner),
 			natural:  true,
 		},
 		{
 			name:     "natural left join",
 			sql:      "SELECT * FROM t1 NATURAL LEFT JOIN t2",
-			wantType: core.JoinType(dialect.JoinLeft),
+			wantType: core.JoinType(core.JoinLeft),
 			natural:  true,
 		},
 		{
 			name:     "natural right join",
 			sql:      "SELECT * FROM t1 NATURAL RIGHT JOIN t2",
-			wantType: core.JoinType(dialect.JoinRight),
+			wantType: core.JoinType(core.JoinRight),
 			natural:  true,
 		},
 		{
 			name:     "natural full join",
 			sql:      "SELECT * FROM t1 NATURAL FULL JOIN t2",
-			wantType: core.JoinType(dialect.JoinFull),
+			wantType: core.JoinType(core.JoinFull),
 			natural:  true,
 		},
 		{
 			name:     "natural left outer join",
 			sql:      "SELECT * FROM t1 NATURAL LEFT OUTER JOIN t2",
-			wantType: core.JoinType(dialect.JoinLeft),
+			wantType: core.JoinType(core.JoinLeft),
 			natural:  true,
 		},
 	}
@@ -100,31 +100,31 @@ func TestJoinUsing(t *testing.T) {
 			name:     "single column",
 			sql:      "SELECT * FROM t1 JOIN t2 USING (id)",
 			wantCols: []string{"id"},
-			joinType: core.JoinType(dialect.JoinInner),
+			joinType: core.JoinType(core.JoinInner),
 		},
 		{
 			name:     "multiple columns",
 			sql:      "SELECT * FROM t1 JOIN t2 USING (id, name, region)",
 			wantCols: []string{"id", "name", "region"},
-			joinType: core.JoinType(dialect.JoinInner),
+			joinType: core.JoinType(core.JoinInner),
 		},
 		{
 			name:     "left join using",
 			sql:      "SELECT * FROM t1 LEFT JOIN t2 USING (customer_id)",
 			wantCols: []string{"customer_id"},
-			joinType: core.JoinType(dialect.JoinLeft),
+			joinType: core.JoinType(core.JoinLeft),
 		},
 		{
 			name:     "right join using",
 			sql:      "SELECT * FROM t1 RIGHT JOIN t2 USING (order_id)",
 			wantCols: []string{"order_id"},
-			joinType: core.JoinType(dialect.JoinRight),
+			joinType: core.JoinType(core.JoinRight),
 		},
 		{
 			name:     "full join using",
 			sql:      "SELECT * FROM t1 FULL JOIN t2 USING (key)",
 			wantCols: []string{"key"},
-			joinType: core.JoinType(dialect.JoinFull),
+			joinType: core.JoinType(core.JoinFull),
 		},
 	}
 
@@ -319,14 +319,14 @@ func TestMultipleJoinsWithDifferentStyles(t *testing.T) {
 
 	// First join: regular ON
 	join1 := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, core.JoinType(dialect.JoinInner), join1.Type)
+	assert.Equal(t, core.JoinType(core.JoinInner), join1.Type)
 	assert.False(t, join1.Natural)
 	assert.NotNil(t, join1.Condition)
 	assert.Empty(t, join1.Using)
 
 	// Second join: NATURAL LEFT
 	join2 := stmt.Body.Left.From.Joins[1]
-	assert.Equal(t, core.JoinType(dialect.JoinLeft), join2.Type)
+	assert.Equal(t, core.JoinType(core.JoinLeft), join2.Type)
 	assert.True(t, join2.Natural)
 	assert.Nil(t, join2.Condition)
 	assert.Empty(t, join2.Using)
@@ -518,7 +518,7 @@ func TestDuckDBJoinWithStandardJoins(t *testing.T) {
 
 	// First join: standard INNER JOIN
 	join1 := stmt.Body.Left.From.Joins[0]
-	assert.Equal(t, core.JoinType(dialect.JoinInner), join1.Type)
+	assert.Equal(t, core.JoinType(core.JoinInner), join1.Type)
 
 	// Second join: SEMI JOIN
 	join2 := stmt.Body.Left.From.Joins[1]
@@ -526,7 +526,7 @@ func TestDuckDBJoinWithStandardJoins(t *testing.T) {
 }
 
 // getDuckDBDialect loads the DuckDB dialect for testing
-func getDuckDBDialect(t *testing.T) *dialect.Dialect {
+func getDuckDBDialect(t *testing.T) *core.Dialect {
 	t.Helper()
 	// Trigger dialect registration by importing
 	d, ok := dialect.Get("duckdb")

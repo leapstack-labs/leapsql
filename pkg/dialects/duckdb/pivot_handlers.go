@@ -10,9 +10,9 @@ import (
 
 // parsePivot handles PIVOT (aggregates FOR column IN (values)).
 // The PIVOT keyword has already been consumed.
-func parsePivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
+func parsePivot(p spi.ParserOps, source core.TableRef) (core.TableRef, error) {
 	pivot := &core.PivotTable{
-		Source: source, // spi.TableRef = core.TableRef
+		Source: source, // core.TableRef = core.TableRef
 	}
 
 	if err := p.Expect(token.LPAREN); err != nil {
@@ -135,7 +135,7 @@ func parsePivotInValue(p spi.ParserOps) (core.PivotInValue, error) {
 	if err != nil {
 		return val, fmt.Errorf("PIVOT IN value: %w", err)
 	}
-	val.Value = expr // spi.Expr = core.Expr
+	val.Value = expr // core.Expr = core.Expr
 
 	// Optional alias
 	if p.Match(token.AS) {
@@ -151,9 +151,9 @@ func parsePivotInValue(p spi.ParserOps) (core.PivotInValue, error) {
 
 // parseUnpivot handles UNPIVOT (value FOR name IN (columns)).
 // The UNPIVOT keyword has already been consumed.
-func parseUnpivot(p spi.ParserOps, source spi.TableRef) (spi.TableRef, error) {
+func parseUnpivot(p spi.ParserOps, source core.TableRef) (core.TableRef, error) {
 	unpivot := &core.UnpivotTable{
-		Source: source, // spi.TableRef = core.TableRef
+		Source: source, // core.TableRef = core.TableRef
 	}
 
 	if err := p.Expect(token.LPAREN); err != nil {

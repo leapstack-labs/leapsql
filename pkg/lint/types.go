@@ -10,7 +10,7 @@ import (
 // =============================================================================
 
 // DialectInfo is a minimal interface to avoid importing the full dialect package.
-// Implemented by dialect.Dialect.
+// Implemented by core.Dialect.
 type DialectInfo interface {
 	GetName() string
 	IsClauseToken(t token.TokenType) bool

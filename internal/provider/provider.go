@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leapstack-labs/leapsql/pkg/core"
-	"github.com/leapstack-labs/leapsql/pkg/dialect"
 	"github.com/leapstack-labs/leapsql/pkg/lint"
 	"github.com/leapstack-labs/leapsql/pkg/lint/project"
 )
@@ -29,12 +28,12 @@ type Provider struct {
 	// Dependencies
 	store   core.Store
 	config  lint.ProjectHealthConfig
-	dialect *dialect.Dialect
+	dialect *core.Dialect
 	logger  *slog.Logger
 }
 
 // New creates a new Provider with the given dependencies.
-func New(store core.Store, d *dialect.Dialect, config lint.ProjectHealthConfig, logger *slog.Logger) *Provider {
+func New(store core.Store, d *core.Dialect, config lint.ProjectHealthConfig, logger *slog.Logger) *Provider {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -239,12 +238,12 @@ func (p *Provider) Store() core.Store {
 }
 
 // Dialect returns the SQL dialect.
-func (p *Provider) Dialect() *dialect.Dialect {
+func (p *Provider) Dialect() *core.Dialect {
 	return p.dialect
 }
 
 // SetDialect updates the dialect and invalidates all cached documents.
-func (p *Provider) SetDialect(d *dialect.Dialect) {
+func (p *Provider) SetDialect(d *core.Dialect) {
 	p.dialect = d
 	p.InvalidateAll()
 }

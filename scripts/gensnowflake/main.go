@@ -792,9 +792,9 @@ func generateFunctionsCode(scalars, aggregates, windows, tableFuncs, generators 
 	// Generate function docs map
 	buf.WriteString("// snowflakeFunctionDocs contains documentation for Snowflake functions.\n")
 	if len(docs) == 0 {
-		buf.WriteString("var snowflakeFunctionDocs = map[string]dialect.FunctionDoc{}\n")
+		buf.WriteString("var snowflakeFunctionDocs = map[string]core.FunctionDoc{}\n")
 	} else {
-		buf.WriteString("var snowflakeFunctionDocs = map[string]dialect.FunctionDoc{\n")
+		buf.WriteString("var snowflakeFunctionDocs = map[string]core.FunctionDoc{\n")
 		// Sort keys for deterministic output
 		keys := make([]string, 0, len(docs))
 		for k := range docs {

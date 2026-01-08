@@ -1601,7 +1601,7 @@ func TestExtractLineage_Errors(t *testing.T) {
 // TestExtractLineage_DialectRequired verifies that dialect is required.
 func TestExtractLineage_DialectRequired(t *testing.T) {
 	_, err := ExtractLineageWithOptions("SELECT 1", ExtractLineageOptions{})
-	if !errors.Is(err, dialect.ErrDialectRequired) {
+	if !errors.Is(err, core.ErrDialectRequired) {
 		t.Errorf("expected ErrDialectRequired, got %v", err)
 	}
 }

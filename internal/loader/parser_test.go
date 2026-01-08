@@ -16,7 +16,7 @@ import (
 )
 
 // testDialect returns the DuckDB dialect for testing.
-func testDialect(t *testing.T) *dialect.Dialect {
+func testDialect(t *testing.T) *core.Dialect {
 	t.Helper()
 	d, ok := dialect.Get("duckdb")
 	require.True(t, ok, "DuckDB dialect not found - ensure duckdb/dialect package is imported")

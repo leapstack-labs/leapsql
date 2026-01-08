@@ -4,10 +4,10 @@
 
 package duckdb
 
-import "github.com/leapstack-labs/leapsql/pkg/dialect"
+import "github.com/leapstack-labs/leapsql/pkg/core"
 
 // duckDBFunctionDocs contains documentation for all DuckDB functions.
-var duckDBFunctionDocs = map[string]dialect.FunctionDoc{
+var duckDBFunctionDocs = map[string]core.FunctionDoc{
 	"abs": {
 		Description: "Absolute value",
 		Signatures: []string{

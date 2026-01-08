@@ -4,7 +4,7 @@
 
 package databricks
 
-import "github.com/leapstack-labs/leapsql/pkg/dialect"
+import "github.com/leapstack-labs/leapsql/pkg/core"
 
 // databricksScalars contains all scalar function names.
 var databricksScalars = []string{
@@ -150,7 +150,7 @@ var databricksTableFunctions = []string{
 }
 
 // databricksFunctionDocs contains documentation for Databricks functions.
-var databricksFunctionDocs = map[string]dialect.FunctionDoc{
+var databricksFunctionDocs = map[string]core.FunctionDoc{
 	"abs": {
 		Description: "Returns the absolute value of the numeric value in expr.",
 		Signatures:  []string{"abs(expr)"},

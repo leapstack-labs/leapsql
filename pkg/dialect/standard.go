@@ -6,6 +6,7 @@
 package dialect
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
@@ -17,76 +18,76 @@ import (
 
 var (
 	// StandardWhere is the standard WHERE clause definition.
-	StandardWhere = ClauseDef{
+	StandardWhere = core.ClauseDef{
 		Token:   token.WHERE,
 		Handler: spi.ClauseHandler(ParseWhere),
-		Slot:    spi.SlotWhere,
+		Slot:    core.SlotWhere,
 	}
 
 	// StandardGroupBy is the standard GROUP BY clause definition.
-	StandardGroupBy = ClauseDef{
+	StandardGroupBy = core.ClauseDef{
 		Token:    token.GROUP,
 		Handler:  spi.ClauseHandler(ParseGroupBy),
-		Slot:     spi.SlotGroupBy,
+		Slot:     core.SlotGroupBy,
 		Keywords: []string{"GROUP", "BY"},
 	}
 
 	// StandardHaving is the standard HAVING clause definition.
-	StandardHaving = ClauseDef{
+	StandardHaving = core.ClauseDef{
 		Token:   token.HAVING,
 		Handler: spi.ClauseHandler(ParseHaving),
-		Slot:    spi.SlotHaving,
+		Slot:    core.SlotHaving,
 	}
 
 	// StandardWindow is the standard WINDOW clause definition.
-	StandardWindow = ClauseDef{
+	StandardWindow = core.ClauseDef{
 		Token:   token.WINDOW,
 		Handler: spi.ClauseHandler(ParseWindow),
-		Slot:    spi.SlotWindow,
+		Slot:    core.SlotWindow,
 	}
 
 	// StandardOrderBy is the standard ORDER BY clause definition.
-	StandardOrderBy = ClauseDef{
+	StandardOrderBy = core.ClauseDef{
 		Token:    token.ORDER,
 		Handler:  spi.ClauseHandler(ParseOrderBy),
-		Slot:     spi.SlotOrderBy,
+		Slot:     core.SlotOrderBy,
 		Keywords: []string{"ORDER", "BY"},
 	}
 
 	// StandardLimit is the standard LIMIT clause definition.
-	StandardLimit = ClauseDef{
+	StandardLimit = core.ClauseDef{
 		Token:   token.LIMIT,
 		Handler: spi.ClauseHandler(ParseLimit),
-		Slot:    spi.SlotLimit,
+		Slot:    core.SlotLimit,
 		Inline:  true,
 	}
 
 	// StandardOffset is the standard OFFSET clause definition.
-	StandardOffset = ClauseDef{
+	StandardOffset = core.ClauseDef{
 		Token:   token.OFFSET,
 		Handler: spi.ClauseHandler(ParseOffset),
-		Slot:    spi.SlotOffset,
+		Slot:    core.SlotOffset,
 		Inline:  true,
 	}
 
 	// StandardFetch is the standard FETCH clause definition (SQL:2008).
-	StandardFetch = ClauseDef{
+	StandardFetch = core.ClauseDef{
 		Token:   token.FETCH,
 		Handler: spi.ClauseHandler(ParseFetch),
-		Slot:    spi.SlotFetch,
+		Slot:    core.SlotFetch,
 	}
 
 	// StandardQualify is the standard QUALIFY clause definition (DuckDB, Databricks, etc.).
-	StandardQualify = ClauseDef{
+	StandardQualify = core.ClauseDef{
 		Token:   token.QUALIFY,
 		Handler: spi.ClauseHandler(ParseQualify),
-		Slot:    spi.SlotQualify,
+		Slot:    core.SlotQualify,
 	}
 )
 
 // StandardSelectClauses is the typical ANSI SELECT clause sequence.
 // Dialects can use this directly or compose their own from the individual defs.
-var StandardSelectClauses = []ClauseDef{
+var StandardSelectClauses = []core.ClauseDef{
 	StandardWhere,
 	StandardGroupBy,
 	StandardHaving,
@@ -106,12 +107,12 @@ type GroupByOpts struct {
 }
 
 // GroupBy returns a ClauseDef for GROUP BY with options.
-func GroupBy(opts GroupByOpts) ClauseDef {
+func GroupBy(opts GroupByOpts) core.ClauseDef {
 	if opts.AllowAll {
-		return ClauseDef{
+		return core.ClauseDef{
 			Token:    token.GROUP,
 			Handler:  spi.ClauseHandler(ParseGroupByWithAll),
-			Slot:     spi.SlotGroupBy,
+			Slot:     core.SlotGroupBy,
 			Keywords: []string{"GROUP", "BY"},
 		}
 	}
@@ -124,12 +125,12 @@ type OrderByOpts struct {
 }
 
 // OrderBy returns a ClauseDef for ORDER BY with options.
-func OrderBy(opts OrderByOpts) ClauseDef {
+func OrderBy(opts OrderByOpts) core.ClauseDef {
 	if opts.AllowAll {
-		return ClauseDef{
+		return core.ClauseDef{
 			Token:    token.ORDER,
 			Handler:  spi.ClauseHandler(ParseOrderByWithAll),
-			Slot:     spi.SlotOrderBy,
+			Slot:     core.SlotOrderBy,
 			Keywords: []string{"ORDER", "BY"},
 		}
 	}

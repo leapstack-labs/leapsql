@@ -20,7 +20,7 @@ var (
 
 // parseExclude handles * EXCLUDE (col1, col2, ...).
 // The EXCLUDE keyword has already been consumed.
-func parseExclude(p spi.ParserOps) (spi.StarModifier, error) {
+func parseExclude(p spi.ParserOps) (core.StarModifier, error) {
 	if err := p.Expect(token.LPAREN); err != nil {
 		return nil, fmt.Errorf("EXCLUDE: %w", err)
 	}
@@ -47,7 +47,7 @@ func parseExclude(p spi.ParserOps) (spi.StarModifier, error) {
 
 // parseReplace handles * REPLACE (expr AS col, ...).
 // The REPLACE keyword has already been consumed.
-func parseReplace(p spi.ParserOps) (spi.StarModifier, error) {
+func parseReplace(p spi.ParserOps) (core.StarModifier, error) {
 	if err := p.Expect(token.LPAREN); err != nil {
 		return nil, fmt.Errorf("REPLACE: %w", err)
 	}
@@ -87,7 +87,7 @@ func parseReplace(p spi.ParserOps) (spi.StarModifier, error) {
 
 // parseRename handles * RENAME (old AS new, ...).
 // The RENAME keyword has already been consumed.
-func parseRename(p spi.ParserOps) (spi.StarModifier, error) {
+func parseRename(p spi.ParserOps) (core.StarModifier, error) {
 	if err := p.Expect(token.LPAREN); err != nil {
 		return nil, fmt.Errorf("RENAME: %w", err)
 	}

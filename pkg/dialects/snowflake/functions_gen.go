@@ -4,7 +4,7 @@
 
 package snowflake
 
-import "github.com/leapstack-labs/leapsql/pkg/dialect"
+import "github.com/leapstack-labs/leapsql/pkg/core"
 
 // snowflakeScalars contains all scalar function names.
 var snowflakeScalars = []string{
@@ -174,7 +174,7 @@ var snowflakeGenerators = []string{
 }
 
 // snowflakeFunctionDocs contains documentation for Snowflake functions.
-var snowflakeFunctionDocs = map[string]dialect.FunctionDoc{
+var snowflakeFunctionDocs = map[string]core.FunctionDoc{
 	"abs": {
 		Description: "Numeric functions (Rounding and Truncation)",
 		Signatures:  []string{"ABS( <num_expr> )"},

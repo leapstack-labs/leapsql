@@ -5,8 +5,8 @@
 package duckdb
 
 import (
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
-	"github.com/leapstack-labs/leapsql/pkg/spi"
 	"github.com/leapstack-labs/leapsql/pkg/token"
 )
 
@@ -52,7 +52,7 @@ var DuckDB = dialect.New(Config).
 	AddKeyword("FOR", TokenFor).
 	// Edge operators
 	AddOperator("//", TokenDslash).
-	AddInfix(TokenDslash, spi.PrecedenceMultiply).
+	AddInfix(TokenDslash, core.PrecedenceMultiply).
 	// Clause Sequence - DuckDB uses standard ANSI clauses
 	// Build() will replace handlers for clauses based on Config flags:
 	// - SupportsGroupByAll -> GROUP BY handler replaced with ALL-aware version
@@ -74,13 +74,13 @@ var DuckDB = dialect.New(Config).
 	// Join Types - standard ANSI + edge DuckDB-specific types
 	// SEMI/ANTI are auto-wired via Config.SupportsSemiAntiJoins
 	JoinTypes(dialect.ANSIJoinTypes).
-	AddJoinType(TokenAsof, dialect.JoinTypeDef{
+	AddJoinType(TokenAsof, core.JoinTypeDef{
 		Token:       TokenAsof,
 		Type:        JoinAsof,
 		RequiresOn:  true,
 		AllowsUsing: false, // ASOF requires inequality conditions
 	}).
-	AddJoinType(TokenPositional, dialect.JoinTypeDef{
+	AddJoinType(TokenPositional, core.JoinTypeDef{
 		Token:       TokenPositional,
 		Type:        JoinPositional,
 		RequiresOn:  false, // No condition for positional join
@@ -93,8 +93,8 @@ var DuckDB = dialect.New(Config).
 	// Expression extensions
 	AddPrefix(token.LBRACKET, parseListLiteral).
 	AddPrefix(token.LBRACE, parseStructLiteral).
-	AddInfixWithHandler(token.LBRACKET, spi.PrecedencePostfix, parseIndexOrSlice).
-	AddInfixWithHandler(token.ARROW, spi.PrecedenceOr, parseLambdaBody).
+	AddInfixWithHandler(token.LBRACKET, core.PrecedencePostfix, parseIndexOrSlice).
+	AddInfixWithHandler(token.ARROW, core.PrecedenceOr, parseLambdaBody).
 	// FROM extensions
 	AddFromItem(TokenPivot, parsePivot).
 	AddFromItem(TokenUnpivot, parseUnpivot).

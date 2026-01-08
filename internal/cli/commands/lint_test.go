@@ -68,7 +68,7 @@ func TestBuildLintConfig(t *testing.T) {
 
 	t.Run("project config disabled rules", func(t *testing.T) {
 		projectCfg := &config.Config{
-			Lint: &config.LintConfig{
+			Lint: &core.LintConfig{
 				Disabled: []string{"AM01", "ST01"},
 			},
 		}
@@ -83,7 +83,7 @@ func TestBuildLintConfig(t *testing.T) {
 
 	t.Run("project config severity overrides", func(t *testing.T) {
 		projectCfg := &config.Config{
-			Lint: &config.LintConfig{
+			Lint: &core.LintConfig{
 				Severity: map[string]string{
 					"AM01": "error",
 					"ST01": "hint",
@@ -102,8 +102,8 @@ func TestBuildLintConfig(t *testing.T) {
 
 	t.Run("project config rule options", func(t *testing.T) {
 		projectCfg := &config.Config{
-			Lint: &config.LintConfig{
-				Rules: map[string]config.RuleOptions{
+			Lint: &core.LintConfig{
+				Rules: map[string]core.RuleOptions{
 					"AL06": {"min_length": 3, "max_length": 20},
 				},
 			},
@@ -120,7 +120,7 @@ func TestBuildLintConfig(t *testing.T) {
 
 	t.Run("CLI overrides project config", func(t *testing.T) {
 		projectCfg := &config.Config{
-			Lint: &config.LintConfig{
+			Lint: &core.LintConfig{
 				Disabled: []string{"AM01"},
 			},
 		}

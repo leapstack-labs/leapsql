@@ -1,30 +1,12 @@
 // Package config provides configuration management for LeapSQL CLI.
 //
-// This package extends the shared configuration types from pkg/core
-// with CLI-specific fields and functionality. The shared types (TargetConfig,
-// LintConfig) are defined in pkg/core and re-exported here via
-// type aliases for convenience.
+// This package provides CLI-specific configuration fields and functionality.
+// Shared types (TargetConfig, LintConfig, DocsConfig, RuleOptions) are in pkg/core.
 package config
 
 import (
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
-
-// TargetConfig is an alias for the shared target configuration.
-// This allows CLI code to use config.TargetConfig without importing pkg/core.
-type TargetConfig = core.TargetConfig
-
-// LintConfig is an alias for the shared lint configuration.
-// This allows CLI code to use config.LintConfig without importing pkg/core.
-type LintConfig = core.LintConfig
-
-// RuleOptions is an alias for the shared rule options type.
-// This allows CLI code to use config.RuleOptions without importing pkg/core.
-type RuleOptions = core.RuleOptions
-
-// DocsConfig is an alias for the shared docs configuration.
-// This allows CLI code to use config.DocsConfig without importing pkg/core.
-type DocsConfig = core.DocsConfig
 
 // UIConfig holds configuration for the UI server.
 type UIConfig struct {
@@ -71,20 +53,20 @@ type Config struct {
 	Environment  string               `koanf:"environment"`
 	Verbose      bool                 `koanf:"verbose"`
 	OutputFormat string               `koanf:"output"`
-	Target       *TargetConfig        `koanf:"target"`
-	Lint         *LintConfig          `koanf:"lint"`
-	Docs         *DocsConfig          `koanf:"docs"`
+	Target       *core.TargetConfig   `koanf:"target"`
+	Lint         *core.LintConfig     `koanf:"lint"`
+	Docs         *core.DocsConfig     `koanf:"docs"`
 	UI           *UIConfig            `koanf:"ui"`
 	Environments map[string]EnvConfig `koanf:"environments"`
 }
 
 // EnvConfig holds environment-specific configuration overrides.
 type EnvConfig struct {
-	DatabasePath string        `koanf:"database"` // Deprecated: use Target.Database
-	ModelsDir    string        `koanf:"models_dir"`
-	SeedsDir     string        `koanf:"seeds_dir"`
-	MacrosDir    string        `koanf:"macros_dir"`
-	Target       *TargetConfig `koanf:"target"`
+	DatabasePath string             `koanf:"database"` // Deprecated: use Target.Database
+	ModelsDir    string             `koanf:"models_dir"`
+	SeedsDir     string             `koanf:"seeds_dir"`
+	MacrosDir    string             `koanf:"macros_dir"`
+	Target       *core.TargetConfig `koanf:"target"`
 }
 
 // CLI-specific default configuration values.
