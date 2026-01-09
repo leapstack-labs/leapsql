@@ -88,6 +88,69 @@ func (q *Queries) GetModelRunsForRun(ctx context.Context, runID string) ([]Model
 	return items, nil
 }
 
+const getModelRunsWithModelInfo = `-- name: GetModelRunsWithModelInfo :many
+SELECT
+    mr.id, mr.run_id, mr.model_id, mr.status,
+    mr.rows_affected, mr.started_at, mr.completed_at,
+    mr.error, mr.render_ms, mr.execution_ms,
+    m.path as model_path, m.name as model_name
+FROM model_runs mr
+JOIN models m ON mr.model_id = m.id
+WHERE mr.run_id = ?
+ORDER BY mr.started_at
+`
+
+type GetModelRunsWithModelInfoRow struct {
+	ID           string     `json:"id"`
+	RunID        string     `json:"run_id"`
+	ModelID      string     `json:"model_id"`
+	Status       string     `json:"status"`
+	RowsAffected *int64     `json:"rows_affected"`
+	StartedAt    time.Time  `json:"started_at"`
+	CompletedAt  *time.Time `json:"completed_at"`
+	Error        *string    `json:"error"`
+	RenderMs     *int64     `json:"render_ms"`
+	ExecutionMs  *int64     `json:"execution_ms"`
+	ModelPath    string     `json:"model_path"`
+	ModelName    string     `json:"model_name"`
+}
+
+func (q *Queries) GetModelRunsWithModelInfo(ctx context.Context, runID string) ([]GetModelRunsWithModelInfoRow, error) {
+	rows, err := q.db.QueryContext(ctx, getModelRunsWithModelInfo, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetModelRunsWithModelInfoRow{}
+	for rows.Next() {
+		var i GetModelRunsWithModelInfoRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.ModelID,
+			&i.Status,
+			&i.RowsAffected,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.Error,
+			&i.RenderMs,
+			&i.ExecutionMs,
+			&i.ModelPath,
+			&i.ModelName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordModelRun = `-- name: RecordModelRun :exec
 INSERT INTO model_runs (id, run_id, model_id, status, rows_affected, started_at, error, render_ms, execution_ms)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

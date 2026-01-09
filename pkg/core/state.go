@@ -31,6 +31,7 @@ type Store interface {
 	RecordModelRun(modelRun *ModelRun) error
 	UpdateModelRun(id string, status ModelRunStatus, rowsAffected int64, errMsg string, renderMS int64, executionMS int64) error
 	GetModelRunsForRun(runID string) ([]*ModelRun, error)
+	GetModelRunsWithModelInfo(runID string) ([]*ModelRunWithInfo, error)
 	GetLatestModelRun(modelID string) (*ModelRun, error)
 
 	// Dependency operations
@@ -184,4 +185,12 @@ type MacroFunction struct {
 	Args      []string
 	Docstring string
 	Line      int
+}
+
+// ModelRunWithInfo represents a model run with additional model info.
+// Used for UI display where we need model path and name alongside run data.
+type ModelRunWithInfo struct {
+	ModelRun
+	ModelPath string
+	ModelName string
 }

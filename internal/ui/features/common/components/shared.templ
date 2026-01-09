@@ -88,22 +88,84 @@ type GraphEdge struct {
 
 // RunsViewData holds data for the runs history page.
 type RunsViewData struct {
-	Runs          []RunItem
+	Runs          []RunListItem
 	SelectedRunID string
-	SelectedRun   *RunDetail
+	SelectedRun   *RunDetailWithTiers
 }
 
-// RunItem represents a run in the list.
-type RunItem struct {
+// RunListItem is a compact run representation for the list view.
+type RunListItem struct {
 	ID          string
 	Environment string
 	Status      string
 	StartedAt   string // formatted time string
 	Duration    string // formatted duration
+	Stats       RunStats
 	Error       string
 }
 
-// RunDetail holds detailed run information.
+// RunStats holds aggregate stats for a run.
+type RunStats struct {
+	TotalModels   int
+	Succeeded     int
+	Failed        int
+	Skipped       int
+	Pending       int
+	Running       int
+	TotalDuration int64 // milliseconds
+}
+
+// TieredModelRun represents a model run with tier information.
+type TieredModelRun struct {
+	ID           string
+	ModelID      string
+	ModelPath    string
+	ModelName    string
+	Status       string
+	RowsAffected int64
+	ExecutionMS  int64
+	RenderMS     int64
+	Error        string
+	Tier         int // Execution tier (0 = no deps, 1 = depends on tier 0, etc.)
+}
+
+// TierGroup represents a group of models at the same execution tier.
+type TierGroup struct {
+	Tier      int
+	Label     string // e.g., "Tier 0: Sources"
+	Models    []TieredModelRun
+	Stats     TierStats
+	Collapsed bool // For tiers not reached due to failure
+}
+
+// TierStats holds aggregate stats for a tier.
+type TierStats struct {
+	TotalModels   int
+	Succeeded     int
+	Failed        int
+	Skipped       int
+	Pending       int
+	Running       int
+	TotalDuration int64 // milliseconds
+}
+
+// RunDetailWithTiers holds full run info with tiered model runs.
+type RunDetailWithTiers struct {
+	ID          string
+	Environment string
+	Status      string
+	StartedAt   string
+	CompletedAt string
+	Duration    string
+	Error       string
+	Stats       RunStats
+	Tiers       []TierGroup
+}
+
+// RunItem represents a run in the list (deprecated, use RunListItem).
+type RunItem = RunListItem
+
+// RunDetail holds detailed run information (deprecated, use RunDetailWithTiers).
 type RunDetail struct {
 	ID          string
 	Environment string
@@ -389,6 +451,8 @@ templ LogDrawer() {
 }
 
 // AppContainer is the fat morph target - the entire app UI.
+// The id="app" is included here so SSE responses can be patched by datastar.
+// Page templates should wrap this with data-init for SSE connections.
 templ AppContainer(data AppData) {
 	<div id="app">
 		@Header()
@@ -626,7 +690,7 @@ templ GraphView(data *GraphViewData) {
 	</div>
 }
 
-// RunsContent renders the runs history page content.
+// RunsContent renders the runs history page content with GitHub Actions-style layout.
 templ RunsContent(data *RunsViewData) {
 	<div class="runs-page">
 		<div class="runs-header">
@@ -635,12 +699,12 @@ templ RunsContent(data *RunsViewData) {
 		</div>
 		<div class="runs-container">
 			<div class="runs-list-container">
-				@RunsListView(data.Runs)
+				@RunsListView(data.Runs, data.SelectedRunID)
 			</div>
 			<div class="runs-detail-container">
 				<div id="run-detail">
 					if data.SelectedRun != nil {
-						@RunDetailView(data.SelectedRun)
+						@RunDetailWithTiersView(data.SelectedRun)
 					} else {
 						<p class="text-muted">Select a run to view details</p>
 					}
@@ -650,8 +714,8 @@ templ RunsContent(data *RunsViewData) {
 	</div>
 }
 
-// RunsListView renders the list of runs.
-templ RunsListView(runs []RunItem) {
+// RunsListView renders the list of runs as GitHub Actions-style cards.
+templ RunsListView(runs []RunListItem, selectedRunID string) {
 	<div id="runs-list" class="runs-list">
 		if len(runs) == 0 {
 			<div class="runs-empty">
@@ -659,27 +723,254 @@ templ RunsListView(runs []RunItem) {
 				<p class="text-muted">Execute a run to see history here</p>
 			</div>
 		} else {
-			<table class="runs-table">
-				<thead>
-					<tr>
-						<th>Status</th>
-						<th>Environment</th>
-						<th>Started</th>
-						<th>Duration</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, run := range runs {
-						@RunRowView(run)
-					}
-				</tbody>
-			</table>
+			<div class="runs-card-list">
+				for _, run := range runs {
+					@RunListCard(run, run.ID == selectedRunID)
+				}
+			</div>
 		}
 	</div>
 }
 
-// RunRowView renders a single run row.
+// RunListCard renders a compact run card for the list view (GitHub Actions style).
+templ RunListCard(run RunListItem, isSelected bool) {
+	<div 
+		class={ "run-list-card", templ.KV("run-list-card--selected", isSelected), runListCardStatusClass(run.Status) }
+		data-on:click={ fmt.Sprintf("@get('/api/runs/%s')", run.ID) }
+	>
+		<div class="run-list-card__main">
+			<div class="run-list-card__status">
+				@StatusIcon(run.Status, "lg")
+			</div>
+			<div class="run-list-card__info">
+				<div class="run-list-card__title">
+					<code class="run-list-card__id">{ truncateID(run.ID) }</code>
+					<span class="run-list-card__env">{ run.Environment }</span>
+				</div>
+				<div class="run-list-card__meta">
+					<span class="run-list-card__time">{ run.StartedAt }</span>
+					if run.Duration != "" {
+						<span class="run-list-card__duration">{ run.Duration }</span>
+					}
+				</div>
+			</div>
+		</div>
+		<div class="run-list-card__stats">
+			if run.Stats.TotalModels > 0 {
+				@RunMiniStats(run.Stats)
+			}
+		</div>
+	</div>
+}
+
+// RunMiniStats renders mini status counts for list cards.
+templ RunMiniStats(stats RunStats) {
+	<div class="run-mini-stats">
+		if stats.Succeeded > 0 {
+			<span class="run-mini-stats__item run-mini-stats__item--success">
+				@StatusIcon("success", "sm")
+				{ itoa(stats.Succeeded) }
+			</span>
+		}
+		if stats.Failed > 0 {
+			<span class="run-mini-stats__item run-mini-stats__item--failed">
+				@StatusIcon("failed", "sm")
+				{ itoa(stats.Failed) }
+			</span>
+		}
+		if stats.Skipped > 0 {
+			<span class="run-mini-stats__item run-mini-stats__item--skipped">
+				@StatusIcon("skipped", "sm")
+				{ itoa(stats.Skipped) }
+			</span>
+		}
+		if stats.Running > 0 {
+			<span class="run-mini-stats__item run-mini-stats__item--running">
+				@StatusIcon("running", "sm")
+				{ itoa(stats.Running) }
+			</span>
+		}
+		if stats.Pending > 0 {
+			<span class="run-mini-stats__item run-mini-stats__item--pending">
+				@StatusIcon("pending", "sm")
+				{ itoa(stats.Pending) }
+			</span>
+		}
+	</div>
+}
+
+// StatusIcon renders a status icon SVG.
+templ StatusIcon(status string, size string) {
+	<span class={ "status-icon", statusIconClass(status), statusIconSizeClass(size) }>
+		if status == "success" || status == "completed" {
+			<svg viewBox="0 0 16 16" fill="currentColor">
+				<path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+			</svg>
+		} else if status == "failed" {
+			<svg viewBox="0 0 16 16" fill="currentColor">
+				<path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
+			</svg>
+		} else if status == "running" {
+			<svg viewBox="0 0 16 16" fill="currentColor" class="status-icon--spinning">
+				<path d="M8 0a8 8 0 108 8h-2a6 6 0 11-6-6V0z"/>
+			</svg>
+		} else if status == "skipped" {
+			<svg viewBox="0 0 16 16" fill="currentColor">
+				<path fill-rule="evenodd" d="M1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0zM8 0a8 8 0 100 16A8 8 0 008 0z"/>
+			</svg>
+		} else {
+			<svg viewBox="0 0 16 16" fill="currentColor">
+				<circle cx="8" cy="8" r="4"/>
+			</svg>
+		}
+	</span>
+}
+
+// RunDetailWithTiersView renders the full detail view with tiered model runs.
+templ RunDetailWithTiersView(run *RunDetailWithTiers) {
+	<div class="run-detail-tiered">
+		@RunDetailHeader(run)
+		@RunSummaryBar(run.Stats)
+		<div class="run-detail-tiered__tiers">
+			for _, tier := range run.Tiers {
+				@TierGroupView(tier)
+			}
+		</div>
+		if run.Error != "" {
+			<div class="run-detail-tiered__error">
+				<strong>Error:</strong> { run.Error }
+			</div>
+		}
+	</div>
+}
+
+// RunDetailHeader renders the full header for a selected run.
+templ RunDetailHeader(run *RunDetailWithTiers) {
+	<div class="run-detail-header">
+		<div class="run-detail-header__title">
+			@StatusIcon(run.Status, "lg")
+			<span class="run-detail-header__label">Run { truncateID(run.ID) }</span>
+			<span class={ "run-status", runStatusBadgeClass(run.Status) }>{ run.Status }</span>
+		</div>
+		<div class="run-detail-header__meta">
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Environment:</span>
+				<span class="run-detail-header__value">{ run.Environment }</span>
+			</span>
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Started:</span>
+				<span class="run-detail-header__value">{ run.StartedAt }</span>
+			</span>
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Duration:</span>
+				<span class="run-detail-header__value">{ run.Duration }</span>
+			</span>
+		</div>
+		if run.Status == "running" {
+			<div class="run-detail-header__progress">
+				<div class="run-detail-header__progress-bar run-detail-header__progress-bar--running"></div>
+			</div>
+		}
+	</div>
+}
+
+// RunSummaryBar renders the horizontal status summary bar.
+templ RunSummaryBar(stats RunStats) {
+	<div class="run-summary-bar">
+		<span class="run-summary-bar__item run-summary-bar__item--success">
+			@StatusIcon("success", "sm")
+			<span>{ itoa(stats.Succeeded) } succeeded</span>
+		</span>
+		<span class="run-summary-bar__item run-summary-bar__item--failed">
+			@StatusIcon("failed", "sm")
+			<span>{ itoa(stats.Failed) } failed</span>
+		</span>
+		<span class="run-summary-bar__item run-summary-bar__item--skipped">
+			@StatusIcon("skipped", "sm")
+			<span>{ itoa(stats.Skipped) } skipped</span>
+		</span>
+		if stats.Running > 0 {
+			<span class="run-summary-bar__item run-summary-bar__item--running">
+				@StatusIcon("running", "sm")
+				<span>{ itoa(stats.Running) } running</span>
+			</span>
+		}
+		if stats.Pending > 0 {
+			<span class="run-summary-bar__item run-summary-bar__item--pending">
+				@StatusIcon("pending", "sm")
+				<span>{ itoa(stats.Pending) } pending</span>
+			</span>
+		}
+	</div>
+}
+
+// TierGroupView renders a collapsible tier section with models.
+templ TierGroupView(tier TierGroup) {
+	<details class={ "tier-group", templ.KV("tier-group--collapsed", tier.Collapsed) } open>
+		<summary class="tier-group__header">
+			<span class="tier-group__toggle">
+				<svg class="tier-group__arrow" viewBox="0 0 16 16" fill="currentColor">
+					<path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/>
+				</svg>
+			</span>
+			<span class="tier-group__label">{ tier.Label }</span>
+			<span class="tier-group__stats">
+				<span class="tier-group__count">{ itoa(tier.Stats.TotalModels) } models</span>
+				if tier.Stats.TotalDuration > 0 {
+					<span class="tier-group__duration">{ formatDurationMS(tier.Stats.TotalDuration) }</span>
+				}
+			</span>
+		</summary>
+		<div class="tier-group__content">
+			<div class="tier-group__models">
+				for i, model := range tier.Models {
+					@ModelRunCard(model, i == len(tier.Models)-1, maxDuration(tier.Models))
+				}
+			</div>
+		</div>
+	</details>
+}
+
+// ModelRunCard renders a single model execution within a tier.
+templ ModelRunCard(model TieredModelRun, isLast bool, maxDurationMS int64) {
+	<div class={ "model-run-card", modelRunCardClass(model.Status) }>
+		<div class="model-run-card__connector">
+			if isLast {
+				<span class="model-run-card__line model-run-card__line--last"></span>
+			} else {
+				<span class="model-run-card__line"></span>
+			}
+		</div>
+		<div class="model-run-card__status">
+			@StatusIcon(model.Status, "md")
+		</div>
+		<div class="model-run-card__info">
+			<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", model.ModelPath)) } class="model-run-card__name">
+				{ model.ModelName }
+			</a>
+		</div>
+		<div class="model-run-card__timing">
+			if model.ExecutionMS > 0 && maxDurationMS > 0 {
+				<div class="model-run-card__duration-bar">
+					<div 
+						class="model-run-card__duration-fill"
+						style={ fmt.Sprintf("width: %.1f%%", float64(model.ExecutionMS)/float64(maxDurationMS)*100) }
+					></div>
+				</div>
+			}
+			if model.ExecutionMS > 0 {
+				<span class="model-run-card__duration-text">{ formatDurationMS(model.ExecutionMS) }</span>
+			}
+		</div>
+		if model.Error != "" {
+			<div class="model-run-card__error">
+				<span class="model-run-card__error-text">{ model.Error }</span>
+			</div>
+		}
+	</div>
+}
+
+// RunRowView renders a single run row (legacy table format).
 templ RunRowView(run RunItem) {
 	<tr class={ "run-row", runStatusRowClass(run.Status) }>
 		<td>
@@ -701,7 +992,7 @@ templ RunRowView(run RunItem) {
 	</tr>
 }
 
-// RunDetailView renders detailed information about a run.
+// RunDetailView renders detailed information about a run (legacy format).
 templ RunDetailView(run *RunDetail) {
 	<div class="run-detail">
 		<div class="run-detail__header">
@@ -983,4 +1274,97 @@ func modelRunStatusRowClass(status string) string {
 	default:
 		return ""
 	}
+}
+
+// New helper functions for GitHub Actions-style runs
+
+func truncateID(id string) string {
+	if len(id) > 7 {
+		return id[:7]
+	}
+	return id
+}
+
+func runListCardStatusClass(status string) string {
+	switch status {
+	case "completed":
+		return "run-list-card--completed"
+	case "running":
+		return "run-list-card--running"
+	case "failed":
+		return "run-list-card--failed"
+	case "cancelled":
+		return "run-list-card--cancelled"
+	default:
+		return ""
+	}
+}
+
+func statusIconClass(status string) string {
+	switch status {
+	case "success", "completed":
+		return "status-icon--success"
+	case "running":
+		return "status-icon--running"
+	case "failed":
+		return "status-icon--failed"
+	case "skipped":
+		return "status-icon--skipped"
+	case "pending":
+		return "status-icon--pending"
+	default:
+		return ""
+	}
+}
+
+func statusIconSizeClass(size string) string {
+	switch size {
+	case "lg":
+		return "status-icon--lg"
+	case "md":
+		return "status-icon--md"
+	case "sm":
+		return "status-icon--sm"
+	default:
+		return "status-icon--md"
+	}
+}
+
+func modelRunCardClass(status string) string {
+	switch status {
+	case "failed":
+		return "model-run-card--failed"
+	case "skipped":
+		return "model-run-card--skipped"
+	case "running":
+		return "model-run-card--running"
+	default:
+		return ""
+	}
+}
+
+func formatDurationMS(ms int64) string {
+	if ms < 1000 {
+		return itoa(int(ms)) + "ms"
+	}
+	secs := float64(ms) / 1000
+	if secs < 60 {
+		// Format with 1 decimal place
+		whole := int(secs)
+		frac := int((secs - float64(whole)) * 10)
+		return itoa(whole) + "." + itoa(frac) + "s"
+	}
+	mins := int(secs / 60)
+	remainSecs := int(secs) % 60
+	return itoa(mins) + "m" + itoa(remainSecs) + "s"
+}
+
+func maxDuration(models []TieredModelRun) int64 {
+	var max int64
+	for _, m := range models {
+		if m.ExecutionMS > max {
+			max = m.ExecutionMS
+		}
+	}
+	return max
 }

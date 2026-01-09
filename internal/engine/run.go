@@ -40,6 +40,11 @@ func (e *Engine) Run(ctx context.Context, env string) (*core.Run, error) {
 
 	e.logger.Debug("created run", "run_id", run.ID)
 
+	// Notify observer of run start
+	if observer := e.getObserver(); observer != nil {
+		observer.OnRunStarted(run)
+	}
+
 	// Get topological order
 	sorted, err := e.graph.TopologicalSort()
 	if err != nil {
@@ -83,6 +88,12 @@ func (e *Engine) Run(ctx context.Context, env string) (*core.Run, error) {
 	}
 
 	run, _ = e.store.GetRun(run.ID)
+
+	// Notify observer of run completion
+	if observer := e.getObserver(); observer != nil {
+		observer.OnRunCompleted(run)
+	}
+
 	return run, runErr
 }
 
@@ -116,6 +127,11 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	}
 
 	e.logger.Debug("created run", "run_id", run.ID)
+
+	// Notify observer of run start
+	if observer := e.getObserver(); observer != nil {
+		observer.OnRunStarted(run)
+	}
 
 	// Get topological order of subgraph
 	sorted, err := subgraph.TopologicalSort()
@@ -160,6 +176,12 @@ func (e *Engine) RunSelected(ctx context.Context, env string, modelPaths []strin
 	}
 
 	run, _ = e.store.GetRun(run.ID)
+
+	// Notify observer of run completion
+	if observer := e.getObserver(); observer != nil {
+		observer.OnRunCompleted(run)
+	}
+
 	return run, runErr
 }
 
@@ -225,9 +247,17 @@ func (e *Engine) validateAndPrepareModels(runID string, sorted []*dag.Node) ([]p
 
 // executeModels executes all prepared models in order.
 func (e *Engine) executeModels(ctx context.Context, runID string, prepared []preparedModel) error {
+	observer := e.getObserver()
+
 	for i, p := range prepared {
 		// Update to running
 		_ = e.store.UpdateModelRun(p.modelRun.ID, core.ModelRunStatusRunning, 0, "", p.renderMS, 0)
+
+		// Notify observer of status change
+		if observer != nil {
+			p.modelRun.Status = core.ModelRunStatusRunning
+			observer.OnModelRunUpdated(runID, p.modelRun)
+		}
 
 		// Execute
 		start := time.Now()
@@ -238,10 +268,26 @@ func (e *Engine) executeModels(ctx context.Context, runID string, prepared []pre
 			e.logger.Debug("model execution failed", "model", p.model.Path, "error", err)
 			_ = e.store.UpdateModelRun(p.modelRun.ID, core.ModelRunStatusFailed, 0, err.Error(), p.renderMS, executionMS)
 
+			// Notify observer of failure
+			if observer != nil {
+				p.modelRun.Status = core.ModelRunStatusFailed
+				p.modelRun.Error = err.Error()
+				p.modelRun.ExecutionMS = executionMS
+				observer.OnModelRunUpdated(runID, p.modelRun)
+			}
+
 			// Mark remaining models as skipped
 			for j := i + 1; j < len(prepared); j++ {
+				skipErr := fmt.Sprintf("skipped: upstream model %s failed", p.model.Path)
 				_ = e.store.UpdateModelRun(prepared[j].modelRun.ID, core.ModelRunStatusSkipped, 0,
-					fmt.Sprintf("skipped: upstream model %s failed", p.model.Path), prepared[j].renderMS, 0)
+					skipErr, prepared[j].renderMS, 0)
+
+				// Notify observer of skipped model
+				if observer != nil {
+					prepared[j].modelRun.Status = core.ModelRunStatusSkipped
+					prepared[j].modelRun.Error = skipErr
+					observer.OnModelRunUpdated(runID, prepared[j].modelRun)
+				}
 			}
 
 			return err
@@ -250,6 +296,14 @@ func (e *Engine) executeModels(ctx context.Context, runID string, prepared []pre
 		e.logger.Debug("model executed", "model", p.model.Path, "rows", rowsAffected, "exec_ms", executionMS)
 		_ = e.store.UpdateModelRun(p.modelRun.ID, core.ModelRunStatusSuccess, rowsAffected, "", p.renderMS, executionMS)
 		e.saveModelSnapshot(runID, p.model, p.persisted)
+
+		// Notify observer of success
+		if observer != nil {
+			p.modelRun.Status = core.ModelRunStatusSuccess
+			p.modelRun.RowsAffected = rowsAffected
+			p.modelRun.ExecutionMS = executionMS
+			observer.OnModelRunUpdated(runID, p.modelRun)
+		}
 	}
 
 	return nil

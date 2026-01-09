@@ -53,6 +53,12 @@ func NewServer(cfg Config) *Server {
 	sessionStore.Options.HttpOnly = true
 	sessionStore.Options.SameSite = http.SameSiteLaxMode
 
+	notify := notifier.New()
+
+	// Wire up RunObserver to broadcast UI updates on run events
+	observer := &uiRunObserver{notifier: notify}
+	cfg.Engine.SetRunObserver(observer)
+
 	return &Server{
 		engine:       cfg.Engine,
 		store:        cfg.Store,
@@ -61,8 +67,28 @@ func NewServer(cfg Config) *Server {
 		watch:        cfg.Watch,
 		modelsDir:    cfg.ModelsDir,
 		logger:       cfg.Logger,
-		notifier:     notifier.New(),
+		notifier:     notify,
 	}
+}
+
+// uiRunObserver implements engine.RunObserver to broadcast updates to SSE clients.
+type uiRunObserver struct {
+	notifier *notifier.Notifier
+}
+
+// OnRunStarted is called when a run starts.
+func (o *uiRunObserver) OnRunStarted(run *core.Run) {
+	o.notifier.Broadcast()
+}
+
+// OnModelRunUpdated is called when a model run status changes.
+func (o *uiRunObserver) OnModelRunUpdated(runID string, modelRun *core.ModelRun) {
+	o.notifier.Broadcast()
+}
+
+// OnRunCompleted is called when a run completes.
+func (o *uiRunObserver) OnRunCompleted(run *core.Run) {
+	o.notifier.Broadcast()
 }
 
 // Serve starts the UI server and blocks until the context is cancelled.

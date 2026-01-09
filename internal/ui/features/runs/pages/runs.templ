@@ -8,9 +8,10 @@ import (
 
 // RunsPage renders the runs history page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer includes id="app" for datastar patching.
 templ RunsPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ datastar.GetSSE("/runs/updates") }>
+		<div data-init={ datastar.GetSSE("/runs/updates") }>
 			@components.AppContainer(data)
 		</div>
 	}

@@ -339,6 +339,51 @@ func (s *SQLiteStore) GetLatestModelRun(modelID string) (*core.ModelRun, error) 
 	return convertModelRun(row), nil
 }
 
+// GetModelRunsWithModelInfo retrieves all model runs for a run with model path and name.
+func (s *SQLiteStore) GetModelRunsWithModelInfo(runID string) ([]*core.ModelRunWithInfo, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not opened")
+	}
+
+	rows, err := s.queries.GetModelRunsWithModelInfo(ctx(), runID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model runs with info: %w", err)
+	}
+
+	result := make([]*core.ModelRunWithInfo, 0, len(rows))
+	for _, row := range rows {
+		mr := &core.ModelRunWithInfo{
+			ModelRun: core.ModelRun{
+				ID:          row.ID,
+				RunID:       row.RunID,
+				ModelID:     row.ModelID,
+				Status:      core.ModelRunStatus(row.Status),
+				StartedAt:   row.StartedAt,
+				CompletedAt: row.CompletedAt,
+			},
+			ModelPath: row.ModelPath,
+			ModelName: row.ModelName,
+		}
+
+		if row.RowsAffected != nil {
+			mr.RowsAffected = *row.RowsAffected
+		}
+		if row.Error != nil {
+			mr.Error = *row.Error
+		}
+		if row.RenderMs != nil {
+			mr.RenderMS = *row.RenderMs
+		}
+		if row.ExecutionMs != nil {
+			mr.ExecutionMS = *row.ExecutionMs
+		}
+
+		result = append(result, mr)
+	}
+
+	return result, nil
+}
+
 // convertModel converts a sqlcgen.Model to a core.PersistedModel.
 func convertModel(row sqlcgen.Model) (*core.PersistedModel, error) {
 	// Create the embedded core.Model first

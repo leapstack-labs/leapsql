@@ -19,6 +19,14 @@ import (
 	"github.com/leapstack-labs/leapsql/pkg/dialect"
 )
 
+// RunObserver receives notifications about run state changes.
+// Implementations can use these callbacks to update UIs, trigger notifications, etc.
+type RunObserver interface {
+	OnRunStarted(run *core.Run)
+	OnModelRunUpdated(runID string, modelRun *core.ModelRun)
+	OnRunCompleted(run *core.Run)
+}
+
 // Engine orchestrates the execution of SQL models.
 type Engine struct {
 	// Database adapter (lazy initialized)
@@ -44,6 +52,10 @@ type Engine struct {
 	models        map[string]*core.Model
 	registry      *registry.ModelRegistry
 	macroRegistry *macro.Registry
+
+	// Observer for run lifecycle events (optional)
+	observer   RunObserver
+	observerMu sync.RWMutex
 }
 
 // Config holds engine configuration.
@@ -283,4 +295,19 @@ func (e *Engine) GetAdapter() adapter.Adapter {
 // This is useful when you need to run queries without running models.
 func (e *Engine) EnsureConnected(ctx context.Context) error {
 	return e.ensureDBConnected(ctx)
+}
+
+// SetRunObserver sets an observer to receive run lifecycle events.
+// Pass nil to remove the observer. Thread-safe.
+func (e *Engine) SetRunObserver(observer RunObserver) {
+	e.observerMu.Lock()
+	defer e.observerMu.Unlock()
+	e.observer = observer
+}
+
+// getObserver returns the current observer (thread-safe).
+func (e *Engine) getObserver() RunObserver {
+	e.observerMu.RLock()
+	defer e.observerMu.RUnlock()
+	return e.observer
 }

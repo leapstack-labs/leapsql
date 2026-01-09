@@ -260,3 +260,562 @@
   color: var(--muted-foreground);
   text-align: right;
 }
+
+/* ============================================
+   GitHub Actions-Style Run Components
+   ============================================ */
+
+/* Status Colors */
+:root {
+  --status-success: var(--accent, oklch(0.7 0.15 145));
+  --status-success-bg: color-mix(in oklch, var(--status-success) 10%, transparent);
+  --status-failed: var(--destructive, oklch(0.6 0.2 25));
+  --status-failed-bg: color-mix(in oklch, var(--status-failed) 10%, transparent);
+  --status-running: var(--primary, oklch(0.7 0.15 250));
+  --status-running-bg: color-mix(in oklch, var(--status-running) 10%, transparent);
+  --status-skipped: var(--muted-foreground, oklch(0.6 0 0));
+  --status-skipped-bg: color-mix(in oklch, var(--status-skipped) 10%, transparent);
+  --status-pending: var(--chart-4, oklch(0.7 0.15 60));
+  --status-pending-bg: color-mix(in oklch, var(--status-pending) 10%, transparent);
+}
+
+/* Run Page Layout (updated for split view) */
+.runs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+}
+
+.runs-container {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+  height: calc(100vh - 180px);
+  min-height: 400px;
+}
+
+.runs-list-container {
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  background: var(--card);
+}
+
+.runs-detail-container {
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  background: var(--card);
+  padding: 16px;
+}
+
+/* Run Card List */
+.runs-card-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Run List Card */
+.run-list-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.run-list-card:hover {
+  background: var(--muted);
+}
+
+.run-list-card--selected {
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  border-left: 3px solid var(--primary);
+  padding-left: 13px;
+}
+
+.run-list-card--completed {
+  border-left-color: var(--status-success);
+}
+
+.run-list-card--failed {
+  border-left-color: var(--status-failed);
+}
+
+.run-list-card--running {
+  border-left-color: var(--status-running);
+}
+
+.run-list-card__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.run-list-card__status {
+  flex-shrink: 0;
+}
+
+.run-list-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.run-list-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.run-list-card__id {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.run-list-card__env {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.run-list-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.run-list-card__stats {
+  flex-shrink: 0;
+}
+
+/* Run Mini Stats */
+.run-mini-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-mini-stats__item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.run-mini-stats__item--success {
+  color: var(--status-success);
+}
+
+.run-mini-stats__item--failed {
+  color: var(--status-failed);
+}
+
+.run-mini-stats__item--skipped {
+  color: var(--status-skipped);
+}
+
+.run-mini-stats__item--running {
+  color: var(--status-running);
+}
+
+.run-mini-stats__item--pending {
+  color: var(--status-pending);
+}
+
+/* Status Icons */
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.status-icon svg {
+  display: block;
+}
+
+.status-icon--sm {
+  width: 14px;
+  height: 14px;
+}
+
+.status-icon--sm svg {
+  width: 10px;
+  height: 10px;
+}
+
+.status-icon--md {
+  width: 18px;
+  height: 18px;
+}
+
+.status-icon--md svg {
+  width: 14px;
+  height: 14px;
+}
+
+.status-icon--lg {
+  width: 24px;
+  height: 24px;
+}
+
+.status-icon--lg svg {
+  width: 18px;
+  height: 18px;
+}
+
+.status-icon--success {
+  color: var(--status-success);
+}
+
+.status-icon--failed {
+  color: var(--status-failed);
+}
+
+.status-icon--running {
+  color: var(--status-running);
+}
+
+.status-icon--skipped {
+  color: var(--status-skipped);
+}
+
+.status-icon--pending {
+  color: var(--status-pending);
+}
+
+/* Running spinner animation */
+.status-icon--spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Run Detail Tiered View */
+.run-detail-tiered {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.run-detail-tiered__error {
+  padding: 12px;
+  background: var(--status-failed-bg);
+  border: 1px solid var(--status-failed);
+  border-radius: var(--radius-md, 6px);
+  color: var(--status-failed);
+  font-size: 13px;
+}
+
+/* Run Detail Header */
+.run-detail-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.run-detail-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.run-detail-header__label {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.run-detail-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.run-detail-header__item {
+  display: flex;
+  gap: 4px;
+}
+
+.run-detail-header__key {
+  color: var(--muted-foreground);
+}
+
+.run-detail-header__value {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+
+.run-detail-header__progress {
+  margin-top: 12px;
+  height: 4px;
+  background: var(--muted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.run-detail-header__progress-bar {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.run-detail-header__progress-bar--running {
+  background: linear-gradient(
+    90deg,
+    var(--status-running),
+    color-mix(in oklch, var(--status-running) 50%, transparent),
+    var(--status-running)
+  );
+  background-size: 200% 100%;
+  animation: progress 1.5s ease-in-out infinite;
+}
+
+@keyframes progress {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Run Summary Bar */
+.run-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--muted);
+  border-radius: var(--radius-md, 6px);
+  font-size: 13px;
+}
+
+.run-summary-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-summary-bar__item--success {
+  color: var(--status-success);
+}
+
+.run-summary-bar__item--failed {
+  color: var(--status-failed);
+}
+
+.run-summary-bar__item--skipped {
+  color: var(--status-skipped);
+}
+
+.run-summary-bar__item--running {
+  color: var(--status-running);
+}
+
+.run-summary-bar__item--pending {
+  color: var(--status-pending);
+}
+
+/* Tier Groups */
+.run-detail-tiered__tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tier-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+}
+
+.tier-group__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.tier-group__header::-webkit-details-marker {
+  display: none;
+}
+
+.tier-group__toggle {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
+}
+
+.tier-group__arrow {
+  width: 16px;
+  height: 16px;
+}
+
+.tier-group[open] .tier-group__toggle {
+  transform: rotate(90deg);
+}
+
+.tier-group__label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tier-group__stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.tier-group__count {
+  font-family: var(--font-mono);
+}
+
+.tier-group__duration {
+  font-family: var(--font-mono);
+}
+
+.tier-group__content {
+  padding: 0;
+}
+
+.tier-group__models {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Model Run Card */
+.model-run-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.model-run-card:last-child {
+  border-bottom: none;
+}
+
+.model-run-card--failed {
+  background: var(--status-failed-bg);
+}
+
+.model-run-card--skipped {
+  opacity: 0.7;
+}
+
+.model-run-card--running {
+  background: var(--status-running-bg);
+}
+
+.model-run-card__connector {
+  position: relative;
+  width: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-run-card__line {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.model-run-card__line--last {
+  bottom: 50%;
+}
+
+.model-run-card__status {
+  flex-shrink: 0;
+}
+
+.model-run-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-run-card__name {
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.model-run-card__name:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.model-run-card__timing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.model-run-card__duration-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--muted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.model-run-card__duration-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.model-run-card__duration-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  min-width: 45px;
+  text-align: right;
+}
+
+.model-run-card__error {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--status-failed-bg);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 12px;
+  color: var(--status-failed);
+}
+
+.model-run-card__error-text {
+  word-break: break-word;
+}
