@@ -168,7 +168,7 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	// Track paths that were explicitly provided as flags (already relative to CWD).
 	// These will be converted to absolute paths before the normal resolution step,
 	// to prevent double-resolution when project root was inferred from them.
-	var flagModelsDir, flagMacrosDir, flagSeedsDir, flagStatePath string
+	var flagModelsDir, flagMacrosDir, flagSeedsDir, flagStatePath, flagDatabase string
 	if flags != nil {
 		if flags.Changed("models-dir") {
 			if v, _ := flags.GetString("models-dir"); v != "" {
@@ -185,9 +185,19 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 				flagSeedsDir, _ = filepath.Abs(v)
 			}
 		}
-		if flags.Changed("state-path") {
-			if v, _ := flags.GetString("state-path"); v != "" {
+		if flags.Changed("state") {
+			if v, _ := flags.GetString("state"); v != "" {
 				flagStatePath, _ = filepath.Abs(v)
+			}
+		}
+		if flags.Changed("database") {
+			if v, _ := flags.GetString("database"); v != "" {
+				// Database path can be :memory: or a file path
+				if v != ":memory:" {
+					flagDatabase, _ = filepath.Abs(v)
+				} else {
+					flagDatabase = v
+				}
 			}
 		}
 	}
@@ -250,6 +260,13 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 			}
 			// Transform kebab-case to snake_case for config keys
 			key := strings.ReplaceAll(f.Name, "-", "_")
+
+			// EXPLICIT MAPPING: Bridge the gap between --state flag and state_path config key
+			// The CLI uses --state for brevity, but the config struct uses state_path for clarity
+			if key == "state" {
+				return "state_path", posflag.FlagVal(flags, f)
+			}
+
 			return key, posflag.FlagVal(flags, f)
 		}), nil); err != nil {
 			return nil, fmt.Errorf("failed to load flags: %w", err)
@@ -338,7 +355,11 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	expandTargetEnvVars(cfg.Target)
 
 	// For backward compatibility: sync DatabasePath with Target.Database
-	if cfg.Target.Database == "" && cfg.DatabasePath != "" {
+	// If --database flag was explicitly set, it takes precedence over config file
+	if flagDatabase != "" {
+		cfg.DatabasePath = flagDatabase
+		cfg.Target.Database = flagDatabase
+	} else if cfg.Target.Database == "" && cfg.DatabasePath != "" {
 		cfg.Target.Database = cfg.DatabasePath
 	} else if cfg.Target.Database != "" && cfg.DatabasePath == "" {
 		cfg.DatabasePath = cfg.Target.Database
