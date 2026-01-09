@@ -10,6 +10,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/graph/pages"
+	graphtypes "github.com/leapstack-labs/leapsql/internal/ui/features/graph/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -82,7 +83,7 @@ func (h *Handlers) sendGraphView(sse *datastar.ServerSentEventGenerator) error {
 }
 
 // buildGraphData assembles all data needed for the graph view.
-func (h *Handlers) buildGraphData() (common.SidebarData, *pages.GraphViewData, error) {
+func (h *Handlers) buildGraphData() (common.SidebarData, *graphtypes.GraphViewData, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/graph",
 		FullWidth:   true,
@@ -104,7 +105,7 @@ func (h *Handlers) buildGraphData() (common.SidebarData, *pages.GraphViewData, e
 }
 
 // buildFullGraphData creates graph view data from all models and their dependencies.
-func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) pages.GraphViewData {
+func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) graphtypes.GraphViewData {
 	// Create a map for quick lookup
 	modelMap := make(map[string]*core.PersistedModel)
 	for _, m := range models {
@@ -112,9 +113,9 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) pages.Graph
 	}
 
 	// Build nodes
-	nodes := make([]pages.GraphNode, 0, len(models))
+	nodes := make([]graphtypes.GraphNode, 0, len(models))
 	for _, m := range models {
-		nodes = append(nodes, pages.GraphNode{
+		nodes = append(nodes, graphtypes.GraphNode{
 			ID:    m.Path,
 			Label: m.Name,
 			Type:  nodeType(m),
@@ -127,7 +128,7 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) pages.Graph
 	})
 
 	// Build edges from dependencies
-	edges := make([]pages.GraphEdge, 0)
+	edges := make([]graphtypes.GraphEdge, 0)
 	for _, m := range models {
 		deps, err := h.store.GetDependencies(m.ID)
 		if err != nil {
@@ -138,14 +139,14 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) pages.Graph
 			if !ok {
 				continue
 			}
-			edges = append(edges, pages.GraphEdge{
+			edges = append(edges, graphtypes.GraphEdge{
 				Source: depModel.Path,
 				Target: m.Path,
 			})
 		}
 	}
 
-	return pages.GraphViewData{
+	return graphtypes.GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}
@@ -191,12 +192,12 @@ func (h *Handlers) ModelGraphSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildModelNeighborhood creates graph data for a model and its immediate neighbors.
-func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.GraphViewData {
-	nodeSet := make(map[string]pages.GraphNode)
-	edges := make([]pages.GraphEdge, 0)
+func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) graphtypes.GraphViewData {
+	nodeSet := make(map[string]graphtypes.GraphNode)
+	edges := make([]graphtypes.GraphEdge, 0)
 
 	// Add the center model
-	nodeSet[model.Path] = pages.GraphNode{
+	nodeSet[model.Path] = graphtypes.GraphNode{
 		ID:    model.Path,
 		Label: model.Name,
 		Type:  nodeType(model),
@@ -209,12 +210,12 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.Grap
 		if err != nil {
 			continue
 		}
-		nodeSet[depModel.Path] = pages.GraphNode{
+		nodeSet[depModel.Path] = graphtypes.GraphNode{
 			ID:    depModel.Path,
 			Label: depModel.Name,
 			Type:  nodeType(depModel),
 		}
-		edges = append(edges, pages.GraphEdge{
+		edges = append(edges, graphtypes.GraphEdge{
 			Source: depModel.Path,
 			Target: model.Path,
 		})
@@ -227,19 +228,19 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.Grap
 		if err != nil {
 			continue
 		}
-		nodeSet[depModel.Path] = pages.GraphNode{
+		nodeSet[depModel.Path] = graphtypes.GraphNode{
 			ID:    depModel.Path,
 			Label: depModel.Name,
 			Type:  nodeType(depModel),
 		}
-		edges = append(edges, pages.GraphEdge{
+		edges = append(edges, graphtypes.GraphEdge{
 			Source: model.Path,
 			Target: depModel.Path,
 		})
 	}
 
 	// Convert node set to slice
-	nodes := make([]pages.GraphNode, 0, len(nodeSet))
+	nodes := make([]graphtypes.GraphNode, 0, len(nodeSet))
 	for _, node := range nodeSet {
 		nodes = append(nodes, node)
 	}
@@ -249,7 +250,7 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.Grap
 		return nodes[i].ID < nodes[j].ID
 	})
 
-	return pages.GraphViewData{
+	return graphtypes.GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}

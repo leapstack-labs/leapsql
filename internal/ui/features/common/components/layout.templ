@@ -196,20 +196,8 @@ templ AppShellWithContext(explorerTree []common.TreeNode, currentPath string, co
 	</div>
 }
 
-// Helper functions
+// Helper functions - delegating to common package
 
 func lenStr(nodes []common.TreeNode) string {
-	return "(" + itoa(len(nodes)) + ")"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	result := ""
-	for n > 0 {
-		result = string('0'+byte(n%10)) + result
-		n /= 10
-	}
-	return result
+	return common.LenStr(nodes)
 }

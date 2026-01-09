@@ -1,3 +1,4 @@
+// Package models provides model detail handlers for the UI.
 package models
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/models/pages"
+	modelstypes "github.com/leapstack-labs/leapsql/internal/ui/features/models/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -92,7 +94,7 @@ func (h *Handlers) sendModelView(sse *datastar.ServerSentEventGenerator, modelPa
 }
 
 // buildModelData assembles all data needed for the model view.
-func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *pages.ModelViewData, *pages.ModelContext, error) {
+func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *modelstypes.ModelViewData, *modelstypes.ModelContext, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/models/" + modelPath,
 		FullWidth:   false,
@@ -105,8 +107,8 @@ func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *pages.
 	}
 	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
-	var modelData *pages.ModelViewData
-	var contextData *pages.ModelContext
+	var modelData *modelstypes.ModelViewData
+	var contextData *modelstypes.ModelContext
 
 	// Get model details if path specified
 	if modelPath != "" {
@@ -131,8 +133,8 @@ func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *pages.
 }
 
 // buildModelViewData builds the model view with all tabs pre-rendered.
-func (h *Handlers) buildModelViewData(model *core.PersistedModel) pages.ModelViewData {
-	data := pages.ModelViewData{
+func (h *Handlers) buildModelViewData(model *core.PersistedModel) modelstypes.ModelViewData {
+	data := modelstypes.ModelViewData{
 		Path:         model.Path,
 		Name:         model.Name,
 		FilePath:     model.FilePath,
@@ -156,12 +158,12 @@ func (h *Handlers) buildModelViewData(model *core.PersistedModel) pages.ModelVie
 }
 
 // buildModelContext builds the context panel data.
-func (h *Handlers) buildModelContext(model *core.PersistedModel) pages.ModelContext {
+func (h *Handlers) buildModelContext(model *core.PersistedModel) modelstypes.ModelContext {
 	deps, _ := h.store.GetDependencies(model.ID)
 	dependents, _ := h.store.GetDependents(model.ID)
 	columns, _ := h.store.GetModelColumns(model.Path)
 
-	return pages.ModelContext{
+	return modelstypes.ModelContext{
 		Path:       model.Path,
 		Name:       model.Name,
 		Type:       model.Materialized,
@@ -186,14 +188,14 @@ func (h *Handlers) resolveModelNames(ids []string) []string {
 }
 
 // toColumnData converts core.ColumnInfo to component-friendly data.
-func toColumnData(columns []core.ColumnInfo) []pages.ColumnData {
-	result := make([]pages.ColumnData, len(columns))
+func toColumnData(columns []core.ColumnInfo) []modelstypes.ColumnData {
+	result := make([]modelstypes.ColumnData, len(columns))
 	for i, col := range columns {
 		sources := make([]string, len(col.Sources))
 		for j, src := range col.Sources {
 			sources[j] = fmt.Sprintf("%s.%s", src.Table, src.Column)
 		}
-		result[i] = pages.ColumnData{
+		result[i] = modelstypes.ColumnData{
 			Name:    col.Name,
 			Type:    string(col.TransformType),
 			Sources: sources,

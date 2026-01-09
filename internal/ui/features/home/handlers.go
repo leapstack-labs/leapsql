@@ -7,6 +7,7 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/home/pages"
+	hometypes "github.com/leapstack-labs/leapsql/internal/ui/features/home/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -80,7 +81,7 @@ func (h *Handlers) sendDashboardView(sse *datastar.ServerSentEventGenerator) err
 }
 
 // buildDashboardData assembles all data needed for the dashboard view.
-func (h *Handlers) buildDashboardData() (common.SidebarData, *pages.DashboardStats, error) {
+func (h *Handlers) buildDashboardData() (common.SidebarData, *hometypes.DashboardStats, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/",
 		FullWidth:   false,
@@ -94,7 +95,7 @@ func (h *Handlers) buildDashboardData() (common.SidebarData, *pages.DashboardSta
 	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Get stats for dashboard
-	stats := &pages.DashboardStats{
+	stats := &hometypes.DashboardStats{
 		ModelCount: len(models),
 	}
 

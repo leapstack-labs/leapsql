@@ -1,49 +1,30 @@
 package pages
 
 import (
-	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	hometypes "github.com/leapstack-labs/leapsql/internal/ui/features/home/types"
+	homecomponents "github.com/leapstack-labs/leapsql/internal/ui/features/home/components"
 	"github.com/starfederation/datastar-go/datastar"
 )
-
-// DashboardStats holds stats for the dashboard view.
-type DashboardStats struct {
-	ModelCount  int
-	SourceCount int
-	RunCount    int
-}
 
 // HomePage renders the home page with full content.
 // SSE is used only for live updates, not initial content.
 // AppShell provides id="app" for datastar patching.
-templ HomePage(title string, isDev bool, sidebar common.SidebarData, stats *DashboardStats) {
+templ HomePage(title string, isDev bool, sidebar common.SidebarData, stats *hometypes.DashboardStats) {
 	@layouts.Base(title, isDev) {
 		<div data-init={ datastar.GetSSE("/updates") }>
 			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, false) {
-				@DashboardContent(stats)
+				@homecomponents.DashboardContent(stats)
 			}
 		</div>
 	}
 }
 
 // HomeAppShell renders just the app shell with dashboard content (for SSE updates).
-templ HomeAppShell(sidebar common.SidebarData, stats *DashboardStats) {
+templ HomeAppShell(sidebar common.SidebarData, stats *hometypes.DashboardStats) {
 	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, false) {
-		@DashboardContent(stats)
+		@homecomponents.DashboardContent(stats)
 	}
-}
-
-// DashboardContent renders the dashboard content.
-templ DashboardContent(stats *DashboardStats) {
-	<div id="model-detail">
-		<h1>LeapSQL Dashboard</h1>
-		<div class="stats-grid">
-			<div class="stat-card">
-				<span class="stat-value">{ fmt.Sprint(stats.ModelCount) }</span>
-				<span class="stat-label">Models</span>
-			</div>
-		</div>
-	</div>
 }

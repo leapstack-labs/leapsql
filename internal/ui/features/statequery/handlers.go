@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/statequery/pages"
+	sqtypes "github.com/leapstack-labs/leapsql/internal/ui/features/statequery/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -98,7 +99,7 @@ func (h *Handlers) QueryPageUpdates(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildQueryData assembles all data needed for the query view.
-func (h *Handlers) buildQueryData(ctx context.Context) (common.SidebarData, *pages.QueryViewData, error) {
+func (h *Handlers) buildQueryData(ctx context.Context) (common.SidebarData, *sqtypes.QueryViewData, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/query",
 		FullWidth:   true,
@@ -115,9 +116,9 @@ func (h *Handlers) buildQueryData(ctx context.Context) (common.SidebarData, *pag
 	db, err := h.getDB()
 	if err != nil {
 		// If we can't get the DB, still render the page with empty table list
-		return sidebar, &pages.QueryViewData{
-			Tables: []pages.TableItem{},
-			Views:  []pages.TableItem{},
+		return sidebar, &sqtypes.QueryViewData{
+			Tables: []sqtypes.TableItem{},
+			Views:  []sqtypes.TableItem{},
 		}, nil
 	}
 
@@ -126,14 +127,14 @@ func (h *Handlers) buildQueryData(ctx context.Context) (common.SidebarData, *pag
 		return sidebar, nil, err
 	}
 
-	return sidebar, &pages.QueryViewData{
+	return sidebar, &sqtypes.QueryViewData{
 		Tables: tables,
 		Views:  views,
 	}, nil
 }
 
 // listTablesAndViews returns tables/views in the format for QueryViewData.
-func (h *Handlers) listTablesAndViews(ctx context.Context, db *sql.DB) ([]pages.TableItem, []pages.TableItem, error) {
+func (h *Handlers) listTablesAndViews(ctx context.Context, db *sql.DB) ([]sqtypes.TableItem, []sqtypes.TableItem, error) {
 	query := `
 		SELECT name, type 
 		FROM sqlite_master 
@@ -150,13 +151,13 @@ func (h *Handlers) listTablesAndViews(ctx context.Context, db *sql.DB) ([]pages.
 	}
 	defer rows.Close()
 
-	var tables, views []pages.TableItem
+	var tables, views []sqtypes.TableItem
 	for rows.Next() {
 		var name, objType string
 		if err := rows.Scan(&name, &objType); err != nil {
 			continue
 		}
-		item := pages.TableItem{Name: name, Type: objType}
+		item := sqtypes.TableItem{Name: name, Type: objType}
 		if objType == "view" {
 			views = append(views, item)
 		} else {
@@ -173,7 +174,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 	var signals QuerySignals
 	if err := datastar.ReadSignals(r, &signals); err != nil {
 		sse := datastar.NewSSE(w, r)
-		_ = sse.PatchElementTempl(pages.QueryResults(pages.QueryResult{
+		_ = sse.PatchElementTempl(pages.QueryResults(sqtypes.QueryResult{
 			Error: "Failed to read signals: " + err.Error(),
 		}))
 		return
@@ -183,7 +184,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(signals.SQL)
 	if query == "" {
-		_ = sse.PatchElementTempl(pages.QueryResults(pages.QueryResult{
+		_ = sse.PatchElementTempl(pages.QueryResults(sqtypes.QueryResult{
 			Error: "Query cannot be empty",
 		}))
 		return
@@ -191,7 +192,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 
 	db, err := h.getDB()
 	if err != nil {
-		_ = sse.PatchElementTempl(pages.QueryResults(pages.QueryResult{
+		_ = sse.PatchElementTempl(pages.QueryResults(sqtypes.QueryResult{
 			Error: err.Error(),
 		}))
 		return
@@ -204,7 +205,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
-		_ = sse.PatchElementTempl(pages.QueryResults(pages.QueryResult{
+		_ = sse.PatchElementTempl(pages.QueryResults(sqtypes.QueryResult{
 			Error: err.Error(),
 		}))
 		return
@@ -214,7 +215,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 	// Get columns
 	cols, err := rows.Columns()
 	if err != nil {
-		_ = sse.PatchElementTempl(pages.QueryResults(pages.QueryResult{
+		_ = sse.PatchElementTempl(pages.QueryResults(sqtypes.QueryResult{
 			Error: err.Error(),
 		}))
 		return
@@ -242,7 +243,7 @@ func (h *Handlers) ExecuteQuerySSE(w http.ResponseWriter, r *http.Request) {
 
 	queryMS := time.Since(start).Milliseconds()
 
-	result := pages.QueryResult{
+	result := sqtypes.QueryResult{
 		Columns:   cols,
 		Rows:      results,
 		RowCount:  len(results),
@@ -321,7 +322,7 @@ func (h *Handlers) SearchSSE(w http.ResponseWriter, r *http.Request) {
 
 // Helper functions
 
-func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName string) (pages.SchemaData, error) {
+func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName string) (sqtypes.SchemaData, error) {
 	// Get object type
 	var objType string
 	err := db.QueryRowContext(ctx, `
@@ -329,18 +330,18 @@ func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName str
 		WHERE name = ? AND type IN ('table', 'view')
 	`, tableName).Scan(&objType)
 	if err != nil {
-		return pages.SchemaData{}, fmt.Errorf("table not found: %s", tableName)
+		return sqtypes.SchemaData{}, fmt.Errorf("table not found: %s", tableName)
 	}
 
 	// Get columns using PRAGMA (table name must be sanitized/validated)
 	// PRAGMA doesn't support parameterized queries, so we validate the table exists first
 	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", tableName))
 	if err != nil {
-		return pages.SchemaData{}, err
+		return sqtypes.SchemaData{}, err
 	}
 	defer rows.Close()
 
-	var columns []pages.ColumnSchema
+	var columns []sqtypes.ColumnSchema
 	for rows.Next() {
 		var cid int
 		var name, colType string
@@ -351,7 +352,7 @@ func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName str
 			continue
 		}
 
-		columns = append(columns, pages.ColumnSchema{
+		columns = append(columns, sqtypes.ColumnSchema{
 			Name:     name,
 			Type:     colType,
 			Nullable: notNull == 0,
@@ -360,14 +361,14 @@ func (h *Handlers) getTableSchema(ctx context.Context, db *sql.DB, tableName str
 		})
 	}
 
-	return pages.SchemaData{
+	return sqtypes.SchemaData{
 		Name:    tableName,
 		Type:    objType,
 		Columns: columns,
 	}, nil
 }
 
-func (h *Handlers) searchModels(ctx context.Context, db *sql.DB, term string) ([]pages.SearchResultItem, error) {
+func (h *Handlers) searchModels(ctx context.Context, db *sql.DB, term string) ([]sqtypes.SearchResultItem, error) {
 	// Try using FTS5 if available, fall back to LIKE
 	query := `
 		SELECT path, name, description
@@ -383,7 +384,7 @@ func (h *Handlers) searchModels(ctx context.Context, db *sql.DB, term string) ([
 	}
 	defer rows.Close()
 
-	var results []pages.SearchResultItem
+	var results []sqtypes.SearchResultItem
 	for rows.Next() {
 		var path, name string
 		var description sql.NullString
@@ -392,7 +393,7 @@ func (h *Handlers) searchModels(ctx context.Context, db *sql.DB, term string) ([
 			continue
 		}
 
-		results = append(results, pages.SearchResultItem{
+		results = append(results, sqtypes.SearchResultItem{
 			Path:        path,
 			Name:        name,
 			Description: description.String,

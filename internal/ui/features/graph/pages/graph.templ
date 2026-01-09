@@ -1,167 +1,35 @@
 package pages
 
 import (
-	"encoding/json"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	graphtypes "github.com/leapstack-labs/leapsql/internal/ui/features/graph/types"
+	graphcomponents "github.com/leapstack-labs/leapsql/internal/ui/features/graph/components"
 	"github.com/starfederation/datastar-go/datastar"
 )
-
-// GraphViewData holds data for the DAG visualization (shared between pages and handlers).
-type GraphViewData struct {
-	Nodes []GraphNode
-	Edges []GraphEdge
-}
-
-// GraphNode represents a node in the graph.
-type GraphNode struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Type  string `json:"type"` // "view", "table", "incremental", "source"
-}
-
-// GraphEdge represents an edge between two nodes.
-type GraphEdge struct {
-	Source string `json:"source"`
-	Target string `json:"target"`
-}
-
-// GraphData is an alias for GraphViewData (legacy backward compat).
-type GraphData = GraphViewData
 
 // GraphPage renders the graph page with full content.
 // SSE is used only for live updates, not initial content.
 // AppShell provides id="app" for datastar patching.
-templ GraphPage(title string, isDev bool, sidebar common.SidebarData, graphData *GraphViewData) {
+templ GraphPage(title string, isDev bool, sidebar common.SidebarData, graphData *graphtypes.GraphViewData) {
 	@layouts.Base(title, isDev) {
 		<div data-init={ datastar.GetSSE("/graph/updates") }>
 			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
-				@GraphContent(graphData)
+				@graphcomponents.GraphContent(graphData)
 			}
 		</div>
 	}
 }
 
 // GraphAppShell renders just the app shell with graph content (for SSE updates).
-templ GraphAppShell(sidebar common.SidebarData, graphData *GraphViewData) {
+templ GraphAppShell(sidebar common.SidebarData, graphData *graphtypes.GraphViewData) {
 	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
-		@GraphContent(graphData)
+		@graphcomponents.GraphContent(graphData)
 	}
 }
 
-// GraphContent renders the DAG visualization page content.
-templ GraphContent(data *GraphViewData) {
-	<div class="graph-page">
-		<div class="graph-header">
-			<h1>DAG</h1>
-			<p class="text-muted">Model dependency graph</p>
-		</div>
-		<div class="graph-container">
-			@GraphView(*data)
-		</div>
-	</div>
-}
-
-// GraphView renders the graph visualization (used by legacy FullGraphSSE endpoint).
-templ GraphView(data GraphViewData) {
-	<div id="graph-container" class="graph-view">
-		<div class="graph-view__canvas">
-			@SVGGraph(data)
-		</div>
-		<div class="graph-view__legend">
-			<div class="graph-legend">
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--view"></span>
-					<span>View</span>
-				</div>
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--table"></span>
-					<span>Table</span>
-				</div>
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--incremental"></span>
-					<span>Incremental</span>
-				</div>
-			</div>
-		</div>
-		<div class="graph-view__stats">
-			{ itoa(len(data.Nodes)) } models, { itoa(len(data.Edges)) } dependencies
-		</div>
-	</div>
-}
-
-// SVGGraph renders an SVG-based graph visualization using CSS grid layout.
-// This is a simplified version - can be replaced with React Flow/D3 later.
-templ SVGGraph(data GraphViewData) {
-	{{
-		nodesJSON, _ := json.Marshal(data.Nodes)
-		edgesJSON, _ := json.Marshal(data.Edges)
-	}}
-	<div
-		class="graph-svg-container"
-		data-graph-nodes={ string(nodesJSON) }
-		data-graph-edges={ string(edgesJSON) }
-	>
-		if len(data.Nodes) == 0 {
-			<div class="graph-empty">
-				<p>No models found</p>
-				<p class="text-muted">Run discovery to populate the graph</p>
-			</div>
-		} else {
-			<div class="graph-nodes">
-				for _, node := range data.Nodes {
-					<div class={ "graph-node", nodeClass(node.Type) } data-node-id={ node.ID }>
-						<span class="graph-node__label">{ node.Label }</span>
-						<span class="graph-node__type">{ node.Type }</span>
-					</div>
-				}
-			</div>
-			if len(data.Edges) > 0 {
-				<div class="graph-edges-info">
-					<p class="text-muted">Dependencies:</p>
-					<ul class="graph-edges-list">
-						for _, edge := range data.Edges {
-							<li>{ extractName(edge.Source) } -> { extractName(edge.Target) }</li>
-						}
-					</ul>
-				</div>
-			}
-		}
-	</div>
-}
-
-func nodeClass(nodeType string) string {
-	switch nodeType {
-	case "table":
-		return "graph-node--table"
-	case "incremental":
-		return "graph-node--incremental"
-	case "source":
-		return "graph-node--source"
-	default:
-		return "graph-node--view"
-	}
-}
-
-func extractName(path string) string {
-	// Extract name from path like "staging.orders" -> "orders"
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '.' {
-			return path[i+1:]
-		}
-	}
-	return path
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	result := ""
-	for n > 0 {
-		result = string('0'+byte(n%10)) + result
-		n /= 10
-	}
-	return result
+// GraphView is a pass-through to the component for backward compatibility with legacy SSE endpoints.
+templ GraphView(data graphtypes.GraphViewData) {
+	@graphcomponents.GraphView(data)
 }

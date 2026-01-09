@@ -9,24 +9,18 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	homecomponents "github.com/leapstack-labs/leapsql/internal/ui/features/home/components"
+	hometypes "github.com/leapstack-labs/leapsql/internal/ui/features/home/types"
 	"github.com/starfederation/datastar-go/datastar"
 )
-
-// DashboardStats holds stats for the dashboard view.
-type DashboardStats struct {
-	ModelCount  int
-	SourceCount int
-	RunCount    int
-}
 
 // HomePage renders the home page with full content.
 // SSE is used only for live updates, not initial content.
 // AppShell provides id="app" for datastar patching.
-func HomePage(title string, isDev bool, sidebar common.SidebarData, stats *DashboardStats) templ.Component {
+func HomePage(title string, isDev bool, sidebar common.SidebarData, stats *hometypes.DashboardStats) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -66,7 +60,7 @@ func HomePage(title string, isDev bool, sidebar common.SidebarData, stats *Dashb
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/updates"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/home/pages/home.templ`, Line: 23, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/home/pages/home.templ`, Line: 17, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -88,7 +82,7 @@ func HomePage(title string, isDev bool, sidebar common.SidebarData, stats *Dashb
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = DashboardContent(stats).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = homecomponents.DashboardContent(stats).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -113,7 +107,7 @@ func HomePage(title string, isDev bool, sidebar common.SidebarData, stats *Dashb
 }
 
 // HomeAppShell renders just the app shell with dashboard content (for SSE updates).
-func HomeAppShell(sidebar common.SidebarData, stats *DashboardStats) templ.Component {
+func HomeAppShell(sidebar common.SidebarData, stats *hometypes.DashboardStats) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -146,56 +140,13 @@ func HomeAppShell(sidebar common.SidebarData, stats *DashboardStats) templ.Compo
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = DashboardContent(stats).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = homecomponents.DashboardContent(stats).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
 		templ_7745c5c3_Err = components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, false).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-// DashboardContent renders the dashboard content.
-func DashboardContent(stats *DashboardStats) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var7 == nil {
-			templ_7745c5c3_Var7 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div id=\"model-detail\"><h1>LeapSQL Dashboard</h1><div class=\"stats-grid\"><div class=\"stat-card\"><span class=\"stat-value\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(stats.ModelCount))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/home/pages/home.templ`, Line: 44, Col: 59}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span> <span class=\"stat-label\">Models</span></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
