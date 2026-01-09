@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/home/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -35,13 +34,13 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 
 // HomePage renders the home page with full content.
 func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
-	appData, err := h.buildDashboardAppData()
+	sidebar, stats, err := h.buildDashboardData()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := pages.HomePage("Dashboard", h.isDev, appData).Render(r.Context(), w); err != nil {
+	if err := pages.HomePage("Dashboard", h.isDev, sidebar, stats).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -73,30 +72,31 @@ func (h *Handlers) HomePageUpdates(w http.ResponseWriter, r *http.Request) {
 
 // sendDashboardView builds and sends the full app view for the dashboard.
 func (h *Handlers) sendDashboardView(sse *datastar.ServerSentEventGenerator) error {
-	appData, err := h.buildDashboardAppData()
+	sidebar, stats, err := h.buildDashboardData()
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(components.AppContainer(appData))
+	return sse.PatchElementTempl(pages.HomeAppShell(sidebar, stats))
 }
 
-// buildDashboardAppData assembles all data needed for the dashboard view.
-func (h *Handlers) buildDashboardAppData() (components.AppData, error) {
-	data := components.AppData{
+// buildDashboardData assembles all data needed for the dashboard view.
+func (h *Handlers) buildDashboardData() (common.SidebarData, *pages.DashboardStats, error) {
+	sidebar := common.SidebarData{
 		CurrentPath: "/",
+		FullWidth:   false,
 	}
 
 	// Build explorer tree
 	models, err := h.store.ListModels()
 	if err != nil {
-		return data, err
+		return sidebar, nil, err
 	}
-	data.ExplorerTree = common.BuildExplorerTree(models)
+	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Get stats for dashboard
-	data.Stats = &components.DashboardStats{
+	stats := &pages.DashboardStats{
 		ModelCount: len(models),
 	}
 
-	return data, nil
+	return sidebar, stats, nil
 }

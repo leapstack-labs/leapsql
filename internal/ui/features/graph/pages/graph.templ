@@ -1,14 +1,15 @@
 package pages
 
 import (
+	"encoding/json"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
 	"github.com/starfederation/datastar-go/datastar"
-	"encoding/json"
 )
 
-// GraphData holds the data for the graph visualization.
-type GraphData struct {
+// GraphViewData holds data for the DAG visualization (shared between pages and handlers).
+type GraphViewData struct {
 	Nodes []GraphNode
 	Edges []GraphEdge
 }
@@ -26,19 +27,44 @@ type GraphEdge struct {
 	Target string `json:"target"`
 }
 
+// GraphData is an alias for GraphViewData (legacy backward compat).
+type GraphData = GraphViewData
+
 // GraphPage renders the graph page with full content.
 // SSE is used only for live updates, not initial content.
-// AppContainer provides id="app" for datastar patching.
-templ GraphPage(title string, isDev bool, data components.AppData) {
+// AppShell provides id="app" for datastar patching.
+templ GraphPage(title string, isDev bool, sidebar common.SidebarData, graphData *GraphViewData) {
 	@layouts.Base(title, isDev) {
 		<div data-init={ datastar.GetSSE("/graph/updates") }>
-			@components.AppContainer(data)
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+				@GraphContent(graphData)
+			}
 		</div>
 	}
 }
 
+// GraphAppShell renders just the app shell with graph content (for SSE updates).
+templ GraphAppShell(sidebar common.SidebarData, graphData *GraphViewData) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+		@GraphContent(graphData)
+	}
+}
+
+// GraphContent renders the DAG visualization page content.
+templ GraphContent(data *GraphViewData) {
+	<div class="graph-page">
+		<div class="graph-header">
+			<h1>DAG</h1>
+			<p class="text-muted">Model dependency graph</p>
+		</div>
+		<div class="graph-container">
+			@GraphView(*data)
+		</div>
+	</div>
+}
+
 // GraphView renders the graph visualization (used by legacy FullGraphSSE endpoint).
-templ GraphView(data GraphData) {
+templ GraphView(data GraphViewData) {
 	<div id="graph-container" class="graph-view">
 		<div class="graph-view__canvas">
 			@SVGGraph(data)
@@ -67,12 +93,12 @@ templ GraphView(data GraphData) {
 
 // SVGGraph renders an SVG-based graph visualization using CSS grid layout.
 // This is a simplified version - can be replaced with React Flow/D3 later.
-templ SVGGraph(data GraphData) {
+templ SVGGraph(data GraphViewData) {
 	{{
 		nodesJSON, _ := json.Marshal(data.Nodes)
 		edgesJSON, _ := json.Marshal(data.Edges)
 	}}
-	<div 
+	<div
 		class="graph-svg-container"
 		data-graph-nodes={ string(nodesJSON) }
 		data-graph-edges={ string(edgesJSON) }

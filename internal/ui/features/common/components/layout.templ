@@ -1,0 +1,215 @@
+package components
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// ThemeControls renders the theme selector and dark mode toggle.
+templ ThemeControls() {
+	<div class="theme-controls">
+		<div class="theme-icons" role="radiogroup" aria-label="Select theme">
+			<button
+				type="button"
+				class="theme-icon"
+				data-class:active="$theme === 'claude'"
+				data-on:click="$theme = 'claude'; localStorage.setItem('theme', 'claude')"
+				title="Claude"
+				aria-label="Claude theme"
+			>
+				<img src="/static/icons/claude.svg" alt="" width="18" height="18"/>
+			</button>
+			<button
+				type="button"
+				class="theme-icon"
+				data-class:active="$theme === 'vercel'"
+				data-on:click="$theme = 'vercel'; localStorage.setItem('theme', 'vercel')"
+				title="Vercel"
+				aria-label="Vercel theme"
+			>
+				<img data-show="$darkMode" src="/static/icons/vercel-dark.svg" alt="" width="18" height="18"/>
+				<img data-show="!$darkMode" src="/static/icons/vercel-light.svg" alt="" width="18" height="18"/>
+			</button>
+			<button
+				type="button"
+				class="theme-icon"
+				data-class:active="$theme === 'catppuccin'"
+				data-on:click="$theme = 'catppuccin'; localStorage.setItem('theme', 'catppuccin')"
+				title="Catppuccin"
+				aria-label="Catppuccin theme"
+			>
+				<img src="/static/icons/catppuccin.png" alt="" width="18" height="18"/>
+			</button>
+		</div>
+		<div class="theme-divider"></div>
+		<button
+			class="theme-toggle"
+			data-on:click="$darkMode = !$darkMode; localStorage.setItem('darkMode', $darkMode)"
+			data-attr:aria-label="$darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+			type="button"
+		>
+			<svg data-show="$darkMode" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<circle cx="12" cy="12" r="5"></circle>
+				<line x1="12" y1="1" x2="12" y2="3"></line>
+				<line x1="12" y1="21" x2="12" y2="23"></line>
+				<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+				<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+				<line x1="1" y1="12" x2="3" y2="12"></line>
+				<line x1="21" y1="12" x2="23" y2="12"></line>
+				<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+				<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+			</svg>
+			<svg data-show="!$darkMode" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+			</svg>
+		</button>
+	</div>
+}
+
+templ Header() {
+	<header class="ui-header">
+		<div class="ui-header__logo">
+			<a href="/">LeapSQL</a>
+		</div>
+		<div class="ui-header__search">
+			<input type="text" placeholder="Search models... (Cmd+K)"/>
+		</div>
+		<div class="ui-header__actions">
+			@ThemeControls()
+		</div>
+	</header>
+}
+
+templ Sidebar(explorerTree []common.TreeNode, currentPath string) {
+	<aside class="ui-sidebar">
+		<div class="ui-sidebar__section">
+			<div class="ui-sidebar__title">Explorer</div>
+			@ExplorerTreeView(explorerTree, currentPath)
+		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/graph" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/graph") }
+			>
+				<span>View DAG</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/runs" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/runs") }
+			>
+				<span>Run History</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/query" 
+				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/query") }
+			>
+				<span>State Query</span>
+			</a>
+		</div>
+	</aside>
+}
+
+templ ExplorerTreeView(nodes []common.TreeNode, currentPath string) {
+	<div class="ui-sidebar__tree">
+		if len(nodes) == 0 {
+			<p class="text-muted">No models found</p>
+		} else {
+			for _, node := range nodes {
+				@TreeItemView(node, currentPath)
+			}
+		}
+	</div>
+}
+
+templ TreeItemView(node common.TreeNode, currentPath string) {
+	if node.Type == "folder" {
+		<details class="tree-folder" open>
+			<summary class="tree-item tree-item--folder">
+				<span class="tree-item__icon">+</span>
+				<span>{ node.Name }</span>
+				<span class="tree-item__count">{ lenStr(node.Children) }</span>
+			</summary>
+			<div class="tree-folder__children">
+				for _, child := range node.Children {
+					@TreeItemView(child, currentPath)
+				}
+			</div>
+		</details>
+	} else {
+		{{
+			modelURL := fmt.Sprintf("/models/%s", node.Path)
+			isActive := currentPath == modelURL
+		}}
+		<a 
+			href={ templ.SafeURL(modelURL) }
+			class={ "tree-item", "tree-item--model", templ.KV("tree-item--active", isActive) }
+		>
+			<span class="tree-item__icon">~</span>
+			<span>{ node.Name }</span>
+		</a>
+	}
+}
+
+templ LogDrawer() {
+	<div class="ui-log-drawer ui-log-drawer--collapsed">
+		<div class="ui-log-drawer__header">
+			<span>Logs</span>
+		</div>
+		<div class="ui-log-drawer__content">
+			<div id="log-content"></div>
+		</div>
+	</div>
+}
+
+// AppShell is the outer shell with sidebar - content is passed as children.
+// This avoids import cycles by not requiring feature-specific type assertions.
+// fullWidth should be true for graph, runs, query pages (no context panel).
+templ AppShell(explorerTree []common.TreeNode, currentPath string, fullWidth bool) {
+	<div id="app">
+		@Header()
+		<div class="ui-main">
+			@Sidebar(explorerTree, currentPath)
+			<main class={ templ.KV("ui-content", true), templ.KV("ui-content--full", fullWidth) }>
+				{ children... }
+			</main>
+		</div>
+		@LogDrawer()
+	</div>
+}
+
+// AppShellWithContext is for pages that have a context panel (model pages).
+templ AppShellWithContext(explorerTree []common.TreeNode, currentPath string, contextPanel templ.Component) {
+	<div id="app">
+		@Header()
+		<div class="ui-main">
+			@Sidebar(explorerTree, currentPath)
+			<main class="ui-content">
+				{ children... }
+			</main>
+			@contextPanel
+		</div>
+		@LogDrawer()
+	</div>
+}
+
+// Helper functions
+
+func lenStr(nodes []common.TreeNode) string {
+	return "(" + itoa(len(nodes)) + ")"
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string('0'+byte(n%10)) + result
+		n /= 10
+	}
+	return result
+}

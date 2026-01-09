@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/graph/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -38,13 +37,13 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 
 // GraphPage renders the graph visualization page with full content.
 func (h *Handlers) GraphPage(w http.ResponseWriter, r *http.Request) {
-	appData, err := h.buildGraphAppData()
+	sidebar, graphData, err := h.buildGraphData()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := pages.GraphPage("DAG", h.isDev, appData).Render(r.Context(), w); err != nil {
+	if err := pages.GraphPage("DAG", h.isDev, sidebar, graphData).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -75,124 +74,37 @@ func (h *Handlers) GraphPageUpdates(w http.ResponseWriter, r *http.Request) {
 
 // sendGraphView builds and sends the full app view for the graph page.
 func (h *Handlers) sendGraphView(sse *datastar.ServerSentEventGenerator) error {
-	appData, err := h.buildGraphAppData()
+	sidebar, graphData, err := h.buildGraphData()
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(components.AppContainer(appData))
+	return sse.PatchElementTempl(pages.GraphAppShell(sidebar, graphData))
 }
 
-// buildGraphAppData assembles all data needed for the graph view.
-func (h *Handlers) buildGraphAppData() (components.AppData, error) {
-	data := components.AppData{
+// buildGraphData assembles all data needed for the graph view.
+func (h *Handlers) buildGraphData() (common.SidebarData, *pages.GraphViewData, error) {
+	sidebar := common.SidebarData{
 		CurrentPath: "/graph",
+		FullWidth:   true,
 	}
 
 	// Get all models
 	models, err := h.store.ListModels()
 	if err != nil {
-		return data, err
+		return sidebar, nil, err
 	}
 
 	// Build explorer tree
-	data.ExplorerTree = common.BuildExplorerTree(models)
+	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Build graph data
 	graphData := h.buildFullGraphData(models)
-	data.Graph = &graphData
 
-	return data, nil
+	return sidebar, &graphData, nil
 }
 
 // buildFullGraphData creates graph view data from all models and their dependencies.
-func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) components.GraphViewData {
-	// Create a map for quick lookup
-	modelMap := make(map[string]*core.PersistedModel)
-	for _, m := range models {
-		modelMap[m.ID] = m
-	}
-
-	// Build nodes
-	nodes := make([]components.GraphNode, 0, len(models))
-	for _, m := range models {
-		nodes = append(nodes, components.GraphNode{
-			ID:    m.Path,
-			Label: m.Name,
-			Type:  nodeType(m),
-		})
-	}
-
-	// Sort nodes for consistent display
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].ID < nodes[j].ID
-	})
-
-	// Build edges from dependencies
-	edges := make([]components.GraphEdge, 0)
-	for _, m := range models {
-		deps, err := h.store.GetDependencies(m.ID)
-		if err != nil {
-			continue
-		}
-		for _, depID := range deps {
-			depModel, ok := modelMap[depID]
-			if !ok {
-				continue
-			}
-			edges = append(edges, components.GraphEdge{
-				Source: depModel.Path,
-				Target: m.Path,
-			})
-		}
-	}
-
-	return components.GraphViewData{
-		Nodes: nodes,
-		Edges: edges,
-	}
-}
-
-// FullGraphSSE sends the full DAG via SSE (legacy endpoint for backward compatibility).
-func (h *Handlers) FullGraphSSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-
-	// Get all models
-	models, err := h.store.ListModels()
-	if err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
-
-	// Build graph data
-	graphData := h.buildFullGraph(models)
-
-	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
-		_ = sse.ConsoleError(err)
-	}
-}
-
-// ModelGraphSSE sends a model's neighborhood graph (parents + children) via SSE.
-func (h *Handlers) ModelGraphSSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-	modelPath := chi.URLParam(r, "path")
-
-	// Get model
-	model, err := h.store.GetModelByPath(modelPath)
-	if err != nil {
-		_ = sse.ConsoleError(err)
-		return
-	}
-
-	// Build neighborhood graph
-	graphData := h.buildModelNeighborhood(model)
-
-	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
-		_ = sse.ConsoleError(err)
-	}
-}
-
-// buildFullGraph creates graph data from all models and their dependencies.
-func (h *Handlers) buildFullGraph(models []*core.PersistedModel) pages.GraphData {
+func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) pages.GraphViewData {
 	// Create a map for quick lookup
 	modelMap := make(map[string]*core.PersistedModel)
 	for _, m := range models {
@@ -233,14 +145,53 @@ func (h *Handlers) buildFullGraph(models []*core.PersistedModel) pages.GraphData
 		}
 	}
 
-	return pages.GraphData{
+	return pages.GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}
 }
 
+// FullGraphSSE sends the full DAG via SSE (legacy endpoint for backward compatibility).
+func (h *Handlers) FullGraphSSE(w http.ResponseWriter, r *http.Request) {
+	sse := datastar.NewSSE(w, r)
+
+	// Get all models
+	models, err := h.store.ListModels()
+	if err != nil {
+		_ = sse.ConsoleError(err)
+		return
+	}
+
+	// Build graph data
+	graphData := h.buildFullGraphData(models)
+
+	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
+		_ = sse.ConsoleError(err)
+	}
+}
+
+// ModelGraphSSE sends a model's neighborhood graph (parents + children) via SSE.
+func (h *Handlers) ModelGraphSSE(w http.ResponseWriter, r *http.Request) {
+	sse := datastar.NewSSE(w, r)
+	modelPath := chi.URLParam(r, "path")
+
+	// Get model
+	model, err := h.store.GetModelByPath(modelPath)
+	if err != nil {
+		_ = sse.ConsoleError(err)
+		return
+	}
+
+	// Build neighborhood graph
+	graphData := h.buildModelNeighborhood(model)
+
+	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
+		_ = sse.ConsoleError(err)
+	}
+}
+
 // buildModelNeighborhood creates graph data for a model and its immediate neighbors.
-func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.GraphData {
+func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.GraphViewData {
 	nodeSet := make(map[string]pages.GraphNode)
 	edges := make([]pages.GraphEdge, 0)
 
@@ -298,7 +249,7 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) pages.Grap
 		return nodes[i].ID < nodes[j].ID
 	})
 
-	return pages.GraphData{
+	return pages.GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}

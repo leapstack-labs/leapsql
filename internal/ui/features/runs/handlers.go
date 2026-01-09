@@ -11,7 +11,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	commonComponents "github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/runs/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -43,7 +42,7 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "id") // "" if not present
 
-	appData, err := h.buildRunsAppDataWithSelection(runID)
+	sidebar, runsData, err := h.buildRunsDataWithSelection(runID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -55,14 +54,14 @@ func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
 		sseUpdatePath = fmt.Sprintf("/runs/%s/updates", runID)
 	}
 
-	if err := pages.RunsPage("Run History", h.isDev, appData, sseUpdatePath).Render(r.Context(), w); err != nil {
+	if err := pages.RunsPage("Run History", h.isDev, sidebar, runsData, sseUpdatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 // RunsPageUpdates is the long-lived SSE endpoint for the runs page.
 // Handles both /runs/updates (no selection) and /runs/{id}/updates (with selection).
-// Pushes full AppContainer on every update so both list and detail stay in sync.
+// Pushes full AppShell on every update so both list and detail stay in sync.
 func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "id") // "" if not present
 	sse := datastar.NewSSE(w, r)
@@ -78,39 +77,40 @@ func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-updates:
-			appData, err := h.buildRunsAppDataWithSelection(runID)
+			sidebar, runsData, err := h.buildRunsDataWithSelection(runID)
 			if err != nil {
 				_ = sse.ConsoleError(err)
 				continue
 			}
-			if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
+			if err := sse.PatchElementTempl(pages.RunsAppShell(sidebar, runsData)); err != nil {
 				_ = sse.ConsoleError(err)
 			}
 		}
 	}
 }
 
-// buildRunsAppDataWithSelection assembles all data needed for the runs view with optional selected run.
-func (h *Handlers) buildRunsAppDataWithSelection(selectedRunID string) (commonComponents.AppData, error) {
-	data := commonComponents.AppData{
+// buildRunsDataWithSelection assembles all data needed for the runs view with optional selected run.
+func (h *Handlers) buildRunsDataWithSelection(selectedRunID string) (common.SidebarData, *pages.RunsViewData, error) {
+	sidebar := common.SidebarData{
 		CurrentPath: "/runs",
+		FullWidth:   true,
 	}
 
 	// Build explorer tree
 	models, err := h.store.ListModels()
 	if err != nil {
-		return data, err
+		return sidebar, nil, err
 	}
-	data.ExplorerTree = common.BuildExplorerTree(models)
+	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Get runs
 	runs, err := h.store.ListRuns(50)
 	if err != nil {
-		return data, err
+		return sidebar, nil, err
 	}
 
 	// Convert to view data with stats
-	runsData := commonComponents.RunsViewData{
+	runsData := &pages.RunsViewData{
 		Runs:          h.convertToRunListItems(runs),
 		SelectedRunID: selectedRunID,
 	}
@@ -124,19 +124,17 @@ func (h *Handlers) buildRunsAppDataWithSelection(selectedRunID string) (commonCo
 		// If error, just don't show the detail (run might have been deleted)
 	}
 
-	data.Runs = &runsData
-
-	return data, nil
+	return sidebar, runsData, nil
 }
 
 // convertToRunListItems converts core.Run to component-friendly RunListItem with stats.
-func (h *Handlers) convertToRunListItems(runs []*core.Run) []commonComponents.RunListItem {
-	items := make([]commonComponents.RunListItem, len(runs))
+func (h *Handlers) convertToRunListItems(runs []*core.Run) []pages.RunListItem {
+	items := make([]pages.RunListItem, len(runs))
 	for i, run := range runs {
 		// Get stats for this run
 		stats := h.getRunStats(run.ID)
 
-		items[i] = commonComponents.RunListItem{
+		items[i] = pages.RunListItem{
 			ID:          run.ID,
 			Environment: run.Environment,
 			Status:      string(run.Status),
@@ -150,8 +148,8 @@ func (h *Handlers) convertToRunListItems(runs []*core.Run) []commonComponents.Ru
 }
 
 // getRunStats calculates aggregate stats for a run.
-func (h *Handlers) getRunStats(runID string) commonComponents.RunStats {
-	stats := commonComponents.RunStats{}
+func (h *Handlers) getRunStats(runID string) pages.RunStats {
+	stats := pages.RunStats{}
 
 	modelRuns, err := h.store.GetModelRunsForRun(runID)
 	if err != nil {
@@ -179,7 +177,7 @@ func (h *Handlers) getRunStats(runID string) commonComponents.RunStats {
 }
 
 // buildRunDetailWithTiers builds a full run detail with tiered model runs.
-func (h *Handlers) buildRunDetailWithTiers(runID string) (*commonComponents.RunDetailWithTiers, error) {
+func (h *Handlers) buildRunDetailWithTiers(runID string) (*pages.RunDetailWithTiers, error) {
 	run, err := h.store.GetRun(runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
@@ -208,7 +206,7 @@ func (h *Handlers) buildRunDetailWithTiers(runID string) (*commonComponents.RunD
 	}
 	duration := formatRunDuration(run.StartedAt, run.CompletedAt)
 
-	return &commonComponents.RunDetailWithTiers{
+	return &pages.RunDetailWithTiers{
 		ID:          run.ID,
 		Environment: run.Environment,
 		Status:      string(run.Status),
@@ -222,10 +220,10 @@ func (h *Handlers) buildRunDetailWithTiers(runID string) (*commonComponents.RunD
 }
 
 // convertToTieredModelRuns converts model runs with info to tiered model runs.
-func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) []commonComponents.TieredModelRun {
-	result := make([]commonComponents.TieredModelRun, len(modelRuns))
+func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) []pages.TieredModelRun {
+	result := make([]pages.TieredModelRun, len(modelRuns))
 	for i, mr := range modelRuns {
-		result[i] = commonComponents.TieredModelRun{
+		result[i] = pages.TieredModelRun{
 			ID:           mr.ID,
 			ModelID:      mr.ModelID,
 			ModelPath:    mr.ModelPath,
@@ -242,7 +240,7 @@ func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) 
 }
 
 // groupByTier groups models by their execution tier based on dependencies.
-func (h *Handlers) groupByTier(models []commonComponents.TieredModelRun) []commonComponents.TierGroup {
+func (h *Handlers) groupByTier(models []pages.TieredModelRun) []pages.TierGroup {
 	if len(models) == 0 {
 		return nil
 	}
@@ -267,7 +265,7 @@ func (h *Handlers) groupByTier(models []commonComponents.TieredModelRun) []commo
 	}
 
 	// Update tier in models and group by tier
-	tierGroups := make(map[int][]commonComponents.TieredModelRun)
+	tierGroups := make(map[int][]pages.TieredModelRun)
 	maxTier := 0
 
 	for i := range models {
@@ -280,7 +278,7 @@ func (h *Handlers) groupByTier(models []commonComponents.TieredModelRun) []commo
 	}
 
 	// Create tier groups in order
-	result := make([]commonComponents.TierGroup, 0, maxTier+1)
+	result := make([]pages.TierGroup, 0, maxTier+1)
 	for tier := 0; tier <= maxTier; tier++ {
 		modelsInTier := tierGroups[tier]
 		if len(modelsInTier) == 0 {
@@ -295,7 +293,7 @@ func (h *Handlers) groupByTier(models []commonComponents.TieredModelRun) []commo
 		// Calculate tier stats
 		tierStats := h.calculateTierStats(modelsInTier)
 
-		result = append(result, commonComponents.TierGroup{
+		result = append(result, pages.TierGroup{
 			Tier:      tier,
 			Label:     h.generateTierLabel(tier, modelsInTier),
 			Models:    modelsInTier,
@@ -331,9 +329,9 @@ func (h *Handlers) calculateTier(modelPath string, deps map[string][]string, vis
 }
 
 // fallbackSingleTier creates a single tier with all models.
-func (h *Handlers) fallbackSingleTier(models []commonComponents.TieredModelRun) []commonComponents.TierGroup {
+func (h *Handlers) fallbackSingleTier(models []pages.TieredModelRun) []pages.TierGroup {
 	tierStats := h.calculateTierStats(models)
-	return []commonComponents.TierGroup{
+	return []pages.TierGroup{
 		{
 			Tier:   0,
 			Label:  "All Models",
@@ -344,8 +342,8 @@ func (h *Handlers) fallbackSingleTier(models []commonComponents.TieredModelRun) 
 }
 
 // calculateStats calculates overall stats from model runs.
-func (h *Handlers) calculateStats(models []commonComponents.TieredModelRun) commonComponents.RunStats {
-	stats := commonComponents.RunStats{
+func (h *Handlers) calculateStats(models []pages.TieredModelRun) pages.RunStats {
+	stats := pages.RunStats{
 		TotalModels: len(models),
 	}
 	for _, m := range models {
@@ -367,8 +365,8 @@ func (h *Handlers) calculateStats(models []commonComponents.TieredModelRun) comm
 }
 
 // calculateTierStats calculates stats for a specific tier.
-func (h *Handlers) calculateTierStats(models []commonComponents.TieredModelRun) commonComponents.TierStats {
-	stats := commonComponents.TierStats{
+func (h *Handlers) calculateTierStats(models []pages.TieredModelRun) pages.TierStats {
+	stats := pages.TierStats{
 		TotalModels: len(models),
 	}
 	for _, m := range models {
@@ -390,7 +388,7 @@ func (h *Handlers) calculateTierStats(models []commonComponents.TieredModelRun) 
 }
 
 // generateTierLabel generates a label for a tier.
-func (h *Handlers) generateTierLabel(tier int, models []commonComponents.TieredModelRun) string {
+func (h *Handlers) generateTierLabel(tier int, models []pages.TieredModelRun) string {
 	if len(models) == 0 {
 		return fmt.Sprintf("Tier %d", tier)
 	}

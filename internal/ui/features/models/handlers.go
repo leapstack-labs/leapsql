@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	commonComponents "github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/models/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -39,7 +38,7 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 func (h *Handlers) ModelPage(w http.ResponseWriter, r *http.Request) {
 	modelPath := chi.URLParam(r, "path")
 
-	appData, err := h.buildAppData(modelPath)
+	sidebar, modelData, contextData, err := h.buildModelData(modelPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -47,12 +46,12 @@ func (h *Handlers) ModelPage(w http.ResponseWriter, r *http.Request) {
 
 	// Get model name for title
 	title := modelPath
-	if appData.Model != nil {
-		title = appData.Model.Name
+	if modelData != nil {
+		title = modelData.Name
 	}
 
 	updatePath := "/models/" + modelPath + "/updates"
-	if err := pages.ModelPage(title, h.isDev, appData, updatePath).Render(r.Context(), w); err != nil {
+	if err := pages.ModelPage(title, h.isDev, sidebar, modelData, contextData, updatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -75,7 +74,7 @@ func (h *Handlers) ModelPageUpdates(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-updates:
-			if err := h.sendAppView(sse, modelPath); err != nil {
+			if err := h.sendModelView(sse, modelPath); err != nil {
 				_ = sse.ConsoleError(err)
 				// Don't return - keep trying on next update
 			}
@@ -83,53 +82,57 @@ func (h *Handlers) ModelPageUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// sendAppView builds and sends the full app view for a model page.
-func (h *Handlers) sendAppView(sse *datastar.ServerSentEventGenerator, modelPath string) error {
-	appData, err := h.buildAppData(modelPath)
+// sendModelView builds and sends the full app view for a model page.
+func (h *Handlers) sendModelView(sse *datastar.ServerSentEventGenerator, modelPath string) error {
+	sidebar, modelData, contextData, err := h.buildModelData(modelPath)
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(commonComponents.AppContainer(appData))
+	return sse.PatchElementTempl(pages.ModelAppShell(sidebar, modelData, contextData))
 }
 
-// buildAppData assembles all data needed for the app view.
-func (h *Handlers) buildAppData(modelPath string) (commonComponents.AppData, error) {
-	data := commonComponents.AppData{
+// buildModelData assembles all data needed for the model view.
+func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *pages.ModelViewData, *pages.ModelContext, error) {
+	sidebar := common.SidebarData{
 		CurrentPath: "/models/" + modelPath,
+		FullWidth:   false,
 	}
 
 	// Build explorer tree
 	models, err := h.store.ListModels()
 	if err != nil {
-		return data, err
+		return sidebar, nil, nil, err
 	}
-	data.ExplorerTree = common.BuildExplorerTree(models)
+	sidebar.ExplorerTree = common.BuildExplorerTree(models)
+
+	var modelData *pages.ModelViewData
+	var contextData *pages.ModelContext
 
 	// Get model details if path specified
 	if modelPath != "" {
 		model, err := h.store.GetModelByPath(modelPath)
 		if err != nil {
-			return data, err
+			return sidebar, nil, nil, err
 		}
 
 		// Only build model view if model exists
 		if model != nil {
 			// Build model view data with all tab content
-			modelView := h.buildModelViewData(model)
-			data.Model = &modelView
+			mv := h.buildModelViewData(model)
+			modelData = &mv
 
 			// Build context panel
-			context := h.buildModelContext(model)
-			data.Context = &context
+			ctx := h.buildModelContext(model)
+			contextData = &ctx
 		}
 	}
 
-	return data, nil
+	return sidebar, modelData, contextData, nil
 }
 
 // buildModelViewData builds the model view with all tabs pre-rendered.
-func (h *Handlers) buildModelViewData(model *core.PersistedModel) commonComponents.ModelViewData {
-	data := commonComponents.ModelViewData{
+func (h *Handlers) buildModelViewData(model *core.PersistedModel) pages.ModelViewData {
+	data := pages.ModelViewData{
 		Path:         model.Path,
 		Name:         model.Name,
 		FilePath:     model.FilePath,
@@ -153,12 +156,12 @@ func (h *Handlers) buildModelViewData(model *core.PersistedModel) commonComponen
 }
 
 // buildModelContext builds the context panel data.
-func (h *Handlers) buildModelContext(model *core.PersistedModel) commonComponents.ModelContext {
+func (h *Handlers) buildModelContext(model *core.PersistedModel) pages.ModelContext {
 	deps, _ := h.store.GetDependencies(model.ID)
 	dependents, _ := h.store.GetDependents(model.ID)
 	columns, _ := h.store.GetModelColumns(model.Path)
 
-	return commonComponents.ModelContext{
+	return pages.ModelContext{
 		Path:       model.Path,
 		Name:       model.Name,
 		Type:       model.Materialized,
@@ -183,14 +186,14 @@ func (h *Handlers) resolveModelNames(ids []string) []string {
 }
 
 // toColumnData converts core.ColumnInfo to component-friendly data.
-func toColumnData(columns []core.ColumnInfo) []commonComponents.ColumnData {
-	result := make([]commonComponents.ColumnData, len(columns))
+func toColumnData(columns []core.ColumnInfo) []pages.ColumnData {
+	result := make([]pages.ColumnData, len(columns))
 	for i, col := range columns {
 		sources := make([]string, len(col.Sources))
 		for j, src := range col.Sources {
 			sources[j] = fmt.Sprintf("%s.%s", src.Table, src.Column)
 		}
-		result[i] = commonComponents.ColumnData{
+		result[i] = pages.ColumnData{
 			Name:    col.Name,
 			Type:    string(col.TransformType),
 			Sources: sources,

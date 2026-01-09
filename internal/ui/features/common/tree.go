@@ -6,27 +6,26 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 )
 
 // BuildExplorerTree groups models into a tree structure by folder.
-func BuildExplorerTree(models []*core.PersistedModel) []components.TreeNode {
-	folders := make(map[string]*components.TreeNode)
+func BuildExplorerTree(models []*core.PersistedModel) []TreeNode {
+	folders := make(map[string]*TreeNode)
 
 	for _, m := range models {
 		folder := ExtractFolder(m.Path)
 
 		if _, ok := folders[folder]; !ok {
-			folders[folder] = &components.TreeNode{
+			folders[folder] = &TreeNode{
 				Name:     folder,
 				Path:     folder,
 				Type:     "folder",
-				Children: []components.TreeNode{},
+				Children: []TreeNode{},
 			}
 		}
 
-		folders[folder].Children = append(folders[folder].Children, components.TreeNode{
+		folders[folder].Children = append(folders[folder].Children, TreeNode{
 			Name: m.Name,
 			Path: m.Path,
 			Type: "model",
@@ -34,7 +33,7 @@ func BuildExplorerTree(models []*core.PersistedModel) []components.TreeNode {
 	}
 
 	// Convert map to sorted slice
-	result := make([]components.TreeNode, 0, len(folders))
+	result := make([]TreeNode, 0, len(folders))
 	for _, node := range folders {
 		// Sort children by name
 		sort.Slice(node.Children, func(i, j int) bool {
