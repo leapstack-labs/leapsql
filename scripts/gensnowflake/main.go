@@ -757,7 +757,7 @@ func generateFunctionsCode(scalars, aggregates, windows, tableFuncs, generators 
 	buf.WriteString("// Source: https://docs.snowflake.com/en/sql-reference/functions-all\n")
 	fmt.Fprintf(&buf, "// Generated: %s\n\n", time.Now().Format("2006-01-02"))
 	buf.WriteString("package snowflake\n\n")
-	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/dialect\"\n\n")
+	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/core\"\n\n")
 
 	// Generate scalars slice
 	buf.WriteString("// snowflakeScalars contains all scalar function names.\n")

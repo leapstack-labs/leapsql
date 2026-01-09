@@ -474,7 +474,7 @@ func generateFunctionsCode(version string, aggregates, tableFuncs []string, docs
 	fmt.Fprintf(&buf, "// Source: DuckDB %s\n", version)
 	fmt.Fprintf(&buf, "// Generated: %s\n\n", time.Now().Format("2006-01-02"))
 	buf.WriteString("package duckdb\n\n")
-	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/dialect\"\n\n")
+	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/core\"\n\n")
 
 	// Generate docs map
 	buf.WriteString("// duckDBFunctionDocs contains documentation for all DuckDB functions.\n")

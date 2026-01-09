@@ -623,7 +623,7 @@ func generateFunctionsCode(scalars, aggregates, windows, tableFuncs []string, do
 	buf.WriteString("// Source: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-functions-builtin-alpha\n")
 	fmt.Fprintf(&buf, "// Generated: %s\n\n", time.Now().Format("2006-01-02"))
 	buf.WriteString("package databricks\n\n")
-	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/dialect\"\n\n")
+	buf.WriteString("import \"github.com/leapstack-labs/leapsql/pkg/core\"\n\n")
 
 	// Generate scalars slice
 	buf.WriteString("// databricksScalars contains all scalar function names.\n")
