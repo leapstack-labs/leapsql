@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strings"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
@@ -108,6 +109,14 @@ templ Sidebar(explorerTree []common.TreeNode, currentPath string) {
 				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/query") }
 			>
 				<span>State Query</span>
+			</a>
+		</div>
+		<div class="ui-sidebar__section">
+			<a 
+				href="/macros" 
+				class={ "tree-item", templ.KV("tree-item--active", strings.HasPrefix(currentPath, "/macros")) }
+			>
+				<span>Macros</span>
 			</a>
 		</div>
 	</aside>

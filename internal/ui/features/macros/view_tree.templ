@@ -1,0 +1,46 @@
+package macros
+
+import "fmt"
+
+// MacroNamespaceTree renders the collapsible namespace tree.
+templ MacroNamespaceTree(namespaces []NamespaceData, selected *FunctionDetail) {
+	<div class="macro-tree">
+		if len(namespaces) == 0 {
+			<p class="text-muted">No macros found</p>
+			<p class="text-muted text-sm">Add .star files to the macros directory</p>
+		} else {
+			for _, ns := range namespaces {
+				@MacroNamespaceItem(ns, selected)
+			}
+		}
+	</div>
+}
+
+// MacroNamespaceItem renders a collapsible namespace with its functions.
+templ MacroNamespaceItem(ns NamespaceData, selected *FunctionDetail) {
+	<details class="macro-namespace" open>
+		<summary class="macro-namespace__header">
+			<span class="macro-namespace__icon"></span>
+			<span class="macro-namespace__name">{ ns.Name }</span>
+			<span class="macro-namespace__count">{ itoa(len(ns.Functions)) }</span>
+		</summary>
+		<div class="macro-namespace__functions">
+			for _, fn := range ns.Functions {
+				@MacroFunctionItem(ns.Name, fn, isSelectedFunction(selected, ns.Name, fn.Name))
+			}
+		</div>
+	</details>
+}
+
+// MacroFunctionItem renders a clickable function in the tree.
+templ MacroFunctionItem(namespace string, fn FunctionSummary, isSelected bool) {
+	<a 
+		href={ templ.SafeURL(fmt.Sprintf("/macros/%s/%s", namespace, fn.Name)) }
+		class={ "macro-function", templ.KV("macro-function--selected", isSelected) }
+	>
+		<span class="macro-function__name">{ fn.Name }</span>
+		if fn.HasDoc {
+			<span class="macro-function__doc-indicator" title="Has documentation"></span>
+		}
+	</a>
+}

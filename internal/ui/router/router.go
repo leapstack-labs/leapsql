@@ -11,6 +11,7 @@ import (
 	databaseFeature "github.com/leapstack-labs/leapsql/internal/ui/features/database"
 	graphFeature "github.com/leapstack-labs/leapsql/internal/ui/features/graph"
 	homeFeature "github.com/leapstack-labs/leapsql/internal/ui/features/home"
+	macrosFeature "github.com/leapstack-labs/leapsql/internal/ui/features/macros"
 	modelsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/models"
 	runsFeature "github.com/leapstack-labs/leapsql/internal/ui/features/runs"
 	statequeryFeature "github.com/leapstack-labs/leapsql/internal/ui/features/statequery"
@@ -59,6 +60,10 @@ func SetupRoutes(
 	}
 
 	if err := statequeryFeature.SetupRoutes(router, store, sessionStore, notify, isDev); err != nil {
+		return err
+	}
+
+	if err := macrosFeature.SetupRoutes(router, eng, store, sessionStore, notify, isDev); err != nil {
 		return err
 	}
 

@@ -1,0 +1,28 @@
+package macros
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+)
+
+// MacrosPage renders the macros catalog page with full content.
+// sseUpdatePath is "/macros/updates" or "/macros/{ns}/{fn}/updates" depending on selection.
+// AppShell provides id="app" for datastar patching.
+templ MacrosPage(title string, isDev bool, sidebar common.SidebarData, macrosData *ViewData, sseUpdatePath string) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ fmt.Sprintf("@get('%s')", sseUpdatePath) }>
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+				@MacrosContent(macrosData)
+			}
+		</div>
+	}
+}
+
+// MacrosAppShell renders just the app shell with macros content (for SSE updates).
+templ MacrosAppShell(sidebar common.SidebarData, macrosData *ViewData) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+		@MacrosContent(macrosData)
+	}
+}

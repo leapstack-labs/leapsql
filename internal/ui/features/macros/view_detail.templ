@@ -1,0 +1,75 @@
+package macros
+
+// MacroFunctionDetailPanel renders the full function detail view.
+templ MacroFunctionDetailPanel(fn *FunctionDetail) {
+	<div class="macro-detail">
+		@MacroBreadcrumb(fn.Namespace, fn.Name)
+		
+		<div class="macro-detail__signature">
+			<code>{ fn.Namespace }.{ fn.Signature }</code>
+		</div>
+		
+		if len(fn.Args) > 0 {
+			<div class="macro-detail__section">
+				<h4>Arguments</h4>
+				<table class="macro-detail__args">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Required</th>
+							<th>Default</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, arg := range fn.Args {
+							<tr>
+								<td><code>{ arg.Name }</code></td>
+								<td>
+									if arg.Required {
+										<span class="macro-detail__required">Yes</span>
+									} else {
+										<span class="text-muted">No</span>
+									}
+								</td>
+								<td>
+									if arg.Default != "" {
+										<code>{ arg.Default }</code>
+									} else {
+										<span class="text-muted">-</span>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		
+		if fn.Docstring != "" {
+			<div class="macro-detail__section">
+				<h4>Description</h4>
+				<p class="macro-detail__docstring">{ fn.Docstring }</p>
+			</div>
+		}
+		
+		<div class="macro-detail__section">
+			<h4>Source</h4>
+			<pre class="macro-detail__source"><code>{ fn.SourceCode }</code></pre>
+		</div>
+		
+		<div class="macro-detail__location">
+			<span class="text-muted">{ fn.FilePath }:{ itoa(fn.Line) }</span>
+		</div>
+	</div>
+}
+
+// MacroBreadcrumb renders navigation breadcrumb.
+templ MacroBreadcrumb(namespace, function string) {
+	<nav class="macro-breadcrumb">
+		<a href="/macros" class="macro-breadcrumb__item">Macros</a>
+		<span class="macro-breadcrumb__separator">/</span>
+		<span class="macro-breadcrumb__item">{ namespace }</span>
+		<span class="macro-breadcrumb__separator">/</span>
+		<span class="macro-breadcrumb__item macro-breadcrumb__item--current">{ function }</span>
+	</nav>
+}

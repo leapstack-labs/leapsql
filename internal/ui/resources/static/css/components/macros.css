@@ -1,0 +1,273 @@
+/* css/components/macros.css - Macros Catalog Styles */
+
+/* Page Layout - Two Panel */
+.macros-page {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.macros-page__sidebar {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.macros-page__header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.macros-page__header h1 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.macros-page__detail {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* Namespace Tree */
+.macro-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.macro-namespace {
+  margin-bottom: 4px;
+}
+
+.macro-namespace > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.macro-namespace > summary::-webkit-details-marker {
+  display: none;
+}
+
+.macro-namespace__header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  gap: 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.macro-namespace__header:hover {
+  background: var(--muted);
+}
+
+.macro-namespace__icon {
+  width: 16px;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+}
+
+.macro-namespace__icon::before {
+  content: "+";
+}
+
+.macro-namespace[open] > .macro-namespace__header .macro-namespace__icon::before {
+  content: "-";
+}
+
+.macro-namespace__name {
+  flex: 1;
+}
+
+.macro-namespace__count {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.macro-namespace__functions {
+  margin-left: 16px;
+  border-left: 1px solid var(--border);
+  padding-left: 4px;
+}
+
+/* Function Item */
+.macro-function {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+
+.macro-function:hover {
+  background: var(--muted);
+}
+
+.macro-function--selected {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.macro-function__name {
+  flex: 1;
+}
+
+.macro-function__doc-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.macro-function--selected .macro-function__doc-indicator {
+  background: var(--primary-foreground);
+}
+
+/* Function Detail */
+.macro-detail {
+  max-width: 800px;
+}
+
+.macro-detail__signature {
+  margin-bottom: 24px;
+}
+
+.macro-detail__signature code {
+  font-size: 18px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  background: var(--muted);
+  padding: 8px 16px;
+  border-radius: var(--radius, 6px);
+  display: inline-block;
+}
+
+.macro-detail__section {
+  margin-bottom: 24px;
+}
+
+.macro-detail__section h4 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin: 0 0 12px 0;
+}
+
+.macro-detail__args {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.macro-detail__args th,
+.macro-detail__args td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.macro-detail__args th {
+  font-weight: 500;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.macro-detail__args code {
+  font-family: var(--font-mono);
+  background: var(--muted);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.macro-detail__required {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.macro-detail__docstring {
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+.macro-detail__source {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.macro-detail__source code {
+  font-family: inherit;
+}
+
+.macro-detail__location {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* Breadcrumb */
+.macro-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.macro-breadcrumb__item {
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+
+.macro-breadcrumb__item:hover {
+  color: var(--foreground);
+}
+
+.macro-breadcrumb__item--current {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.macro-breadcrumb__separator {
+  color: var(--muted-foreground);
+}
+
+/* Empty State */
+.macros-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+.macros-empty p {
+  margin: 4px 0;
+}
+
+.text-sm {
+  font-size: 12px;
+}
