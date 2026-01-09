@@ -32,6 +32,7 @@ leapsql dag
 | `--macros-dir` |  |  | Path to macros directory |
 | `--models-dir` |  |  | Path to models directory |
 | `--output` | -o |  | Output format (auto\|text\|markdown\|json) |
+| `--project-dir` | -C |  | Project root directory (auto-detected from models-dir or config file location) |
 | `--seeds-dir` |  |  | Path to seeds directory |
 | `--state` |  |  | Path to state database |
 | `--target` | -t |  | Target environment to use (e.g., dev, staging, prod) |

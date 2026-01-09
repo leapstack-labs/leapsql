@@ -28,17 +28,18 @@ leapsql <command> [options]
 | [`completion`](/cli/completion) | Generate shell completion scripts |
 | [`dag`](/cli/dag) | Show the dependency graph |
 | [`discover`](/cli/discover) | Index macros and models for IDE features |
-| [`docs`](/cli/docs) | Generate and serve documentation site |
 | [`doctor`](/cli/doctor) | Run a comprehensive project health check |
 | [`init`](/cli/init) | Initialize a new LeapSQL project |
 | [`lineage`](/cli/lineage) | Show lineage for a model |
 | [`lint`](/cli/lint) | Run lint rules on SQL models |
 | [`list`](/cli/list) | List all models and their dependencies |
 | [`lsp`](/cli/lsp) | Start the Language Server Protocol server |
+| [`query`](/cli/query) | Query the state database |
 | [`render`](/cli/render) | Render SQL for a model with templates expanded |
 | [`rules`](/cli/rules) | List available lint rules |
 | [`run`](/cli/run) | Run all models or specific models |
 | [`seed`](/cli/seed) | Load seed data from CSV files |
+| [`ui`](/cli/ui) | Start the LeapSQL development UI |
 | [`version`](/cli/version) | Show version information |
 
 ## Global Options
@@ -53,6 +54,7 @@ These flags are available for all commands:
 | `--macros-dir` |  |  | Path to macros directory |
 | `--models-dir` |  |  | Path to models directory |
 | `--output` | -o |  | Output format (auto\|text\|markdown\|json) |
+| `--project-dir` | -C |  | Project root directory (auto-detected from models-dir or config file location) |
 | `--seeds-dir` |  |  | Path to seeds directory |
 | `--state` |  |  | Path to state database |
 | `--target` | -t |  | Target environment to use (e.g., dev, staging, prod) |
@@ -89,6 +91,5 @@ leapsql --help
 
 # Command-specific help
 leapsql run --help
-leapsql docs --help
 ```
 
