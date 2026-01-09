@@ -1,0 +1,41 @@
+package models
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// DataPreviewTable renders the data preview table.
+templ DataPreviewTable(preview *PreviewData) {
+	<div class="data-preview">
+		<div class="data-preview__header">
+			<span class="data-preview__count">
+				{ common.Itoa(preview.RowCount) } rows
+				if preview.Limited {
+					(limited to 50)
+				}
+			</span>
+		</div>
+		if len(preview.Columns) > 0 {
+			<div class="data-preview__table-wrapper">
+				<table class="data-preview__table">
+					<thead>
+						<tr>
+							for _, col := range preview.Columns {
+								<th>{ col }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range preview.Rows {
+							<tr>
+								for _, cell := range row {
+									<td>{ cell }</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}

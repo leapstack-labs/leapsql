@@ -20,7 +20,7 @@ func SetupRoutes(
 ) error {
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	router.Get("/", handlers.HomePage)
+	router.Get("/", handlers.HandleHomePage)
 	router.Get("/updates", handlers.HomePageUpdates)
 
 	return nil

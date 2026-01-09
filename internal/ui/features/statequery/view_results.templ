@@ -1,0 +1,55 @@
+package statequery
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// QueryResults renders the query execution results.
+templ QueryResults(result QueryResult) {
+	<div id="query-results" class="query-results">
+		if result.Error != "" {
+			<div class="query-results__error">
+				<span class="query-results__error-icon">x</span>
+				<span class="query-results__error-message">{ result.Error }</span>
+			</div>
+		} else if result.RowCount == 0 && len(result.Columns) == 0 {
+			<div class="query-results__empty">
+				<p class="text-muted">Enter a query and press Execute</p>
+			</div>
+		} else if result.RowCount == 0 {
+			<div class="query-results__empty">
+				<p>(0 rows)</p>
+			</div>
+		} else {
+			<div class="query-results__header">
+				<span class="query-results__count">
+					{ common.Itoa(result.RowCount) } rows
+					if result.Truncated {
+						<span class="query-results__truncated">(limited to 1000)</span>
+					}
+				</span>
+				<span class="query-results__time">{ common.Itoa(int(result.QueryMS)) }ms</span>
+			</div>
+			<div class="query-results__table-wrapper">
+				<table class="query-results__table">
+					<thead>
+						<tr>
+							for _, col := range result.Columns {
+								<th>{ col }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range result.Rows {
+							<tr>
+								for _, cell := range row {
+									<td title={ cell }>{ cell }</td>
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}

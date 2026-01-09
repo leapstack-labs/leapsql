@@ -6,8 +6,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/home/pages"
-	hometypes "github.com/leapstack-labs/leapsql/internal/ui/features/home/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -33,15 +31,15 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// HomePage renders the home page with full content.
-func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
+// HandleHomePage renders the home page with full content.
+func (h *Handlers) HandleHomePage(w http.ResponseWriter, r *http.Request) {
 	sidebar, stats, err := h.buildDashboardData()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := pages.HomePage("Dashboard", h.isDev, sidebar, stats).Render(r.Context(), w); err != nil {
+	if err := HomePage("Dashboard", h.isDev, sidebar, stats).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -77,11 +75,11 @@ func (h *Handlers) sendDashboardView(sse *datastar.ServerSentEventGenerator) err
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(pages.HomeAppShell(sidebar, stats))
+	return sse.PatchElementTempl(HomeAppShell(sidebar, stats))
 }
 
 // buildDashboardData assembles all data needed for the dashboard view.
-func (h *Handlers) buildDashboardData() (common.SidebarData, *hometypes.DashboardStats, error) {
+func (h *Handlers) buildDashboardData() (common.SidebarData, *DashboardStats, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/",
 		FullWidth:   false,
@@ -95,7 +93,7 @@ func (h *Handlers) buildDashboardData() (common.SidebarData, *hometypes.Dashboar
 	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
 	// Get stats for dashboard
-	stats := &hometypes.DashboardStats{
+	stats := &DashboardStats{
 		ModelCount: len(models),
 	}
 

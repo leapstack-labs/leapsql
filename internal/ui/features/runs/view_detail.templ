@@ -1,0 +1,83 @@
+package runs
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// RunDetailWithTiersView renders the full detail view with tiered model runs.
+templ RunDetailWithTiersView(run *RunDetailWithTiers) {
+	<div class="run-detail-tiered">
+		@RunDetailHeader(run)
+		@RunSummaryBar(run.Stats)
+		<div class="run-detail-tiered__tiers">
+			for _, tier := range run.Tiers {
+				@TierGroupView(tier)
+			}
+		</div>
+		if run.Error != "" {
+			<div class="run-detail-tiered__error">
+				<strong>Error:</strong> { run.Error }
+			</div>
+		}
+	</div>
+}
+
+// RunDetailHeader renders the full header for a selected run.
+templ RunDetailHeader(run *RunDetailWithTiers) {
+	<div class="run-detail-header">
+		<div class="run-detail-header__title">
+			@StatusIcon(run.Status, "lg")
+			<span class="run-detail-header__label">Run { truncateID(run.ID) }</span>
+			<span class={ "run-status", runStatusBadgeClass(run.Status) }>{ run.Status }</span>
+		</div>
+		<div class="run-detail-header__meta">
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Environment:</span>
+				<span class="run-detail-header__value">{ run.Environment }</span>
+			</span>
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Started:</span>
+				<span class="run-detail-header__value">{ run.StartedAt }</span>
+			</span>
+			<span class="run-detail-header__item">
+				<span class="run-detail-header__key">Duration:</span>
+				<span class="run-detail-header__value">{ run.Duration }</span>
+			</span>
+		</div>
+		if run.Status == "running" {
+			<div class="run-detail-header__progress">
+				<div class="run-detail-header__progress-bar run-detail-header__progress-bar--running"></div>
+			</div>
+		}
+	</div>
+}
+
+// RunSummaryBar renders the horizontal status summary bar.
+templ RunSummaryBar(stats RunStats) {
+	<div class="run-summary-bar">
+		<span class="run-summary-bar__item run-summary-bar__item--success">
+			@StatusIcon("success", "sm")
+			<span>{ common.Itoa(stats.Succeeded) } succeeded</span>
+		</span>
+		<span class="run-summary-bar__item run-summary-bar__item--failed">
+			@StatusIcon("failed", "sm")
+			<span>{ common.Itoa(stats.Failed) } failed</span>
+		</span>
+		<span class="run-summary-bar__item run-summary-bar__item--skipped">
+			@StatusIcon("skipped", "sm")
+			<span>{ common.Itoa(stats.Skipped) } skipped</span>
+		</span>
+		if stats.Running > 0 {
+			<span class="run-summary-bar__item run-summary-bar__item--running">
+				@StatusIcon("running", "sm")
+				<span>{ common.Itoa(stats.Running) } running</span>
+			</span>
+		}
+		if stats.Pending > 0 {
+			<span class="run-summary-bar__item run-summary-bar__item--pending">
+				@StatusIcon("pending", "sm")
+				<span>{ common.Itoa(stats.Pending) } pending</span>
+			</span>
+		}
+	</div>
+}

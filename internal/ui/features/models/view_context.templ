@@ -1,0 +1,79 @@
+package models
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// ContextPanel renders the context panel sidebar.
+templ ContextPanel(mctx *ModelContext) {
+	<aside class="ui-context-panel">
+		<div class="ui-context-panel__header">Properties</div>
+		<div id="context-content">
+			if mctx != nil {
+				@ModelContextContent(*mctx)
+			} else {
+				<p class="text-muted">Select a model to view details</p>
+			}
+		</div>
+	</aside>
+}
+
+// ModelContextContent renders the model context content.
+templ ModelContextContent(mctx ModelContext) {
+	<div class="model-context">
+		<div class="model-context__section">
+			<div class="model-context__label">Model</div>
+			<div class="model-context__value">{ mctx.Name }</div>
+		</div>
+		<div class="model-context__section">
+			<div class="model-context__label">Type</div>
+			<div class="model-context__value">{ common.MaterializationLabel(mctx.Type) }</div>
+		</div>
+		if mctx.Schema != "" {
+			<div class="model-context__section">
+				<div class="model-context__label">Schema</div>
+				<div class="model-context__value">{ mctx.Schema }</div>
+			</div>
+		}
+		if len(mctx.DependsOn) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Depends On</div>
+				<ul class="model-context__list">
+					for _, dep := range mctx.DependsOn {
+						<li>
+							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if len(mctx.Dependents) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Dependents</div>
+				<ul class="model-context__list">
+					for _, dep := range mctx.Dependents {
+						<li>
+							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if len(mctx.Columns) > 0 {
+			<div class="model-context__section">
+				<div class="model-context__label">Columns ({ common.Itoa(len(mctx.Columns)) })</div>
+				<ul class="model-context__columns">
+					for _, col := range mctx.Columns {
+						<li class="model-context__column">
+							<span class="model-context__column-name">{ col.Name }</span>
+							if col.Type != "" {
+								<span class="model-context__column-type">{ col.Type }</span>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
+	</div>
+}

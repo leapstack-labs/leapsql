@@ -1,0 +1,28 @@
+package statequery
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/starfederation/datastar-go/datastar"
+)
+
+// QueryPage renders the query page with full content.
+// SSE is used only for live updates, not initial content.
+// AppShell provides id="app" for datastar patching.
+templ QueryPage(title string, isDev bool, sidebar common.SidebarData, queryData *QueryViewData) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ datastar.GetSSE("/query/updates") }>
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+				@QueryContent(queryData)
+			}
+		</div>
+	}
+}
+
+// QueryAppShell renders just the app shell with query content (for SSE updates).
+templ QueryAppShell(sidebar common.SidebarData, queryData *QueryViewData) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+		@QueryContent(queryData)
+	}
+}

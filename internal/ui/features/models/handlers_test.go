@@ -85,7 +85,7 @@ func TestModelPage(t *testing.T) {
 			req = features.RequestWithPathParam(req, "path", tt.modelPath)
 			rec := httptest.NewRecorder()
 
-			h.ModelPage(rec, req)
+			h.HandleModelPage(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			body := rec.Body.String()
@@ -118,7 +118,7 @@ func TestModelPage_FullContent(t *testing.T) {
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
 	rec := httptest.NewRecorder()
 
-	h.ModelPage(rec, req)
+	h.HandleModelPage(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
@@ -270,7 +270,7 @@ func TestModelPage_ContextPanel(t *testing.T) {
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
 	rec := httptest.NewRecorder()
 
-	h.ModelPage(rec, req)
+	h.HandleModelPage(rec, req)
 
 	body := rec.Body.String()
 
@@ -299,7 +299,7 @@ func TestModelPage_CompiledSQL(t *testing.T) {
 	req = features.RequestWithPathParam(req, "path", "staging.customers")
 	rec := httptest.NewRecorder()
 
-	h.ModelPage(rec, req)
+	h.HandleModelPage(rec, req)
 
 	body := rec.Body.String()
 

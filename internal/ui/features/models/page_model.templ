@@ -1,0 +1,28 @@
+package models
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+)
+
+// ModelPage renders the model detail page with full content.
+// SSE is used only for live updates, not initial content.
+// AppShellWithContext provides id="app" for datastar patching.
+templ ModelPage(title string, isDev bool, sidebar common.SidebarData, modelData *ModelViewData, contextData *ModelContext, updatePath string) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ fmt.Sprintf("@get('%s')", updatePath) }>
+			@components.AppShellWithContext(sidebar.ExplorerTree, sidebar.CurrentPath, ContextPanel(contextData)) {
+				@ModelContent(modelData)
+			}
+		</div>
+	}
+}
+
+// ModelAppShell renders just the app shell with model content (for SSE updates).
+templ ModelAppShell(sidebar common.SidebarData, modelData *ModelViewData, contextData *ModelContext) {
+	@components.AppShellWithContext(sidebar.ExplorerTree, sidebar.CurrentPath, ContextPanel(contextData)) {
+		@ModelContent(modelData)
+	}
+}

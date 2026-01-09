@@ -19,7 +19,7 @@ func SetupRoutes(
 	handlers := NewHandlers(store, sessionStore, notify, isDev)
 
 	// Page routes (full page render with content)
-	router.Get("/query", handlers.QueryPage)
+	router.Get("/query", handlers.HandleQueryPage)
 
 	// SSE routes (live updates only)
 	router.Get("/query/updates", handlers.QueryPageUpdates)

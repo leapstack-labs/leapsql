@@ -9,8 +9,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/models/pages"
-	modelstypes "github.com/leapstack-labs/leapsql/internal/ui/features/models/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -36,8 +34,8 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// ModelPage renders the model detail page with full content.
-func (h *Handlers) ModelPage(w http.ResponseWriter, r *http.Request) {
+// HandleModelPage renders the model detail page with full content.
+func (h *Handlers) HandleModelPage(w http.ResponseWriter, r *http.Request) {
 	modelPath := chi.URLParam(r, "path")
 
 	sidebar, modelData, contextData, err := h.buildModelData(modelPath)
@@ -53,7 +51,7 @@ func (h *Handlers) ModelPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatePath := "/models/" + modelPath + "/updates"
-	if err := pages.ModelPage(title, h.isDev, sidebar, modelData, contextData, updatePath).Render(r.Context(), w); err != nil {
+	if err := ModelPage(title, h.isDev, sidebar, modelData, contextData, updatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -90,11 +88,11 @@ func (h *Handlers) sendModelView(sse *datastar.ServerSentEventGenerator, modelPa
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(pages.ModelAppShell(sidebar, modelData, contextData))
+	return sse.PatchElementTempl(ModelAppShell(sidebar, modelData, contextData))
 }
 
 // buildModelData assembles all data needed for the model view.
-func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *modelstypes.ModelViewData, *modelstypes.ModelContext, error) {
+func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *ModelViewData, *ModelContext, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/models/" + modelPath,
 		FullWidth:   false,
@@ -107,8 +105,8 @@ func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *models
 	}
 	sidebar.ExplorerTree = common.BuildExplorerTree(models)
 
-	var modelData *modelstypes.ModelViewData
-	var contextData *modelstypes.ModelContext
+	var modelData *ModelViewData
+	var contextData *ModelContext
 
 	// Get model details if path specified
 	if modelPath != "" {
@@ -133,8 +131,8 @@ func (h *Handlers) buildModelData(modelPath string) (common.SidebarData, *models
 }
 
 // buildModelViewData builds the model view with all tabs pre-rendered.
-func (h *Handlers) buildModelViewData(model *core.PersistedModel) modelstypes.ModelViewData {
-	data := modelstypes.ModelViewData{
+func (h *Handlers) buildModelViewData(model *core.PersistedModel) ModelViewData {
+	data := ModelViewData{
 		Path:         model.Path,
 		Name:         model.Name,
 		FilePath:     model.FilePath,
@@ -158,12 +156,12 @@ func (h *Handlers) buildModelViewData(model *core.PersistedModel) modelstypes.Mo
 }
 
 // buildModelContext builds the context panel data.
-func (h *Handlers) buildModelContext(model *core.PersistedModel) modelstypes.ModelContext {
+func (h *Handlers) buildModelContext(model *core.PersistedModel) ModelContext {
 	deps, _ := h.store.GetDependencies(model.ID)
 	dependents, _ := h.store.GetDependents(model.ID)
 	columns, _ := h.store.GetModelColumns(model.Path)
 
-	return modelstypes.ModelContext{
+	return ModelContext{
 		Path:       model.Path,
 		Name:       model.Name,
 		Type:       model.Materialized,
@@ -188,14 +186,14 @@ func (h *Handlers) resolveModelNames(ids []string) []string {
 }
 
 // toColumnData converts core.ColumnInfo to component-friendly data.
-func toColumnData(columns []core.ColumnInfo) []modelstypes.ColumnData {
-	result := make([]modelstypes.ColumnData, len(columns))
+func toColumnData(columns []core.ColumnInfo) []ColumnData {
+	result := make([]ColumnData, len(columns))
 	for i, col := range columns {
 		sources := make([]string, len(col.Sources))
 		for j, src := range col.Sources {
 			sources[j] = fmt.Sprintf("%s.%s", src.Table, src.Column)
 		}
-		result[i] = modelstypes.ColumnData{
+		result[i] = ColumnData{
 			Name:    col.Name,
 			Type:    string(col.TransformType),
 			Sources: sources,

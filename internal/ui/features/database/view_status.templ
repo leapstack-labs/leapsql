@@ -1,0 +1,21 @@
+package database
+
+import "github.com/starfederation/datastar-go/datastar"
+
+templ DatabaseStatus(status ConnectionStatus) {
+	<div id="db-status" class="db-status">
+		if status.Connected {
+			<span class="db-status__indicator db-status__indicator--connected"></span>
+			<span class="db-status__text">{ status.DialectName }</span>
+		} else {
+			<span class="db-status__indicator db-status__indicator--disconnected"></span>
+			<span class="db-status__text">{ status.Message }</span>
+		}
+	</div>
+}
+
+templ DatabaseTree() {
+	<div id="database-tree" class="db-tree" data-init={ datastar.GetSSE("/api/database/schemas") }>
+		<p class="text-muted">Loading schemas...</p>
+	</div>
+}

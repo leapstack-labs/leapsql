@@ -34,10 +34,10 @@ func setupTestHandlers(t *testing.T, models ...features.TestModel) (*Handlers, *
 }
 
 // =============================================================================
-// HomePage Tests - Full HTML page responses with server-rendered content
+// HandleHomePage Tests - Full HTML page responses with server-rendered content
 // =============================================================================
 
-func TestHomePage(t *testing.T) {
+func TestHandleHomePage(t *testing.T) {
 	tests := []struct {
 		name       string
 		wantStatus int
@@ -63,7 +63,7 @@ func TestHomePage(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			rec := httptest.NewRecorder()
 
-			h.HomePage(rec, req)
+			h.HandleHomePage(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			body := rec.Body.String()
@@ -74,7 +74,7 @@ func TestHomePage(t *testing.T) {
 	}
 }
 
-func TestHomePage_WithModels(t *testing.T) {
+func TestHandleHomePage_WithModels(t *testing.T) {
 	// Test that models appear in the server-rendered content
 	testModels := []features.TestModel{
 		{
@@ -94,7 +94,7 @@ func TestHomePage_WithModels(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
-	h.HomePage(rec, req)
+	h.HandleHomePage(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
@@ -148,7 +148,7 @@ func TestHomePageUpdates_SendsUpdateOnBroadcast(t *testing.T) {
 	body := rec.Body.String()
 
 	// Should have received at least 1 SSE event from the broadcast
-	// (No initial event - content is server-rendered by HomePage)
+	// (No initial event - content is server-rendered by HandleHomePage)
 	eventCount := strings.Count(body, "event:")
 	assert.GreaterOrEqual(t, eventCount, 1, "should have at least 1 SSE event from broadcast")
 
@@ -158,7 +158,7 @@ func TestHomePageUpdates_SendsUpdateOnBroadcast(t *testing.T) {
 
 func TestHomePageUpdates_NoInitialState(t *testing.T) {
 	// Verify that HomePageUpdates does NOT send initial state
-	// (that's now handled by HomePage's server render)
+	// (that's now handled by HandleHomePage's server render)
 	testModels := []features.TestModel{
 		{Path: "staging.customers", Name: "customers", SQL: "SELECT 1"},
 	}

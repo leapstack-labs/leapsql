@@ -1,0 +1,26 @@
+package database
+
+templ TableDetail(meta TableMeta) {
+	<div id="context-content" class="db-table-detail">
+		<div class="db-table-detail__header">
+			<div class="db-table-detail__name">{ meta.Name }</div>
+			if meta.Schema != "" {
+				<div class="db-table-detail__schema">{ meta.Schema }</div>
+			}
+		</div>
+		<div class="db-table-detail__section">
+			<div class="db-table-detail__label">Columns ({ itoa(len(meta.Columns)) })</div>
+			<ul class="db-table-detail__columns">
+				for _, col := range meta.Columns {
+					<li class="db-table-detail__column">
+						<span class="db-table-detail__column-name">{ col.Name }</span>
+						<span class="db-table-detail__column-type">{ col.Type }</span>
+						if col.Nullable {
+							<span class="db-table-detail__column-nullable">?</span>
+						}
+					</li>
+				}
+			</ul>
+		</div>
+	</div>
+}

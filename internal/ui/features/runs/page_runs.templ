@@ -1,0 +1,28 @@
+package runs
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+)
+
+// RunsPage renders the runs history page with full content.
+// sseUpdatePath is "/runs/updates" or "/runs/{id}/updates" depending on selection.
+// AppShell provides id="app" for datastar patching.
+templ RunsPage(title string, isDev bool, sidebar common.SidebarData, runsData *RunsViewData, sseUpdatePath string) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ fmt.Sprintf("@get('%s')", sseUpdatePath) }>
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+				@RunsContent(runsData)
+			}
+		</div>
+	}
+}
+
+// RunsAppShell renders just the app shell with runs content (for SSE updates).
+templ RunsAppShell(sidebar common.SidebarData, runsData *RunsViewData) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+		@RunsContent(runsData)
+	}
+}

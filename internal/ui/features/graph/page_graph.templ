@@ -1,0 +1,28 @@
+package graph
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/starfederation/datastar-go/datastar"
+)
+
+// GraphPage renders the graph page with full content.
+// SSE is used only for live updates, not initial content.
+// AppShell provides id="app" for datastar patching.
+templ GraphPage(title string, isDev bool, sidebar common.SidebarData, graphData *GraphViewData) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ datastar.GetSSE("/graph/updates") }>
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+				@GraphContent(graphData)
+			}
+		</div>
+	}
+}
+
+// GraphAppShell renders just the app shell with graph content (for SSE updates).
+templ GraphAppShell(sidebar common.SidebarData, graphData *GraphViewData) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, true) {
+		@GraphContent(graphData)
+	}
+}

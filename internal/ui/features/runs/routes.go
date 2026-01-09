@@ -21,8 +21,8 @@ func SetupRoutes(
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	// Page routes - each run is a resource
-	router.Get("/runs", handlers.RunsPage)
-	router.Get("/runs/{id}", handlers.RunsPage)
+	router.Get("/runs", handlers.HandleRunsPage)
+	router.Get("/runs/{id}", handlers.HandleRunsPage)
 
 	// SSE routes - live updates for both list and detail views
 	router.Get("/runs/updates", handlers.RunsPageUpdates)

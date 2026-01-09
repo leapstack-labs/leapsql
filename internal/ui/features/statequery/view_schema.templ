@@ -1,0 +1,28 @@
+package statequery
+
+// SchemaPanel renders the schema panel.
+templ SchemaPanel(schema SchemaData) {
+	<div id="query-schema-panel" class="query-sidebar__schema">
+		<div class="schema-panel__header">
+			<span class="schema-panel__type">{ schema.Type }</span>
+			<span class="schema-panel__name">{ schema.Name }</span>
+		</div>
+		if len(schema.Columns) > 0 {
+			<ul class="schema-panel__columns">
+				for _, col := range schema.Columns {
+					<li class="schema-panel__column">
+						<span class="schema-panel__col-name">
+							{ col.Name }
+							if col.IsPK {
+								<span class="schema-panel__pk">PK</span>
+							}
+						</span>
+						<span class="schema-panel__col-type">{ col.Type }</span>
+					</li>
+				}
+			</ul>
+		} else {
+			<p class="text-muted">No columns</p>
+		}
+	</div>
+}

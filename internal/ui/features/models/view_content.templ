@@ -1,0 +1,104 @@
+package models
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// ModelContent wraps ModelView with nil check
+templ ModelContent(data *ModelViewData) {
+	if data != nil {
+		@ModelView(data)
+	} else {
+		<div class="model-detail model-detail--empty">
+			<h2>Model Not Found</h2>
+			<p class="text-muted">The requested model does not exist.</p>
+		</div>
+	}
+}
+
+// ModelView renders the model detail view.
+templ ModelView(data *ModelViewData) {
+	<div class="model-detail" data-signals="{view: 'source'}">
+		// Header
+		<div class="model-detail__header">
+			<h2 class="model-detail__title">{ data.Name }</h2>
+			<span class="model-detail__path">{ data.Path }</span>
+		</div>
+		
+		if data.Description != "" {
+			<p class="model-detail__description">{ data.Description }</p>
+		}
+		
+		// Metadata badges
+		<div class="model-detail__meta">
+			<span class="model-detail__badge">{ common.MaterializationLabel(data.Materialized) }</span>
+			if data.Schema != "" {
+				<span class="model-detail__schema">{ data.Schema }</span>
+			}
+			if data.Owner != "" {
+				<span class="model-detail__owner">Owner: { data.Owner }</span>
+			}
+		</div>
+		
+		if len(data.Tags) > 0 {
+			<div class="model-detail__tags">
+				for _, tag := range data.Tags {
+					<span class="model-detail__tag">{ tag }</span>
+				}
+			</div>
+		}
+		
+		// Tab buttons
+		<div class="model-detail__tabs">
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'source'"
+				data-class:tab-btn--active="$view === 'source'"
+			>
+				Source SQL
+			</button>
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'compiled'"
+				data-class:tab-btn--active="$view === 'compiled'"
+			>
+				Compiled SQL
+			</button>
+			<button 
+				class="tab-btn"
+				data-on:click="$view = 'preview'"
+				data-class:tab-btn--active="$view === 'preview'"
+			>
+				Preview Data
+			</button>
+		</div>
+		
+		// Tab content
+		<div class="model-detail__content">
+			// Source SQL tab
+			<div data-show="$view === 'source'">
+				<pre class="sql-code"><code>{ data.SourceSQL }</code></pre>
+			</div>
+			
+			// Compiled SQL tab
+			<div data-show="$view === 'compiled'">
+				if data.CompileError != "" {
+					<div class="error-message">{ data.CompileError }</div>
+				} else {
+					<pre class="sql-code"><code>{ data.CompiledSQL }</code></pre>
+				}
+			</div>
+			
+			// Preview tab
+			<div data-show="$view === 'preview'">
+				if data.PreviewError != "" {
+					<div class="error-message">{ data.PreviewError }</div>
+				} else if data.Preview != nil {
+					@DataPreviewTable(data.Preview)
+				} else {
+					<p class="text-muted">Run the model to preview data</p>
+				}
+			</div>
+		</div>
+	</div>
+}

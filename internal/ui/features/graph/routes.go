@@ -20,7 +20,7 @@ func SetupRoutes(
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	// Page route (full page render with content)
-	router.Get("/graph", handlers.GraphPage)
+	router.Get("/graph", handlers.HandleGraphPage)
 
 	// SSE route (live updates only)
 	router.Get("/graph/updates", handlers.GraphPageUpdates)

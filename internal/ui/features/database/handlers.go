@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/database/components"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -37,11 +36,11 @@ func (h *Handlers) StatusSSE(w http.ResponseWriter, r *http.Request) {
 
 	adapter := h.engine.GetAdapter()
 	if adapter == nil {
-		status := components.ConnectionStatus{
+		status := ConnectionStatus{
 			Connected: false,
 			Message:   "No database configured",
 		}
-		if err := sse.PatchElementTempl(components.DatabaseStatus(status)); err != nil {
+		if err := sse.PatchElementTempl(DatabaseStatus(status)); err != nil {
 			_ = sse.ConsoleError(err)
 		}
 		return
@@ -49,24 +48,24 @@ func (h *Handlers) StatusSSE(w http.ResponseWriter, r *http.Request) {
 
 	// Try to ensure connection
 	if err := h.engine.EnsureConnected(r.Context()); err != nil {
-		status := components.ConnectionStatus{
+		status := ConnectionStatus{
 			Connected: false,
 			Message:   fmt.Sprintf("Connection failed: %v", err),
 		}
-		if err := sse.PatchElementTempl(components.DatabaseStatus(status)); err != nil {
+		if err := sse.PatchElementTempl(DatabaseStatus(status)); err != nil {
 			_ = sse.ConsoleError(err)
 		}
 		return
 	}
 
 	dialectCfg := adapter.DialectConfig()
-	status := components.ConnectionStatus{
+	status := ConnectionStatus{
 		Connected:   true,
 		DialectName: dialectCfg.Name,
 		Message:     "Connected",
 	}
 
-	if err := sse.PatchElementTempl(components.DatabaseStatus(status)); err != nil {
+	if err := sse.PatchElementTempl(DatabaseStatus(status)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
@@ -92,7 +91,7 @@ func (h *Handlers) SchemasSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := sse.PatchElementTempl(components.SchemaList(schemas)); err != nil {
+	if err := sse.PatchElementTempl(SchemaList(schemas)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
@@ -119,7 +118,7 @@ func (h *Handlers) TablesSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := sse.PatchElementTempl(components.TableList(schemaName, tables)); err != nil {
+	if err := sse.PatchElementTempl(TableList(schemaName, tables)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
@@ -152,21 +151,21 @@ func (h *Handlers) TableMetaSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tableMeta := components.TableMeta{
+	tableMeta := TableMeta{
 		Schema:  schemaName,
 		Name:    tableName,
-		Columns: make([]components.ColumnMeta, len(meta.Columns)),
+		Columns: make([]ColumnMeta, len(meta.Columns)),
 	}
 
 	for i, col := range meta.Columns {
-		tableMeta.Columns[i] = components.ColumnMeta{
+		tableMeta.Columns[i] = ColumnMeta{
 			Name:     col.Name,
 			Type:     col.Type,
 			Nullable: col.Nullable,
 		}
 	}
 
-	if err := sse.PatchElementTempl(components.TableDetail(tableMeta)); err != nil {
+	if err := sse.PatchElementTempl(TableDetail(tableMeta)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
@@ -174,7 +173,7 @@ func (h *Handlers) TableMetaSSE(w http.ResponseWriter, r *http.Request) {
 // listSchemas queries the database for available schemas.
 func (h *Handlers) listSchemas(ctx context.Context, adapter interface {
 	Query(ctx context.Context, sql string) (*core.Rows, error)
-}) ([]components.SchemaInfo, error) {
+}) ([]SchemaInfo, error) {
 	// Use information_schema for standard SQL databases
 	// DuckDB also supports this
 	query := `
@@ -187,11 +186,11 @@ func (h *Handlers) listSchemas(ctx context.Context, adapter interface {
 	rows, err := adapter.Query(ctx, query)
 	if err != nil {
 		// Fallback for databases that don't support information_schema
-		return []components.SchemaInfo{{Name: "main"}}, nil
+		return []SchemaInfo{{Name: "main"}}, nil
 	}
 	defer func() { _ = rows.Close() }()
 
-	var schemas []components.SchemaInfo
+	var schemas []SchemaInfo
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
@@ -201,12 +200,12 @@ func (h *Handlers) listSchemas(ctx context.Context, adapter interface {
 		if strings.TrimSpace(name) == "" {
 			continue
 		}
-		schemas = append(schemas, components.SchemaInfo{Name: name})
+		schemas = append(schemas, SchemaInfo{Name: name})
 	}
 
 	// If no schemas found, return default "main"
 	if len(schemas) == 0 {
-		schemas = []components.SchemaInfo{{Name: "main"}}
+		schemas = []SchemaInfo{{Name: "main"}}
 	}
 
 	return schemas, nil
@@ -215,7 +214,7 @@ func (h *Handlers) listSchemas(ctx context.Context, adapter interface {
 // listTables queries the database for tables in a schema.
 func (h *Handlers) listTables(ctx context.Context, adapter interface {
 	Query(ctx context.Context, sql string) (*core.Rows, error)
-}, schemaName string) ([]components.TableInfo, error) {
+}, schemaName string) ([]TableInfo, error) {
 	query := fmt.Sprintf(`
 		SELECT table_name, table_type
 		FROM information_schema.tables 
@@ -229,13 +228,13 @@ func (h *Handlers) listTables(ctx context.Context, adapter interface {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var tables []components.TableInfo
+	var tables []TableInfo
 	for rows.Next() {
 		var name, tableType string
 		if err := rows.Scan(&name, &tableType); err != nil {
 			continue
 		}
-		tables = append(tables, components.TableInfo{
+		tables = append(tables, TableInfo{
 			Name: name,
 			Type: normalizeTableType(tableType),
 		})

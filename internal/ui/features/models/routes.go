@@ -21,7 +21,7 @@ func SetupRoutes(
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
 	// Page routes (full page render with content)
-	router.Get("/models/{path}", handlers.ModelPage)
+	router.Get("/models/{path}", handlers.HandleModelPage)
 
 	// SSE routes (live updates only)
 	router.Get("/models/{path}/updates", handlers.ModelPageUpdates)

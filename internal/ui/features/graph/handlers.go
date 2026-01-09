@@ -9,8 +9,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/graph/pages"
-	graphtypes "github.com/leapstack-labs/leapsql/internal/ui/features/graph/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -36,15 +34,15 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// GraphPage renders the graph visualization page with full content.
-func (h *Handlers) GraphPage(w http.ResponseWriter, r *http.Request) {
+// HandleGraphPage renders the graph visualization page with full content.
+func (h *Handlers) HandleGraphPage(w http.ResponseWriter, r *http.Request) {
 	sidebar, graphData, err := h.buildGraphData()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := pages.GraphPage("DAG", h.isDev, sidebar, graphData).Render(r.Context(), w); err != nil {
+	if err := GraphPage("DAG", h.isDev, sidebar, graphData).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -79,11 +77,11 @@ func (h *Handlers) sendGraphView(sse *datastar.ServerSentEventGenerator) error {
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(pages.GraphAppShell(sidebar, graphData))
+	return sse.PatchElementTempl(GraphAppShell(sidebar, graphData))
 }
 
 // buildGraphData assembles all data needed for the graph view.
-func (h *Handlers) buildGraphData() (common.SidebarData, *graphtypes.GraphViewData, error) {
+func (h *Handlers) buildGraphData() (common.SidebarData, *GraphViewData, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/graph",
 		FullWidth:   true,
@@ -105,7 +103,7 @@ func (h *Handlers) buildGraphData() (common.SidebarData, *graphtypes.GraphViewDa
 }
 
 // buildFullGraphData creates graph view data from all models and their dependencies.
-func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) graphtypes.GraphViewData {
+func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) GraphViewData {
 	// Create a map for quick lookup
 	modelMap := make(map[string]*core.PersistedModel)
 	for _, m := range models {
@@ -113,9 +111,9 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) graphtypes.
 	}
 
 	// Build nodes
-	nodes := make([]graphtypes.GraphNode, 0, len(models))
+	nodes := make([]GraphNode, 0, len(models))
 	for _, m := range models {
-		nodes = append(nodes, graphtypes.GraphNode{
+		nodes = append(nodes, GraphNode{
 			ID:    m.Path,
 			Label: m.Name,
 			Type:  nodeType(m),
@@ -128,7 +126,7 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) graphtypes.
 	})
 
 	// Build edges from dependencies
-	edges := make([]graphtypes.GraphEdge, 0)
+	edges := make([]GraphEdge, 0)
 	for _, m := range models {
 		deps, err := h.store.GetDependencies(m.ID)
 		if err != nil {
@@ -139,14 +137,14 @@ func (h *Handlers) buildFullGraphData(models []*core.PersistedModel) graphtypes.
 			if !ok {
 				continue
 			}
-			edges = append(edges, graphtypes.GraphEdge{
+			edges = append(edges, GraphEdge{
 				Source: depModel.Path,
 				Target: m.Path,
 			})
 		}
 	}
 
-	return graphtypes.GraphViewData{
+	return GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}
@@ -166,7 +164,7 @@ func (h *Handlers) FullGraphSSE(w http.ResponseWriter, r *http.Request) {
 	// Build graph data
 	graphData := h.buildFullGraphData(models)
 
-	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
+	if err := sse.PatchElementTempl(GraphView(graphData)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
@@ -186,18 +184,18 @@ func (h *Handlers) ModelGraphSSE(w http.ResponseWriter, r *http.Request) {
 	// Build neighborhood graph
 	graphData := h.buildModelNeighborhood(model)
 
-	if err := sse.PatchElementTempl(pages.GraphView(graphData)); err != nil {
+	if err := sse.PatchElementTempl(GraphView(graphData)); err != nil {
 		_ = sse.ConsoleError(err)
 	}
 }
 
 // buildModelNeighborhood creates graph data for a model and its immediate neighbors.
-func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) graphtypes.GraphViewData {
-	nodeSet := make(map[string]graphtypes.GraphNode)
-	edges := make([]graphtypes.GraphEdge, 0)
+func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) GraphViewData {
+	nodeSet := make(map[string]GraphNode)
+	edges := make([]GraphEdge, 0)
 
 	// Add the center model
-	nodeSet[model.Path] = graphtypes.GraphNode{
+	nodeSet[model.Path] = GraphNode{
 		ID:    model.Path,
 		Label: model.Name,
 		Type:  nodeType(model),
@@ -210,12 +208,12 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) graphtypes
 		if err != nil {
 			continue
 		}
-		nodeSet[depModel.Path] = graphtypes.GraphNode{
+		nodeSet[depModel.Path] = GraphNode{
 			ID:    depModel.Path,
 			Label: depModel.Name,
 			Type:  nodeType(depModel),
 		}
-		edges = append(edges, graphtypes.GraphEdge{
+		edges = append(edges, GraphEdge{
 			Source: depModel.Path,
 			Target: model.Path,
 		})
@@ -228,19 +226,19 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) graphtypes
 		if err != nil {
 			continue
 		}
-		nodeSet[depModel.Path] = graphtypes.GraphNode{
+		nodeSet[depModel.Path] = GraphNode{
 			ID:    depModel.Path,
 			Label: depModel.Name,
 			Type:  nodeType(depModel),
 		}
-		edges = append(edges, graphtypes.GraphEdge{
+		edges = append(edges, GraphEdge{
 			Source: model.Path,
 			Target: depModel.Path,
 		})
 	}
 
 	// Convert node set to slice
-	nodes := make([]graphtypes.GraphNode, 0, len(nodeSet))
+	nodes := make([]GraphNode, 0, len(nodeSet))
 	for _, node := range nodeSet {
 		nodes = append(nodes, node)
 	}
@@ -250,7 +248,7 @@ func (h *Handlers) buildModelNeighborhood(model *core.PersistedModel) graphtypes
 		return nodes[i].ID < nodes[j].ID
 	})
 
-	return graphtypes.GraphViewData{
+	return GraphViewData{
 		Nodes: nodes,
 		Edges: edges,
 	}

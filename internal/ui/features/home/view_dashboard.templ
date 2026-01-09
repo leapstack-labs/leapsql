@@ -1,0 +1,18 @@
+package home
+
+import (
+	"fmt"
+)
+
+// DashboardContent renders the dashboard content.
+templ DashboardContent(stats *DashboardStats) {
+	<div id="model-detail">
+		<h1>LeapSQL Dashboard</h1>
+		<div class="stats-grid">
+			<div class="stat-card">
+				<span class="stat-value">{ fmt.Sprint(stats.ModelCount) }</span>
+				<span class="stat-label">Models</span>
+			</div>
+		</div>
+	</div>
+}

@@ -1,0 +1,51 @@
+package statequery
+
+import (
+	"fmt"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+)
+
+// QueryTablesList renders the list of tables and views in the query sidebar.
+templ QueryTablesList(tables, views []TableItem) {
+	<div id="query-sidebar-tables" class="query-sidebar__tables">
+		if len(tables) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Tables ({ common.Itoa(len(tables)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, t := range tables {
+						<li>
+							<button
+								class="query-sidebar__item"
+								data-on:click={ fmt.Sprintf("@get('/api/query/schema/%s')", t.Name) }
+							>
+								<span class="query-sidebar__icon">T</span>
+								{ t.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(views) > 0 {
+			<details class="query-sidebar__group" open>
+				<summary>Views ({ common.Itoa(len(views)) })</summary>
+				<ul class="query-sidebar__list">
+					for _, v := range views {
+						<li>
+							<button
+								class="query-sidebar__item"
+								data-on:click={ fmt.Sprintf("@get('/api/query/schema/%s')", v.Name) }
+							>
+								<span class="query-sidebar__icon">V</span>
+								{ v.Name }
+							</button>
+						</li>
+					}
+				</ul>
+			</details>
+		}
+		if len(tables) == 0 && len(views) == 0 {
+			<p class="text-muted">No tables found</p>
+		}
+	</div>
+}

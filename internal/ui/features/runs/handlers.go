@@ -11,8 +11,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/runs/pages"
-	runstypes "github.com/leapstack-labs/leapsql/internal/ui/features/runs/types"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/starfederation/datastar-go/datastar"
@@ -38,9 +36,9 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 	}
 }
 
-// RunsPage renders the runs history page with full content.
+// HandleRunsPage renders the runs history page with full content.
 // Handles both /runs (no selection) and /runs/{id} (with selection).
-func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HandleRunsPage(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "id") // "" if not present
 
 	sidebar, runsData, err := h.buildRunsDataWithSelection(runID)
@@ -55,7 +53,7 @@ func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
 		sseUpdatePath = fmt.Sprintf("/runs/%s/updates", runID)
 	}
 
-	if err := pages.RunsPage("Run History", h.isDev, sidebar, runsData, sseUpdatePath).Render(r.Context(), w); err != nil {
+	if err := RunsPage("Run History", h.isDev, sidebar, runsData, sseUpdatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -83,7 +81,7 @@ func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 				_ = sse.ConsoleError(err)
 				continue
 			}
-			if err := sse.PatchElementTempl(pages.RunsAppShell(sidebar, runsData)); err != nil {
+			if err := sse.PatchElementTempl(RunsAppShell(sidebar, runsData)); err != nil {
 				_ = sse.ConsoleError(err)
 			}
 		}
@@ -91,7 +89,7 @@ func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildRunsDataWithSelection assembles all data needed for the runs view with optional selected run.
-func (h *Handlers) buildRunsDataWithSelection(selectedRunID string) (common.SidebarData, *runstypes.RunsViewData, error) {
+func (h *Handlers) buildRunsDataWithSelection(selectedRunID string) (common.SidebarData, *RunsViewData, error) {
 	sidebar := common.SidebarData{
 		CurrentPath: "/runs",
 		FullWidth:   true,
@@ -111,7 +109,7 @@ func (h *Handlers) buildRunsDataWithSelection(selectedRunID string) (common.Side
 	}
 
 	// Convert to view data with stats
-	runsData := &runstypes.RunsViewData{
+	runsData := &RunsViewData{
 		Runs:          h.convertToRunListItems(runs),
 		SelectedRunID: selectedRunID,
 	}
@@ -129,13 +127,13 @@ func (h *Handlers) buildRunsDataWithSelection(selectedRunID string) (common.Side
 }
 
 // convertToRunListItems converts core.Run to component-friendly RunListItem with stats.
-func (h *Handlers) convertToRunListItems(runs []*core.Run) []runstypes.RunListItem {
-	items := make([]runstypes.RunListItem, len(runs))
+func (h *Handlers) convertToRunListItems(runs []*core.Run) []RunListItem {
+	items := make([]RunListItem, len(runs))
 	for i, run := range runs {
 		// Get stats for this run
 		stats := h.getRunStats(run.ID)
 
-		items[i] = runstypes.RunListItem{
+		items[i] = RunListItem{
 			ID:          run.ID,
 			Environment: run.Environment,
 			Status:      string(run.Status),
@@ -149,8 +147,8 @@ func (h *Handlers) convertToRunListItems(runs []*core.Run) []runstypes.RunListIt
 }
 
 // getRunStats calculates aggregate stats for a run.
-func (h *Handlers) getRunStats(runID string) runstypes.RunStats {
-	stats := runstypes.RunStats{}
+func (h *Handlers) getRunStats(runID string) RunStats {
+	stats := RunStats{}
 
 	modelRuns, err := h.store.GetModelRunsForRun(runID)
 	if err != nil {
@@ -178,7 +176,7 @@ func (h *Handlers) getRunStats(runID string) runstypes.RunStats {
 }
 
 // buildRunDetailWithTiers builds a full run detail with tiered model runs.
-func (h *Handlers) buildRunDetailWithTiers(runID string) (*runstypes.RunDetailWithTiers, error) {
+func (h *Handlers) buildRunDetailWithTiers(runID string) (*RunDetailWithTiers, error) {
 	run, err := h.store.GetRun(runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
@@ -207,7 +205,7 @@ func (h *Handlers) buildRunDetailWithTiers(runID string) (*runstypes.RunDetailWi
 	}
 	duration := formatRunDuration(run.StartedAt, run.CompletedAt)
 
-	return &runstypes.RunDetailWithTiers{
+	return &RunDetailWithTiers{
 		ID:          run.ID,
 		Environment: run.Environment,
 		Status:      string(run.Status),
@@ -221,10 +219,10 @@ func (h *Handlers) buildRunDetailWithTiers(runID string) (*runstypes.RunDetailWi
 }
 
 // convertToTieredModelRuns converts model runs with info to tiered model runs.
-func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) []runstypes.TieredModelRun {
-	result := make([]runstypes.TieredModelRun, len(modelRuns))
+func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) []TieredModelRun {
+	result := make([]TieredModelRun, len(modelRuns))
 	for i, mr := range modelRuns {
-		result[i] = runstypes.TieredModelRun{
+		result[i] = TieredModelRun{
 			ID:           mr.ID,
 			ModelID:      mr.ModelID,
 			ModelPath:    mr.ModelPath,
@@ -241,7 +239,7 @@ func (h *Handlers) convertToTieredModelRuns(modelRuns []*core.ModelRunWithInfo) 
 }
 
 // groupByTier groups models by their execution tier based on dependencies.
-func (h *Handlers) groupByTier(models []runstypes.TieredModelRun) []runstypes.TierGroup {
+func (h *Handlers) groupByTier(models []TieredModelRun) []TierGroup {
 	if len(models) == 0 {
 		return nil
 	}
@@ -266,7 +264,7 @@ func (h *Handlers) groupByTier(models []runstypes.TieredModelRun) []runstypes.Ti
 	}
 
 	// Update tier in models and group by tier
-	tierGroups := make(map[int][]runstypes.TieredModelRun)
+	tierGroups := make(map[int][]TieredModelRun)
 	maxTier := 0
 
 	for i := range models {
@@ -279,7 +277,7 @@ func (h *Handlers) groupByTier(models []runstypes.TieredModelRun) []runstypes.Ti
 	}
 
 	// Create tier groups in order
-	result := make([]runstypes.TierGroup, 0, maxTier+1)
+	result := make([]TierGroup, 0, maxTier+1)
 	for tier := 0; tier <= maxTier; tier++ {
 		modelsInTier := tierGroups[tier]
 		if len(modelsInTier) == 0 {
@@ -294,7 +292,7 @@ func (h *Handlers) groupByTier(models []runstypes.TieredModelRun) []runstypes.Ti
 		// Calculate tier stats
 		tierStats := h.calculateTierStats(modelsInTier)
 
-		result = append(result, runstypes.TierGroup{
+		result = append(result, TierGroup{
 			Tier:      tier,
 			Label:     h.generateTierLabel(tier, modelsInTier),
 			Models:    modelsInTier,
@@ -330,9 +328,9 @@ func (h *Handlers) calculateTier(modelPath string, deps map[string][]string, vis
 }
 
 // fallbackSingleTier creates a single tier with all models.
-func (h *Handlers) fallbackSingleTier(models []runstypes.TieredModelRun) []runstypes.TierGroup {
+func (h *Handlers) fallbackSingleTier(models []TieredModelRun) []TierGroup {
 	tierStats := h.calculateTierStats(models)
-	return []runstypes.TierGroup{
+	return []TierGroup{
 		{
 			Tier:   0,
 			Label:  "All Models",
@@ -343,8 +341,8 @@ func (h *Handlers) fallbackSingleTier(models []runstypes.TieredModelRun) []runst
 }
 
 // calculateStats calculates overall stats from model runs.
-func (h *Handlers) calculateStats(models []runstypes.TieredModelRun) runstypes.RunStats {
-	stats := runstypes.RunStats{
+func (h *Handlers) calculateStats(models []TieredModelRun) RunStats {
+	stats := RunStats{
 		TotalModels: len(models),
 	}
 	for _, m := range models {
@@ -366,8 +364,8 @@ func (h *Handlers) calculateStats(models []runstypes.TieredModelRun) runstypes.R
 }
 
 // calculateTierStats calculates stats for a specific tier.
-func (h *Handlers) calculateTierStats(models []runstypes.TieredModelRun) runstypes.TierStats {
-	stats := runstypes.TierStats{
+func (h *Handlers) calculateTierStats(models []TieredModelRun) TierStats {
+	stats := TierStats{
 		TotalModels: len(models),
 	}
 	for _, m := range models {
@@ -389,7 +387,7 @@ func (h *Handlers) calculateTierStats(models []runstypes.TieredModelRun) runstyp
 }
 
 // generateTierLabel generates a label for a tier.
-func (h *Handlers) generateTierLabel(tier int, models []runstypes.TieredModelRun) string {
+func (h *Handlers) generateTierLabel(tier int, models []TieredModelRun) string {
 	if len(models) == 0 {
 		return fmt.Sprintf("Tier %d", tier)
 	}

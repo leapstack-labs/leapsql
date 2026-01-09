@@ -1,0 +1,28 @@
+package home
+
+import (
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
+	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
+	"github.com/starfederation/datastar-go/datastar"
+)
+
+// HomePage renders the home page with full content.
+// SSE is used only for live updates, not initial content.
+// AppShell provides id="app" for datastar patching.
+templ HomePage(title string, isDev bool, sidebar common.SidebarData, stats *DashboardStats) {
+	@layouts.Base(title, isDev) {
+		<div data-init={ datastar.GetSSE("/updates") }>
+			@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, false) {
+				@DashboardContent(stats)
+			}
+		</div>
+	}
+}
+
+// HomeAppShell renders just the app shell with dashboard content (for SSE updates).
+templ HomeAppShell(sidebar common.SidebarData, stats *DashboardStats) {
+	@components.AppShell(sidebar.ExplorerTree, sidebar.CurrentPath, false) {
+		@DashboardContent(stats)
+	}
+}

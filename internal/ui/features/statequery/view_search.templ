@@ -1,0 +1,22 @@
+package statequery
+
+// SearchResults renders search results.
+templ SearchResults(results []SearchResultItem) {
+	<div id="query-search-results" class="query-search-results">
+		if len(results) == 0 {
+			<p class="text-muted">No results found</p>
+		} else {
+			<ul class="query-search-results__list">
+				for _, r := range results {
+					<li class="query-search-results__item">
+						<span class="query-search-results__name">{ r.Name }</span>
+						<span class="query-search-results__path">{ r.Path }</span>
+						if r.Description != "" {
+							<span class="query-search-results__desc">{ r.Description }</span>
+						}
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}

@@ -1,0 +1,52 @@
+package database
+
+import "github.com/starfederation/datastar-go/datastar"
+
+templ SchemaList(schemas []SchemaInfo) {
+	<div id="database-tree" class="db-tree">
+		if len(schemas) == 0 {
+			<p class="text-muted">No schemas found</p>
+		} else {
+			for _, schema := range schemas {
+				@SchemaItem(schema)
+			}
+		}
+	</div>
+}
+
+templ SchemaItem(schema SchemaInfo) {
+	<details class="db-schema">
+		<summary 
+			class="db-schema__header"
+			data-on:toggle={ datastar.GetSSE("/api/database/schemas/%s", schema.Name) }
+		>
+			<span class="db-schema__icon">+</span>
+			<span class="db-schema__name">{ schema.Name }</span>
+		</summary>
+		<div id={ "schema-" + schema.Name } class="db-schema__tables">
+			<p class="text-muted">Loading tables...</p>
+		</div>
+	</details>
+}
+
+templ TableList(schemaName string, tables []TableInfo) {
+	<div id={ "schema-" + schemaName } class="db-schema__tables">
+		if len(tables) == 0 {
+			<p class="text-muted">No tables found</p>
+		} else {
+			for _, table := range tables {
+				@TableItem(schemaName, table)
+			}
+		}
+	</div>
+}
+
+templ TableItem(schemaName string, table TableInfo) {
+	<div 
+		class={ "db-table", tableClass(table.Type) }
+		data-on:click={ datastar.GetSSE("/api/database/tables/%s/%s", schemaName, table.Name) }
+	>
+		<span class="db-table__icon">{ tableIcon(table.Type) }</span>
+		<span class="db-table__name">{ table.Name }</span>
+	</div>
+}
