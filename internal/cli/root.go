@@ -103,6 +103,7 @@ Built with Go and DuckDB
 	// Global persistent flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: ./leapsql.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&targetFlag, "target", "t", "", "Target environment to use (e.g., dev, staging, prod)")
+	rootCmd.PersistentFlags().StringP("project-dir", "C", "", "Project root directory (auto-detected from models-dir or config file location)")
 	rootCmd.PersistentFlags().String("models-dir", "", "Path to models directory")
 	rootCmd.PersistentFlags().String("seeds-dir", "", "Path to seeds directory")
 	rootCmd.PersistentFlags().String("macros-dir", "", "Path to macros directory")

@@ -24,6 +24,9 @@ import (
 // This key is shared with root.go via both using the same type.
 type loggerKey struct{}
 
+// maxUpwardSearchLevels limits how far up the directory tree to search for config files.
+const maxUpwardSearchLevels = 10
+
 // Package-level koanf instance and config file tracking
 var (
 	k              = koanf.New(".")
@@ -44,6 +47,88 @@ func findConfigFile(explicit string) string {
 		return "leapsql.yml"
 	}
 	return ""
+}
+
+// configExistsIn checks if a leapsql config file exists in the directory.
+func configExistsIn(dir string) bool {
+	for _, name := range []string{"leapsql.yaml", "leapsql.yml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// findProjectRootUpward searches upward from startDir for a leapsql config file.
+// Returns empty string if not found within maxUpwardSearchLevels.
+func findProjectRootUpward(startDir string) string {
+	dir := startDir
+	for i := 0; i < maxUpwardSearchLevels; i++ {
+		if configExistsIn(dir) {
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
+// inferProjectRoot determines the project root from CLI flags and filesystem.
+// Priority:
+//  1. Explicit --project-dir flag
+//  2. Infer from --models-dir (parent if contains config or named "models")
+//  3. Search upward from CWD for leapsql.yaml
+//  4. Current working directory
+func inferProjectRoot(flags *pflag.FlagSet) string {
+	// 1. Check explicit --project-dir
+	if flags != nil {
+		if projectDir, _ := flags.GetString("project-dir"); projectDir != "" && flags.Changed("project-dir") {
+			abs, err := filepath.Abs(projectDir)
+			if err == nil {
+				return abs
+			}
+			return filepath.Clean(projectDir)
+		}
+	}
+
+	// 2. Infer from --models-dir
+	if flags != nil {
+		if modelsDir, _ := flags.GetString("models-dir"); modelsDir != "" && flags.Changed("models-dir") {
+			absModels, err := filepath.Abs(modelsDir)
+			if err == nil {
+				parent := filepath.Dir(absModels)
+
+				// If parent has a config file, it's the project root
+				if configExistsIn(parent) {
+					return parent
+				}
+
+				// If folder is named "models", assume parent is root
+				if filepath.Base(absModels) == "models" {
+					return parent
+				}
+			}
+		}
+	}
+
+	// 3. Search upward from CWD for leapsql.yaml
+	if cwd, err := os.Getwd(); err == nil {
+		if root := findProjectRootUpward(cwd); root != "" {
+			return root
+		}
+	}
+
+	// 4. Default to CWD
+	cwd, _ := os.Getwd()
+	if cwd == "" {
+		cwd = "."
+	}
+	return cwd
 }
 
 // resolvePathRelativeTo resolves a path relative to baseDir if it's not absolute.
@@ -75,6 +160,47 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	// Reset koanf for fresh load
 	k = koanf.New(".")
 
+	// Infer project root from flags before loading config
+	// This enables the "anchor pattern" where --models-dir testdata/models
+	// implies project root is testdata/
+	projectRoot := inferProjectRoot(flags)
+
+	// Track paths that were explicitly provided as flags (already relative to CWD).
+	// These will be converted to absolute paths before the normal resolution step,
+	// to prevent double-resolution when project root was inferred from them.
+	var flagModelsDir, flagMacrosDir, flagSeedsDir, flagStatePath string
+	if flags != nil {
+		if flags.Changed("models-dir") {
+			if v, _ := flags.GetString("models-dir"); v != "" {
+				flagModelsDir, _ = filepath.Abs(v)
+			}
+		}
+		if flags.Changed("macros-dir") {
+			if v, _ := flags.GetString("macros-dir"); v != "" {
+				flagMacrosDir, _ = filepath.Abs(v)
+			}
+		}
+		if flags.Changed("seeds-dir") {
+			if v, _ := flags.GetString("seeds-dir"); v != "" {
+				flagSeedsDir, _ = filepath.Abs(v)
+			}
+		}
+		if flags.Changed("state-path") {
+			if v, _ := flags.GetString("state-path"); v != "" {
+				flagStatePath, _ = filepath.Abs(v)
+			}
+		}
+	}
+
+	// If an explicit config file is provided, use its directory as project root
+	// (unless a more specific hint was given via flags)
+	if cfgFile != "" && projectRoot == inferProjectRoot(nil) {
+		// No flag-based inference happened, use config file's directory
+		if absPath, err := filepath.Abs(cfgFile); err == nil {
+			projectRoot = filepath.Dir(absPath)
+		}
+	}
+
 	// 1. Load defaults
 	if err := k.Load(confmap.Provider(map[string]interface{}{
 		"models_dir":  intconfig.DefaultModelsDir,
@@ -89,6 +215,17 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 	}
 
 	// 2. Find and load config file
+	// Search in project root if no explicit config file provided
+	if cfgFile == "" {
+		// Look for config in inferred project root
+		for _, name := range []string{"leapsql.yaml", "leapsql.yml"} {
+			candidate := filepath.Join(projectRoot, name)
+			if _, err := os.Stat(candidate); err == nil {
+				cfgFile = candidate
+				break
+			}
+		}
+	}
 	configFileUsed = findConfigFile(cfgFile)
 	if configFileUsed != "" {
 		if err := k.Load(file.Provider(configFileUsed), yaml.Parser()); err != nil {
@@ -125,18 +262,33 @@ func LoadConfigWithTarget(cfgFile string, targetOverride string, flags *pflag.Fl
 		return nil, fmt.Errorf("unable to decode config: %w", err)
 	}
 
-	// 6. Resolve relative paths in config relative to config file directory.
-	// This ensures paths like "models/" in a config file at "/projects/app/leapsql.yaml"
-	// resolve to "/projects/app/models/" rather than being relative to CWD.
-	if configFileUsed != "" {
-		configDir := filepath.Dir(configFileUsed)
-		if absDir, err := filepath.Abs(configDir); err == nil {
-			configDir = absDir
-		}
-		cfg.ModelsDir = resolvePathRelativeTo(cfg.ModelsDir, configDir)
-		cfg.SeedsDir = resolvePathRelativeTo(cfg.SeedsDir, configDir)
-		cfg.MacrosDir = resolvePathRelativeTo(cfg.MacrosDir, configDir)
-		cfg.StatePath = resolvePathRelativeTo(cfg.StatePath, configDir)
+	// 6. Set project root and resolve relative paths
+	// Use project root as base for all path resolution (not config file directory)
+	// This implements the "anchor pattern" for intuitive path resolution
+	cfg.ProjectRoot = projectRoot
+
+	// For paths explicitly provided via flags, use the pre-computed absolute paths
+	// (already computed relative to CWD at flag parse time).
+	// For paths from config file or defaults, resolve relative to project root.
+	if flagModelsDir != "" {
+		cfg.ModelsDir = flagModelsDir
+	} else {
+		cfg.ModelsDir = resolvePathRelativeTo(cfg.ModelsDir, projectRoot)
+	}
+	if flagSeedsDir != "" {
+		cfg.SeedsDir = flagSeedsDir
+	} else {
+		cfg.SeedsDir = resolvePathRelativeTo(cfg.SeedsDir, projectRoot)
+	}
+	if flagMacrosDir != "" {
+		cfg.MacrosDir = flagMacrosDir
+	} else {
+		cfg.MacrosDir = resolvePathRelativeTo(cfg.MacrosDir, projectRoot)
+	}
+	if flagStatePath != "" {
+		cfg.StatePath = flagStatePath
+	} else {
+		cfg.StatePath = resolvePathRelativeTo(cfg.StatePath, projectRoot)
 	}
 
 	// Determine which environment to use for target selection

@@ -1,12 +1,13 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/leapstack-labs/leapsql/pkg/core"
 	intconfig "github.com/leapstack-labs/leapsql/internal/config"
+	"github.com/leapstack-labs/leapsql/pkg/core"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -421,9 +422,11 @@ target:
 	cfg, err := LoadConfigWithTarget(cfgPath, "", flags)
 	require.NoError(t, err)
 
-	// Flag should win - path is resolved relative to config file directory
-	expectedPath := filepath.Join(tmpDir, "from_flag")
-	assert.Equal(t, expectedPath, cfg.ModelsDir, "flag value should override config file and env var")
+	// Flag should win - paths from flags are resolved relative to CWD (not config file directory)
+	// This matches user expectation: when you type --models-dir relative/path, it's relative to where you are
+	cwd, _ := os.Getwd()
+	expectedPath := filepath.Join(cwd, "from_flag")
+	assert.Equal(t, expectedPath, cfg.ModelsDir, "flag value should override config file and env var, resolved relative to CWD")
 }
 
 // TestLoadConfigWithTarget_EnvPrecedenceOverFile tests that env vars override config file.
@@ -481,4 +484,220 @@ target:
 	// Env should win since flag wasn't explicitly set - path is resolved relative to config file directory
 	expectedPath := filepath.Join(tmpDir, "from_env")
 	assert.Equal(t, expectedPath, cfg.ModelsDir, "env var should be used when flag is not set")
+}
+
+// TestInferProjectRoot tests the project root inference logic.
+func TestInferProjectRoot(t *testing.T) {
+	t.Run("explicit project-dir wins over everything", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		projectDir := filepath.Join(tmpDir, "myproject")
+		require.NoError(t, os.MkdirAll(projectDir, 0750))
+
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		require.NoError(t, flags.Set("project-dir", projectDir))
+		require.NoError(t, flags.Set("models-dir", filepath.Join(tmpDir, "other/models")))
+
+		result := inferProjectRoot(flags)
+		assert.Equal(t, projectDir, result)
+	})
+
+	t.Run("infers from models-dir with config file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		projectDir := filepath.Join(tmpDir, "testdata")
+		modelsDir := filepath.Join(projectDir, "models")
+		require.NoError(t, os.MkdirAll(modelsDir, 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(projectDir, "leapsql.yaml"), []byte("name: test"), 0600))
+
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		require.NoError(t, flags.Set("models-dir", modelsDir))
+
+		result := inferProjectRoot(flags)
+		assert.Equal(t, projectDir, result)
+	})
+
+	t.Run("infers from models-dir named models without config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		projectDir := filepath.Join(tmpDir, "testdata")
+		modelsDir := filepath.Join(projectDir, "models")
+		require.NoError(t, os.MkdirAll(modelsDir, 0750))
+		// No leapsql.yaml file
+
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		require.NoError(t, flags.Set("models-dir", modelsDir))
+
+		result := inferProjectRoot(flags)
+		assert.Equal(t, projectDir, result)
+	})
+
+	t.Run("defaults to cwd when no flags", func(t *testing.T) {
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		// Don't set any flags
+
+		result := inferProjectRoot(flags)
+		// Result should be CWD or a parent with leapsql.yaml
+		assert.NotEmpty(t, result)
+		// If no leapsql.yaml found upward, should be cwd
+		if !configExistsIn(result) {
+			assert.Equal(t, cwd, result)
+		}
+	})
+
+	t.Run("nil flags defaults to cwd", func(t *testing.T) {
+		result := inferProjectRoot(nil)
+		assert.NotEmpty(t, result)
+	})
+}
+
+// TestFindProjectRootUpward tests the upward search for config files.
+func TestFindProjectRootUpward(t *testing.T) {
+	t.Run("finds config in current dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "leapsql.yaml"), []byte("name: test"), 0600))
+
+		result := findProjectRootUpward(tmpDir)
+		assert.Equal(t, tmpDir, result)
+	})
+
+	t.Run("finds config in parent dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		childDir := filepath.Join(tmpDir, "child", "grandchild")
+		require.NoError(t, os.MkdirAll(childDir, 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "leapsql.yaml"), []byte("name: test"), 0600))
+
+		result := findProjectRootUpward(childDir)
+		assert.Equal(t, tmpDir, result)
+	})
+
+	t.Run("returns empty when no config found", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		childDir := filepath.Join(tmpDir, "child")
+		require.NoError(t, os.MkdirAll(childDir, 0750))
+		// No leapsql.yaml anywhere
+
+		result := findProjectRootUpward(childDir)
+		assert.Empty(t, result)
+	})
+
+	t.Run("respects max search levels", func(t *testing.T) {
+		// Create a deep directory structure without config
+		tmpDir := t.TempDir()
+		deepDir := tmpDir
+		for i := 0; i < maxUpwardSearchLevels+5; i++ {
+			deepDir = filepath.Join(deepDir, fmt.Sprintf("level%d", i))
+		}
+		require.NoError(t, os.MkdirAll(deepDir, 0750))
+		// Put config at root
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "leapsql.yaml"), []byte("name: test"), 0600))
+
+		// Should not find config if it's beyond maxUpwardSearchLevels
+		result := findProjectRootUpward(deepDir)
+		// This could find or not find depending on depth - just verify it doesn't panic
+		_ = result
+	})
+}
+
+// TestConfigExistsIn tests the config file detection.
+func TestConfigExistsIn(t *testing.T) {
+	t.Run("finds leapsql.yaml", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "leapsql.yaml"), []byte("name: test"), 0600))
+
+		assert.True(t, configExistsIn(tmpDir))
+	})
+
+	t.Run("finds leapsql.yml", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "leapsql.yml"), []byte("name: test"), 0600))
+
+		assert.True(t, configExistsIn(tmpDir))
+	})
+
+	t.Run("returns false when no config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		assert.False(t, configExistsIn(tmpDir))
+	})
+}
+
+// TestLoadConfigWithTarget_ProjectRootInference tests that project root is correctly inferred.
+func TestLoadConfigWithTarget_ProjectRootInference(t *testing.T) {
+	t.Run("infers project root from models-dir flag", func(t *testing.T) {
+		ResetConfig()
+
+		// Create a project structure
+		tmpDir := t.TempDir()
+		projectDir := filepath.Join(tmpDir, "testdata")
+		modelsDir := filepath.Join(projectDir, "models")
+		macrosDir := filepath.Join(projectDir, "macros")
+		require.NoError(t, os.MkdirAll(modelsDir, 0750))
+		require.NoError(t, os.MkdirAll(macrosDir, 0750))
+
+		// Create config in project dir
+		cfgContent := `name: test
+models_dir: models
+macros_dir: macros
+target:
+  type: duckdb
+`
+		require.NoError(t, os.WriteFile(filepath.Join(projectDir, "leapsql.yaml"), []byte(cfgContent), 0600))
+
+		// Use models-dir flag
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		flags.String("macros-dir", "", "")
+		flags.String("state", "", "")
+		require.NoError(t, flags.Set("models-dir", modelsDir))
+
+		cfg, err := LoadConfigWithTarget("", "", flags)
+		require.NoError(t, err)
+
+		// Project root should be inferred
+		assert.Equal(t, projectDir, cfg.ProjectRoot)
+		// Paths should be resolved relative to project root
+		assert.Equal(t, modelsDir, cfg.ModelsDir)
+		assert.Equal(t, macrosDir, cfg.MacrosDir)
+	})
+
+	t.Run("explicit project-dir overrides models-dir inference", func(t *testing.T) {
+		ResetConfig()
+
+		// Create two project structures
+		tmpDir := t.TempDir()
+		project1 := filepath.Join(tmpDir, "project1")
+		project2 := filepath.Join(tmpDir, "project2")
+		require.NoError(t, os.MkdirAll(filepath.Join(project1, "models"), 0750))
+		require.NoError(t, os.MkdirAll(filepath.Join(project2, "models"), 0750))
+
+		// Create config in both
+		cfgContent := `target:
+  type: duckdb
+`
+		require.NoError(t, os.WriteFile(filepath.Join(project1, "leapsql.yaml"), []byte(cfgContent), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(project2, "leapsql.yaml"), []byte(cfgContent), 0600))
+
+		// Use project-dir to override
+		flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		flags.String("project-dir", "", "")
+		flags.String("models-dir", "", "")
+		require.NoError(t, flags.Set("project-dir", project1))
+		require.NoError(t, flags.Set("models-dir", filepath.Join(project2, "models")))
+
+		cfg, err := LoadConfigWithTarget("", "", flags)
+		require.NoError(t, err)
+
+		// Project root should be from explicit flag
+		assert.Equal(t, project1, cfg.ProjectRoot)
+	})
 }

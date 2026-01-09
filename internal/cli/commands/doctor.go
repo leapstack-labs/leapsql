@@ -8,6 +8,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/leapstack-labs/leapsql/internal/cli/config"
 	"github.com/leapstack-labs/leapsql/internal/cli/output"
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -57,6 +58,15 @@ Output adapts to environment:
 
 // DoctorOutput is the JSON output for the doctor command.
 type DoctorOutput struct {
+	// Configuration info for debugging
+	ProjectRoot string `json:"project_root"`
+	ConfigFile  string `json:"config_file,omitempty"`
+	ModelsDir   string `json:"models_dir"`
+	MacrosDir   string `json:"macros_dir"`
+	SeedsDir    string `json:"seeds_dir"`
+	StatePath   string `json:"state_path"`
+
+	// Project health
 	Summary         ProjectSummary `json:"summary"`
 	HealthChecks    []HealthCheck  `json:"health_checks"`
 	Score           int            `json:"score"`
@@ -119,7 +129,7 @@ func runDoctor(cmd *cobra.Command, opts *DoctorOptions) error {
 	diags := analyzer.Analyze(projectCtx)
 
 	// Build output
-	doctorOutput := buildDoctorOutput(eng, projectCtx, diags)
+	doctorOutput := buildDoctorOutput(eng, projectCtx, diags, cfg)
 
 	// Render based on mode
 	effectiveMode := r.EffectiveMode()
@@ -133,7 +143,7 @@ func runDoctor(cmd *cobra.Command, opts *DoctorOptions) error {
 	}
 }
 
-func buildDoctorOutput(eng *engine.Engine, _ *project.Context, diags []project.Diagnostic) *DoctorOutput {
+func buildDoctorOutput(eng *engine.Engine, _ *project.Context, diags []project.Diagnostic, cfg *config.Config) *DoctorOutput {
 	// Build summary
 	summary := buildProjectSummary(eng)
 
@@ -188,6 +198,15 @@ func buildDoctorOutput(eng *engine.Engine, _ *project.Context, diags []project.D
 	recommendations := generateRecommendations(healthChecks, diags)
 
 	return &DoctorOutput{
+		// Configuration info
+		ProjectRoot: cfg.ProjectRoot,
+		ConfigFile:  config.GetConfigFileUsed(),
+		ModelsDir:   cfg.ModelsDir,
+		MacrosDir:   cfg.MacrosDir,
+		SeedsDir:    cfg.SeedsDir,
+		StatePath:   cfg.StatePath,
+
+		// Health info
 		Summary:         summary,
 		HealthChecks:    healthChecks,
 		Score:           score,
@@ -342,6 +361,20 @@ func renderDoctorText(r *output.Renderer, out *DoctorOutput) error {
 	r.Println(styles.Muted.Render(strings.Repeat("=", 55)))
 	r.Println("")
 
+	// Configuration section (for debugging path resolution)
+	r.Println(styles.Header2.Render("Configuration"))
+	r.Printf("   Project Root: %s\n", out.ProjectRoot)
+	if out.ConfigFile != "" {
+		r.Printf("   Config File:  %s\n", out.ConfigFile)
+	} else {
+		r.Printf("   Config File:  %s\n", styles.Muted.Render("(none)"))
+	}
+	r.Printf("   Models Dir:   %s\n", out.ModelsDir)
+	r.Printf("   Macros Dir:   %s\n", out.MacrosDir)
+	r.Printf("   Seeds Dir:    %s\n", out.SeedsDir)
+	r.Printf("   State DB:     %s\n", out.StatePath)
+	r.Println("")
+
 	// Project Summary
 	r.Println(styles.Header2.Render("Project Summary"))
 	r.Printf("   Models: %d | Macros: %d | Seeds: %d\n", out.Summary.Models, out.Summary.Macros, out.Summary.Seeds)
@@ -412,6 +445,21 @@ func renderDoctorText(r *output.Renderer, out *DoctorOutput) error {
 
 func renderDoctorMarkdown(r *output.Renderer, out *DoctorOutput) error {
 	r.Println("# LeapSQL Project Health Report")
+	r.Println("")
+
+	// Configuration section
+	r.Println("## Configuration")
+	r.Println("")
+	r.Printf("- **Project Root**: `%s`\n", out.ProjectRoot)
+	if out.ConfigFile != "" {
+		r.Printf("- **Config File**: `%s`\n", out.ConfigFile)
+	} else {
+		r.Println("- **Config File**: _(none)_")
+	}
+	r.Printf("- **Models Dir**: `%s`\n", out.ModelsDir)
+	r.Printf("- **Macros Dir**: `%s`\n", out.MacrosDir)
+	r.Printf("- **Seeds Dir**: `%s`\n", out.SeedsDir)
+	r.Printf("- **State DB**: `%s`\n", out.StatePath)
 	r.Println("")
 
 	// Project Summary

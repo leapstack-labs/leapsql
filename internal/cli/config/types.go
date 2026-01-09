@@ -45,6 +45,7 @@ func (c *Config) GetUIConfig() *UIConfig {
 
 // Config holds all CLI configuration options.
 type Config struct {
+	ProjectRoot  string               `koanf:"-"` // Computed project root, not from config file
 	ModelsDir    string               `koanf:"models_dir"`
 	SeedsDir     string               `koanf:"seeds_dir"`
 	MacrosDir    string               `koanf:"macros_dir"`
