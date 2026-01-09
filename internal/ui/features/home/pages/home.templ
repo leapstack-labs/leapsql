@@ -8,9 +8,10 @@ import (
 
 // HomePage renders the home page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 templ HomePage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ datastar.GetSSE("/updates") }>
+		<div data-init={ datastar.GetSSE("/updates") }>
 			@components.AppContainer(data)
 		</div>
 	}

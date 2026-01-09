@@ -1,17 +1,17 @@
 package pages
 
 import (
+	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
-	"github.com/starfederation/datastar-go/datastar"
 )
 
 // RunsPage renders the runs history page with full content.
-// SSE is used only for live updates, not initial content.
-// AppContainer includes id="app" for datastar patching.
-templ RunsPage(title string, isDev bool, data components.AppData) {
+// sseUpdatePath is "/runs/updates" or "/runs/{id}/updates" depending on selection.
+// AppContainer provides id="app" for datastar patching.
+templ RunsPage(title string, isDev bool, data components.AppData, sseUpdatePath string) {
 	@layouts.Base(title, isDev) {
-		<div data-init={ datastar.GetSSE("/runs/updates") }>
+		<div data-init={ fmt.Sprintf("@get('%s')", sseUpdatePath) }>
 			@components.AppContainer(data)
 		</div>
 	}

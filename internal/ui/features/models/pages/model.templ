@@ -8,9 +8,10 @@ import (
 
 // ModelPage renders the model detail page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 templ ModelPage(title string, isDev bool, data components.AppData, updatePath string) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ fmt.Sprintf("@get('%s')", updatePath) }>
+		<div data-init={ fmt.Sprintf("@get('%s')", updatePath) }>
 			@components.AppContainer(data)
 		</div>
 	}

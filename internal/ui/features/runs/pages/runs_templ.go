@@ -9,14 +9,15 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common/layouts"
-	"github.com/starfederation/datastar-go/datastar"
 )
 
 // RunsPage renders the runs history page with full content.
-// SSE is used only for live updates, not initial content.
-func RunsPage(title string, isDev bool, data components.AppData) templ.Component {
+// sseUpdatePath is "/runs/updates" or "/runs/{id}/updates" depending on selection.
+// AppContainer provides id="app" for datastar patching.
+func RunsPage(title string, isDev bool, data components.AppData, sseUpdatePath string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,14 +50,14 @@ func RunsPage(title string, isDev bool, data components.AppData) templ.Component
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"app\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/runs/updates"))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("@get('%s')", sseUpdatePath))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/runs/pages/runs.templ`, Line: 13, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/runs/pages/runs.templ`, Line: 14, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {

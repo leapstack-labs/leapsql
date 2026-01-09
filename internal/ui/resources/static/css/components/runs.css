@@ -35,6 +35,27 @@
   color: var(--muted-foreground);
 }
 
+.run-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: var(--muted-foreground);
+  text-align: center;
+  min-height: 200px;
+}
+
+.run-detail-empty__link {
+  margin-top: 16px;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.run-detail-empty__link:hover {
+  text-decoration: underline;
+}
+
 /* Runs Table */
 .runs-table {
   width: 100%;
@@ -325,10 +346,18 @@
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s ease;
+  /* Anchor element styling */
+  text-decoration: none;
+  color: inherit;
 }
 
 .run-list-card:hover {
   background: var(--muted);
+}
+
+.run-list-card:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .run-list-card--selected {

@@ -36,6 +36,7 @@ type GraphEdge struct {
 
 // GraphPage renders the graph page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 func GraphPage(title string, isDev bool, data components.AppData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -69,14 +70,14 @@ func GraphPage(title string, isDev bool, data components.AppData) templ.Componen
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"app\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/graph/updates"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 33, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 34, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -141,7 +142,7 @@ func GraphView(data GraphData) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(data.Nodes)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 62, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 63, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -154,7 +155,7 @@ func GraphView(data GraphData) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(data.Edges)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 62, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 63, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -200,7 +201,7 @@ func SVGGraph(data GraphData) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(string(nodesJSON))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 76, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 77, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -213,7 +214,7 @@ func SVGGraph(data GraphData) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(string(edgesJSON))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 77, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 78, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -259,7 +260,7 @@ func SVGGraph(data GraphData) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(node.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 87, Col: 77}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 88, Col: 77}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -272,7 +273,7 @@ func SVGGraph(data GraphData) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(node.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 88, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 89, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -285,7 +286,7 @@ func SVGGraph(data GraphData) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(node.Type)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 89, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 90, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -313,7 +314,7 @@ func SVGGraph(data GraphData) templ.Component {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(extractName(edge.Source))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 98, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 99, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -326,7 +327,7 @@ func SVGGraph(data GraphData) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(extractName(edge.Target))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 98, Col: 69}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/graph/pages/graph.templ`, Line: 99, Col: 69}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,7 +12,6 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/engine"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 	commonComponents "github.com/leapstack-labs/leapsql/internal/ui/features/common/components"
-	"github.com/leapstack-labs/leapsql/internal/ui/features/runs/components"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/runs/pages"
 	"github.com/leapstack-labs/leapsql/internal/ui/notifier"
 	"github.com/leapstack-labs/leapsql/pkg/core"
@@ -41,22 +39,32 @@ func NewHandlers(eng *engine.Engine, store core.Store, sessionStore sessions.Sto
 }
 
 // RunsPage renders the runs history page with full content.
+// Handles both /runs (no selection) and /runs/{id} (with selection).
 func (h *Handlers) RunsPage(w http.ResponseWriter, r *http.Request) {
-	appData, err := h.buildRunsAppData()
+	runID := chi.URLParam(r, "id") // "" if not present
+
+	appData, err := h.buildRunsAppDataWithSelection(runID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := pages.RunsPage("Run History", h.isDev, appData).Render(r.Context(), w); err != nil {
+	// SSE path depends on whether viewing a specific run
+	sseUpdatePath := "/runs/updates"
+	if runID != "" {
+		sseUpdatePath = fmt.Sprintf("/runs/%s/updates", runID)
+	}
+
+	if err := pages.RunsPage("Run History", h.isDev, appData, sseUpdatePath).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 // RunsPageUpdates is the long-lived SSE endpoint for the runs page.
-// It subscribes to updates and pushes changes when the store changes.
-// Unlike the old pattern, it does NOT send initial state - that's rendered by RunsPage.
+// Handles both /runs/updates (no selection) and /runs/{id}/updates (with selection).
+// Pushes full AppContainer on every update so both list and detail stay in sync.
 func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
+	runID := chi.URLParam(r, "id") // "" if not present
 	sse := datastar.NewSSE(w, r)
 
 	// Subscribe to updates
@@ -70,25 +78,16 @@ func (h *Handlers) RunsPageUpdates(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-updates:
-			if err := h.sendRunsView(sse); err != nil {
+			appData, err := h.buildRunsAppDataWithSelection(runID)
+			if err != nil {
+				_ = sse.ConsoleError(err)
+				continue
+			}
+			if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
 				_ = sse.ConsoleError(err)
 			}
 		}
 	}
-}
-
-// sendRunsView builds and sends the full app view for the runs page.
-func (h *Handlers) sendRunsView(sse *datastar.ServerSentEventGenerator) error {
-	appData, err := h.buildRunsAppData()
-	if err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(commonComponents.AppContainer(appData))
-}
-
-// buildRunsAppData assembles all data needed for the runs view (no selection).
-func (h *Handlers) buildRunsAppData() (commonComponents.AppData, error) {
-	return h.buildRunsAppDataWithSelection("")
 }
 
 // buildRunsAppDataWithSelection assembles all data needed for the runs view with optional selected run.
@@ -177,59 +176,6 @@ func (h *Handlers) getRunStats(runID string) commonComponents.RunStats {
 	}
 
 	return stats
-}
-
-// RunsListSSE sends the list of recent runs via SSE.
-func (h *Handlers) RunsListSSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-
-	// Parse limit from query param, default to 50
-	limit := 50
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-
-	runs, err := h.store.ListRuns(limit)
-	if err != nil {
-		_ = sse.ConsoleError(fmt.Errorf("failed to list runs: %w", err))
-		return
-	}
-
-	// Convert to display data
-	runItems := make([]components.RunItem, len(runs))
-	for i, run := range runs {
-		runItems[i] = components.RunItem{
-			ID:          run.ID,
-			Environment: run.Environment,
-			Status:      string(run.Status),
-			StartedAt:   run.StartedAt,
-			CompletedAt: run.CompletedAt,
-			Error:       run.Error,
-		}
-	}
-
-	if err := sse.PatchElementTempl(components.RunsList(runItems)); err != nil {
-		_ = sse.ConsoleError(err)
-	}
-}
-
-// RunDetailSSE sends the full app view with the selected run's details via SSE (fat morph).
-func (h *Handlers) RunDetailSSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-	runID := chi.URLParam(r, "id")
-
-	appData, err := h.buildRunsAppDataWithSelection(runID)
-	if err != nil {
-		_ = sse.ConsoleError(fmt.Errorf("failed to build app data: %w", err))
-		return
-	}
-
-	// Fat morph - send entire AppContainer
-	if err := sse.PatchElementTempl(commonComponents.AppContainer(appData)); err != nil {
-		_ = sse.ConsoleError(err)
-	}
 }
 
 // buildRunDetailWithTiers builds a full run detail with tiered model runs.
@@ -470,44 +416,6 @@ func (h *Handlers) generateTierLabel(tier int, models []commonComponents.TieredM
 	}
 
 	return fmt.Sprintf("Tier %d", tier)
-}
-
-// RunModelsSSE sends the model runs for a specific run via SSE.
-func (h *Handlers) RunModelsSSE(w http.ResponseWriter, r *http.Request) {
-	sse := datastar.NewSSE(w, r)
-	runID := chi.URLParam(r, "id")
-
-	modelRuns, err := h.store.GetModelRunsForRun(runID)
-	if err != nil {
-		_ = sse.ConsoleError(fmt.Errorf("failed to get model runs: %w", err))
-		return
-	}
-
-	// Convert to display data with model names
-	modelItems := make([]components.ModelRunItem, len(modelRuns))
-	for i, mr := range modelRuns {
-		modelName := mr.ModelID // Default to ID
-		// Try to get model name
-		if model, err := h.store.GetModelByID(mr.ModelID); err == nil && model != nil {
-			modelName = model.Name
-		}
-
-		modelItems[i] = components.ModelRunItem{
-			ID:           mr.ID,
-			ModelID:      mr.ModelID,
-			ModelName:    modelName,
-			Status:       string(mr.Status),
-			RowsAffected: mr.RowsAffected,
-			ExecutionMS:  mr.ExecutionMS,
-			StartedAt:    mr.StartedAt,
-			CompletedAt:  mr.CompletedAt,
-			Error:        mr.Error,
-		}
-	}
-
-	if err := sse.PatchElementTempl(components.ModelRunsList(runID, modelItems)); err != nil {
-		_ = sse.ConsoleError(err)
-	}
 }
 
 // formatTimeAgo formats a time as a human-readable relative time string.

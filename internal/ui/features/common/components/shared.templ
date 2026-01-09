@@ -705,8 +705,15 @@ templ RunsContent(data *RunsViewData) {
 				<div id="run-detail">
 					if data.SelectedRun != nil {
 						@RunDetailWithTiersView(data.SelectedRun)
+					} else if data.SelectedRunID != "" {
+						<div class="run-detail-empty">
+							<p>Run not found</p>
+							<a href="/runs" class="run-detail-empty__link">← Back to runs</a>
+						</div>
 					} else {
-						<p class="text-muted">Select a run to view details</p>
+						<div class="run-detail-empty">
+							<p>Select a run to view details</p>
+						</div>
 					}
 				</div>
 			</div>
@@ -733,10 +740,15 @@ templ RunsListView(runs []RunListItem, selectedRunID string) {
 }
 
 // RunListCard renders a compact run card for the list view (GitHub Actions style).
+// Each run is a resource with its own URL for proper navigation and bookmarking.
+// When selected, automatically scrolls into view on page load.
 templ RunListCard(run RunListItem, isSelected bool) {
-	<div 
+	<a 
+		href={ templ.SafeURL(fmt.Sprintf("/runs/%s", run.ID)) }
 		class={ "run-list-card", templ.KV("run-list-card--selected", isSelected), runListCardStatusClass(run.Status) }
-		data-on:click={ fmt.Sprintf("@get('/api/runs/%s')", run.ID) }
+		if isSelected {
+			data-init="el.scrollIntoView({ block: 'center', behavior: 'instant' })"
+		}
 	>
 		<div class="run-list-card__main">
 			<div class="run-list-card__status">
@@ -760,7 +772,7 @@ templ RunListCard(run RunListItem, isSelected bool) {
 				@RunMiniStats(run.Stats)
 			}
 		</div>
-	</div>
+	</a>
 }
 
 // RunMiniStats renders mini status counts for list cards.

@@ -28,9 +28,10 @@ type GraphEdge struct {
 
 // GraphPage renders the graph page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 templ GraphPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ datastar.GetSSE("/graph/updates") }>
+		<div data-init={ datastar.GetSSE("/graph/updates") }>
 			@components.AppContainer(data)
 		</div>
 	}

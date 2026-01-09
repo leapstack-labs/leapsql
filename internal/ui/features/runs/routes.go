@@ -20,18 +20,13 @@ func SetupRoutes(
 ) error {
 	handlers := NewHandlers(eng, store, sessionStore, notify, isDev)
 
-	// Page route (full page render with content)
+	// Page routes - each run is a resource
 	router.Get("/runs", handlers.RunsPage)
+	router.Get("/runs/{id}", handlers.RunsPage)
 
-	// SSE route (live updates only)
+	// SSE routes - live updates for both list and detail views
 	router.Get("/runs/updates", handlers.RunsPageUpdates)
-
-	// API routes for run history (kept for backward compatibility)
-	router.Route("/api/runs", func(r chi.Router) {
-		r.Get("/", handlers.RunsListSSE)             // List recent runs
-		r.Get("/{id}", handlers.RunDetailSSE)        // Run details
-		r.Get("/{id}/models", handlers.RunModelsSSE) // Model runs for a run
-	})
+	router.Get("/runs/{id}/updates", handlers.RunsPageUpdates)
 
 	return nil
 }

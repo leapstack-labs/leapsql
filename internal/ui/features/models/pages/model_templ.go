@@ -16,6 +16,7 @@ import (
 
 // ModelPage renders the model detail page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 func ModelPage(title string, isDev bool, data components.AppData, updatePath string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -49,14 +50,14 @@ func ModelPage(title string, isDev bool, data components.AppData, updatePath str
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"app\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("@get('%s')", updatePath))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/models/pages/model.templ`, Line: 13, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/features/models/pages/model.templ`, Line: 14, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {

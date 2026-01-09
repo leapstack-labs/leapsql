@@ -8,9 +8,10 @@ import (
 
 // QueryPage renders the query page with full content.
 // SSE is used only for live updates, not initial content.
+// AppContainer provides id="app" for datastar patching.
 templ QueryPage(title string, isDev bool, data components.AppData) {
 	@layouts.Base(title, isDev) {
-		<div id="app" data-init={ datastar.GetSSE("/query/updates") }>
+		<div data-init={ datastar.GetSSE("/query/updates") }>
 			@components.AppContainer(data)
 		</div>
 	}
