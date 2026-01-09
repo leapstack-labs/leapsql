@@ -263,7 +263,6 @@ func isOrchestrator(path string) bool {
 		"internal/engine":   true,
 		"internal/lsp":      true,
 		"internal/provider": true,
-		"internal/docs":     true,
 	}
 	return orchestrators[path]
 }

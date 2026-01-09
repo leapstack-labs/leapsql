@@ -44,3 +44,4 @@ node_modules/
 # External materialization outputs
 output/
 context/*/
+*_templ.go

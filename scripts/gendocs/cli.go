@@ -118,8 +118,7 @@ leapsql help
 leapsql --help
 
 # Command-specific help
-leapsql run --help
-leapsql docs --help`)
+leapsql run --help`)
 
 	// Write file
 	filename := filepath.Join(outDir, "index.md")

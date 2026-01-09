@@ -56,7 +56,6 @@ type Config struct {
 	OutputFormat string               `koanf:"output"`
 	Target       *core.TargetConfig   `koanf:"target"`
 	Lint         *core.LintConfig     `koanf:"lint"`
-	Docs         *core.DocsConfig     `koanf:"docs"`
 	UI           *UIConfig            `koanf:"ui"`
 	Environments map[string]EnvConfig `koanf:"environments"`
 }

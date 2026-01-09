@@ -46,7 +46,7 @@ func TestHelpCommand(t *testing.T) {
 	require.NoError(t, err, "help command error")
 
 	output := buf.String()
-	expectedCommands := []string{"run", "list", "dag", "seed", "lineage", "render", "docs"}
+	expectedCommands := []string{"run", "list", "dag", "seed", "lineage", "render"}
 	for _, expected := range expectedCommands {
 		assert.Contains(t, output, expected, "help output should contain '%s'", expected)
 	}

@@ -7,7 +7,6 @@ const (
 	DefaultModelsDir = "models"
 	DefaultSeedsDir  = "seeds"
 	DefaultMacrosDir = "macros"
-	DefaultDocsTheme = "vercel"
 )
 
 // ApplyDefaults applies default values to a ProjectConfig.
@@ -23,16 +22,6 @@ func ApplyDefaults(c *core.ProjectConfig) {
 	}
 	if c.MacrosDir == "" {
 		c.MacrosDir = DefaultMacrosDir
-	}
-}
-
-// ApplyDocsDefaults applies default values to a DocsConfig.
-func ApplyDocsDefaults(cfg *core.DocsConfig) {
-	if cfg == nil {
-		return
-	}
-	if cfg.Theme == "" {
-		cfg.Theme = DefaultDocsTheme
 	}
 }
 
