@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"strings"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
@@ -81,47 +80,6 @@ templ Header() {
 	</header>
 }
 
-templ Sidebar(explorerTree []common.TreeNode, currentPath string) {
-	<aside class="ui-sidebar">
-		<div class="ui-sidebar__section">
-			<div class="ui-sidebar__title">Explorer</div>
-			@ExplorerTreeView(explorerTree, currentPath)
-		</div>
-		<div class="ui-sidebar__section">
-			<a 
-				href="/graph" 
-				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/graph") }
-			>
-				<span>View DAG</span>
-			</a>
-		</div>
-		<div class="ui-sidebar__section">
-			<a 
-				href="/runs" 
-				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/runs") }
-			>
-				<span>Run History</span>
-			</a>
-		</div>
-		<div class="ui-sidebar__section">
-			<a 
-				href="/query" 
-				class={ "tree-item", templ.KV("tree-item--active", currentPath == "/query") }
-			>
-				<span>State Query</span>
-			</a>
-		</div>
-		<div class="ui-sidebar__section">
-			<a 
-				href="/macros" 
-				class={ "tree-item", templ.KV("tree-item--active", strings.HasPrefix(currentPath, "/macros")) }
-			>
-				<span>Macros</span>
-			</a>
-		</div>
-	</aside>
-}
-
 templ ExplorerTreeView(nodes []common.TreeNode, currentPath string) {
 	<div class="ui-sidebar__tree">
 		if len(nodes) == 0 {
@@ -174,14 +132,15 @@ templ LogDrawer() {
 	</div>
 }
 
-// AppShell is the outer shell with sidebar - content is passed as children.
+// AppShell is the outer shell with activity bar and side panel.
 // This avoids import cycles by not requiring feature-specific type assertions.
 // fullWidth should be true for graph, runs, query pages (no context panel).
 templ AppShell(explorerTree []common.TreeNode, currentPath string, fullWidth bool) {
 	<div id="app">
 		@Header()
 		<div class="ui-main">
-			@Sidebar(explorerTree, currentPath)
+			@ActivityBar(currentPath)
+			@SidePanel(explorerTree, currentPath)
 			<main class={ templ.KV("ui-content", true), templ.KV("ui-content--full", fullWidth) }>
 				{ children... }
 			</main>
@@ -195,7 +154,8 @@ templ AppShellWithContext(explorerTree []common.TreeNode, currentPath string, co
 	<div id="app">
 		@Header()
 		<div class="ui-main">
-			@Sidebar(explorerTree, currentPath)
+			@ActivityBar(currentPath)
+			@SidePanel(explorerTree, currentPath)
 			<main class="ui-content">
 				{ children... }
 			</main>

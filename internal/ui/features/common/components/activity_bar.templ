@@ -1,0 +1,70 @@
+package components
+
+import "strings"
+
+// ActivityBar renders the slim icon navigation bar
+templ ActivityBar(currentPath string) {
+	<nav class="ui-activity-bar" aria-label="Main navigation">
+		// Panel toggle buttons (top group)
+		<div class="activity-bar__group">
+			<button
+				type="button"
+				class="activity-bar__item"
+				data-class:active="$activePanel === 'explorer' && $sidePanelOpen"
+				data-on:click="if ($activePanel === 'explorer' && $sidePanelOpen) { $sidePanelOpen = false } else { $activePanel = 'explorer'; $sidePanelOpen = true }; localStorage.setItem('sidePanelOpen', $sidePanelOpen); localStorage.setItem('activePanel', $activePanel)"
+				title="Explorer (Cmd+B)"
+				aria-label="Toggle Explorer panel"
+			>
+				@Icon("files")
+			</button>
+		</div>
+		// Navigation links (middle group)
+		<div class="activity-bar__group">
+			<a
+				href="/graph"
+				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/graph") }
+				title="View DAG"
+				aria-label="View DAG graph"
+			>
+				@Icon("git-graph")
+			</a>
+			<a
+				href="/runs"
+				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/runs") }
+				title="Run History"
+				aria-label="View run history"
+			>
+				@Icon("history")
+			</a>
+			<a
+				href="/query"
+				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/query") }
+				title="State Query"
+				aria-label="State query tool"
+			>
+				@Icon("zap")
+			</a>
+			<a
+				href="/macros"
+				class={ "activity-bar__item", templ.KV("activity-bar__item--current", strings.HasPrefix(currentPath, "/macros")) }
+				title="Macros"
+				aria-label="View macros"
+			>
+				@Icon("code")
+			</a>
+		</div>
+		// Spacer to push settings to bottom
+		<div class="activity-bar__spacer"></div>
+		// Settings (bottom group)
+		<div class="activity-bar__group">
+			<button
+				type="button"
+				class="activity-bar__item"
+				title="Settings"
+				aria-label="Open settings"
+			>
+				@Icon("settings")
+			</button>
+		</div>
+	</nav>
+}

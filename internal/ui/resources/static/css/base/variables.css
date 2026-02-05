@@ -1,7 +1,8 @@
 /* css/base/variables.css - Non-theme layout variables */
 :root {
-  --sidebar-width: 240px;
   --header-height: 48px;
+  --activity-bar-width: 48px;
+  --side-panel-width: 260px;
   --context-panel-width: 280px;
   --log-drawer-height: 200px;
 }

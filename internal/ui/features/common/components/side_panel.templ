@@ -1,0 +1,31 @@
+package components
+
+import "github.com/leapstack-labs/leapsql/internal/ui/features/common"
+
+// SidePanel renders the collapsible side panel container
+templ SidePanel(explorerTree []common.TreeNode, currentPath string) {
+	<aside
+		class="ui-side-panel"
+		data-show="$sidePanelOpen"
+		aria-label="Side panel"
+	>
+		// Explorer Panel
+		<div class="side-panel__view" data-show="$activePanel === 'explorer'">
+			<div class="side-panel__header">
+				<span class="side-panel__title">EXPLORER</span>
+				<button
+					type="button"
+					class="side-panel__close"
+					data-on:click="$sidePanelOpen = false; localStorage.setItem('sidePanelOpen', 'false')"
+					title="Close panel (Cmd+B)"
+					aria-label="Close panel"
+				>
+					×
+				</button>
+			</div>
+			<div class="side-panel__content">
+				@ExplorerTreeView(explorerTree, currentPath)
+			</div>
+		</div>
+	</aside>
+}

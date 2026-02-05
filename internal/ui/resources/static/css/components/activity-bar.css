@@ -1,0 +1,86 @@
+/* css/components/activity-bar.css - Slim Icon Navigation */
+
+.ui-activity-bar {
+  width: var(--activity-bar-width);
+  min-width: var(--activity-bar-width);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  z-index: 20;
+}
+
+.activity-bar__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.activity-bar__group:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.activity-bar__spacer {
+  flex: 1;
+}
+
+.activity-bar__item {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-decoration: none;
+  position: relative;
+}
+
+.activity-bar__item:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+/* Active state for panel toggles */
+.activity-bar__item.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.activity-bar__item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 24px;
+  background: var(--primary);
+  border-radius: 0 2px 2px 0;
+}
+
+/* Current page indicator for navigation links */
+.activity-bar__item--current {
+  color: var(--primary);
+}
+
+.activity-bar__item--current::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 50%;
+}

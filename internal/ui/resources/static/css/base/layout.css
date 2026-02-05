@@ -16,4 +16,16 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  /* Children: activity-bar | side-panel | content | context-panel */
+}
+
+.ui-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  min-width: 0; /* Prevent flex overflow */
+}
+
+.ui-content--full {
+  padding: 16px;
 }

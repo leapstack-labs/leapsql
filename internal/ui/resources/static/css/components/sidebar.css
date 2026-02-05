@@ -1,7 +1,11 @@
-/* css/components/sidebar.css - Sidebar Styles */
+/* css/components/sidebar.css - DEPRECATED
+ * Replaced by activity-bar.css and side-panel.css
+ * Keeping temporarily in case any legacy code references these classes.
+ * Safe to delete if no other references exist.
+ */
 
 .ui-sidebar {
-  width: var(--sidebar-width);
+  width: var(--side-panel-width);
   background: var(--card);
   border-right: 1px solid var(--border);
   display: flex;
