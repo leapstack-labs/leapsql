@@ -4,26 +4,26 @@
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
+  gap: var(--ui-space-sm);
 }
 
 .stat-card {
-  padding: 16px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 8px);
+  padding: var(--ui-space-sm);
+  background: var(--ui-color-surface-container);
+  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-radius: var(--ui-radius-lg);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--ui-space-xs);
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 600;
-  color: var(--foreground);
+  font-size: var(--ui-type-size-3xl);
+  font-weight: var(--ui-weight-semibold);
+  color: var(--ui-color-surface-on);
 }
 
 .stat-label {
-  font-size: 12px;
-  color: var(--muted-foreground);
+  font-size: var(--ui-type-size-sm);
+  color: var(--ui-color-surface-variant-on);
 }

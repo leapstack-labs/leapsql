@@ -4,21 +4,21 @@ input[type="text"],
 input[type="search"],
 input[type="email"],
 input[type="password"] {
-  padding: 8px 12px;
-  background: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 6px);
-  color: var(--foreground);
-  font-size: 13px;
-  font-family: var(--font-sans);
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  background: var(--ui-color-surface-variant);
+  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-color-surface-on);
+  font-size: var(--ui-type-size-sm);
+  font-family: var(--ui-font-body);
 }
 
 input::placeholder {
-  color: var(--muted-foreground);
+  color: var(--ui-color-surface-variant-on);
 }
 
 input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 20%, transparent);
+  border-color: var(--ui-color-primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ui-color-primary) 20%, transparent);
 }

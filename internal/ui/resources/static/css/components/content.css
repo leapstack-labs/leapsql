@@ -3,18 +3,18 @@
 .ui-content {
   flex: 1;
   overflow: auto;
-  padding: 24px;
-  background: var(--background);
+  padding: var(--ui-space-lg);
+  background: var(--ui-color-background);
 }
 
 .ui-content h1 {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 24px;
+  font-size: var(--ui-type-size-2xl);
+  font-weight: var(--ui-weight-semibold);
+  margin-bottom: var(--ui-space-lg);
 }
 
 .ui-content--full {
-  padding: 16px;
+  padding: var(--ui-space-sm);
 }
 
 .empty-state {
@@ -22,5 +22,5 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--muted-foreground);
+  color: var(--ui-color-surface-variant-on);
 }

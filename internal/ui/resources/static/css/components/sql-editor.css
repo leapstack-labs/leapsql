@@ -15,30 +15,30 @@ sql-editor {
 
 .sql-editor__container .cm-editor {
   height: 100%;
-  border-radius: var(--radius);
+  border-radius: var(--ui-radius-md);
   overflow: hidden;
 }
 
 .sql-editor__container .cm-focused {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--ui-color-primary);
   outline-offset: -2px;
 }
 
 /* Scrollbar styling */
 .sql-editor__container .cm-scroller::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--ui-space-sm);
+  height: var(--ui-space-sm);
 }
 
 .sql-editor__container .cm-scroller::-webkit-scrollbar-track {
-  background: var(--muted);
+  background: var(--ui-color-surface-variant);
 }
 
 .sql-editor__container .cm-scroller::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: var(--ui-color-outline);
+  border-radius: var(--ui-radius-sm);
 }
 
 .sql-editor__container .cm-scroller::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  background: var(--ui-color-surface-variant-on);
 }

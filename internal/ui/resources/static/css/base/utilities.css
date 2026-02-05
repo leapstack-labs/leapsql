@@ -1,6 +1,6 @@
 /* css/base/utilities.css - Helper Classes */
 .text-muted {
-  color: var(--muted-foreground);
+  color: var(--ui-color-surface-variant-on);
 }
 
 .hidden {

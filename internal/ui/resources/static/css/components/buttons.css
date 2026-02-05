@@ -1,63 +1,63 @@
 /* css/components/buttons.css - Button Styles */
 
 .btn {
-  padding: 6px 12px;
-  border-radius: var(--radius, 6px);
-  border: 1px solid var(--border);
-  background: var(--muted);
-  color: var(--foreground);
-  font-size: 13px;
+  padding: var(--ui-space-xs) var(--ui-space-md);
+  border-radius: var(--ui-radius-md);
+  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  background: var(--ui-color-surface-variant);
+  color: var(--ui-color-surface-on);
+  font-size: var(--ui-type-size-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-duration-fast) var(--ui-ease-default);
 }
 
 .btn:hover {
-  background: var(--card);
-  border-color: var(--muted-foreground);
+  background: var(--ui-color-surface-container);
+  border-color: var(--ui-color-surface-variant-on);
 }
 
 .btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--ui-color-primary);
+  border-color: var(--ui-color-primary);
+  color: var(--ui-color-primary-on);
 }
 
 .btn--primary:hover {
-  background: var(--accent);
+  background: var(--ui-color-tertiary);
 }
 
 .btn--sm {
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+  font-size: var(--ui-type-size-xs);
 }
 
 /* Tab Buttons */
 .model-detail__tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
+  gap: var(--ui-space-xs);
+  margin-bottom: var(--ui-space-sm);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  padding-bottom: var(--ui-space-sm);
 }
 
 .tab-btn {
-  padding: 8px 16px;
+  padding: var(--ui-space-sm) var(--ui-space-sm);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius, 6px);
-  color: var(--muted-foreground);
-  font-size: 13px;
+  border: var(--ui-border-sm) solid transparent;
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-color-surface-variant-on);
+  font-size: var(--ui-type-size-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-duration-fast) var(--ui-ease-default);
 }
 
 .tab-btn:hover {
-  color: var(--foreground);
-  background: var(--muted);
+  color: var(--ui-color-surface-on);
+  background: var(--ui-color-surface-variant);
 }
 
 .tab-btn--active {
-  color: var(--foreground);
-  background: var(--card);
-  border-color: var(--border);
+  color: var(--ui-color-surface-on);
+  background: var(--ui-color-surface-container);
+  border-color: var(--ui-color-outline);
 }

@@ -126,6 +126,7 @@
     --ui-font-heading: var(--op-font-sans);
 
     /* Border Radii */
+    --ui-radius-xs: var(--op-radius-1);
     --ui-radius-sm: var(--op-radius-2);
     --ui-radius-md: var(--op-radius-3);
     --ui-radius-lg: var(--op-radius-4);
@@ -177,7 +178,6 @@
     --ui-breakpoint-xl: 1280px;
   }
 
-  /* Theme Toggles */
-  :root[data-theme="light"] { color-scheme: light; }
-  :root[data-theme="dark"] { color-scheme: dark; }
+  /* Dark Mode Support */
+  /* Color scheme is automatically handled by light-dark() function and .dark class */
 }

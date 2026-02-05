@@ -3,26 +3,26 @@
 .ui-activity-bar {
   width: var(--activity-bar-width);
   min-width: var(--activity-bar-width);
-  background: var(--card);
-  border-right: 1px solid var(--border);
+  background: var(--ui-color-surface-container);
+  border-right: var(--ui-border-sm) solid var(--ui-color-outline);
   display: flex;
   flex-direction: column;
-  padding: 8px 0;
-  z-index: 20;
+  padding: var(--ui-space-sm) 0;
+  z-index: var(--ui-layer-raised);
 }
 
 .activity-bar__group {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 4px 0;
+  gap: var(--ui-space-xs);
+  padding: var(--ui-space-xs) 0;
 }
 
 .activity-bar__group:not(:last-child) {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  padding-bottom: var(--ui-space-sm);
+  margin-bottom: var(--ui-space-xs);
 }
 
 .activity-bar__spacer {
@@ -37,23 +37,23 @@
   justify-content: center;
   border: none;
   background: transparent;
-  color: var(--muted-foreground);
-  border-radius: var(--radius-sm, 4px);
+  color: var(--ui-color-surface-variant-on);
+  border-radius: var(--ui-radius-sm);
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: all var(--ui-duration-fast) var(--ui-ease-default);
   text-decoration: none;
   position: relative;
 }
 
 .activity-bar__item:hover {
-  color: var(--foreground);
-  background: var(--muted);
+  color: var(--ui-color-surface-on);
+  background: var(--ui-color-surface-variant);
 }
 
 /* Active state for panel toggles */
 .activity-bar__item.active {
-  color: var(--foreground);
-  background: var(--muted);
+  color: var(--ui-color-surface-on);
+  background: var(--ui-color-surface-variant);
 }
 
 .activity-bar__item.active::before {
@@ -63,14 +63,14 @@
   top: 50%;
   transform: translateY(-50%);
   width: 2px;
-  height: 24px;
-  background: var(--primary);
-  border-radius: 0 2px 2px 0;
+  height: var(--ui-space-lg);
+  background: var(--ui-color-primary);
+  border-radius: 0 var(--ui-radius-xs) var(--ui-radius-xs) 0;
 }
 
 /* Current page indicator for navigation links */
 .activity-bar__item--current {
-  color: var(--primary);
+  color: var(--ui-color-primary);
 }
 
 .activity-bar__item--current::after {
@@ -79,8 +79,8 @@
   bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  background: var(--primary);
-  border-radius: 50%;
+  width: var(--ui-space-xs);
+  height: var(--ui-space-xs);
+  background: var(--ui-color-primary);
+  border-radius: var(--ui-radius-full);
 }

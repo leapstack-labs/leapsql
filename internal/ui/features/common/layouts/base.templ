@@ -4,32 +4,28 @@ templ Base(title string, isDev bool) {
 	<!DOCTYPE html>
 	<html
 		lang="en"
-		data-signals="{theme: 'claude', darkMode: false, sidePanelOpen: true, activePanel: 'explorer'}"
+		data-signals="{darkMode: false, sidePanelOpen: true, activePanel: 'explorer'}"
 		data-init="
-			$theme = localStorage.getItem('theme') || 'claude';
 			$darkMode = localStorage.getItem('darkMode') === 'true' || 
 				(!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
 			$sidePanelOpen = localStorage.getItem('sidePanelOpen') !== 'false';
 			$activePanel = localStorage.getItem('activePanel') || 'explorer'
 		"
 		data-class:dark="$darkMode"
-		data-attr:data-theme="$theme"
 	>
 		<head>
 			<title>{ title } - LeapSQL</title>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico"/>
-			<!-- Anti-FOUC: Set theme before render -->
+			<!-- Anti-FOUC: Set dark mode before render -->
 			<script>
 				(function() {
-					var theme = localStorage.getItem('theme') || 'claude';
 					var darkMode = localStorage.getItem('darkMode');
 					var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 					if (darkMode === 'true' || (darkMode === null && prefersDark)) {
 						document.documentElement.classList.add('dark');
 					}
-					document.documentElement.setAttribute('data-theme', theme);
 				})();
 			</script>
 			<!-- All themes loaded - CSS cascade selects active -->

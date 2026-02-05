@@ -1,9 +1,7 @@
 /* css/base.css - Main Entry Point */
 
-/* ===== Themes (all loaded, CSS cascade selects active) ===== */
-@import url('./themes/claude.css');
-@import url('./themes/vercel.css');
-@import url('./themes/catppuccin.css');
+/* ===== Design Tokens ===== */
+@import url('./tokens/index.css');
 
 /* ===== Base ===== */
 @import url('./base/reset.css');

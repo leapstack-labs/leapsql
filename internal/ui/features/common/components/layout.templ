@@ -5,43 +5,9 @@ import (
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
-// ThemeControls renders the theme selector and dark mode toggle.
+// ThemeControls renders the dark mode toggle.
 templ ThemeControls() {
 	<div class="theme-controls">
-		<div class="theme-icons" role="radiogroup" aria-label="Select theme">
-			<button
-				type="button"
-				class="theme-icon"
-				data-class:active="$theme === 'claude'"
-				data-on:click="$theme = 'claude'; localStorage.setItem('theme', 'claude')"
-				title="Claude"
-				aria-label="Claude theme"
-			>
-				<img src="/static/icons/claude.svg" alt="" width="18" height="18"/>
-			</button>
-			<button
-				type="button"
-				class="theme-icon"
-				data-class:active="$theme === 'vercel'"
-				data-on:click="$theme = 'vercel'; localStorage.setItem('theme', 'vercel')"
-				title="Vercel"
-				aria-label="Vercel theme"
-			>
-				<img data-show="$darkMode" src="/static/icons/vercel-dark.svg" alt="" width="18" height="18"/>
-				<img data-show="!$darkMode" src="/static/icons/vercel-light.svg" alt="" width="18" height="18"/>
-			</button>
-			<button
-				type="button"
-				class="theme-icon"
-				data-class:active="$theme === 'catppuccin'"
-				data-on:click="$theme = 'catppuccin'; localStorage.setItem('theme', 'catppuccin')"
-				title="Catppuccin"
-				aria-label="Catppuccin theme"
-			>
-				<img src="/static/icons/catppuccin.png" alt="" width="18" height="18"/>
-			</button>
-		</div>
-		<div class="theme-divider"></div>
 		<button
 			class="theme-toggle"
 			data-on:click="$darkMode = !$darkMode; localStorage.setItem('darkMode', $darkMode)"

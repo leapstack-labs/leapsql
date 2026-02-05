@@ -1,14 +1,15 @@
 /* css/base/typography.css - Typography & Font Styles */
 body {
-  font-family: var(--font-sans);
-  font-size: var(--text-base, 14px);
-  line-height: 1.5;
-  color: var(--foreground);
-  background: var(--background);
+  font-family: var(--ui-font-body);
+  font-size: var(--ui-type-size-base);
+  line-height: var(--ui-leading-normal);
+  color: var(--ui-color-background-on);
+  background: var(--ui-color-background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Smooth theme transitions */
-  transition: background-color 150ms ease-out, color 150ms ease-out;
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-out),
+              color var(--ui-duration-fast) var(--ui-ease-out);
 }
 
 a {
@@ -17,5 +18,5 @@ a {
 }
 
 code, pre {
-  font-family: var(--font-mono);
+  font-family: var(--ui-font-code);
 }

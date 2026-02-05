@@ -22,10 +22,10 @@
 .ui-content {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: var(--ui-space-lg);
   min-width: 0; /* Prevent flex overflow */
 }
 
 .ui-content--full {
-  padding: 16px;
+  padding: var(--ui-space-sm);
 }

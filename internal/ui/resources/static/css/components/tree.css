@@ -4,37 +4,37 @@
 .tree-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
-  gap: 8px;
-  border-radius: var(--radius-sm, 4px);
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+  gap: var(--ui-space-sm);
+  border-radius: var(--ui-radius-sm);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--ui-type-size-sm);
   text-decoration: none;
-  color: var(--foreground);
+  color: var(--ui-color-surface-on);
 }
 
 .tree-item:hover {
-  background: var(--muted);
+  background: var(--ui-color-surface-variant);
 }
 
 .tree-item--selected,
 .tree-item--active {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--ui-color-primary);
+  color: var(--ui-color-primary-on);
 }
 
 .tree-item__icon {
   width: 16px;
   height: 16px;
   opacity: 0.7;
-  font-family: var(--font-mono);
+  font-family: var(--ui-font-code);
   text-align: center;
 }
 
 .tree-item__count {
   margin-left: auto;
-  font-size: 11px;
-  color: var(--muted-foreground);
+  font-size: var(--ui-type-size-xs);
+  color: var(--ui-color-surface-variant-on);
 }
 
 /* Tree Folder */
@@ -59,15 +59,15 @@
 }
 
 .tree-folder__children {
-  margin-left: 16px;
-  border-left: 1px solid var(--border);
-  padding-left: 4px;
+  margin-left: var(--ui-space-sm);
+  border-left: var(--ui-border-sm) solid var(--ui-color-outline);
+  padding-left: var(--ui-space-xs);
 }
 
 .tree-item--folder {
-  font-weight: 500;
+  font-weight: var(--ui-weight-medium);
 }
 
 .tree-item--model {
-  padding-left: 8px;
+  padding-left: var(--ui-space-sm);
 }
