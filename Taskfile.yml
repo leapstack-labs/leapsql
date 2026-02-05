@@ -8,6 +8,12 @@ vars:
   STATE_FILE: .leapsql/state.db
   DATABASE: ""
 
+  # cssgen common parameters
+  CSSGEN_SOURCE: internal/ui/resources/static/css
+  CSSGEN_OUTPUT_DIR: internal/ui/cssgen
+  CSSGEN_PACKAGE: cssgen
+  CSSGEN_LINT_PATHS: "internal/ui/features/**/*.templ"
+
 tasks:
   default:
     desc: Show available tasks
@@ -69,15 +75,18 @@ tasks:
       - go test -tags=governance ./pkg/core/... -v
 
   check:
-    desc: Run tests and linting
+    desc: Run tests, linting, and CSS linting
+    ignore_error: true
     cmds:
       - task: test
       - task: lint
+      - task: css:lint
 
   generate:
-    desc: Run all go generate directives (sqlc)
+    desc: Run all go generate directives (sqlc + cssgen)
     cmds:
       - go generate ./...
+      - task: generate:css
 
   generate:dialect:
     desc: Generate DuckDB dialect metadata (functions, keywords, types)
@@ -282,3 +291,16 @@ tasks:
       - mkdir -p ../resources/static/js
       - cp static/js/*.js ../resources/static/js/
 
+  generate:css:
+    desc: Generate type-safe CSS constants from CSS files
+    sources:
+      - internal/ui/resources/static/css/**/*.css
+    generates:
+      - internal/ui/cssgen/styles*.gen.go
+    cmds:
+      - cssgen -source {{.CSSGEN_SOURCE}} -output-dir {{.CSSGEN_OUTPUT_DIR}} -package {{.CSSGEN_PACKAGE}} -include "**/*.css"
+
+  css:lint:
+    desc: Lint CSS usage (golangci-lint style - issues only)
+    cmds:
+      - cssgen -lint-only -output-dir {{.CSSGEN_OUTPUT_DIR}} -lint-paths "{{.CSSGEN_LINT_PATHS}}"
