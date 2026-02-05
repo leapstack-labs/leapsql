@@ -1,27 +1,29 @@
 package runs
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 // RunsContent renders the runs history page content with GitHub Actions-style layout.
 templ RunsContent(data *RunsViewData) {
-	<div class="runs-page">
-		<div class="runs-header">
+	<div class={ui.RunsPage}>
+		<div class={ui.RunsHeader}>
 			<h1>Run History</h1>
-			<p class="text-muted">View past pipeline executions</p>
+			<p class={ui.TextMuted}>View past pipeline executions</p>
 		</div>
-		<div class="runs-container">
-			<div class="runs-list-container">
+		<div class={ui.RunsContainer}>
+			<div class={ui.RunsListContainer}>
 				@RunsListView(data.Runs, data.SelectedRunID)
 			</div>
-			<div class="runs-detail-container">
+			<div class={ui.RunsDetailContainer}>
 				<div id="run-detail">
 					if data.SelectedRun != nil {
 						@RunDetailWithTiersView(data.SelectedRun)
 					} else if data.SelectedRunID != "" {
-						<div class="run-detail-empty">
+						<div class={ui.RunDetailEmpty}>
 							<p>Run not found</p>
-							<a href="/runs" class="run-detail-empty__link">← Back to runs</a>
+							<a href="/runs" class={ui.RunDetailEmptyLink}>← Back to runs</a>
 						</div>
 					} else {
-						<div class="run-detail-empty">
+						<div class={ui.RunDetailEmpty}>
 							<p>Select a run to view details</p>
 						</div>
 					}

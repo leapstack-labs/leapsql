@@ -1,11 +1,14 @@
 package database
 
-import "github.com/starfederation/datastar-go/datastar"
+import (
+	"github.com/starfederation/datastar-go/datastar"
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+)
 
 templ SchemaList(schemas []SchemaInfo) {
-	<div id="database-tree" class="db-tree">
+	<div id="database-tree" class={ui.DbTree}>
 		if len(schemas) == 0 {
-			<p class="text-muted">No schemas found</p>
+			<p class={ui.TextMuted}>No schemas found</p>
 		} else {
 			for _, schema := range schemas {
 				@SchemaItem(schema)
@@ -15,24 +18,24 @@ templ SchemaList(schemas []SchemaInfo) {
 }
 
 templ SchemaItem(schema SchemaInfo) {
-	<details class="db-schema">
+	<details class={ui.DbSchema}>
 		<summary 
-			class="db-schema__header"
+			class={ui.DbSchemaHeader}
 			data-on:toggle={ datastar.GetSSE("/api/database/schemas/%s", schema.Name) }
 		>
-			<span class="db-schema__icon">+</span>
-			<span class="db-schema__name">{ schema.Name }</span>
+			<span class={ui.DbSchemaIcon}>+</span>
+			<span class={ui.DbSchemaName}>{ schema.Name }</span>
 		</summary>
-		<div id={ "schema-" + schema.Name } class="db-schema__tables">
-			<p class="text-muted">Loading tables...</p>
+		<div id={ "schema-" + schema.Name } class={ui.DbSchemaTables}>
+			<p class={ui.TextMuted}>Loading tables...</p>
 		</div>
 	</details>
 }
 
 templ TableList(schemaName string, tables []TableInfo) {
-	<div id={ "schema-" + schemaName } class="db-schema__tables">
+	<div id={ "schema-" + schemaName } class={ui.DbSchemaTables}>
 		if len(tables) == 0 {
-			<p class="text-muted">No tables found</p>
+			<p class={ui.TextMuted}>No tables found</p>
 		} else {
 			for _, table := range tables {
 				@TableItem(schemaName, table)
@@ -43,10 +46,10 @@ templ TableList(schemaName string, tables []TableInfo) {
 
 templ TableItem(schemaName string, table TableInfo) {
 	<div 
-		class={ "db-table", tableClass(table.Type) }
+		class={ ui.DbTable, tableClass(table.Type) }
 		data-on:click={ datastar.GetSSE("/api/database/tables/%s/%s", schemaName, table.Name) }
 	>
-		<span class="db-table__icon">{ tableIcon(table.Type) }</span>
-		<span class="db-table__name">{ table.Name }</span>
+		<span class={ui.DbTableIcon}>{ tableIcon(table.Type) }</span>
+		<span class={ui.DbTableName}>{ table.Name }</span>
 	</div>
 }

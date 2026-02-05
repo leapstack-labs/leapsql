@@ -1,13 +1,16 @@
 package macros
 
-import "fmt"
+import (
+	"fmt"
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+)
 
 // MacroNamespaceTree renders the collapsible namespace tree.
 templ MacroNamespaceTree(namespaces []NamespaceData, selected *FunctionDetail) {
-	<div class="macro-tree">
+	<div class={ui.MacroTree}>
 		if len(namespaces) == 0 {
-			<p class="text-muted">No macros found</p>
-			<p class="text-muted text-sm">Add .star files to the macros directory</p>
+			<p class={ui.TextMuted}>No macros found</p>
+			<p class={ui.TextMuted, ui.TextSm}>Add .star files to the macros directory</p>
 		} else {
 			for _, ns := range namespaces {
 				@MacroNamespaceItem(ns, selected)
@@ -18,13 +21,13 @@ templ MacroNamespaceTree(namespaces []NamespaceData, selected *FunctionDetail) {
 
 // MacroNamespaceItem renders a collapsible namespace with its functions.
 templ MacroNamespaceItem(ns NamespaceData, selected *FunctionDetail) {
-	<details class="macro-namespace" open>
-		<summary class="macro-namespace__header">
-			<span class="macro-namespace__icon"></span>
-			<span class="macro-namespace__name">{ ns.Name }</span>
-			<span class="macro-namespace__count">{ itoa(len(ns.Functions)) }</span>
+	<details class={ui.MacroNamespace} open>
+		<summary class={ui.MacroNamespaceHeader}>
+			<span class={ui.MacroNamespaceIcon}></span>
+			<span class={ui.MacroNamespaceName}>{ ns.Name }</span>
+			<span class={ui.MacroNamespaceCount}>{ itoa(len(ns.Functions)) }</span>
 		</summary>
-		<div class="macro-namespace__functions">
+		<div class={ui.MacroNamespaceFunctions}>
 			for _, fn := range ns.Functions {
 				@MacroFunctionItem(ns.Name, fn, isSelectedFunction(selected, ns.Name, fn.Name))
 			}
@@ -36,11 +39,11 @@ templ MacroNamespaceItem(ns NamespaceData, selected *FunctionDetail) {
 templ MacroFunctionItem(namespace string, fn FunctionSummary, isSelected bool) {
 	<a 
 		href={ templ.SafeURL(fmt.Sprintf("/macros/%s/%s", namespace, fn.Name)) }
-		class={ "macro-function", templ.KV("macro-function--selected", isSelected) }
+		class={ "macro-function", templ.KV(ui.MacroFunctionSelected, isSelected) }
 	>
-		<span class="macro-function__name">{ fn.Name }</span>
+		<span class={ui.MacroFunctionName}>{ fn.Name }</span>
 		if fn.HasDoc {
-			<span class="macro-function__doc-indicator" title="Has documentation"></span>
+			<span class={ui.MacroFunctionDocIndicator} title="Has documentation"></span>
 		}
 	</a>
 }

@@ -1,14 +1,15 @@
 package models
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
 // DataPreviewTable renders the data preview table.
 templ DataPreviewTable(preview *PreviewData) {
-	<div class="data-preview">
-		<div class="data-preview__header">
-			<span class="data-preview__count">
+	<div class={ui.DataPreview}>
+		<div class={ui.DataPreviewHeader}>
+			<span class={ui.DataPreviewCount}>
 				{ common.Itoa(preview.RowCount) } rows
 				if preview.Limited {
 					(limited to 50)
@@ -16,8 +17,8 @@ templ DataPreviewTable(preview *PreviewData) {
 			</span>
 		</div>
 		if len(preview.Columns) > 0 {
-			<div class="data-preview__table-wrapper">
-				<table class="data-preview__table">
+			<div class={ui.DataPreviewTableWrapper}>
+				<table class={ui.DataPreviewTable}>
 					<thead>
 						<tr>
 							for _, col := range preview.Columns {

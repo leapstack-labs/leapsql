@@ -1,20 +1,21 @@
 package runs
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
 // RunsListView renders the list of runs as GitHub Actions-style cards.
 templ RunsListView(runsList []RunListItem, selectedRunID string) {
-	<div id="runs-list" class="runs-list">
+	<div id="runs-list" class={ui.RunsList}>
 		if len(runsList) == 0 {
-			<div class="runs-empty">
+			<div class={ui.RunsEmpty}>
 				<p>No runs found</p>
-				<p class="text-muted">Execute a run to see history here</p>
+				<p class={ui.TextMuted}>Execute a run to see history here</p>
 			</div>
 		} else {
-			<div class="runs-card-list">
+			<div class={ui.RunsCardList}>
 				for _, run := range runsList {
 					@RunListCard(run, run.ID == selectedRunID)
 				}
@@ -27,29 +28,29 @@ templ RunsListView(runsList []RunListItem, selectedRunID string) {
 templ RunListCard(run RunListItem, isSelected bool) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/runs/%s", run.ID)) }
-		class={ "run-list-card", templ.KV("run-list-card--selected", isSelected), runListCardStatusClass(run.Status) }
+		class={ "run-list-card", templ.KV(ui.RunListCardSelected, isSelected), runListCardStatusClass(run.Status) }
 		if isSelected {
 			data-init="el.scrollIntoView({ block: 'center', behavior: 'instant' })"
 		}
 	>
-		<div class="run-list-card__main">
-			<div class="run-list-card__status">
+		<div class={ui.RunListCardMain}>
+			<div class={ui.RunListCardStatus}>
 				@StatusIcon(run.Status, "lg")
 			</div>
-			<div class="run-list-card__info">
-				<div class="run-list-card__title">
-					<code class="run-list-card__id">{ truncateID(run.ID) }</code>
-					<span class="run-list-card__env">{ run.Environment }</span>
+			<div class={ui.RunListCardInfo}>
+				<div class={ui.RunListCardTitle}>
+					<code class={ui.RunListCardId}>{ truncateID(run.ID) }</code>
+					<span class={ui.RunListCardEnv}>{ run.Environment }</span>
 				</div>
-				<div class="run-list-card__meta">
-					<span class="run-list-card__time">{ run.StartedAt }</span>
+				<div class={ui.RunListCardMeta}>
+					<span class={ui.RunListCardTime}>{ run.StartedAt }</span>
 					if run.Duration != "" {
-						<span class="run-list-card__duration">{ run.Duration }</span>
+						<span class={ui.RunListCardDuration}>{ run.Duration }</span>
 					}
 				</div>
 			</div>
 		</div>
-		<div class="run-list-card__stats">
+		<div class={ui.RunListCardStats}>
 			if run.Stats.TotalModels > 0 {
 				@RunMiniStats(run.Stats)
 			}
@@ -59,33 +60,33 @@ templ RunListCard(run RunListItem, isSelected bool) {
 
 // RunMiniStats renders mini status counts for list cards.
 templ RunMiniStats(stats RunStats) {
-	<div class="run-mini-stats">
+	<div class={ui.RunMiniStats}>
 		if stats.Succeeded > 0 {
-			<span class="run-mini-stats__item run-mini-stats__item--success">
+			<span class={ui.RunMiniStatsItem, ui.RunMiniStatsItemSuccess}>
 				@StatusIcon("success", "sm")
 				{ common.Itoa(stats.Succeeded) }
 			</span>
 		}
 		if stats.Failed > 0 {
-			<span class="run-mini-stats__item run-mini-stats__item--failed">
+			<span class={ui.RunMiniStatsItem, ui.RunMiniStatsItemFailed}>
 				@StatusIcon("failed", "sm")
 				{ common.Itoa(stats.Failed) }
 			</span>
 		}
 		if stats.Skipped > 0 {
-			<span class="run-mini-stats__item run-mini-stats__item--skipped">
+			<span class={ui.RunMiniStatsItem, ui.RunMiniStatsItemSkipped}>
 				@StatusIcon("skipped", "sm")
 				{ common.Itoa(stats.Skipped) }
 			</span>
 		}
 		if stats.Running > 0 {
-			<span class="run-mini-stats__item run-mini-stats__item--running">
+			<span class={ui.RunMiniStatsItem, ui.RunMiniStatsItemRunning}>
 				@StatusIcon("running", "sm")
 				{ common.Itoa(stats.Running) }
 			</span>
 		}
 		if stats.Pending > 0 {
-			<span class="run-mini-stats__item run-mini-stats__item--pending">
+			<span class={ui.RunMiniStatsItem, ui.RunMiniStatsItemPending}>
 				@StatusIcon("pending", "sm")
 				{ common.Itoa(stats.Pending) }
 			</span>

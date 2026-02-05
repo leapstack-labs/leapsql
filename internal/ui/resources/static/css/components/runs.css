@@ -332,6 +332,11 @@
 }
 
 /* Run Card List */
+.runs-list {
+  display: flex;
+  flex-direction: column;
+}
+
 .runs-card-list {
   display: flex;
   flex-direction: column;
@@ -423,6 +428,14 @@
   gap: var(--ui-space-md);
   font-size: var(--ui-type-size-sm);
   color: var(--ui-color-surface-variant-on);
+}
+
+.run-list-card__time {
+  color: var(--ui-color-surface-variant-on);
+}
+
+.run-list-card__duration {
+  font-family: var(--ui-font-code);
 }
 
 .run-list-card__stats {
@@ -670,6 +683,10 @@
   border: var(--ui-border-sm) solid var(--ui-color-outline);
   border-radius: var(--ui-radius-md);
   overflow: hidden;
+}
+
+.tier-group--collapsed {
+  opacity: 0.7;
 }
 
 .tier-group__header {

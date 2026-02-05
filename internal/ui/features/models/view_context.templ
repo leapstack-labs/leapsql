@@ -1,19 +1,20 @@
 package models
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"fmt"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
 // ContextPanel renders the context panel sidebar.
 templ ContextPanel(mctx *ModelContext) {
-	<aside class="ui-context-panel">
-		<div class="ui-context-panel__header">Properties</div>
+	<aside class={ui.UiContextPanel}>
+		<div class={ui.UiContextPanelHeader}>Properties</div>
 		<div id="context-content">
 			if mctx != nil {
 				@ModelContextContent(*mctx)
 			} else {
-				<p class="text-muted">Select a model to view details</p>
+				<p class={ui.TextMuted}>Select a model to view details</p>
 			}
 		</div>
 	</aside>
@@ -21,25 +22,25 @@ templ ContextPanel(mctx *ModelContext) {
 
 // ModelContextContent renders the model context content.
 templ ModelContextContent(mctx ModelContext) {
-	<div class="model-context">
-		<div class="model-context__section">
-			<div class="model-context__label">Model</div>
-			<div class="model-context__value">{ mctx.Name }</div>
+	<div class={ui.ModelContext}>
+		<div class={ui.ModelContextSection}>
+			<div class={ui.ModelContextLabel}>Model</div>
+			<div class={ui.ModelContextValue}>{ mctx.Name }</div>
 		</div>
-		<div class="model-context__section">
-			<div class="model-context__label">Type</div>
-			<div class="model-context__value">{ common.MaterializationLabel(mctx.Type) }</div>
+		<div class={ui.ModelContextSection}>
+			<div class={ui.ModelContextLabel}>Type</div>
+			<div class={ui.ModelContextValue}>{ common.MaterializationLabel(mctx.Type) }</div>
 		</div>
 		if mctx.Schema != "" {
-			<div class="model-context__section">
-				<div class="model-context__label">Schema</div>
-				<div class="model-context__value">{ mctx.Schema }</div>
+			<div class={ui.ModelContextSection}>
+				<div class={ui.ModelContextLabel}>Schema</div>
+				<div class={ui.ModelContextValue}>{ mctx.Schema }</div>
 			</div>
 		}
 		if len(mctx.DependsOn) > 0 {
-			<div class="model-context__section">
-				<div class="model-context__label">Depends On</div>
-				<ul class="model-context__list">
+			<div class={ui.ModelContextSection}>
+				<div class={ui.ModelContextLabel}>Depends On</div>
+				<ul class={ui.ModelContextList}>
 					for _, dep := range mctx.DependsOn {
 						<li>
 							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
@@ -49,9 +50,9 @@ templ ModelContextContent(mctx ModelContext) {
 			</div>
 		}
 		if len(mctx.Dependents) > 0 {
-			<div class="model-context__section">
-				<div class="model-context__label">Dependents</div>
-				<ul class="model-context__list">
+			<div class={ui.ModelContextSection}>
+				<div class={ui.ModelContextLabel}>Dependents</div>
+				<ul class={ui.ModelContextList}>
 					for _, dep := range mctx.Dependents {
 						<li>
 							<a href={ templ.SafeURL(fmt.Sprintf("/models/%s", dep)) }>{ dep }</a>
@@ -61,14 +62,14 @@ templ ModelContextContent(mctx ModelContext) {
 			</div>
 		}
 		if len(mctx.Columns) > 0 {
-			<div class="model-context__section">
-				<div class="model-context__label">Columns ({ common.Itoa(len(mctx.Columns)) })</div>
-				<ul class="model-context__columns">
+			<div class={ui.ModelContextSection}>
+				<div class={ui.ModelContextLabel}>Columns ({ common.Itoa(len(mctx.Columns)) })</div>
+				<ul class={ui.ModelContextColumns}>
 					for _, col := range mctx.Columns {
-						<li class="model-context__column">
-							<span class="model-context__column-name">{ col.Name }</span>
+						<li class={ui.ModelContextColumn}>
+							<span class={ui.ModelContextColumnName}>{ col.Name }</span>
 							if col.Type != "" {
-								<span class="model-context__column-type">{ col.Type }</span>
+								<span class={ui.ModelContextColumnType}>{ col.Type }</span>
 							}
 						</li>
 					}

@@ -2,8 +2,8 @@
 //
 // Source: internal/ui/resources/static/css
 // Files scanned: 35
-// Classes generated: 333
-// Generated: 2026-02-05 21:28:45
+// Classes generated: 341
+// Generated: 2026-02-05 21:33:16
 //
 // This file provides type-safe constants for CSS classes.
 // Each constant includes metadata about layer, inheritance, and styles.
@@ -45,6 +45,7 @@ var AllCSSClasses = map[string]bool{
 	"activity-bar__spacer": true,
 	"btn": true,
 	"btn--primary": true,
+	"btn--secondary": true,
 	"btn--sm": true,
 	"cm-content": true,
 	"cm-editor": true,
@@ -104,6 +105,7 @@ var AllCSSClasses = map[string]bool{
 	"graph-node__label": true,
 	"graph-node__type": true,
 	"graph-nodes": true,
+	"graph-page": true,
 	"graph-svg-container": true,
 	"graph-view": true,
 	"graph-view__canvas": true,
@@ -148,6 +150,7 @@ var AllCSSClasses = map[string]bool{
 	"model-context__section": true,
 	"model-context__value": true,
 	"model-detail": true,
+	"model-detail--empty": true,
 	"model-detail__actions": true,
 	"model-detail__badge": true,
 	"model-detail__content": true,
@@ -205,6 +208,7 @@ var AllCSSClasses = map[string]bool{
 	"query-page__sidebar": true,
 	"query-page__title": true,
 	"query-results": true,
+	"query-results__count": true,
 	"query-results__empty": true,
 	"query-results__error": true,
 	"query-results__error-icon": true,
@@ -257,6 +261,7 @@ var AllCSSClasses = map[string]bool{
 	"run-list-card--failed": true,
 	"run-list-card--running": true,
 	"run-list-card--selected": true,
+	"run-list-card__duration": true,
 	"run-list-card__env": true,
 	"run-list-card__id": true,
 	"run-list-card__info": true,
@@ -264,6 +269,7 @@ var AllCSSClasses = map[string]bool{
 	"run-list-card__meta": true,
 	"run-list-card__stats": true,
 	"run-list-card__status": true,
+	"run-list-card__time": true,
 	"run-list-card__title": true,
 	"run-mini-stats": true,
 	"run-mini-stats__item": true,
@@ -292,6 +298,7 @@ var AllCSSClasses = map[string]bool{
 	"runs-detail-container": true,
 	"runs-empty": true,
 	"runs-header": true,
+	"runs-list": true,
 	"runs-list-container": true,
 	"runs-page": true,
 	"runs-table": true,
@@ -332,6 +339,7 @@ var AllCSSClasses = map[string]bool{
 	"theme-controls": true,
 	"theme-toggle": true,
 	"tier-group": true,
+	"tier-group--collapsed": true,
 	"tier-group__arrow": true,
 	"tier-group__content": true,
 	"tier-group__count": true,

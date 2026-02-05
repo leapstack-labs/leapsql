@@ -1,28 +1,30 @@
 package statequery
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 // SchemaPanel renders the schema panel.
 templ SchemaPanel(schema SchemaData) {
-	<div id="query-schema-panel" class="query-sidebar__schema">
-		<div class="schema-panel__header">
-			<span class="schema-panel__type">{ schema.Type }</span>
-			<span class="schema-panel__name">{ schema.Name }</span>
+	<div id="query-schema-panel" class={ui.QuerySidebarSchema}>
+		<div class={ui.SchemaPanelHeader}>
+			<span class={ui.SchemaPanelType}>{ schema.Type }</span>
+			<span class={ui.SchemaPanelName}>{ schema.Name }</span>
 		</div>
 		if len(schema.Columns) > 0 {
-			<ul class="schema-panel__columns">
+			<ul class={ui.SchemaPanelColumns}>
 				for _, col := range schema.Columns {
-					<li class="schema-panel__column">
-						<span class="schema-panel__col-name">
+					<li class={ui.SchemaPanelColumn}>
+						<span class={ui.SchemaPanelColName}>
 							{ col.Name }
 							if col.IsPK {
-								<span class="schema-panel__pk">PK</span>
+								<span class={ui.SchemaPanelPk}>PK</span>
 							}
 						</span>
-						<span class="schema-panel__col-type">{ col.Type }</span>
+						<span class={ui.SchemaPanelColType}>{ col.Type }</span>
 					</li>
 				}
 			</ul>
 		} else {
-			<p class="text-muted">No columns</p>
+			<p class={ui.TextMuted}>No columns</p>
 		}
 	</div>
 }

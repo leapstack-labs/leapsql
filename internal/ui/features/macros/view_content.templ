@@ -1,22 +1,24 @@
 package macros
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 // MacrosContent renders the macros catalog page content.
 templ MacrosContent(data *ViewData) {
-	<div class="macros-page">
-		<div class="macros-page__sidebar">
-			<div class="macros-page__header">
+	<div class={ui.MacrosPage}>
+		<div class={ui.MacrosPageSidebar}>
+			<div class={ui.MacrosPageHeader}>
 				<h1>Macros</h1>
-				<p class="text-muted">Project macro functions</p>
+				<p class={ui.TextMuted}>Project macro functions</p>
 			</div>
 			@MacroNamespaceTree(data.Namespaces, data.SelectedFunction)
 		</div>
-		<div class="macros-page__detail">
+		<div class={ui.MacrosPageDetail}>
 			if data.SelectedFunction != nil {
 				@MacroFunctionDetailPanel(data.SelectedFunction)
 			} else {
-				<div class="macros-empty">
+				<div class={ui.MacrosEmpty}>
 					<p>Select a function to view details</p>
-					<p class="text-muted">Browse namespaces on the left</p>
+					<p class={ui.TextMuted}>Browse namespaces on the left</p>
 				</div>
 			}
 		</div>

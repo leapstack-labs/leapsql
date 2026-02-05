@@ -4,6 +4,12 @@
   max-width: 900px;
 }
 
+.model-detail--empty {
+  text-align: center;
+  padding: var(--ui-space-xl);
+  color: var(--ui-color-surface-variant-on);
+}
+
 .model-detail__header {
   margin-bottom: var(--ui-space-sm);
 }

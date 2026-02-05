@@ -116,6 +116,10 @@
     font-size: var(--ui-type-size-sm);
 }
 
+.query-results__count {
+    font-weight: var(--ui-weight-medium);
+}
+
 .query-results__truncated {
     color: var(--warning);
     margin-left: var(--spacing-xs);

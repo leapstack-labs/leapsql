@@ -1,22 +1,24 @@
 package database
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 templ TableDetail(meta TableMeta) {
-	<div id="context-content" class="db-table-detail">
-		<div class="db-table-detail__header">
-			<div class="db-table-detail__name">{ meta.Name }</div>
+	<div id="context-content" class={ui.DbTableDetail}>
+		<div class={ui.DbTableDetailHeader}>
+			<div class={ui.DbTableDetailName}>{ meta.Name }</div>
 			if meta.Schema != "" {
-				<div class="db-table-detail__schema">{ meta.Schema }</div>
+				<div class={ui.DbTableDetailSchema}>{ meta.Schema }</div>
 			}
 		</div>
-		<div class="db-table-detail__section">
-			<div class="db-table-detail__label">Columns ({ itoa(len(meta.Columns)) })</div>
-			<ul class="db-table-detail__columns">
+		<div class={ui.DbTableDetailSection}>
+			<div class={ui.DbTableDetailLabel}>Columns ({ itoa(len(meta.Columns)) })</div>
+			<ul class={ui.DbTableDetailColumns}>
 				for _, col := range meta.Columns {
-					<li class="db-table-detail__column">
-						<span class="db-table-detail__column-name">{ col.Name }</span>
-						<span class="db-table-detail__column-type">{ col.Type }</span>
+					<li class={ui.DbTableDetailColumn}>
+						<span class={ui.DbTableDetailColumnName}>{ col.Name }</span>
+						<span class={ui.DbTableDetailColumnType}>{ col.Type }</span>
 						if col.Nullable {
-							<span class="db-table-detail__column-nullable">?</span>
+							<span class={ui.DbTableDetailColumnNullable}>?</span>
 						}
 					</li>
 				}

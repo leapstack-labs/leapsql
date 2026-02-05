@@ -1,6 +1,7 @@
 package home
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"fmt"
 )
 
@@ -8,10 +9,10 @@ import (
 templ DashboardContent(stats *DashboardStats) {
 	<div id="model-detail">
 		<h1>LeapSQL Dashboard</h1>
-		<div class="stats-grid">
-			<div class="stat-card">
-				<span class="stat-value">{ fmt.Sprint(stats.ModelCount) }</span>
-				<span class="stat-label">Models</span>
+		<div class={ui.StatsGrid}>
+			<div class={ui.StatCard}>
+				<span class={ui.StatValue}>{ fmt.Sprint(stats.ModelCount) }</span>
+				<span class={ui.StatLabel}>Models</span>
 			</div>
 		</div>
 	</div>

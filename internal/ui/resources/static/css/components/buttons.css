@@ -26,6 +26,16 @@
   background: var(--ui-color-tertiary);
 }
 
+.btn--secondary {
+  background: var(--ui-color-surface-container);
+  border-color: var(--ui-color-outline);
+  color: var(--ui-color-surface-on);
+}
+
+.btn--secondary:hover {
+  background: var(--ui-color-surface-variant);
+}
+
 .btn--sm {
   padding: var(--ui-space-xs) var(--ui-space-sm);
   font-size: var(--ui-type-size-xs);

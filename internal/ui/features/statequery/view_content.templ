@@ -1,19 +1,21 @@
 package statequery
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 // QueryContent renders the state query page content.
 templ QueryContent(data *QueryViewData) {
 	<div
-		class="query-page"
+		class={ui.QueryPage}
 		data-signals="{sql: ''}"
 		data-on:editor-change="$sql = evt.detail"
 	>
-		<div class="query-page__main">
-			<div class="query-page__editor-section">
-				<div class="query-page__editor-header">
-					<h1 class="query-page__title">State Query</h1>
-					<p class="text-muted">Query the LeapSQL state database</p>
+		<div class={ui.QueryPageMain}>
+			<div class={ui.QueryPageEditorSection}>
+				<div class={ui.QueryPageEditorHeader}>
+					<h1 class={ui.QueryPageTitle}>State Query</h1>
+					<p class={ui.TextMuted}>Query the LeapSQL state database</p>
 				</div>
-				<div class="query-editor">
+				<div class={ui.QueryEditor}>
 					<sql-editor
 						id="sql-editor"
 						initial-value=""
@@ -21,11 +23,11 @@ templ QueryContent(data *QueryViewData) {
 						data-on:editor-execute="document.getElementById('execute-btn').click()"
 					></sql-editor>
 				</div>
-				<div class="query-page__actions">
+				<div class={ui.QueryPageActions}>
 					<button
 						type="button"
 						id="execute-btn"
-						class="btn btn--primary"
+						class={ui.Btn, ui.BtnPrimary}
 						data-on:click="@post('/api/query/execute')"
 					>
 						Execute
@@ -33,7 +35,7 @@ templ QueryContent(data *QueryViewData) {
 					</button>
 					<button
 						type="button"
-						class="btn btn--secondary"
+						class={ui.Btn, ui.BtnSecondary}
 						id="clear-btn"
 						data-on:click="document.getElementById('sql-editor').clear(); $sql = ''"
 					>
@@ -41,16 +43,16 @@ templ QueryContent(data *QueryViewData) {
 					</button>
 				</div>
 			</div>
-			<div id="query-results" class="query-results">
-				<div class="query-results__empty">
-					<p class="text-muted">Enter a query and press Execute</p>
+			<div id="query-results" class={ui.QueryResults}>
+				<div class={ui.QueryResultsEmpty}>
+					<p class={ui.TextMuted}>Enter a query and press Execute</p>
 				</div>
 			</div>
 		</div>
-		<aside class="query-page__sidebar">
+		<aside class={ui.QueryPageSidebar}>
 			@QueryTablesList(data.Tables, data.Views)
-			<div id="query-schema-panel" class="query-sidebar__schema">
-				<p class="text-muted">Click a table to view schema</p>
+			<div id="query-schema-panel" class={ui.QuerySidebarSchema}>
+				<p class={ui.TextMuted}>Click a table to view schema</p>
 			</div>
 		</aside>
 	</div>

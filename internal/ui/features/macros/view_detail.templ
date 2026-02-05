@@ -1,18 +1,20 @@
 package macros
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 // MacroFunctionDetailPanel renders the full function detail view.
 templ MacroFunctionDetailPanel(fn *FunctionDetail) {
-	<div class="macro-detail">
+	<div class={ui.MacroDetail}>
 		@MacroBreadcrumb(fn.Namespace, fn.Name)
 		
-		<div class="macro-detail__signature">
+		<div class={ui.MacroDetailSignature}>
 			<code>{ fn.Namespace }.{ fn.Signature }</code>
 		</div>
 		
 		if len(fn.Args) > 0 {
-			<div class="macro-detail__section">
+			<div class={ui.MacroDetailSection}>
 				<h4>Arguments</h4>
-				<table class="macro-detail__args">
+				<table class={ui.MacroDetailArgs}>
 					<thead>
 						<tr>
 							<th>Name</th>
@@ -26,16 +28,16 @@ templ MacroFunctionDetailPanel(fn *FunctionDetail) {
 								<td><code>{ arg.Name }</code></td>
 								<td>
 									if arg.Required {
-										<span class="macro-detail__required">Yes</span>
+										<span class={ui.MacroDetailRequired}>Yes</span>
 									} else {
-										<span class="text-muted">No</span>
+										<span class={ui.TextMuted}>No</span>
 									}
 								</td>
 								<td>
 									if arg.Default != "" {
 										<code>{ arg.Default }</code>
 									} else {
-										<span class="text-muted">-</span>
+										<span class={ui.TextMuted}>-</span>
 									}
 								</td>
 							</tr>
@@ -46,30 +48,30 @@ templ MacroFunctionDetailPanel(fn *FunctionDetail) {
 		}
 		
 		if fn.Docstring != "" {
-			<div class="macro-detail__section">
+			<div class={ui.MacroDetailSection}>
 				<h4>Description</h4>
-				<p class="macro-detail__docstring">{ fn.Docstring }</p>
+				<p class={ui.MacroDetailDocstring}>{ fn.Docstring }</p>
 			</div>
 		}
 		
-		<div class="macro-detail__section">
+		<div class={ui.MacroDetailSection}>
 			<h4>Source</h4>
-			<pre class="macro-detail__source"><code>{ fn.SourceCode }</code></pre>
+			<pre class={ui.MacroDetailSource}><code>{ fn.SourceCode }</code></pre>
 		</div>
 		
-		<div class="macro-detail__location">
-			<span class="text-muted">{ fn.FilePath }:{ itoa(fn.Line) }</span>
+		<div class={ui.MacroDetailLocation}>
+			<span class={ui.TextMuted}>{ fn.FilePath }:{ itoa(fn.Line) }</span>
 		</div>
 	</div>
 }
 
 // MacroBreadcrumb renders navigation breadcrumb.
 templ MacroBreadcrumb(namespace, function string) {
-	<nav class="macro-breadcrumb">
-		<a href="/macros" class="macro-breadcrumb__item">Macros</a>
-		<span class="macro-breadcrumb__separator">/</span>
-		<span class="macro-breadcrumb__item">{ namespace }</span>
-		<span class="macro-breadcrumb__separator">/</span>
-		<span class="macro-breadcrumb__item macro-breadcrumb__item--current">{ function }</span>
+	<nav class={ui.MacroBreadcrumb}>
+		<a href="/macros" class={ui.MacroBreadcrumbItem}>Macros</a>
+		<span class={ui.MacroBreadcrumbSeparator}>/</span>
+		<span class={ui.MacroBreadcrumbItem}>{ namespace }</span>
+		<span class={ui.MacroBreadcrumbSeparator}>/</span>
+		<span class={ui.MacroBreadcrumbItem, ui.MacroBreadcrumbItemCurrent}>{ function }</span>
 	</nav>
 }

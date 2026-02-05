@@ -1,37 +1,38 @@
 package statequery
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
 // QueryResults renders the query execution results.
 templ QueryResults(result QueryResult) {
-	<div id="query-results" class="query-results">
+	<div id="query-results" class={ui.QueryResults}>
 		if result.Error != "" {
-			<div class="query-results__error">
-				<span class="query-results__error-icon">x</span>
-				<span class="query-results__error-message">{ result.Error }</span>
+			<div class={ui.QueryResultsError}>
+				<span class={ui.QueryResultsErrorIcon}>x</span>
+				<span class={ui.QueryResultsErrorMessage}>{ result.Error }</span>
 			</div>
 		} else if result.RowCount == 0 && len(result.Columns) == 0 {
-			<div class="query-results__empty">
-				<p class="text-muted">Enter a query and press Execute</p>
+			<div class={ui.QueryResultsEmpty}>
+				<p class={ui.TextMuted}>Enter a query and press Execute</p>
 			</div>
 		} else if result.RowCount == 0 {
-			<div class="query-results__empty">
+			<div class={ui.QueryResultsEmpty}>
 				<p>(0 rows)</p>
 			</div>
 		} else {
-			<div class="query-results__header">
-				<span class="query-results__count">
+			<div class={ui.QueryResultsHeader}>
+				<span class={ui.QueryResultsCount}>
 					{ common.Itoa(result.RowCount) } rows
 					if result.Truncated {
-						<span class="query-results__truncated">(limited to 1000)</span>
+						<span class={ui.QueryResultsTruncated}>(limited to 1000)</span>
 					}
 				</span>
-				<span class="query-results__time">{ common.Itoa(int(result.QueryMS)) }ms</span>
+				<span class={ui.QueryResultsTime}>{ common.Itoa(int(result.QueryMS)) }ms</span>
 			</div>
-			<div class="query-results__table-wrapper">
-				<table class="query-results__table">
+			<div class={ui.QueryResultsTableWrapper}>
+				<table class={ui.QueryResultsTable}>
 					<thead>
 						<tr>
 							for _, col := range result.Columns {

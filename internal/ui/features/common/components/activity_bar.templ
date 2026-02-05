@@ -1,15 +1,18 @@
 package components
 
-import "strings"
+import (
+	"strings"
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+)
 
 // ActivityBar renders the slim icon navigation bar
 templ ActivityBar(currentPath string) {
-	<nav class="ui-activity-bar" aria-label="Main navigation">
+	<nav class={ui.UiActivityBar} aria-label="Main navigation">
 		// Panel toggle buttons (top group)
-		<div class="activity-bar__group">
+		<div class={ui.ActivityBarGroup}>
 			<button
 				type="button"
-				class="activity-bar__item"
+				class={ui.ActivityBarItem}
 				data-class:active="$activePanel === 'explorer' && $sidePanelOpen"
 				data-on:click="if ($activePanel === 'explorer' && $sidePanelOpen) { $sidePanelOpen = false } else { $activePanel = 'explorer'; $sidePanelOpen = true }; localStorage.setItem('sidePanelOpen', $sidePanelOpen); localStorage.setItem('activePanel', $activePanel)"
 				title="Explorer (Cmd+B)"
@@ -19,10 +22,10 @@ templ ActivityBar(currentPath string) {
 			</button>
 		</div>
 		// Navigation links (middle group)
-		<div class="activity-bar__group">
+		<div class={ui.ActivityBarGroup}>
 			<a
 				href="/graph"
-				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/graph") }
+				class={ ui.ActivityBarItem, templ.KV(ui.ActivityBarItemCurrent, currentPath == "/graph") }
 				title="View DAG"
 				aria-label="View DAG graph"
 			>
@@ -30,7 +33,7 @@ templ ActivityBar(currentPath string) {
 			</a>
 			<a
 				href="/runs"
-				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/runs") }
+				class={ ui.ActivityBarItem, templ.KV(ui.ActivityBarItemCurrent, currentPath == "/runs") }
 				title="Run History"
 				aria-label="View run history"
 			>
@@ -38,7 +41,7 @@ templ ActivityBar(currentPath string) {
 			</a>
 			<a
 				href="/query"
-				class={ "activity-bar__item", templ.KV("activity-bar__item--current", currentPath == "/query") }
+				class={ ui.ActivityBarItem, templ.KV(ui.ActivityBarItemCurrent, currentPath == "/query") }
 				title="State Query"
 				aria-label="State query tool"
 			>
@@ -46,7 +49,7 @@ templ ActivityBar(currentPath string) {
 			</a>
 			<a
 				href="/macros"
-				class={ "activity-bar__item", templ.KV("activity-bar__item--current", strings.HasPrefix(currentPath, "/macros")) }
+				class={ ui.ActivityBarItem, templ.KV(ui.ActivityBarItemCurrent, strings.HasPrefix(currentPath, "/macros")) }
 				title="Macros"
 				aria-label="View macros"
 			>
@@ -54,12 +57,12 @@ templ ActivityBar(currentPath string) {
 			</a>
 		</div>
 		// Spacer to push settings to bottom
-		<div class="activity-bar__spacer"></div>
+		<div class={ui.ActivityBarSpacer}></div>
 		// Settings (bottom group)
-		<div class="activity-bar__group">
+		<div class={ui.ActivityBarGroup}>
 			<button
 				type="button"
-				class="activity-bar__item"
+				class={ui.ActivityBarItem}
 				title="Settings"
 				aria-label="Open settings"
 			>

@@ -1,18 +1,19 @@
 package graph
 
 import (
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
 	"encoding/json"
 	"github.com/leapstack-labs/leapsql/internal/ui/features/common"
 )
 
 // GraphContent renders the DAG visualization page content.
 templ GraphContent(data *GraphViewData) {
-	<div class="graph-page">
-		<div class="graph-header">
+	<div class={ui.GraphPage}>
+		<div class={ui.GraphHeader}>
 			<h1>DAG</h1>
-			<p class="text-muted">Model dependency graph</p>
+			<p class={ui.TextMuted}>Model dependency graph</p>
 		</div>
-		<div class="graph-container">
+		<div class={ui.GraphContainer}>
 			@GraphView(*data)
 		</div>
 	</div>
@@ -20,27 +21,27 @@ templ GraphContent(data *GraphViewData) {
 
 // GraphView renders the graph visualization.
 templ GraphView(data GraphViewData) {
-	<div id="graph-container" class="graph-view">
-		<div class="graph-view__canvas">
+	<div id="graph-container" class={ui.GraphView}>
+		<div class={ui.GraphViewCanvas}>
 			@SVGGraph(data)
 		</div>
-		<div class="graph-view__legend">
-			<div class="graph-legend">
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--view"></span>
+		<div class={ui.GraphViewLegend}>
+			<div class={ui.GraphLegend}>
+				<div class={ui.GraphLegendItem}>
+					<span class={ui.GraphLegendColor, ui.GraphLegendColorView}></span>
 					<span>View</span>
 				</div>
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--table"></span>
+				<div class={ui.GraphLegendItem}>
+					<span class={ui.GraphLegendColor, ui.GraphLegendColorTable}></span>
 					<span>Table</span>
 				</div>
-				<div class="graph-legend__item">
-					<span class="graph-legend__color graph-legend__color--incremental"></span>
+				<div class={ui.GraphLegendItem}>
+					<span class={ui.GraphLegendColor, ui.GraphLegendColorIncremental}></span>
 					<span>Incremental</span>
 				</div>
 			</div>
 		</div>
-		<div class="graph-view__stats">
+		<div class={ui.GraphViewStats}>
 			{ common.Itoa(len(data.Nodes)) } models, { common.Itoa(len(data.Edges)) } dependencies
 		</div>
 	</div>
@@ -53,28 +54,28 @@ templ SVGGraph(data GraphViewData) {
 		edgesJSON, _ := json.Marshal(data.Edges)
 	}}
 	<div
-		class="graph-svg-container"
+		class={ui.GraphSvgContainer}
 		data-graph-nodes={ string(nodesJSON) }
 		data-graph-edges={ string(edgesJSON) }
 	>
 		if len(data.Nodes) == 0 {
-			<div class="graph-empty">
+			<div class={ui.GraphEmpty}>
 				<p>No models found</p>
-				<p class="text-muted">Run discovery to populate the graph</p>
+				<p class={ui.TextMuted}>Run discovery to populate the graph</p>
 			</div>
 		} else {
-			<div class="graph-nodes">
+			<div class={ui.GraphNodes}>
 				for _, node := range data.Nodes {
-					<div class={ "graph-node", nodeClass(node.Type) } data-node-id={ node.ID }>
-						<span class="graph-node__label">{ node.Label }</span>
-						<span class="graph-node__type">{ node.Type }</span>
+					<div class={ ui.GraphNode, nodeClass(node.Type) } data-node-id={ node.ID }>
+						<span class={ui.GraphNodeLabel}>{ node.Label }</span>
+						<span class={ui.GraphNodeType}>{ node.Type }</span>
 					</div>
 				}
 			</div>
 			if len(data.Edges) > 0 {
-				<div class="graph-edges-info">
-					<p class="text-muted">Dependencies:</p>
-					<ul class="graph-edges-list">
+				<div class={ui.GraphEdgesInfo}>
+					<p class={ui.TextMuted}>Dependencies:</p>
+					<ul class={ui.GraphEdgesList}>
 						for _, edge := range data.Edges {
 							<li>{ extractName(edge.Source) } -> { extractName(edge.Target) }</li>
 						}

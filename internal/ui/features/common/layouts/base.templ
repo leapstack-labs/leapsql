@@ -1,5 +1,7 @@
 package layouts
 
+import ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+
 templ Base(title string, isDev bool) {
 	<!DOCTYPE html>
 	<html
@@ -35,7 +37,7 @@ templ Base(title string, isDev bool) {
 			<script defer type="module" src="/static/js/sql-editor.js"></script>
 		</head>
 		<body
-			class="ui-body"
+			class={ui.UiBody}
 			data-on:keydown__window="if ((evt.metaKey || evt.ctrlKey) && evt.key === 'b') { evt.preventDefault(); $sidePanelOpen = !$sidePanelOpen; localStorage.setItem('sidePanelOpen', $sidePanelOpen) }"
 		>
 			if isDev {

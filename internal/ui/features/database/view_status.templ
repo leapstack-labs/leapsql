@@ -1,21 +1,24 @@
 package database
 
-import "github.com/starfederation/datastar-go/datastar"
+import (
+	"github.com/starfederation/datastar-go/datastar"
+	ui "github.com/leapstack-labs/leapsql/internal/ui/cssgen"
+)
 
 templ DatabaseStatus(status ConnectionStatus) {
-	<div id="db-status" class="db-status">
+	<div id="db-status" class={ui.DbStatus}>
 		if status.Connected {
-			<span class="db-status__indicator db-status__indicator--connected"></span>
-			<span class="db-status__text">{ status.DialectName }</span>
+			<span class={ui.DbStatusIndicator, ui.DbStatusIndicatorConnected}></span>
+			<span class={ui.DbStatusText}>{ status.DialectName }</span>
 		} else {
-			<span class="db-status__indicator db-status__indicator--disconnected"></span>
-			<span class="db-status__text">{ status.Message }</span>
+			<span class={ui.DbStatusIndicator, ui.DbStatusIndicatorDisconnected}></span>
+			<span class={ui.DbStatusText}>{ status.Message }</span>
 		}
 	</div>
 }
 
 templ DatabaseTree() {
-	<div id="database-tree" class="db-tree" data-init={ datastar.GetSSE("/api/database/schemas") }>
-		<p class="text-muted">Loading schemas...</p>
+	<div id="database-tree" class={ui.DbTree} data-init={ datastar.GetSSE("/api/database/schemas") }>
+		<p class={ui.TextMuted}>Loading schemas...</p>
 	</div>
 }
