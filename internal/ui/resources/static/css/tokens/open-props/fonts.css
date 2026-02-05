@@ -1,0 +1,65 @@
+/**
+ * Fonts Tokens
+ * Source: Open Props (https://open-props.style)
+ * Generated: 2026-02-05 19:31:44
+ *
+ * DO NOT EDIT - Regenerate with: npx basetoken
+ */
+:root {
+  --op-font-system-ui: system-ui, sans-serif;
+  --op-font-transitional: Charter, Bitstream Charter, Sitka Text, Cambria, serif;
+  --op-font-old-style: Iowan Old Style, Palatino Linotype, URW Palladio L, P052, serif;
+  --op-font-humanist: Seravek, Gill Sans Nova, Ubuntu, Calibri, DejaVu Sans, source-sans-pro, sans-serif;
+  --op-font-geometric-humanist: Avenir, Montserrat, Corbel, URW Gothic, source-sans-pro, sans-serif;
+  --op-font-classical-humanist: Optima, Candara, Noto Sans, source-sans-pro, sans-serif;
+  --op-font-neo-grotesque: Inter, Roboto, Helvetica Neue, Arial Nova, Nimbus Sans, Arial, sans-serif;
+  --op-font-monospace-slab-serif: Nimbus Mono PS, Courier New, monospace;
+  --op-font-monospace-code: Dank Mono,Operator Mono, Inconsolata, Fira Mono, ui-monospace, SF Mono, Monaco, Droid Sans Mono, Source Code Pro, Cascadia Code, Menlo, Consolas, DejaVu Sans Mono, monospace;
+  --op-font-industrial: Bahnschrift, DIN Alternate, Franklin Gothic Medium, Nimbus Sans Narrow, sans-serif-condensed, sans-serif;
+  --op-font-rounded-sans: ui-rounded, Hiragino Maru Gothic ProN, Quicksand, Comfortaa, Manjari, Arial Rounded MT, Arial Rounded MT Bold, Calibri, source-sans-pro, sans-serif;
+  --op-font-slab-serif: Rockwell, Rockwell Nova, Roboto Slab, DejaVu Serif, Sitka Small, serif;
+  --op-font-antique: Superclarendon, Bookman Old Style, URW Bookman, URW Bookman L, Georgia Pro, Georgia, serif;
+  --op-font-didone: Didot, Bodoni MT, Noto Serif Display, URW Palladio L, P052, Sylfaen, serif;
+  --op-font-handwritten: Segoe Print, Bradley Hand, Chilanka, TSCu_Comic, casual, cursive;
+  --op-font-sans: var(--font-system-ui);
+  --op-font-serif: ui-serif, serif;
+  --op-font-mono: var(--font-monospace-code);
+  --op-font-weight-1: 100;
+  --op-font-weight-2: 200;
+  --op-font-weight-3: 300;
+  --op-font-weight-4: 400;
+  --op-font-weight-5: 500;
+  --op-font-weight-6: 600;
+  --op-font-weight-7: 700;
+  --op-font-weight-8: 800;
+  --op-font-weight-9: 900;
+  --op-font-lineheight-00: .95;
+  --op-font-lineheight-0: 1.1;
+  --op-font-lineheight-1: 1.25;
+  --op-font-lineheight-2: 1.375;
+  --op-font-lineheight-3: 1.5;
+  --op-font-lineheight-4: 1.75;
+  --op-font-lineheight-5: 2;
+  --op-font-letterspacing-0: -.05em;
+  --op-font-letterspacing-1: .025em;
+  --op-font-letterspacing-2: .050em;
+  --op-font-letterspacing-3: .075em;
+  --op-font-letterspacing-4: .150em;
+  --op-font-letterspacing-5: .500em;
+  --op-font-letterspacing-6: .750em;
+  --op-font-letterspacing-7: 1em;
+  --op-font-size-00: .5rem;
+  --op-font-size-0: .75rem;
+  --op-font-size-1: 1rem;
+  --op-font-size-2: 1.1rem;
+  --op-font-size-3: 1.25rem;
+  --op-font-size-4: 1.5rem;
+  --op-font-size-5: 2rem;
+  --op-font-size-6: 2.5rem;
+  --op-font-size-7: 3rem;
+  --op-font-size-8: 3.5rem;
+  --op-font-size-fluid-0: clamp(.75rem, 2vw, 1rem);
+  --op-font-size-fluid-1: clamp(1rem, 4vw, 1.5rem);
+  --op-font-size-fluid-2: clamp(1.5rem, 6vw, 2.5rem);
+  --op-font-size-fluid-3: clamp(2rem, 9vw, 3.5rem);
+}

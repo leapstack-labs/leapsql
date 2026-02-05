@@ -1,0 +1,19 @@
+/**
+ * App-Specific Tokens
+ *
+ * This file is NOT generated. Add custom tokens here.
+ * These tokens are specific to your application.
+ */
+
+:root {
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --header-height: 56px;
+
+  /* Container Widths */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+}

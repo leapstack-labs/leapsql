@@ -1,0 +1,29 @@
+/**
+ * Tokens Layer - Main Entry Point
+ * Generated: 2026-02-05 19:31:44
+ *
+ * Prefix Legend:
+ *   --md-palette-* = Material Design palettes (raw color steps)
+ *   --op-*      = Open Props primitives (raw values)
+ *   --ui-*        = Application tokens (USE THESE!)
+ * 
+ * Tier 1: Warehouses (Primitives)
+ * Tier 2: Showroom (Semantic)
+ * Tier 3: App-Specific (manual)
+ *
+ * DO NOT EDIT - Regenerate with: npx basetoken
+ */
+
+/* === Tier 1: Warehouses (Primitives) === */
+@import "./material/palettes.css";
+@import "./open-props/borders.css";
+@import "./open-props/easings.css";
+@import "./open-props/fonts.css";
+@import "./open-props/shadows.css";
+@import "./open-props/sizes.css";
+
+/* === Tier 2: Showroom (Semantic) === */
+@import "./semantic.css";
+
+/* === Tier 3: App-Specific === */
+@import "./app.css";

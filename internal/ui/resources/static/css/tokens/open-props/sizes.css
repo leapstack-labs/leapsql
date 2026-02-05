@@ -1,0 +1,83 @@
+/**
+ * Sizes Tokens
+ * Source: Open Props (https://open-props.style)
+ * Generated: 2026-02-05 19:31:44
+ *
+ * DO NOT EDIT - Regenerate with: npx basetoken
+ */
+:root {
+  --op-size-000: -.5rem;
+  --op-size-00: -.25rem;
+  --op-size-1: .25rem;
+  --op-size-2: .5rem;
+  --op-size-3: 1rem;
+  --op-size-4: 1.25rem;
+  --op-size-5: 1.5rem;
+  --op-size-6: 1.75rem;
+  --op-size-7: 2rem;
+  --op-size-8: 3rem;
+  --op-size-9: 4rem;
+  --op-size-10: 5rem;
+  --op-size-11: 7.5rem;
+  --op-size-12: 10rem;
+  --op-size-13: 15rem;
+  --op-size-14: 20rem;
+  --op-size-15: 30rem;
+  --op-size-px-000: -8px;
+  --op-size-px-00: -4px;
+  --op-size-px-1: 4px;
+  --op-size-px-2: 8px;
+  --op-size-px-3: 16px;
+  --op-size-px-4: 20px;
+  --op-size-px-5: 24px;
+  --op-size-px-6: 28px;
+  --op-size-px-7: 32px;
+  --op-size-px-8: 48px;
+  --op-size-px-9: 64px;
+  --op-size-px-10: 80px;
+  --op-size-px-11: 120px;
+  --op-size-px-12: 160px;
+  --op-size-px-13: 240px;
+  --op-size-px-14: 320px;
+  --op-size-px-15: 480px;
+  --op-size-fluid-1: clamp(.5rem, 1vw, 1rem);
+  --op-size-fluid-2: clamp(1rem, 2vw, 1.5rem);
+  --op-size-fluid-3: clamp(1.5rem, 3vw, 2rem);
+  --op-size-fluid-4: clamp(2rem, 4vw, 3rem);
+  --op-size-fluid-5: clamp(4rem, 5vw, 5rem);
+  --op-size-fluid-6: clamp(5rem, 7vw, 7.5rem);
+  --op-size-fluid-7: clamp(7.5rem, 10vw, 10rem);
+  --op-size-fluid-8: clamp(10rem, 20vw, 15rem);
+  --op-size-fluid-9: clamp(15rem, 30vw, 20rem);
+  --op-size-fluid-10: clamp(20rem, 40vw, 30rem);
+  --op-size-content-1: 20ch;
+  --op-size-content-2: 45ch;
+  --op-size-content-3: 60ch;
+  --op-size-header-1: 20ch;
+  --op-size-header-2: 25ch;
+  --op-size-header-3: 35ch;
+  --op-size-xxs: 240px;
+  --op-size-xs: 360px;
+  --op-size-sm: 480px;
+  --op-size-md: 768px;
+  --op-size-lg: 1024px;
+  --op-size-xl: 1440px;
+  --op-size-xxl: 1920px;
+  --op-size-relative-000: -.5ch;
+  --op-size-relative-00: -.25ch;
+  --op-size-relative-1: .25ch;
+  --op-size-relative-2: .5ch;
+  --op-size-relative-3: 1ch;
+  --op-size-relative-4: 1.25ch;
+  --op-size-relative-5: 1.5ch;
+  --op-size-relative-6: 1.75ch;
+  --op-size-relative-7: 2ch;
+  --op-size-relative-8: 3ch;
+  --op-size-relative-9: 4ch;
+  --op-size-relative-10: 5ch;
+  --op-size-relative-11: 7.5ch;
+  --op-size-relative-12: 10ch;
+  --op-size-relative-13: 15ch;
+  --op-size-relative-14: 20ch;
+  --op-size-relative-15: 30ch;
+}
