@@ -22,9 +22,10 @@
 }
 
 .model-detail__path {
-  font-size: var(--ui-type-size-sm);
+  font-size: var(--ui-type-size-xs);
   color: var(--ui-color-surface-variant-on);
   font-family: var(--ui-font-code);
+  opacity: 0.7;
 }
 
 .model-detail__description {
@@ -45,7 +46,7 @@
   padding: 2px var(--ui-space-sm);
   background: var(--ui-color-surface-variant);
   border: var(--ui-border-sm) solid var(--ui-color-outline);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
   font-size: var(--ui-type-size-sm);
   font-weight: var(--ui-weight-medium);
 }
@@ -67,12 +68,14 @@
   padding: 2px var(--ui-space-sm);
   background: var(--ui-color-primary-container);
   color: var(--ui-color-primary-container-on);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
   font-size: var(--ui-type-size-xs);
+  border: var(--ui-border-sm) solid var(--ui-color-primary-container-on);
+  opacity: 0.9;
 }
 
 .model-detail__sql {
-  margin-top: var(--ui-space-lg);
+  margin-top: var(--ui-space-xl);
 }
 
 .model-detail__sql-header {
@@ -88,16 +91,17 @@
 
 .model-detail__sql-code,
 .sql-code {
-  background: var(--ui-color-surface-container);
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
-  border-radius: var(--ui-radius-lg);
-  padding: var(--ui-space-sm);
+  background: var(--ui-color-surface-container-lowest);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-space-lg);
   overflow-x: auto;
   font-family: var(--ui-font-code);
   font-size: var(--ui-type-size-sm);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .model-detail__sql-code code,

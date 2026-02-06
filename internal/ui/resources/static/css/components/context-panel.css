@@ -6,7 +6,7 @@
   color: var(--ui-color-surface-on);
   border-left: var(--ui-border-sm) solid var(--ui-color-outline);
   overflow-y: auto;
-  padding: var(--ui-space-md);
+  padding: var(--ui-space-lg);
 }
 
 .ui-context-panel__header {
@@ -21,7 +21,7 @@
 .model-context {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-sm);
+  gap: var(--ui-space-md);
 }
 
 .model-context__section {
@@ -75,7 +75,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--ui-space-xs) 0;
+  padding: var(--ui-space-sm) 0;
   font-size: var(--ui-type-size-sm);
   border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
 }
@@ -94,4 +94,12 @@
   background: var(--ui-color-surface-variant);
   border-radius: var(--ui-radius-xs);
   color: var(--ui-color-surface-variant-on);
+}
+
+/* Special styling for EXPR badges */
+.model-context__column-type[data-type="EXPR"],
+.model-context__column-type:is([title*="expression"], [title*="Expression"]) {
+  background: var(--ui-color-tertiary-container);
+  color: var(--ui-color-tertiary-container-on);
+  font-weight: var(--ui-weight-medium);
 }

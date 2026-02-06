@@ -103,6 +103,6 @@
 .tab-btn--active {
   color: var(--ui-color-surface-on);
   background: var(--ui-color-surface-bright);
-  border-color: var(--ui-color-primary);
-  font-weight: var(--ui-weight-medium);
+  border-bottom: var(--ui-border-lg) solid var(--ui-color-primary);
+  font-weight: var(--ui-weight-semibold);
 }

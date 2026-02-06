@@ -4,13 +4,14 @@
 .tree-item {
   display: flex;
   align-items: center;
-  padding: var(--ui-space-xs) var(--ui-space-sm);
+  padding: var(--ui-space-sm) var(--ui-space-md);
   gap: var(--ui-space-sm);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-md);
   cursor: pointer;
   font-size: var(--ui-type-size-sm);
   text-decoration: none;
   color: var(--ui-color-surface-on);
+  line-height: var(--ui-leading-relaxed);
 }
 
 .tree-item:hover {
@@ -22,7 +23,7 @@
   background: var(--ui-color-surface-bright);
   color: var(--ui-color-surface-on);
   border-left: var(--ui-border-lg) solid var(--ui-color-primary);
-  padding-left: calc(var(--ui-space-sm) - var(--ui-border-lg));
+  padding-left: calc(var(--ui-space-md) - var(--ui-border-lg));
   font-weight: var(--ui-weight-medium);
 }
 
