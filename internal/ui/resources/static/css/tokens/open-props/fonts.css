@@ -6,7 +6,7 @@
  * DO NOT EDIT - Regenerate with: npx basetoken
  */
 :root {
-  --op-font-system-ui: system-ui, sans-serif;
+  --op-font-system-ui: Geist, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --op-font-transitional: Charter, Bitstream Charter, Sitka Text, Cambria, serif;
   --op-font-old-style: Iowan Old Style, Palatino Linotype, URW Palladio L, P052, serif;
   --op-font-humanist: Seravek, Gill Sans Nova, Ubuntu, Calibri, DejaVu Sans, source-sans-pro, sans-serif;
@@ -14,16 +14,16 @@
   --op-font-classical-humanist: Optima, Candara, Noto Sans, source-sans-pro, sans-serif;
   --op-font-neo-grotesque: Inter, Roboto, Helvetica Neue, Arial Nova, Nimbus Sans, Arial, sans-serif;
   --op-font-monospace-slab-serif: Nimbus Mono PS, Courier New, monospace;
-  --op-font-monospace-code: Dank Mono,Operator Mono, Inconsolata, Fira Mono, ui-monospace, SF Mono, Monaco, Droid Sans Mono, Source Code Pro, Cascadia Code, Menlo, Consolas, DejaVu Sans Mono, monospace;
+  --op-font-monospace-code: "Geist Mono", Dank Mono, Operator Mono, Inconsolata, Fira Mono, ui-monospace, SF Mono, Monaco, Droid Sans Mono, Source Code Pro, Cascadia Code, Menlo, Consolas, DejaVu Sans Mono, monospace;
   --op-font-industrial: Bahnschrift, DIN Alternate, Franklin Gothic Medium, Nimbus Sans Narrow, sans-serif-condensed, sans-serif;
   --op-font-rounded-sans: ui-rounded, Hiragino Maru Gothic ProN, Quicksand, Comfortaa, Manjari, Arial Rounded MT, Arial Rounded MT Bold, Calibri, source-sans-pro, sans-serif;
   --op-font-slab-serif: Rockwell, Rockwell Nova, Roboto Slab, DejaVu Serif, Sitka Small, serif;
   --op-font-antique: Superclarendon, Bookman Old Style, URW Bookman, URW Bookman L, Georgia Pro, Georgia, serif;
   --op-font-didone: Didot, Bodoni MT, Noto Serif Display, URW Palladio L, P052, Sylfaen, serif;
   --op-font-handwritten: Segoe Print, Bradley Hand, Chilanka, TSCu_Comic, casual, cursive;
-  --op-font-sans: var(--font-system-ui);
+  --op-font-sans: var(--op-font-system-ui);
   --op-font-serif: ui-serif, serif;
-  --op-font-mono: var(--font-monospace-code);
+  --op-font-mono: var(--op-font-monospace-code);
   --op-font-weight-1: 100;
   --op-font-weight-2: 200;
   --op-font-weight-3: 300;

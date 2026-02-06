@@ -69,7 +69,6 @@
   color: var(--ui-color-primary-container-on);
   border-radius: var(--ui-radius-sm);
   font-size: var(--ui-type-size-xs);
-  color: var(--ui-color-primary-on);
 }
 
 .model-detail__sql {
