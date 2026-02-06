@@ -3,8 +3,9 @@
 .ui-activity-bar {
   width: var(--activity-bar-width);
   min-width: var(--activity-bar-width);
-  background: var(--ui-color-surface-container);
-  border-right: var(--ui-border-sm) solid var(--ui-color-outline);
+  background: var(--ui-color-surface-container-highest);
+  color: var(--ui-color-surface-on);
+  border-right: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   display: flex;
   flex-direction: column;
   padding: var(--ui-space-sm) 0;
@@ -20,7 +21,7 @@
 }
 
 .activity-bar__group:not(:last-child) {
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   padding-bottom: var(--ui-space-sm);
   margin-bottom: var(--ui-space-xs);
 }
@@ -47,13 +48,13 @@
 
 .activity-bar__item:hover {
   color: var(--ui-color-surface-on);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 /* Active state for panel toggles */
 .activity-bar__item.active {
   color: var(--ui-color-surface-on);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-bright);
 }
 
 .activity-bar__item.active::before {

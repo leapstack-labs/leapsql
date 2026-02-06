@@ -4,16 +4,17 @@
   padding: var(--ui-space-xs) var(--ui-space-md);
   border-radius: var(--ui-radius-md);
   border: var(--ui-border-sm) solid var(--ui-color-outline);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   color: var(--ui-color-surface-on);
   font-size: var(--ui-type-size-sm);
+  font-weight: var(--ui-weight-medium);
   cursor: pointer;
   transition: all var(--ui-duration-fast) var(--ui-ease-default);
 }
 
 .btn:hover {
-  background: var(--ui-color-surface-container);
-  border-color: var(--ui-color-surface-variant-on);
+  background: var(--ui-color-surface-variant);
+  border-color: var(--ui-color-primary);
 }
 
 .btn--primary {
@@ -23,17 +24,20 @@
 }
 
 .btn--primary:hover {
-  background: var(--ui-color-tertiary);
+  background: var(--ui-color-primary-container);
+  color: var(--ui-color-primary-container-on);
+  border-color: var(--ui-color-primary);
 }
 
 .btn--secondary {
-  background: var(--ui-color-surface-container);
+  background: var(--ui-color-surface-container-high);
   border-color: var(--ui-color-outline);
   color: var(--ui-color-surface-on);
 }
 
 .btn--secondary:hover {
   background: var(--ui-color-surface-variant);
+  border-color: var(--ui-color-primary);
 }
 
 .btn--sm {
@@ -41,12 +45,42 @@
   font-size: var(--ui-type-size-xs);
 }
 
+/* Tertiary Button - Ghost/Minimal Style */
+.btn--tertiary {
+  background: transparent;
+  border-color: var(--ui-color-outline-variant);
+  color: var(--ui-color-primary);
+}
+
+.btn--tertiary:hover {
+  background: var(--ui-color-primary-container);
+  border-color: var(--ui-color-primary);
+  color: var(--ui-color-primary-container-on);
+}
+
+/* Disabled State */
+.btn:disabled,
+.btn[disabled] {
+  background: var(--ui-color-surface-dim);
+  color: var(--ui-color-surface-variant-on);
+  border-color: var(--ui-color-outline-variant);
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Focus State */
+.btn:focus-visible {
+  outline: var(--ui-border-md) solid var(--ui-color-primary);
+  outline-offset: 2px;
+}
+
 /* Tab Buttons */
 .model-detail__tabs {
   display: flex;
   gap: var(--ui-space-xs);
   margin-bottom: var(--ui-space-sm);
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   padding-bottom: var(--ui-space-sm);
 }
 
@@ -63,11 +97,12 @@
 
 .tab-btn:hover {
   color: var(--ui-color-surface-on);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .tab-btn--active {
   color: var(--ui-color-surface-on);
-  background: var(--ui-color-surface-container);
-  border-color: var(--ui-color-outline);
+  background: var(--ui-color-surface-bright);
+  border-color: var(--ui-color-primary);
+  font-weight: var(--ui-weight-medium);
 }

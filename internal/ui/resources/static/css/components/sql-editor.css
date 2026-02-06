@@ -31,7 +31,7 @@ sql-editor {
 }
 
 .sql-editor__container .cm-scroller::-webkit-scrollbar-track {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-low);
 }
 
 .sql-editor__container .cm-scroller::-webkit-scrollbar-thumb {

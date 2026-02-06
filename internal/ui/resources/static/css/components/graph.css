@@ -43,15 +43,15 @@
 
 .graph-view__legend {
   padding: var(--ui-space-md) var(--ui-space-sm);
-  border-top: var(--ui-border-sm) solid var(--ui-color-outline);
-  background: var(--ui-color-surface-variant);
+  border-top: var(--ui-border-sm) solid var(--ui-color-outline-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .graph-view__stats {
   padding: var(--ui-space-sm) var(--ui-space-sm);
   font-size: var(--ui-type-size-sm);
   color: var(--ui-color-surface-variant-on);
-  border-top: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-top: var(--ui-border-sm) solid var(--ui-color-outline-variant);
 }
 
 .graph-legend {
@@ -81,7 +81,7 @@
 }
 
 .graph-legend__color--incremental {
-  background: var(--chart-4, oklch(0.692 0.2041 42.4293));
+  background: var(--ui-color-secondary);
 }
 
 /* Graph Nodes */
@@ -103,8 +103,8 @@
 
 .graph-node {
   padding: var(--ui-space-md);
-  background: var(--ui-color-surface-variant);
-  border: 2px solid var(--ui-color-outline);
+  background: var(--ui-color-surface-container);
+  border: 2px solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-lg);
   cursor: pointer;
   transition: all var(--ui-duration-fast) var(--ui-ease-default);
@@ -114,7 +114,8 @@
 }
 
 .graph-node:hover {
-  border-color: var(--ui-color-surface-variant-on);
+  background: var(--ui-color-surface-container-high);
+  border-color: var(--ui-color-primary);
   transform: translateY(-2px);
 }
 
@@ -140,7 +141,7 @@
 }
 
 .graph-node--incremental {
-  border-left-color: var(--chart-4, oklch(0.692 0.2041 42.4293));
+  border-left-color: var(--ui-color-secondary);
   border-left-width: var(--ui-space-xs);
 }
 
@@ -153,7 +154,7 @@
 .graph-edges-info {
   margin-top: var(--ui-space-lg);
   padding-top: var(--ui-space-sm);
-  border-top: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-top: var(--ui-border-sm) solid var(--ui-color-outline-variant);
 }
 
 .graph-edges-list {
@@ -169,7 +170,7 @@
   font-size: var(--ui-type-size-sm);
   font-family: var(--ui-font-code);
   padding: var(--ui-space-xs) var(--ui-space-sm);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-color-surface-variant-on);
+  color: var(--ui-color-surface-on);
 }

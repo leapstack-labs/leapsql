@@ -3,22 +3,62 @@
 input[type="text"],
 input[type="search"],
 input[type="email"],
-input[type="password"] {
+input[type="password"],
+textarea,
+select {
   padding: var(--ui-space-sm) var(--ui-space-md);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container);
   border: var(--ui-border-sm) solid var(--ui-color-outline);
   border-radius: var(--ui-radius-md);
   color: var(--ui-color-surface-on);
   font-size: var(--ui-type-size-sm);
   font-family: var(--ui-font-body);
+  transition: all var(--ui-duration-fast) var(--ui-ease-default);
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--ui-color-surface-variant-on);
 }
 
-input:focus {
-  outline: none;
+input:focus,
+textarea:focus,
+select:focus {
+  outline: var(--ui-border-md) solid var(--ui-color-primary);
+  outline-offset: 2px;
   border-color: var(--ui-color-primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ui-color-primary) 20%, transparent);
+}
+
+/* Disabled State */
+input:disabled,
+textarea:disabled,
+select:disabled,
+input[disabled],
+textarea[disabled],
+select[disabled] {
+  background: var(--ui-color-surface-dim);
+  color: var(--ui-color-surface-variant-on);
+  border-color: var(--ui-color-outline-variant);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Error State */
+input.error,
+textarea.error,
+select.error {
+  border-color: var(--ui-color-error);
+}
+
+input.error:focus,
+textarea.error:focus,
+select.error:focus {
+  outline-color: var(--ui-color-error);
+}
+
+/* Read-only State */
+input:read-only,
+textarea:read-only {
+  background: var(--ui-color-surface-container-low);
+  cursor: default;
 }

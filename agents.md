@@ -4,6 +4,8 @@ Instructions for AI agents working on this codebase.
 
 IMPORTANT: Product has not been, relesed so we do not need Backward Compatibility.
 
+REMINDER: You have an LSP tool which is great!
+
 ## Test Strategy
 
 Use progressive disclosure when running tests - start with minimal output and drill down only when needed.

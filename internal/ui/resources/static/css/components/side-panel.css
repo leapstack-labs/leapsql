@@ -3,8 +3,8 @@
 .ui-side-panel {
   width: var(--side-panel-width);
   min-width: var(--side-panel-width);
-  background: var(--ui-color-background);
-  border-right: var(--ui-border-sm) solid var(--ui-color-outline);
+  background: var(--ui-color-surface-container-low);
+  border-right: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -30,8 +30,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--ui-space-sm) var(--ui-space-md);
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
-  background: var(--ui-color-surface-container);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
+  background: var(--ui-color-surface-container-low);
 }
 
 .side-panel__title {

@@ -3,7 +3,7 @@
 /* Data Preview */
 .data-preview {
   background: var(--ui-color-surface-container);
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-lg);
   overflow: hidden;
 }
@@ -13,7 +13,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--ui-space-md) var(--ui-space-sm);
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   background: var(--ui-color-surface-variant);
 }
 
@@ -46,7 +46,7 @@
 .data-preview__table td {
   padding: var(--ui-space-sm) var(--ui-space-md);
   text-align: left;
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   white-space: nowrap;
 }
 

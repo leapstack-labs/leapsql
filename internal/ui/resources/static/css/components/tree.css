@@ -14,13 +14,21 @@
 }
 
 .tree-item:hover {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .tree-item--selected,
 .tree-item--active {
-  background: var(--ui-color-primary);
-  color: var(--ui-color-primary-on);
+  background: var(--ui-color-surface-bright);
+  color: var(--ui-color-surface-on);
+  border-left: var(--ui-border-lg) solid var(--ui-color-primary);
+  padding-left: calc(var(--ui-space-sm) - var(--ui-border-lg));
+  font-weight: var(--ui-weight-medium);
+}
+
+.tree-item:focus-visible {
+  outline: var(--ui-border-md) solid var(--ui-color-primary);
+  outline-offset: -2px;
 }
 
 .tree-item__icon {
@@ -60,7 +68,7 @@
 
 .tree-folder__children {
   margin-left: var(--ui-space-sm);
-  border-left: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-left: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   padding-left: var(--ui-space-xs);
 }
 

@@ -9,12 +9,20 @@
 
 .stat-card {
   padding: var(--ui-space-sm);
-  background: var(--ui-color-surface-container);
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  background: var(--ui-color-surface-container-high);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-lg);
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-xs);
+  transition: all var(--ui-duration-fast) var(--ui-ease-default);
+}
+
+.stat-card:hover {
+  background: var(--ui-color-surface-bright);
+  border-color: var(--ui-color-outline);
+  transform: translateY(-1px);
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .stat-value {

@@ -2,7 +2,8 @@
 
 .ui-context-panel {
   width: var(--context-panel-width);
-  background: var(--ui-color-surface-container);
+  background: var(--ui-color-surface-container-highest);
+  color: var(--ui-color-surface-on);
   border-left: var(--ui-border-sm) solid var(--ui-color-outline);
   overflow-y: auto;
   padding: var(--ui-space-md);

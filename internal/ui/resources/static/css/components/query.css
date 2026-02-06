@@ -94,7 +94,7 @@
     margin-left: var(--spacing-xs);
     padding: 2px 6px;
     font-size: var(--ui-type-size-xs);
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
     border-radius: var(--ui-radius-sm);
     font-family: var(--ui-font-code);
     opacity: 0.7;
@@ -121,7 +121,7 @@
 }
 
 .query-results__truncated {
-    color: var(--warning);
+    color: var(--ui-color-error);
     margin-left: var(--spacing-xs);
 }
 
@@ -134,10 +134,10 @@
     align-items: flex-start;
     gap: var(--spacing-sm);
     padding: var(--spacing-md);
-    background: color-mix(in oklch, var(--ui-color-error) 10%, transparent);
+    background: var(--ui-color-error-container);
     border: var(--ui-border-sm) solid var(--ui-color-error);
     border-radius: var(--ui-radius-md);
-    color: var(--ui-color-error);
+    color: var(--ui-color-error-container-on);
 }
 
 .query-results__error-icon {
@@ -177,7 +177,7 @@
 .query-results__table td {
     padding: var(--spacing-xs) var(--spacing-sm);
     text-align: left;
-    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
     white-space: nowrap;
     max-width: 300px;
     overflow: hidden;
@@ -185,7 +185,7 @@
 }
 
 .query-results__table th {
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
     font-weight: var(--ui-weight-semibold);
     position: sticky;
     top: 0;
@@ -193,7 +193,7 @@
 }
 
 .query-results__table tbody tr:hover {
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
 }
 
 .query-results__table td {
@@ -202,8 +202,8 @@
 
 /* Sidebar */
 .query-page__sidebar {
-    border-left: 1px solid var(--ui-color-outline);
-    background: var(--ui-color-surface-container);
+    border-left: 1px solid var(--ui-color-outline-variant);
+    background: var(--ui-color-surface-container-low);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -256,7 +256,7 @@
 }
 
 .query-sidebar__item:hover {
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
 }
 
 .query-sidebar__icon {
@@ -267,17 +267,17 @@
     justify-content: center;
     font-size: var(--ui-type-size-xs);
     font-weight: bold;
-    color: var(--ui-color-surface-variant-on);
-    background: var(--ui-color-surface-variant);
+    color: var(--ui-color-surface-on);
+    background: var(--ui-color-surface-container-high);
     border-radius: var(--ui-radius-sm);
     flex-shrink: 0;
 }
 
 /* Schema Panel */
 .query-sidebar__schema {
-    border-top: var(--ui-border-sm) solid var(--ui-color-outline);
+    border-top: var(--ui-border-sm) solid var(--ui-color-outline-variant);
     padding: var(--spacing-md);
-    background: var(--ui-color-background);
+    background: var(--ui-color-surface-container-low);
     max-height: 300px;
     overflow-y: auto;
 }
@@ -292,9 +292,9 @@
 .schema-panel__type {
     font-size: var(--ui-type-size-xs);
     text-transform: uppercase;
-    color: var(--ui-color-surface-variant-on);
+    color: var(--ui-color-surface-on);
     padding: 2px 6px;
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
     border-radius: var(--ui-radius-sm);
 }
 
@@ -316,7 +316,7 @@
     align-items: center;
     padding: var(--spacing-xs) 0;
     font-size: var(--ui-type-size-sm);
-    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
 }
 
 .schema-panel__column:last-child {
@@ -358,12 +358,12 @@
 
 .query-search-results__item {
     padding: var(--spacing-sm);
-    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+    border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
     cursor: pointer;
 }
 
 .query-search-results__item:hover {
-    background: var(--ui-color-surface-variant);
+    background: var(--ui-color-surface-container-high);
 }
 
 .query-search-results__name {

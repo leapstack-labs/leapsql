@@ -5,6 +5,7 @@
 }
 
 .model-detail--empty {
+  background: var(--ui-color-surface-dim);
   text-align: center;
   padding: var(--ui-space-xl);
   color: var(--ui-color-surface-variant-on);
@@ -64,7 +65,8 @@
 
 .model-detail__tag {
   padding: 2px var(--ui-space-sm);
-  background: var(--ui-color-primary);
+  background: var(--ui-color-primary-container);
+  color: var(--ui-color-primary-container-on);
   border-radius: var(--ui-radius-sm);
   font-size: var(--ui-type-size-xs);
   color: var(--ui-color-primary-on);
@@ -120,7 +122,8 @@
 
 .error-message {
   padding: var(--ui-space-md) var(--ui-space-sm);
-  background: var(--ui-color-error);
+  background: var(--ui-color-error-container);
+  color: var(--ui-color-error-container-on);
   color: var(--ui-color-error-on);
   border-radius: var(--ui-radius-md);
   font-size: var(--ui-type-size-sm);

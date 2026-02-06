@@ -64,7 +64,7 @@
 }
 
 .macro-namespace__header:hover {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .macro-namespace__icon {
@@ -111,7 +111,7 @@
 }
 
 .macro-function:hover {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .macro-function--selected {
@@ -147,7 +147,7 @@
   font-size: var(--ui-type-size-lg);
   font-weight: var(--ui-weight-medium);
   font-family: var(--ui-font-code);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   padding: var(--ui-space-sm) var(--ui-space-sm);
   border-radius: var(--ui-radius-md);
   display: inline-block;
@@ -187,7 +187,7 @@
 
 .macro-detail__args code {
   font-family: var(--ui-font-code);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   padding: 2px 6px;
   border-radius: var(--ui-radius-sm);
 }
@@ -204,7 +204,7 @@
 
 .macro-detail__source {
   background: var(--ui-color-surface-container);
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-lg);
   padding: var(--ui-space-sm);
   overflow-x: auto;

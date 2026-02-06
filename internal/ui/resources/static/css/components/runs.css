@@ -75,14 +75,14 @@
   font-weight: var(--ui-weight-semibold);
   text-transform: uppercase;
   color: var(--ui-color-surface-variant-on);
-  background: var(--ui-color-surface-container);
+  background: var(--ui-color-surface-container-high);
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
 .runs-table tbody tr:hover {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 /* Run Row States */
@@ -105,22 +105,22 @@
 }
 
 .run-status--completed {
-  background: color-mix(in oklch, var(--ui-color-tertiary) 15%, transparent);
-  color: var(--ui-color-tertiary);
+  background: var(--ui-color-tertiary-container);
+  color: var(--ui-color-tertiary-container-on);
 }
 
 .run-status--running {
-  background: color-mix(in oklch, var(--ui-color-primary) 15%, transparent);
-  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-container);
+  color: var(--ui-color-primary-container-on);
 }
 
 .run-status--failed {
-  background: color-mix(in oklch, var(--ui-color-error) 15%, transparent);
-  color: var(--ui-color-error);
+  background: var(--ui-color-error-container);
+  color: var(--ui-color-error-container-on);
 }
 
 .run-status--cancelled {
-  background: color-mix(in oklch, var(--ui-color-surface-variant-on) 15%, transparent);
+  background: var(--ui-color-surface-variant);
   color: var(--ui-color-surface-variant-on);
 }
 
@@ -243,28 +243,28 @@
 }
 
 .model-run-status--success {
-  background: color-mix(in oklch, var(--ui-color-tertiary) 15%, transparent);
-  color: var(--ui-color-tertiary);
+  background: var(--ui-color-tertiary-container);
+  color: var(--ui-color-tertiary-container-on);
 }
 
 .model-run-status--running {
-  background: color-mix(in oklch, var(--ui-color-primary) 15%, transparent);
-  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-container);
+  color: var(--ui-color-primary-container-on);
 }
 
 .model-run-status--failed {
-  background: color-mix(in oklch, var(--ui-color-error) 15%, transparent);
-  color: var(--ui-color-error);
+  background: var(--ui-color-error-container);
+  color: var(--ui-color-error-container-on);
 }
 
 .model-run-status--skipped {
-  background: color-mix(in oklch, var(--ui-color-surface-variant-on) 15%, transparent);
+  background: var(--ui-color-surface-variant);
   color: var(--ui-color-surface-variant-on);
 }
 
 .model-run-status--pending {
-  background: color-mix(in oklch, var(--chart-4, oklch(0.692 0.2041 42.4293)) 15%, transparent);
-  color: var(--chart-4, oklch(0.692 0.2041 42.4293));
+  background: var(--ui-color-secondary-container);
+  color: var(--ui-color-secondary-container-on);
 }
 
 .model-run-name {
@@ -286,18 +286,27 @@
    GitHub Actions-Style Run Components
    ============================================ */
 
-/* Status Colors */
+/* Status Colors - Using Semantic Tokens */
 :root {
+  /* Success → Tertiary (green/teal) */
   --status-success: var(--ui-color-tertiary);
-  --status-success-bg: color-mix(in oklch, var(--status-success) 10%, transparent);
+  --status-success-bg: var(--ui-color-tertiary-container);
+  
+  /* Failed → Error (red) */
   --status-failed: var(--ui-color-error);
-  --status-failed-bg: color-mix(in oklch, var(--status-failed) 10%, transparent);
+  --status-failed-bg: var(--ui-color-error-container);
+  
+  /* Running → Primary (blue/purple) */
   --status-running: var(--ui-color-primary);
-  --status-running-bg: color-mix(in oklch, var(--status-running) 10%, transparent);
+  --status-running-bg: var(--ui-color-primary-container);
+  
+  /* Pending → Secondary (muted blue/gray) */
+  --status-pending: var(--ui-color-secondary);
+  --status-pending-bg: var(--ui-color-secondary-container);
+  
+  /* Skipped → Surface variant (neutral) */
   --status-skipped: var(--ui-color-surface-variant-on);
-  --status-skipped-bg: color-mix(in oklch, var(--status-skipped) 10%, transparent);
-  --status-pending: var(--chart-4, oklch(0.7 0.15 60));
-  --status-pending-bg: color-mix(in oklch, var(--status-pending) 10%, transparent);
+  --status-skipped-bg: var(--ui-color-surface-variant);
 }
 
 /* Run Page Layout (updated for split view) */
@@ -318,9 +327,9 @@
 
 .runs-list-container {
   overflow-y: auto;
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-lg);
-  background: var(--ui-color-surface-container);
+  background: var(--ui-color-surface-container-low);
 }
 
 .runs-detail-container {
@@ -357,7 +366,7 @@
 }
 
 .run-list-card:hover {
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
 }
 
 .run-list-card:focus {
@@ -366,8 +375,8 @@
 }
 
 .run-list-card--selected {
-  background: color-mix(in oklch, var(--ui-color-primary) 8%, transparent);
-  border-left: 3px solid var(--ui-color-primary);
+  background: var(--ui-color-primary-container);
+  border-left: var(--ui-border-lg) solid var(--ui-color-primary);
   padding-left: 13px;
 }
 
@@ -418,8 +427,8 @@
   font-size: var(--ui-type-size-xs);
   padding: 1px 6px;
   border-radius: var(--ui-space-xs);
-  background: var(--ui-color-surface-variant);
-  color: var(--ui-color-surface-variant-on);
+  background: var(--ui-color-surface-container-high);
+  color: var(--ui-color-surface-on);
 }
 
 .run-list-card__meta {
@@ -609,7 +618,7 @@
 .run-detail-header__progress {
   margin-top: var(--ui-space-md);
   height: var(--ui-space-xs);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -641,7 +650,7 @@
   flex-wrap: wrap;
   gap: var(--ui-space-sm);
   padding: var(--ui-space-md) var(--ui-space-sm);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   border-radius: var(--ui-radius-md);
   font-size: var(--ui-type-size-sm);
 }
@@ -680,7 +689,7 @@
 }
 
 .tier-group {
-  border: var(--ui-border-sm) solid var(--ui-color-outline);
+  border: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   border-radius: var(--ui-radius-md);
   overflow: hidden;
 }
@@ -694,7 +703,7 @@
   align-items: center;
   gap: var(--ui-space-sm);
   padding: 10px var(--ui-space-md);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -758,7 +767,7 @@
   align-items: center;
   gap: var(--ui-space-sm);
   padding: var(--ui-space-sm) var(--ui-space-md);
-  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline);
+  border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   font-size: var(--ui-type-size-sm);
 }
 
@@ -793,7 +802,7 @@
   top: -8px;
   bottom: -8px;
   width: 1px;
-  background: var(--ui-color-outline);
+  background: var(--ui-color-outline-variant);
   transform: translateX(-50%);
 }
 
@@ -832,7 +841,7 @@
 .model-run-card__duration-bar {
   flex: 1;
   height: var(--ui-space-xs);
-  background: var(--ui-color-surface-variant);
+  background: var(--ui-color-surface-container-high);
   border-radius: 2px;
   overflow: hidden;
 }
