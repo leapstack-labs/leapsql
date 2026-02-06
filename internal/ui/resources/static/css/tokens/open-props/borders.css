@@ -13,8 +13,8 @@
   --op-border-size-5: 25px;
   --op-radius-1: 2px;
   --op-radius-2: 5px;
-  --op-radius-3: 1rem;
-  --op-radius-4: 2rem;
+  --op-radius-3: 0.5rem;
+  --op-radius-4: 0.75rem;
   --op-radius-5: 4rem;
   --op-radius-6: 8rem;
   --op-radius-drawn-1: 255px 15px 225px 15px / 15px 225px 15px 255px;

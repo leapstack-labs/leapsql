@@ -5,17 +5,21 @@
   height: var(--header-height);
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 0 var(--ui-space-sm);
   background: var(--ui-color-surface-container-highest);
   color: var(--ui-color-surface-on);
   border-bottom: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   gap: var(--ui-space-sm);
+  position: relative;
 }
 
 .ui-header__logo {
   font-weight: var(--ui-weight-semibold);
   font-size: var(--ui-type-size-md);
   color: var(--ui-color-primary);
+  position: absolute;
+  left: var(--ui-space-sm);
 }
 
 .ui-header__logo a {
@@ -24,13 +28,13 @@
 }
 
 .ui-header__search {
-  flex: 1;
-  max-width: 400px;
+  max-width: 500px;
+  width: 100%;
 }
 
 .ui-header__search input {
   width: 100%;
-  padding: var(--ui-space-xs) var(--ui-space-md);
+  padding: 6px var(--ui-space-md);
   background: var(--ui-color-surface-container-high);
   border: var(--ui-border-sm) solid var(--ui-color-outline);
   border-radius: var(--ui-radius-md);
@@ -51,7 +55,8 @@
   display: flex;
   align-items: center;
   gap: var(--ui-space-sm);
-  margin-left: auto;
+  position: absolute;
+  right: var(--ui-space-sm);
 }
 
 /* Theme Controls */

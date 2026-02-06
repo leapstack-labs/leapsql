@@ -12,9 +12,13 @@
   height: 100%;
 }
 
+#app {
+  height: 100vh;
+}
+
 .ui-main {
   display: flex;
-  flex: 1;
+  height: calc(100vh - var(--header-height));
   overflow: hidden;
   /* Children: activity-bar | side-panel | content | context-panel */
 }
@@ -23,9 +27,11 @@
   flex: 1;
   overflow: auto;
   padding: var(--ui-space-lg);
+  padding-bottom: calc(var(--log-drawer-height) + var(--ui-space-lg));
   min-width: 0; /* Prevent flex overflow */
 }
 
 .ui-content--full {
   padding: var(--ui-space-sm);
+  padding-bottom: calc(var(--log-drawer-height) + var(--ui-space-sm));
 }

@@ -1,16 +1,25 @@
 /* css/components/log-drawer.css - Bottom Log Panel */
 
 .ui-log-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   height: var(--log-drawer-height);
   background: var(--ui-color-surface-container-highest);
   color: var(--ui-color-surface-on);
   border-top: var(--ui-border-sm) solid var(--ui-color-outline-variant);
   display: flex;
   flex-direction: column;
+  z-index: var(--ui-layer-raised);
 }
 
 .ui-log-drawer--collapsed {
-  height: 32px;
+  height: auto;
+}
+
+.ui-log-drawer--collapsed .ui-log-drawer__content {
+  display: none;
 }
 
 .ui-log-drawer__header {
@@ -23,6 +32,7 @@
   color: var(--ui-color-surface-variant-on);
   font-size: var(--ui-type-size-sm);
   font-weight: var(--ui-weight-medium);
+  flex-shrink: 0;
 }
 
 .ui-log-drawer__content {
