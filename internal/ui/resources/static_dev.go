@@ -30,9 +30,8 @@ func Handler() http.Handler {
 	slog.Info("static assets served from filesystem", "path", staticDir)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Disable caching in dev so changes apply immediately
-		// w.Header().Set("Cache-Control", "no-store")
-		// Strip the prefix and serve from the absolute computed path
+		// Allow browser caching with validation (Last-Modified/If-Modified-Since)
+		// Use Cmd+Shift+R to force refresh when needed
 		http.StripPrefix("/static/", http.FileServer(http.FS(os.DirFS(staticDir)))).ServeHTTP(w, r)
 	})
 }

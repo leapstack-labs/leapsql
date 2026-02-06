@@ -15,7 +15,13 @@ var staticFS embed.FS
 // In production mode, files are embedded in the binary.
 func Handler() http.Handler {
 	fsys, _ := fs.Sub(staticFS, "static")
-	return http.StripPrefix("/static/", http.FileServer(http.FS(fsys)))
+	fileServer := http.FileServer(http.FS(fsys))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Cache embedded static assets for 1 year (they never change in prod)
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		http.StripPrefix("/static/", fileServer).ServeHTTP(w, r)
+	})
 }
 
 // StaticPath returns the URL path for a static asset.
